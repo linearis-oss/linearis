@@ -906,6 +906,7 @@ export class GraphQLIssuesService {
         : (issue.updatedAt
           ? new Date(issue.updatedAt).toISOString()
           : new Date().toISOString()),
+      branchName: issue.branchName || undefined,
     };
   }
 }

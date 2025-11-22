@@ -20,6 +20,7 @@ export const ISSUE_CORE_FIELDS = `
   estimate
   createdAt
   updatedAt
+  branchName
 `;
 
 /**
