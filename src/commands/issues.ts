@@ -120,6 +120,7 @@ export function setupIssuesCommands(program: Command): void {
     .description("Create new issue.")
     .option("-d, --description <desc>", "issue description")
     .option("-a, --assignee <assigneeId>", "assign to user ID")
+    .option("--self-assigned", "assign issue to current user (cannot be used with --assignee)")
     .option("-p, --priority <priority>", "priority level (1-4)")
     .option("--project <project>", "add to project (name or ID)")
     .option(
@@ -140,6 +141,13 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (title: string, options: any, command: Command) => {
+          // Check for mutually exclusive assignee flags
+          if (options.assignee && options.selfAssigned) {
+            throw new Error(
+              "Cannot use --assignee and --self-assigned together",
+            );
+          }
+
           const [graphQLService, linearService] = await Promise.all([
             createGraphQLService(command.parent!.parent!.opts()),
             createLinearService(command.parent!.parent!.opts()),
@@ -148,6 +156,17 @@ export function setupIssuesCommands(program: Command): void {
             graphQLService,
             linearService,
           );
+
+          // Get assignee ID - either from --assignee or from current user
+          let assigneeId = options.assignee;
+          if (options.selfAssigned) {
+            const viewerQuery = `query GetViewer { viewer { id } }`;
+            const viewerResult = await graphQLService.rawRequest(viewerQuery);
+            if (!viewerResult.viewer) {
+              throw new Error("Failed to get current user information");
+            }
+            assigneeId = viewerResult.viewer.id;
+          }
 
           // Prepare labels array if provided
           let labelIds: string[] | undefined;
@@ -159,7 +178,7 @@ export function setupIssuesCommands(program: Command): void {
             title,
             teamId: options.team, // GraphQL service handles team resolution
             description: options.description,
-            assigneeId: options.assignee,
+            assigneeId,
             priority: options.priority ? parseInt(options.priority) : undefined,
             projectId: options.project, // GraphQL service handles project resolution
             statusId: options.status,

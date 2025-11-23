@@ -26,6 +26,7 @@ import { setupProjectMilestonesCommands } from "./commands/project-milestones.js
 import { setupTeamsCommands } from "./commands/teams.js";
 import { setupUsersCommands } from "./commands/users.js";
 import { setupDocumentsCommands } from "./commands/documents.js";
+import { setupWhoamiCommand } from "./commands/whoami.js";
 import { outputUsageInfo } from "./utils/usage.js";
 
 // Setup main program
@@ -51,6 +52,7 @@ setupEmbedsCommands(program);
 setupTeamsCommands(program);
 setupUsersCommands(program);
 setupDocumentsCommands(program);
+setupWhoamiCommand(program);
 
 // Add usage command
 program.command("usage")
