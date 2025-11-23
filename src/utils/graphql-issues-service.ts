@@ -90,7 +90,7 @@ export class GraphQLIssuesService {
 
     // Add state filter based on --in-progress flag
     if (inProgress) {
-      filter.state = { type: { eq: "started" } };
+      filter.state = { name: { eq: "In Progress" } };
     } else {
       // Default: exclude completed issues
       filter.state = { type: { neq: "completed" } };
