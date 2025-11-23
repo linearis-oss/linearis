@@ -32,7 +32,7 @@ export function setupIssuesCommands(program: Command): void {
   /**
    * List issues
    *
-   * Command: `linearis issues list [--limit <number>]`
+   * Command: `linearis issues list [--limit <number>] [--assigned] [--in-progress]`
    *
    * Lists issues with all relationships in a single optimized GraphQL query.
    * Includes comments, assignees, projects, labels, and state information.
@@ -40,6 +40,8 @@ export function setupIssuesCommands(program: Command): void {
   issues.command("list")
     .description("List issues.")
     .option("-l, --limit <number>", "limit results", "25")
+    .option("--assigned", "filter by issues assigned to current user")
+    .option("--in-progress", "filter by issues in progress state")
     .action(
       handleAsyncCommand(
         async (options: any, command: Command) => {
@@ -54,7 +56,11 @@ export function setupIssuesCommands(program: Command): void {
           );
 
           // Fetch issues with optimized single query
-          const result = await issuesService.getIssues(parseInt(options.limit));
+          const result = await issuesService.getIssues({
+            limit: parseInt(options.limit),
+            assignedToMe: options.assigned,
+            inProgress: options.inProgress,
+          });
           outputSuccess(result);
         },
       ),

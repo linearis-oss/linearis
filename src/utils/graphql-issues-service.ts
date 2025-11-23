@@ -29,20 +29,81 @@ import {
  * GraphQL-optimized issues service for single API call operations
  */
 export class GraphQLIssuesService {
+  private currentUser?: { id: string; name: string; email: string };
+
   constructor(
     private graphQLService: GraphQLService,
     private linearService: LinearService,
   ) {}
 
   /**
+   * Get current authenticated user
+   * Cached after first call to avoid redundant API requests
+   */
+  private async getCurrentUser(): Promise<{
+    id: string;
+    name: string;
+    email: string;
+  }> {
+    if (this.currentUser) {
+      return this.currentUser;
+    }
+
+    const result = await this.graphQLService.rawRequest(
+      `query GetViewer { viewer { id name email } }`,
+    );
+
+    if (!result.viewer) {
+      throw new Error("Failed to get current user information");
+    }
+
+    this.currentUser = {
+      id: result.viewer.id,
+      name: result.viewer.name,
+      email: result.viewer.email,
+    };
+
+    return this.currentUser;
+  }
+
+  /**
    * Get issues list with all relationships in single query
    * Reduces from 1 + (5 × N issues) API calls to 1 API call
    */
-  async getIssues(limit: number = 25): Promise<LinearIssue[]> {
-    const result = await this.graphQLService.rawRequest(GET_ISSUES_QUERY, {
-      first: limit,
-      orderBy: "updatedAt" as any,
-    });
+  async getIssues(options?: {
+    limit?: number;
+    assignedToMe?: boolean;
+    inProgress?: boolean;
+  }): Promise<LinearIssue[]> {
+    const limit = options?.limit ?? 25;
+    const assignedToMe = options?.assignedToMe ?? false;
+    const inProgress = options?.inProgress ?? false;
+
+    // Build filter
+    const filter: any = {};
+
+    // Add assignee filter if --assigned flag is set
+    if (assignedToMe) {
+      const viewer = await this.getCurrentUser();
+      filter.assignee = { id: { eq: viewer.id } };
+    }
+
+    // Add state filter based on --in-progress flag
+    if (inProgress) {
+      filter.state = { type: { eq: "started" } };
+    } else {
+      // Default: exclude completed issues
+      filter.state = { type: { neq: "completed" } };
+    }
+
+    const result = await this.graphQLService.rawRequest(
+      FILTERED_SEARCH_ISSUES_QUERY,
+      {
+        first: limit,
+        orderBy: "updatedAt" as any,
+        filter,
+      },
+    );
 
     if (!result.issues?.nodes) {
       return [];
