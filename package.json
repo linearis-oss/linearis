@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/main.js",
-    "postinstall": "npm run build",
+    "prepare": "npm run build",
     "clean": "rm -rf dist/",
     "start": "tsx src/main.ts",
     "test": "vitest run",
