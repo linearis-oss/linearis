@@ -3,6 +3,8 @@ import { createGraphQLService } from "../utils/graphql-service.js";
 import { GraphQLIssuesService } from "../utils/graphql-issues-service.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { getApiToken } from "../utils/auth.js";
+import { FileService } from "../utils/file-service.js";
 
 /**
  * Setup issues commands on the program
@@ -277,6 +279,16 @@ export function setupIssuesCommands(program: Command): void {
       "set cycle (can use name or ID, will try to resolve within team context first)",
     )
     .option("--clear-cycle", "clear existing cycle assignment")
+    .optionsGroup("File attachment options:")
+    .option(
+      "--attach-file <paths...>",
+      "attach files to issue (can specify multiple files)"
+    )
+    .optionsGroup("Document linking options:")
+    .option(
+      "--attach-document <documentId>",
+      "link document to issue (creates issue relation)"
+    )
     .action(
       handleAsyncCommand(
         async (issueId: string, options: any, command: Command) => {
@@ -338,6 +350,75 @@ export function setupIssuesCommands(program: Command): void {
             graphQLService,
             linearService,
           );
+
+          // Handle file attachments if --attach-file is provided
+          if (options.attachFile && options.attachFile.length > 0) {
+            const apiToken = await getApiToken(command.parent!.parent!.opts());
+            const fileService = new FileService(apiToken);
+
+            // Upload files and create attachments
+            const uploadResults = await fileService.uploadAndAttachFiles(
+              issueId,
+              options.attachFile,
+              graphQLService,
+            );
+
+            // Report results
+            const successfulUploads = uploadResults.filter((r) => r.success && r.attachmentCreated);
+            const failedUploads = uploadResults.filter((r) => !r.success || !r.attachmentCreated);
+
+            if (successfulUploads.length > 0) {
+              console.log(
+                `Successfully attached ${successfulUploads.length} file(s) to issue ${issueId}:`,
+              );
+              for (const upload of successfulUploads) {
+                console.log(`  - ${upload.filename}`);
+              }
+            }
+
+            if (failedUploads.length > 0) {
+              console.error(`Failed to attach ${failedUploads.length} file(s):`);
+              for (const failed of failedUploads) {
+                console.error(`  - ${failed.filename}: ${failed.error}`);
+              }
+            }
+          }
+
+          // Handle document linking if --attach-document is provided
+          if (options.attachDocument) {
+            const client = linearService.getLinearClient();
+
+            try {
+              // Resolve issue ID to UUID (SDK needs actual UUID)
+              const resolvedIssueId = await linearService.resolveIssueId(issueId);
+
+              // Fetch the document to get its title and URL
+              const document = await client.document(options.attachDocument);
+
+              // Fetch current issue to get existing description
+              const issue = await client.issue(resolvedIssueId);
+              const currentDescription = issue.description || "";
+
+              // Append document link to issue description
+              const documentLink = `\n\n---\n**Related Document:** [${document.title}](${document.url})`;
+              const newDescription = currentDescription + documentLink;
+
+              // Update issue with new description
+              await client.updateIssue(resolvedIssueId, {
+                description: newDescription,
+              });
+
+              console.log(
+                `Successfully added document link to issue ${issueId}: ${document.url}`,
+              );
+            } catch (error) {
+              console.error(
+                `Failed to link document: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
+          }
 
           // Prepare update arguments for GraphQL service
           let labelIds: string[] | undefined;

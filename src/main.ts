@@ -17,6 +17,7 @@
 import { program } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { setupCommentsCommands } from "./commands/comments.js";
+import { setupDocumentsCommands } from "./commands/documents.js";
 import { setupEmbedsCommands } from "./commands/embeds.js";
 import { setupIssuesCommands } from "./commands/issues.js";
 import { setupLabelsCommands } from "./commands/labels.js";
@@ -25,7 +26,6 @@ import { setupCyclesCommands } from "./commands/cycles.js";
 import { setupProjectMilestonesCommands } from "./commands/project-milestones.js";
 import { setupTeamsCommands } from "./commands/teams.js";
 import { setupUsersCommands } from "./commands/users.js";
-import { setupDocumentsCommands } from "./commands/documents.js";
 import { setupWhoamiCommand } from "./commands/whoami.js";
 import { outputUsageInfo } from "./utils/usage.js";
 
@@ -44,6 +44,7 @@ program.action(() => {
 // Setup all subcommand groups
 setupIssuesCommands(program);
 setupCommentsCommands(program);
+setupDocumentsCommands(program);
 setupLabelsCommands(program);
 setupProjectsCommands(program);
 setupCyclesCommands(program);

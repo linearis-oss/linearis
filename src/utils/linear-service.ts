@@ -88,6 +88,15 @@ export class LinearService {
   }
 
   /**
+   * Get the underlying Linear client for SDK operations
+   *
+   * @returns LinearClient instance
+   */
+  getLinearClient(): LinearClient {
+    return this.client;
+  }
+
+  /**
    * Resolve issue identifier to UUID (lightweight version for ID-only resolution)
    *
    * @param issueId - Either a UUID string or TEAM-123 format identifier

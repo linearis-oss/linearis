@@ -371,6 +371,85 @@ export const BATCH_RESOLVE_FOR_CREATE_QUERY = `
     }
 
     # Resolve cycles by name (team-scoped lookup is preferred but we also provide global fallback)
-    
+
+  }
+`;
+
+/**
+ * File upload mutation to get signed upload URL
+ *
+ * Returns signed URL and headers for uploading file to Linear's cloud storage.
+ * This is step 1 of the three-step upload process.
+ *
+ * @see {@link https://linear.app/docs/graphql/mutations#fileUpload}
+ */
+export const FILE_UPLOAD_MUTATION = `
+  mutation FileUpload(
+    $contentType: String!
+    $filename: String!
+    $size: Int!
+    $makePublic: Boolean
+    $metaData: JSON
+  ) {
+    fileUpload(
+      contentType: $contentType
+      filename: $filename
+      size: $size
+      makePublic: $makePublic
+      metaData: $metaData
+    ) {
+      success
+      lastSyncId
+      uploadFile {
+        uploadUrl
+        assetUrl
+        headers {
+          key
+          value
+        }
+        contentType
+        filename
+        size
+      }
+    }
+  }
+`;
+
+/**
+ * Attachment creation mutation to attach uploaded files to issues
+ *
+ * Creates attachment metadata for an issue using the assetUrl from fileUpload.
+ * This is step 3 of the three-step upload process.
+ *
+ * @see {@link https://linear.app/docs/graphql/mutations#attachmentCreate}
+ */
+export const ATTACHMENT_CREATE_MUTATION = `
+  mutation AttachmentCreate(
+    $issueId: String!
+    $title: String!
+    $url: String!
+    $subtitle: String
+    $metadata: JSONObject
+  ) {
+    attachmentCreate(
+      input: {
+        issueId: $issueId
+        title: $title
+        url: $url
+        subtitle: $subtitle
+        metadata: $metadata
+      }
+    ) {
+      success
+      lastSyncId
+      attachment {
+        id
+        url
+        title
+        subtitle
+        metadata
+        createdAt
+      }
+    }
   }
 `;

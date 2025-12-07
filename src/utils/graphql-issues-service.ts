@@ -12,6 +12,7 @@ import {
   SEARCH_ISSUES_QUERY,
   UPDATE_ISSUE_MUTATION,
 } from "../queries/issues.js";
+import { GET_DOCUMENTS_FOR_ISSUE_QUERY } from "../queries/documents.js";
 import type {
   CreateIssueArgs,
   LinearIssue,
@@ -134,6 +135,7 @@ export class GraphQLIssuesService {
    */
   async getIssueById(issueId: string): Promise<LinearIssue> {
     let issueData;
+    let resolvedIssueId: string;
 
     if (isUuid(issueId)) {
       // Direct UUID lookup
@@ -148,6 +150,7 @@ export class GraphQLIssuesService {
         throw new Error(`Issue with ID "${issueId}" not found`);
       }
       issueData = result.issue;
+      resolvedIssueId = issueId;
     } else {
       // Parse identifier (ABC-123 format)
       const { teamKey, issueNumber } = parseIssueIdentifier(issueId);
@@ -164,10 +167,27 @@ export class GraphQLIssuesService {
         throw new Error(`Issue with identifier "${issueId}" not found`);
       }
       issueData = result.issues.nodes[0];
+      resolvedIssueId = issueData.id;
+    }
+
+    // Fetch documents for this issue
+    let documents: any[] = [];
+    try {
+      const documentsResult = await this.graphQLService.rawRequest(
+        GET_DOCUMENTS_FOR_ISSUE_QUERY,
+        {
+          issueId: resolvedIssueId,
+        },
+      );
+      documents = documentsResult.documents?.nodes || [];
+    } catch (error) {
+      // If documents query fails, continue without documents
+      // This allows graceful degradation if API doesn't support issue filtering
+      console.error("Failed to fetch documents for issue:", error);
     }
 
     // Transform GraphQL response to LinearIssue format
-    return this.transformIssueData(issueData);
+    return this.transformIssueData(issueData, documents);
   }
 
   /**
@@ -854,9 +874,9 @@ export class GraphQLIssuesService {
   /**
    * Transform GraphQL issue response to LinearIssue format
    */
-  private transformIssueData(issue: any): LinearIssue {
+  private transformIssueData(issue: any, documents: any[] = []): LinearIssue {
     try {
-      return this.doTransformIssueData(issue);
+      return this.doTransformIssueData(issue, documents);
     } catch (error: any) {
       // Diagnostic output: dump raw API response to help debug null field issues
       // See: https://github.com/czottmann/linearis/issues/6
@@ -877,14 +897,28 @@ export class GraphQLIssuesService {
   /**
    * Internal transform implementation
    */
-  private doTransformIssueData(issue: any): LinearIssue {
+  private doTransformIssueData(issue: any, documents: any[] = []): LinearIssue {
     return {
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
       description: issue.description || undefined,
-      branchName: issue.branchName || undefined,
       embeds: issue.description ? extractEmbeds(issue.description) : undefined,
+      documents: documents.length > 0 ? documents.map((doc: any) => ({
+        id: doc.id,
+        title: doc.title,
+        url: doc.url,
+        createdAt: doc.createdAt instanceof Date
+          ? doc.createdAt.toISOString()
+          : (doc.createdAt
+            ? new Date(doc.createdAt).toISOString()
+            : new Date().toISOString()),
+        updatedAt: doc.updatedAt instanceof Date
+          ? doc.updatedAt.toISOString()
+          : (doc.updatedAt
+            ? new Date(doc.updatedAt).toISOString()
+            : new Date().toISOString()),
+      })) : undefined,
       state: {
         id: issue.state.id,
         name: issue.state.name,

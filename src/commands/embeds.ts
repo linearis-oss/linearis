@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { getApiToken } from "../utils/auth.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
 import { FileService } from "../utils/file-service.js";
+import { createGraphQLService } from "../utils/graphql-service.js";
 
 /**
  * Setup embeds commands on the program
@@ -96,11 +97,13 @@ export function setupEmbedsCommands(program: Command): void {
       handleAsyncCommand(
         async (filePath: string, _options: any, command: Command) => {
           // Get API token from parent command options for authentication
-          const apiToken = await getApiToken(command.parent!.parent!.opts());
+          const rootOpts = command.parent!.parent!.opts();
+          const apiToken = await getApiToken(rootOpts);
 
-          // Create file service and initiate upload
+          // Create file service and graphQL service for upload
           const fileService = new FileService(apiToken);
-          const result = await fileService.uploadFile(filePath);
+          const graphQLService = await createGraphQLService(rootOpts);
+          const result = await fileService.uploadFile({ filePath }, graphQLService);
 
           if (result.success) {
             // Successful upload with asset URL
@@ -111,15 +114,10 @@ export function setupEmbedsCommands(program: Command): void {
               message: `File uploaded successfully: ${result.assetUrl}`,
             });
           } else {
-            // Include status code for debugging
-            const error: any = {
+            outputSuccess({
               success: false,
               error: result.error,
-            };
-            if (result.statusCode) {
-              error.statusCode = result.statusCode;
-            }
-            outputSuccess(error);
+            });
           }
         },
       ),

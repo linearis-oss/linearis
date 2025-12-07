@@ -9,6 +9,14 @@ export interface LinearIssue {
     url: string;
     expiresAt: string;
   }>;
+  attachments?: Attachment[];
+  documents?: Array<{
+    id: string;
+    title: string;
+    url: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   state: {
     id: string;
     name: string;
@@ -263,6 +271,76 @@ export interface MilestoneUpdateOptions {
   sortOrder?: string;
 }
 
+// File Upload Types
+
+export interface UploadFileHeader {
+  key: string;
+  value: string;
+}
+
+export interface UploadFile {
+  uploadUrl: string;
+  assetUrl: string;
+  headers: UploadFileHeader[];
+  contentType: string;
+  filename: string;
+  size: number;
+}
+
+export interface UploadPayload {
+  success: boolean;
+  lastSyncId: number;
+  uploadFile?: UploadFile;
+}
+
+export interface FileUploadOptions {
+  filePath: string;
+  makePublic?: boolean;
+  metaData?: Record<string, any>;
+}
+
+export interface FileUploadResult {
+  success: boolean;
+  assetUrl?: string;
+  filename: string;
+  size: number;
+  error?: string;
+}
+
+// Attachment Types
+
+export interface Attachment {
+  id: string;
+  url: string;
+  title: string;
+  subtitle?: string;
+  metadata: Record<string, any>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AttachmentCreateInput {
+  issueId: string;
+  url: string;
+  title: string;
+  subtitle?: string;
+  commentBody?: string;
+  iconUrl?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface AttachmentPayload {
+  success: boolean;
+  lastSyncId: number;
+  attachment?: Attachment;
+}
+
+export interface AttachmentCreateResult {
+  success: boolean;
+  attachmentId?: string;
+  error?: string;
+}
+
 // Document types
 export interface LinearDocument {
   id: string;
@@ -302,6 +380,19 @@ export interface DocumentUpdateInput {
   color?: string;
 }
 
+export interface CreateDocumentArgs {
+  title: string;
+  content: string;
+  projectId?: string;
+  teamId?: string;
+}
+
+export interface DocumentPayload {
+  success: boolean;
+  lastSyncId: number;
+  document?: LinearDocument;
+}
+
 // Attachment types (internal use for documents linking)
 export interface LinearAttachment {
   id: string;
@@ -319,13 +410,4 @@ export interface LinearAttachment {
     id: string;
     name: string;
   };
-}
-
-export interface AttachmentCreateInput {
-  issueId: string;
-  url: string;
-  title: string;
-  subtitle?: string;
-  commentBody?: string;
-  iconUrl?: string;
 }

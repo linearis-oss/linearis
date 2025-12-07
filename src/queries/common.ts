@@ -143,6 +143,24 @@ export const ISSUE_CHILDREN_FRAGMENT = `
 `;
 
 /**
+ * Issue attachments relationship
+ * Provides file attachments associated with the issue
+ */
+export const ISSUE_ATTACHMENTS_FRAGMENT = `
+  attachments(first: 50) {
+    nodes {
+      id
+      url
+      title
+      subtitle
+      metadata
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+/**
  * Complete issue fragment with all relationships
  *
  * Combines all issue fragments into a comprehensive field selection.
@@ -160,6 +178,7 @@ export const COMPLETE_ISSUE_FRAGMENT = `
   ${ISSUE_PROJECT_MILESTONE_FRAGMENT}
   ${ISSUE_PARENT_FRAGMENT}
   ${ISSUE_CHILDREN_FRAGMENT}
+  ${ISSUE_ATTACHMENTS_FRAGMENT}
 `;
 
 /**

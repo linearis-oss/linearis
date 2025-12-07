@@ -13,6 +13,15 @@
 import { access, mkdir, readFile, stat, writeFile } from "fs/promises";
 import { basename, dirname, extname } from "path";
 import { extractFilenameFromUrl, isLinearUploadUrl } from "./embed-parser.js";
+import { getMimeType } from "./mime-types.js";
+import { FILE_UPLOAD_MUTATION, ATTACHMENT_CREATE_MUTATION } from "../queries/issues.js";
+import type {
+  FileUploadOptions,
+  FileUploadResult,
+  AttachmentCreateResult,
+  UploadPayload,
+  AttachmentPayload,
+} from "./linear-types.js";
 
 /**
  * Maximum file size for uploads (20MB)
@@ -20,59 +29,6 @@ import { extractFilenameFromUrl, isLinearUploadUrl } from "./embed-parser.js";
  * See: https://linear.app/developers/graphql/fileupload
  */
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-
-/**
- * Common MIME types by file extension
- * Used for Content-Type header when uploading files
- */
-const MIME_TYPES: Record<string, string> = {
-  // Images
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-  // Documents
-  ".pdf": "application/pdf",
-  ".doc": "application/msword",
-  ".docx":
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ".xls": "application/vnd.ms-excel",
-  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ".ppt": "application/vnd.ms-powerpoint",
-  ".pptx":
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  // Text
-  ".txt": "text/plain",
-  ".csv": "text/csv",
-  ".json": "application/json",
-  ".xml": "application/xml",
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".ts": "application/typescript",
-  ".md": "text/markdown",
-  // Archives
-  ".zip": "application/zip",
-  ".tar": "application/x-tar",
-  ".gz": "application/gzip",
-  // Video/Audio
-  ".mp4": "video/mp4",
-  ".mp3": "audio/mpeg",
-  ".wav": "audio/wav",
-};
-
-/**
- * Get MIME type for a file based on extension
- * @param filePath - Path to file
- * @returns MIME type string, defaults to application/octet-stream
- */
-function getMimeType(filePath: string): string {
-  const ext = extname(filePath).toLowerCase();
-  return MIME_TYPES[ext] || "application/octet-stream";
-}
 
 export interface DownloadOptions {
   /** Custom output file path (defaults to filename from URL) */
@@ -234,12 +190,16 @@ export class FileService {
    * then PUTs the file content to that URL. Returns the asset URL for
    * use in markdown (comments, descriptions, etc.).
    *
-   * @param filePath - Path to the local file to upload
+   * @param options - Upload options including file path
+   * @param graphQLService - GraphQL service for executing mutation
    * @returns Upload result with success status, asset URL, or error details
    *
    * @example
    * ```typescript
-   * const result = await fileService.uploadFile("./screenshot.png");
+   * const result = await fileService.uploadFile(
+   *   { filePath: "./screenshot.png" },
+   *   graphQLService
+   * );
    *
    * if (result.success) {
    *   console.log(`Asset URL: ${result.assetUrl}`);
@@ -249,143 +209,101 @@ export class FileService {
    * }
    * ```
    */
-  async uploadFile(filePath: string): Promise<UploadResult> {
-    const filename = basename(filePath);
+  async uploadFile(
+    options: FileUploadOptions,
+    graphQLService: any, // GraphQLService - avoid circular dependency
+  ): Promise<FileUploadResult> {
+    const { filePath, makePublic = false, metaData } = options;
 
-    // Check if file exists
     try {
-      await access(filePath);
-    } catch {
-      return {
-        success: false,
-        error: `File not found: ${filePath}`,
-      };
-    }
-
-    // Get file size and validate
-    let fileSize: number;
-    try {
-      const fileStat = await stat(filePath);
-      fileSize = fileStat.size;
-    } catch (error) {
-      return {
-        success: false,
-        error: `Cannot read file: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      };
-    }
-
-    if (fileSize > MAX_FILE_SIZE) {
-      const maxMB = MAX_FILE_SIZE / (1024 * 1024);
-      const actualMB = fileSize / (1024 * 1024);
-      return {
-        success: false,
-        error: `File too large: ${
-          actualMB.toFixed(1)
-        }MB exceeds limit of ${maxMB}MB`,
-      };
-    }
-
-    const contentType = getMimeType(filePath);
-
-    // Step 1: Request upload URL via GraphQL fileUpload mutation
-    const query = `
-      mutation FileUpload($contentType: String!, $filename: String!, $size: Int!) {
-        fileUpload(contentType: $contentType, filename: $filename, size: $size) {
-          success
-          uploadFile {
-            uploadUrl
-            assetUrl
-            headers {
-              key
-              value
-            }
-          }
-        }
+      // Check file exists and get size
+      const stats = await stat(filePath);
+      if (!stats.isFile()) {
+        return {
+          success: false,
+          filename: basename(filePath),
+          size: 0,
+          error: `Path is not a file: ${filePath}`,
+        };
       }
-    `;
 
-    try {
-      // Make GraphQL request
-      const graphqlResponse = await fetch("https://api.linear.app/graphql", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: this.apiToken,
+      const fileSize = stats.size;
+      const filename = basename(filePath);
+      const contentType = getMimeType(filename);
+
+      if (fileSize > MAX_FILE_SIZE) {
+        const maxMB = MAX_FILE_SIZE / (1024 * 1024);
+        const actualMB = fileSize / (1024 * 1024);
+        return {
+          success: false,
+          filename,
+          size: fileSize,
+          error: `File too large: ${actualMB.toFixed(1)}MB exceeds limit of ${maxMB}MB`,
+        };
+      }
+
+      // Step 1: Get signed upload URL from Linear
+      const response: any = await graphQLService.rawRequest(
+        FILE_UPLOAD_MUTATION,
+        {
+          contentType,
+          filename,
+          size: fileSize,
+          makePublic,
+          metaData,
         },
-        body: JSON.stringify({
-          query,
-          variables: {
-            contentType,
+      );
+
+      // GraphQL response is nested under mutation name
+      const uploadPayload: UploadPayload = response.fileUpload;
+
+      if (!uploadPayload || !uploadPayload.uploadFile) {
+        return {
+          success: false,
+          filename,
+          size: fileSize,
+          error: "Failed to get upload URL from Linear API",
+        };
+      }
+
+      const { uploadUrl, assetUrl, headers } = uploadPayload.uploadFile;
+
+      // Step 2: Read file and upload to signed URL
+      const fileBuffer = await readFile(filePath);
+
+      // Follow Linear's official example exactly
+      // https://linear.app/developers/how-to-upload-a-file-to-linear
+      const uploadHeaders = new Headers();
+      uploadHeaders.set("Content-Type", contentType);
+      uploadHeaders.set("Cache-Control", "public, max-age=31536000");
+
+      // Add all headers from Linear's response
+      for (const header of headers) {
+        uploadHeaders.set(header.key, header.value);
+      }
+
+      try {
+        const uploadResponse = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: uploadHeaders,
+          body: fileBuffer,
+        });
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          return {
+            success: false,
             filename,
             size: fileSize,
-          },
-        }),
-      });
-
-      if (!graphqlResponse.ok) {
+            error: `Upload failed: HTTP ${uploadResponse.status} - ${errorText.substring(0, 200)}`,
+          };
+        }
+      } catch (error) {
         return {
           success: false,
-          error: `GraphQL request failed: HTTP ${graphqlResponse.status}`,
-          statusCode: graphqlResponse.status,
-        };
-      }
-
-      const data = await graphqlResponse.json();
-
-      // Check for GraphQL errors
-      if (data.errors) {
-        const errorMsg = data.errors[0]?.message || "GraphQL error";
-        return {
-          success: false,
-          error: `Failed to request upload URL: ${errorMsg}`,
-        };
-      }
-
-      const fileUpload = data.data?.fileUpload;
-      if (!fileUpload?.success) {
-        return {
-          success: false,
-          error: "Failed to request upload URL: success=false",
-        };
-      }
-
-      const uploadFile = fileUpload.uploadFile;
-      const uploadUrl = uploadFile?.uploadUrl;
-      const assetUrl = uploadFile?.assetUrl;
-      const headersList = uploadFile?.headers || [];
-
-      if (!uploadUrl || !assetUrl) {
-        return {
-          success: false,
-          error: "Missing uploadUrl or assetUrl in response",
-        };
-      }
-
-      // Step 2: PUT file content to pre-signed URL
-      const fileBuffer = await readFile(filePath);
-      // Convert Buffer to Uint8Array for fetch body compatibility
-      const fileContent = new Uint8Array(fileBuffer);
-
-      const putHeaders: Record<string, string> = {
-        "Content-Type": contentType,
-      };
-      for (const header of headersList) {
-        putHeaders[header.key] = header.value;
-      }
-
-      const putResponse = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: putHeaders,
-        body: fileContent,
-      });
-
-      if (!putResponse.ok) {
-        return {
-          success: false,
-          error: `File upload failed: HTTP ${putResponse.status}`,
-          statusCode: putResponse.status,
+          filename,
+          size: fileSize,
+          error: error instanceof Error ? error.message : String(error),
         };
       }
 
@@ -393,6 +311,86 @@ export class FileService {
         success: true,
         assetUrl,
         filename,
+        size: fileSize,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        filename: basename(filePath),
+        size: 0,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Creates an attachment on a Linear issue using an uploaded file's assetUrl.
+   *
+   * This is step 3 of the upload process - it creates the attachment metadata
+   * that links the uploaded file to an issue.
+   *
+   * @param issueId - Issue ID to attach the file to
+   * @param assetUrl - Asset URL returned from uploadFile()
+   * @param filename - Original filename for the attachment title
+   * @param graphQLService - GraphQL service for executing mutation
+   * @param fileSize - Optional file size for subtitle display
+   * @returns Attachment creation result
+   *
+   * @example
+   * ```typescript
+   * const result = await fileService.createAttachment(
+   *   "issue-uuid",
+   *   "https://uploads.linear.app/...",
+   *   "document.pdf",
+   *   graphQLService,
+   *   1024000
+   * );
+   * ```
+   */
+  async createAttachment(
+    issueId: string,
+    assetUrl: string,
+    filename: string,
+    graphQLService: any,
+    fileSize?: number,
+  ): Promise<AttachmentCreateResult> {
+    try {
+      // Format subtitle with file size if available
+      let subtitle: string | undefined;
+      if (fileSize) {
+        const sizeKB = fileSize / 1024;
+        const sizeMB = sizeKB / 1024;
+        if (sizeMB >= 1) {
+          subtitle = `${sizeMB.toFixed(2)} MB`;
+        } else {
+          subtitle = `${sizeKB.toFixed(2)} KB`;
+        }
+      }
+
+      const response: any = await graphQLService.rawRequest(
+        ATTACHMENT_CREATE_MUTATION,
+        {
+          issueId,
+          title: filename,
+          url: assetUrl,
+          subtitle,
+          metadata: { uploadedBy: "linearis-cli" },
+        },
+      );
+
+      // GraphQL response is nested under mutation name
+      const attachmentPayload: AttachmentPayload = response.attachmentCreate;
+
+      if (!attachmentPayload || !attachmentPayload.attachment) {
+        return {
+          success: false,
+          error: "Failed to create attachment on issue",
+        };
+      }
+
+      return {
+        success: true,
+        attachmentId: attachmentPayload.attachment.id,
       };
     } catch (error) {
       return {
@@ -400,5 +398,70 @@ export class FileService {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * Upload files and attach them to a Linear issue.
+   *
+   * Convenience method that combines file upload and attachment creation.
+   * Continues uploading even if some files fail.
+   *
+   * @param issueId - Issue ID to attach files to
+   * @param filePaths - Array of file paths to upload
+   * @param graphQLService - GraphQL service for executing mutations
+   * @returns Array of upload results (one per file)
+   *
+   * @example
+   * ```typescript
+   * const results = await fileService.uploadAndAttachFiles(
+   *   "issue-uuid",
+   *   ["./doc1.pdf", "./doc2.png"],
+   *   graphQLService
+   * );
+   *
+   * // Check for failures
+   * const failures = results.filter(r => !r.success);
+   * if (failures.length > 0) {
+   *   console.error(`${failures.length} files failed to upload`);
+   * }
+   * ```
+   */
+  async uploadAndAttachFiles(
+    issueId: string,
+    filePaths: string[],
+    graphQLService: any,
+  ): Promise<(FileUploadResult & { attachmentCreated?: boolean })[]> {
+    const results: (FileUploadResult & { attachmentCreated?: boolean })[] = [];
+
+    for (const filePath of filePaths) {
+      // Step 1 & 2: Upload file
+      const uploadResult = await this.uploadFile({ filePath }, graphQLService);
+
+      if (!uploadResult.success || !uploadResult.assetUrl) {
+        // Upload failed, add result and continue
+        results.push(uploadResult);
+        continue;
+      }
+
+      // Step 3: Create attachment
+      const attachmentResult = await this.createAttachment(
+        issueId,
+        uploadResult.assetUrl,
+        uploadResult.filename,
+        graphQLService,
+        uploadResult.size,
+      );
+
+      // Combine results
+      results.push({
+        ...uploadResult,
+        attachmentCreated: attachmentResult.success,
+        error: attachmentResult.success
+          ? uploadResult.error
+          : `File uploaded but attachment creation failed: ${attachmentResult.error}`,
+      });
+    }
+
+    return results;
   }
 }

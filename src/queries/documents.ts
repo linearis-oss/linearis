@@ -80,6 +80,26 @@ export const LIST_DOCUMENTS_QUERY = `
 `;
 
 /**
+ * Query to fetch documents for a specific issue
+ *
+ * This attempts to use issue filtering on documents query.
+ * The Linear API may support this even if TypeScript types don't reflect it.
+ */
+export const GET_DOCUMENTS_FOR_ISSUE_QUERY = `
+  query GetDocumentsForIssue($issueId: ID!) {
+    documents(
+      filter: {
+        issue: { id: { eq: $issueId } }
+      }
+    ) {
+      nodes {
+        ${DOCUMENT_FRAGMENT}
+      }
+    }
+  }
+`;
+
+/**
  * Delete (trash) a document
  *
  * Note: This is a soft delete - the document is moved to trash.
