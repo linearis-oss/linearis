@@ -268,6 +268,10 @@ export function setupIssuesCommands(program: Command): void {
       "set cycle (can use name or ID, will try to resolve within team context first)",
     )
     .option("--clear-cycle", "clear existing cycle assignment")
+    .option(
+      "--sort-order <number>",
+      "position relative to other issues (lower = higher in list)",
+    )
     .action(
       handleAsyncCommand(
         async (issueId: string, options: any, command: Command) => {
@@ -330,6 +334,17 @@ export function setupIssuesCommands(program: Command): void {
             linearService,
           );
 
+          // Validate sortOrder if provided
+          let sortOrder: number | undefined;
+          if (options.sortOrder !== undefined) {
+            sortOrder = parseFloat(options.sortOrder);
+            if (!Number.isFinite(sortOrder)) {
+              throw new Error(
+                `Invalid --sort-order value "${options.sortOrder}": must be a number`,
+              );
+            }
+          }
+
           // Prepare update arguments for GraphQL service
           let labelIds: string[] | undefined;
           if (options.clearLabels) {
@@ -355,6 +370,7 @@ export function setupIssuesCommands(program: Command): void {
             milestoneId: options.projectMilestone ||
               (options.clearProjectMilestone ? null : undefined),
             cycleId: options.cycle || (options.clearCycle ? null : undefined),
+            sortOrder,
           };
 
           const labelMode = options.labelBy || "adding";
