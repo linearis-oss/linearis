@@ -147,6 +147,17 @@ export function setupIssuesCommands(program: Command): void {
             linearService,
           );
 
+          // Validate sortOrder if provided
+          let sortOrder: number | undefined;
+          if (options.sortOrder !== undefined) {
+            sortOrder = parseFloat(options.sortOrder);
+            if (!Number.isFinite(sortOrder)) {
+              throw new Error(
+                `Invalid --sort-order value "${options.sortOrder}": must be a number`,
+              );
+            }
+          }
+
           // Prepare labels array if provided
           let labelIds: string[] | undefined;
           if (options.labels) {
@@ -165,9 +176,7 @@ export function setupIssuesCommands(program: Command): void {
             parentId: options.parentTicket, // GraphQL service handles parent resolution
             milestoneId: options.projectMilestone,
             cycleId: options.cycle,
-            sortOrder: options.sortOrder !== undefined
-              ? parseFloat(options.sortOrder)
-              : undefined,
+            sortOrder,
           };
 
           const result = await issuesService.createIssue(createArgs);
