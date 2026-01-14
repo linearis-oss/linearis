@@ -58,6 +58,7 @@ export class GraphQLProjectsService {
       teams: project.teams.nodes,
       lead: project.lead,
       targetDate: project.targetDate,
+      startDate: project.startDate,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     };

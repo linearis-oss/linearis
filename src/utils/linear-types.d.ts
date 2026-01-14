@@ -87,6 +87,7 @@ export interface LinearProject {
     name: string;
   };
   targetDate?: string;
+  startDate?: string;
   createdAt: string;
   updatedAt: string;
 }
