@@ -21,3 +21,6 @@ export * from "./documents.js";
 
 // Attachment queries and mutations
 export * from "./attachments.js";
+
+// Project queries and mutations
+export * from "./projects.js";
