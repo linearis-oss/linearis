@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [Unreleased]
+
+[Unreleased]: https://github.com/czottmann/linearis/compare/v2025.12.3...HEAD
+
+### Added
+
+- New `projects create` command to create Linear projects <!-- ENG-3224 -->
+  - Required `--team` flag (accepts team key, name, or UUID; comma-separated for multiple teams)
+  - Optional flags: `--description`, `--color`, `--icon`, `--lead`, `--target-date`, `--start-date`, `--state`
+  - Validates date format (YYYY-MM-DD) and state values before sending to API
+- New `--sort-order` flag for `issues create` and `issues update` commands <!-- ENG-3224 -->
+  - Allows controlling issue position relative to other issues (lower values = higher in list)
+  - Validates numeric input before sending to API
+
+### Fixed
+
+- `LinearProject` type now includes `startDate` field (was previously fetched but not exposed) <!-- ENG-3224 -->
+
+---
+
 ## [2025.12.3] - 2025-12-11
 
 [2025.12.3]: https://github.com/czottmann/linearis/compare/v2025.12.2...v2025.12.3
