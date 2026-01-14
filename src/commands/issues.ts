@@ -131,6 +131,10 @@ export function setupIssuesCommands(program: Command): void {
     )
     .option("--status <status>", "status name or ID")
     .option("--parent-ticket <parentId>", "parent issue ID or identifier")
+    .option(
+      "--sort-order <number>",
+      "position relative to other issues (lower = higher in list)",
+    )
     .action(
       handleAsyncCommand(
         async (title: string, options: any, command: Command) => {
@@ -161,6 +165,9 @@ export function setupIssuesCommands(program: Command): void {
             parentId: options.parentTicket, // GraphQL service handles parent resolution
             milestoneId: options.projectMilestone,
             cycleId: options.cycle,
+            sortOrder: options.sortOrder !== undefined
+              ? parseFloat(options.sortOrder)
+              : undefined,
           };
 
           const result = await issuesService.createIssue(createArgs);
