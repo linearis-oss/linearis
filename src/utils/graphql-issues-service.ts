@@ -385,6 +385,7 @@ export class GraphQLIssuesService {
     if (finalLabelIds !== undefined) {
       updateInput.labelIds = finalLabelIds;
     }
+    if (args.sortOrder !== undefined) updateInput.sortOrder = args.sortOrder;
 
     const updateResult = await this.graphQLService.rawRequest(
       UPDATE_ISSUE_MUTATION,
@@ -614,6 +615,7 @@ export class GraphQLIssuesService {
     if (finalParentId) createInput.parentId = finalParentId;
     if (finalMilestoneId) createInput.projectMilestoneId = finalMilestoneId;
     if (finalCycleId) createInput.cycleId = finalCycleId;
+    if (args.sortOrder !== undefined) createInput.sortOrder = args.sortOrder;
 
     const createResult = await this.graphQLService.rawRequest(
       CREATE_ISSUE_MUTATION,
