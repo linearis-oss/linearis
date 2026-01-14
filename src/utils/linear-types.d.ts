@@ -104,6 +104,7 @@ export interface CreateIssueArgs {
   parentId?: string;
   milestoneId?: string;
   cycleId?: string;
+  sortOrder?: number;
 }
 
 export interface UpdateIssueArgs {
@@ -119,6 +120,7 @@ export interface UpdateIssueArgs {
   parentId?: string;
   milestoneId?: string | null;
   cycleId?: string | null;
+  sortOrder?: number;
 }
 
 export interface SearchIssuesArgs {
