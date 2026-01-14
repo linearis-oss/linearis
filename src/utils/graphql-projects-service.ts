@@ -52,13 +52,13 @@ export class GraphQLProjectsService {
     return {
       id: project.id,
       name: project.name,
-      description: project.description,
+      description: project.description || undefined,
       state: project.state,
       progress: project.progress,
       teams: project.teams.nodes,
-      lead: project.lead,
-      targetDate: project.targetDate,
-      startDate: project.startDate,
+      lead: project.lead || undefined,
+      targetDate: project.targetDate || undefined,
+      startDate: project.startDate || undefined,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     };

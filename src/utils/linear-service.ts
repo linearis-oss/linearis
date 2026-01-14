@@ -220,6 +220,9 @@ export class LinearService {
       targetDate: project.targetDate
         ? new Date(project.targetDate).toISOString()
         : undefined,
+      startDate: project.startDate
+        ? new Date(project.startDate).toISOString()
+        : undefined,
       createdAt: project.createdAt
         ? new Date(project.createdAt).toISOString()
         : new Date().toISOString(),
