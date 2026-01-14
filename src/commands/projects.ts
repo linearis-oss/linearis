@@ -106,6 +106,25 @@ export function setupProjectsCommands(program: Command): void {
           );
         }
 
+        // Validate date format (YYYY-MM-DD)
+        const isValidDate = (dateStr: string): boolean => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+          const date = new Date(dateStr);
+          return !isNaN(date.getTime());
+        };
+
+        if (options.targetDate && !isValidDate(options.targetDate)) {
+          throw new Error(
+            `Invalid --target-date "${options.targetDate}". Must be YYYY-MM-DD format.`,
+          );
+        }
+
+        if (options.startDate && !isValidDate(options.startDate)) {
+          throw new Error(
+            `Invalid --start-date "${options.startDate}". Must be YYYY-MM-DD format.`,
+          );
+        }
+
         const createArgs = {
           name,
           teamIds,
