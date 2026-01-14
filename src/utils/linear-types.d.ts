@@ -132,6 +132,18 @@ export interface SearchIssuesArgs {
   limit?: number;
 }
 
+export interface ProjectCreateArgs {
+  name: string;
+  teamIds: string[]; // Required - at least one team
+  description?: string;
+  color?: string;
+  icon?: string;
+  leadId?: string;
+  targetDate?: string; // ISO date string
+  startDate?: string; // ISO date string
+  state?: string; // "planned" | "started" | "paused" | "completed" | "canceled"
+}
+
 export interface LinearLabel {
   id: string;
   name: string;
