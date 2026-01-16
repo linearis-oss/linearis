@@ -881,10 +881,12 @@ export class GraphQLIssuesService {
         id: comment.id,
         body: comment.body,
         embeds: extractEmbeds(comment.body),
-        user: {
-          id: comment.user.id,
-          name: comment.user.name,
-        },
+        user: comment.user
+          ? {
+              id: comment.user.id,
+              name: comment.user.name,
+            }
+          : undefined,
         createdAt: comment.createdAt instanceof Date
           ? comment.createdAt.toISOString()
           : (comment.createdAt
