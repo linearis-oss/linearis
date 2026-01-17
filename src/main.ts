@@ -14,22 +14,9 @@
  * - Complete API coverage with optimized queries
  */
 
-// Proxy support: Node.js native fetch doesn't respect HTTP_PROXY env vars.
-// This configures undici's global dispatcher to route through the proxy.
-import { ProxyAgent, setGlobalDispatcher } from "undici";
-const proxyUrl =
-  process.env.HTTPS_PROXY ||
-  process.env.HTTP_PROXY ||
-  process.env.https_proxy ||
-  process.env.http_proxy;
-if (proxyUrl) {
-  setGlobalDispatcher(
-    new ProxyAgent({
-      uri: proxyUrl,
-      proxyTls: { rejectUnauthorized: false },
-    })
-  );
-}
+// Initialize proxy support before any HTTP requests
+import { initializeProxy } from "./utils/proxy.js";
+initializeProxy();
 
 import { program } from "commander";
 import pkg from "../package.json" with { type: "json" };

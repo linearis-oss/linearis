@@ -240,6 +240,48 @@ linearis issues list
 1. Go to _Settings_ → _Security & Access_ → _Personal API keys_
 1. Create a new API key
 
+## Proxy Configuration
+
+Linearis automatically detects and uses HTTP proxy settings from standard environment variables. This is useful in corporate networks, Docker containers, or CI/CD environments that require proxy configuration.
+
+### Supported Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `HTTPS_PROXY` | Proxy URL for HTTPS requests (highest priority) |
+| `HTTP_PROXY` | Proxy URL for HTTP requests |
+| `https_proxy` | Lowercase alternative for HTTPS_PROXY |
+| `http_proxy` | Lowercase alternative for HTTP_PROXY |
+| `NO_PROXY` | Comma-separated list of hosts to bypass proxy |
+| `no_proxy` | Lowercase alternative for NO_PROXY |
+
+Priority order: `HTTPS_PROXY` > `HTTP_PROXY` > `https_proxy` > `http_proxy`
+
+### Usage Example
+
+```bash
+# Set proxy and use linearis normally
+export HTTPS_PROXY="http://proxy.example.com:8080"
+linearis issues list
+
+# With authentication
+export HTTPS_PROXY="http://user:password@proxy.example.com:8080"
+linearis issues list
+
+# Exclude certain hosts from proxy
+export NO_PROXY="localhost,127.0.0.1,.internal.company.com"
+```
+
+### Insecure Proxy Mode
+
+If your proxy uses a self-signed certificate or intercepts HTTPS traffic, you may need to disable TLS verification for the proxy connection:
+
+```bash
+export LINEARIS_PROXY_INSECURE=1
+```
+
+**Warning:** This disables TLS certificate verification for the connection between Linearis and the proxy. Only use this in trusted environments where you understand the security implications.
+
 ## Example rule for your LLM agent
 
 ```markdown
