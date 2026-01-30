@@ -252,6 +252,9 @@ export function setupIssuesCommands(program: Command): void {
       "set cycle (can use name or ID, will try to resolve within team context first)",
     )
     .option("--clear-cycle", "clear existing cycle assignment")
+    .optionsGroup("Estimate-related options:")
+    .option("--estimate <points>", "set point estimate")
+    .option("--clear-estimate", "clear existing point estimate")
     .action(
       handleAsyncCommand(
         async (issueId: string, options: any, command: Command) => {
@@ -273,6 +276,13 @@ export function setupIssuesCommands(program: Command): void {
           if (options.cycle && options.clearCycle) {
             throw new Error(
               "Cannot use --cycle and --clear-cycle together",
+            );
+          }
+
+          // Check for mutually exclusive estimate flags
+          if (options.estimate && options.clearEstimate) {
+            throw new Error(
+              "Cannot use --estimate and --clear-estimate together",
             );
           }
 
@@ -339,6 +349,9 @@ export function setupIssuesCommands(program: Command): void {
             milestoneId: options.projectMilestone ||
               (options.clearProjectMilestone ? null : undefined),
             cycleId: options.cycle || (options.clearCycle ? null : undefined),
+            estimate: options.estimate
+              ? parseInt(options.estimate)
+              : (options.clearEstimate ? null : undefined),
           };
 
           const labelMode = options.labelBy || "adding";

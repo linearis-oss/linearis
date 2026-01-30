@@ -115,7 +115,7 @@ export interface UpdateIssueArgs {
   assigneeId?: string;
   projectId?: string;
   labelIds?: string[];
-  estimate?: number;
+  estimate?: number | null;
   parentId?: string;
   milestoneId?: string | null;
   cycleId?: string | null;
