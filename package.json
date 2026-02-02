@@ -21,6 +21,10 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:commands": "tsx tests/command-coverage.ts",
+    "generate": "graphql-codegen --config codegen.config.ts",
+    "prestart": "npm run generate",
+    "predev": "npm run generate",
+    "postinstall": "npm run generate",
     "prepublishOnly": "npm run build && npm run test && test -x dist/main.js"
   },
   "engines": {
@@ -48,11 +52,19 @@
     "commander": "^14.0.0"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^6.1.1",
+    "@graphql-codegen/client-preset": "^5.2.2",
+    "@graphql-codegen/introspection": "5.0.0",
+    "@graphql-codegen/schema-ast": "^5.0.0",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^2.1.8",
     "@vitest/ui": "^2.1.8",
     "tsx": "^4.20.5",
     "typescript": "^5.0.0",
     "vitest": "^2.1.8"
+  },
+  "graphql": {
+    "schema": "https://api.linear.app/graphql",
+    "documents": "src/**/*.graphql"
   }
 }
