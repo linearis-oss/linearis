@@ -1,15 +1,31 @@
 import { LinearClient } from "@linear/sdk";
 import { CommandOptions, getApiToken } from "./auth.js";
-import {
-  CreateCommentArgs,
-  LinearComment,
-  LinearIssue,
-  LinearLabel,
-  LinearProject,
-} from "./linear-types.js";
 import { isUuid } from "./uuid.js";
 import { parseIssueIdentifier } from "./identifier-parser.js";
 import { multipleMatchesError, notFoundError } from "./error-messages.js";
+
+// Type aliases for linear-service return types
+type LinearLabel = {
+  id: string;
+  name: string;
+  color: string;
+  scope: "team" | "workspace";
+  team?: { id: string; name: string };
+  group?: { id: string; name: string };
+};
+
+type LinearComment = {
+  id: string;
+  body: string;
+  user: { id: string; name: string };
+  createdAt: string;
+  updatedAt: string;
+};
+
+type CreateCommentArgs = {
+  issueId: string;
+  body: string;
+};
 
 // Default pagination limit for Linear SDK queries to avoid complexity errors
 const DEFAULT_CYCLE_PAGINATION_LIMIT = 250;
@@ -181,7 +197,20 @@ export class LinearService {
   /**
    * Get all projects
    */
-  async getProjects(): Promise<LinearProject[]> {
+  async getProjects(): Promise<
+    {
+      id: string;
+      name: string;
+      description?: string;
+      state: string;
+      progress: number;
+      teams: Array<{ id: string; key: string; name: string }>;
+      lead?: { id: string; name: string };
+      targetDate?: string;
+      createdAt: string;
+      updatedAt: string;
+    }[]
+  > {
     const projects = await this.client.projects({
       first: 100,
       orderBy: "updatedAt" as any,

@@ -560,16 +560,11 @@ export class GraphQLIssuesService {
         }
       }
 
-      // If not found in project context, try global milestone lookup (may fail if wrong project)
-      if (!finalMilestoneId && resolveResult.milestones?.nodes?.length) {
-        finalMilestoneId = resolveResult.milestones.nodes[0].id;
-      }
-
       if (!finalMilestoneId) {
         const hint = finalProjectId
           ? ` in project`
           : ` (consider specifying --project)`;
-        throw new Error(`Milestone "${input.milestoneId}" not found${hint}`);
+        throw new Error(`Milestone "${input.projectMilestoneId}" not found${hint}`);
       }
     }
 
