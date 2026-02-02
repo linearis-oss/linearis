@@ -30,12 +30,7 @@ export class GraphQLIssuesService {
    * Get issues list with all relationships in single query
    * Reduces from 1 + (5 × N issues) API calls to 1 API call
    */
-  async getIssues(
-    limit: number = 25
-  ): Promise<GetIssuesQuery["issues"]["nodes"]> {
-    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
-    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
-    // * (GetIssuesDocument) with the appropriate return type parameter.
+  async getIssues(limit: number = 25): Promise<IssueFromList[]> {
     const result = await this.graphQLService.rawRequest<GetIssuesQuery>(
       print(GetIssuesDocument),
       {
@@ -44,14 +39,7 @@ export class GraphQLIssuesService {
       }
     );
 
-    if (!result.issues?.nodes) {
-      return [];
-    }
-
-    // Transform all issues using the same transformation logic
-    return result.issues.nodes.map((issue: any) =>
-      this.transformIssueData(issue)
-    );
+    return result.issues?.nodes ?? [];
   }
 
   /**
