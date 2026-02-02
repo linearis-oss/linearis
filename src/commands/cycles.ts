@@ -1,16 +1,23 @@
 import { Command } from "commander";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
-import type {
-  CycleListOptions,
-  CycleReadOptions,
-  LinearCycle,
-} from "../utils/linear-types.js";
 import {
   invalidParameterError,
   notFoundError,
   requiresParameterError,
 } from "../utils/error-messages.js";
+import { Cycle } from "../gql/graphql.js";
+
+interface CycleListOptions {
+  team?: string;
+  active?: boolean;
+  aroundActive?: string;
+}
+
+interface CycleReadOptions {
+  team?: string;
+  issuesFirst?: string;
+}
 
 export function setupCyclesCommands(program: Command): void {
   const cycles = program.command("cycles").description("Cycle operations");
@@ -54,7 +61,7 @@ export function setupCyclesCommands(program: Command): void {
               );
             }
 
-            const activeCycle = allCycles.find((c: LinearCycle) => c.isActive);
+            const activeCycle = allCycles.find((c: Cycle) => c.isActive);
             if (!activeCycle) {
               throw notFoundError("Active cycle", options.team!, "for team");
             }
@@ -64,11 +71,11 @@ export function setupCyclesCommands(program: Command): void {
             const max = activeNumber + n;
 
             const filtered = allCycles
-              .filter((c: LinearCycle) =>
+              .filter((c: Cycle) =>
                 typeof c.number === "number" && c.number >= min &&
                 c.number <= max
               )
-              .sort((a: LinearCycle, b: LinearCycle) => a.number - b.number);
+              .sort((a: Cycle, b: Cycle) => a.number - b.number);
 
             outputSuccess(filtered);
             return;
