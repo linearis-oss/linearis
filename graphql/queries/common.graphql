@@ -1,0 +1,147 @@
+# ------------------------------------------------------------
+# Common GraphQL fragments for reuse across queries
+# 
+# These fragments define reusable field selections for Linear entities,
+# ensuring consistent data structure and reducing duplication in query definitions.
+# Each fragment focuses on specific entity relationships for optimal querying.
+# ------------------------------------------------------------
+
+# Complete issue fragment with all relationships
+#
+# Combines all issue fragments into a comprehensive field selection.
+# This is used when full issue details are needed including all
+# relationships (state, assignee, team, project, labels, comments).
+fragment CompleteIssueFields on Issue {
+  id
+  identifier
+  title
+  description
+  branchName
+  priority
+  estimate
+  createdAt
+  updatedAt
+  state {
+    id
+    name
+  }
+  assignee {
+    id
+    name
+  }
+  team {
+    id
+    key
+    name
+  }
+  project {
+    id
+    name
+  }
+  labels {
+    nodes {
+      id
+      name
+    }
+  }
+  cycle {
+    id
+    name
+    number
+  }
+  projectMilestone {
+    id
+    name
+    targetDate
+  }
+  parent {
+    id
+    identifier
+    title
+  }
+  children {
+    nodes {
+      id
+      identifier
+      title
+    }
+  }
+}
+
+# Complete issue fragment with all relationships and comments
+#
+# Combines all issue fragments into a comprehensive field selection.
+# This is used when full issue details are needed including all
+# relationships (state, assignee, team, project, labels, comments).
+fragment CompleteIssueWithCommentsFields on Issue {
+  ...CompleteIssueFields
+  comments {
+    nodes {
+      id
+      body
+    }
+  }
+}
+
+
+# Complete issue search fragment with all relationships
+#
+# Combines all issue fragments into a comprehensive field selection.
+# This is used when full issue details are needed including all
+# relationships (state, assignee, team, project, labels, comments).
+fragment CompleteIssueSearchFields on IssueSearchResult {
+  id
+  identifier
+  title
+  description
+  branchName
+  priority
+  estimate
+  createdAt
+  updatedAt
+  state {
+    id
+    name
+  }
+  assignee {
+    id
+    name
+  }
+  team {
+    id
+    key
+    name
+  }
+  project {
+    id
+    name
+  }
+  labels {
+    nodes {
+      id
+      name
+    }
+  }
+  cycle {
+    id
+    name
+    number
+  }
+  projectMilestone {
+    id
+    name
+    targetDate
+  }
+  parent {
+    id
+    identifier
+    title
+  }
+  children {
+    nodes {
+      id
+      identifier
+      title
+    }
+  }
+}

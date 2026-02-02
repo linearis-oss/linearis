@@ -1,0 +1,40 @@
+query FindCycleScoped($name: String!, $teamId: ID!) {
+  cycles(
+    filter: {
+      and: [{ name: { eq: $name } }, { team: { id: { eq: $teamId } } }]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      number
+      startsAt
+      isActive
+      isNext
+      isPrevious
+      team {
+        id
+        key
+      }
+    }
+  }
+}
+
+query FindCycleGlobal($name: String!) {
+  cycles(filter: { name: { eq: $name } }, first: 10) {
+    nodes {
+      id
+      name
+      number
+      startsAt
+      isActive
+      isNext
+      isPrevious
+      team {
+        id
+        key
+      }
+    }
+  }
+}

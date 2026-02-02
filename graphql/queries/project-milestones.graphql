@@ -1,0 +1,160 @@
+# ------------------------------------------------------------
+# ------------------------------------------------------------
+# Common GraphQL fragments for reuse across queries
+#
+# These fragments define reusable field selections for Linear entities,
+# ensuring consistent data structure and reducing duplication. Place
+# all shared fragments for project-milestone-related queries here.
+# ------------------------------------------------------------
+
+# List project milestones in a project with minimal fields (optimized)
+#
+# Fetches a list of project milestones for a given project.
+query ListProjectMilestones($projectId: String!, $first: Int!) {
+  project(id: $projectId) {
+    id
+    name
+    projectMilestones(first: $first) {
+      nodes {
+        id
+        name
+        description
+        targetDate
+        sortOrder
+        createdAt
+        updatedAt
+      }
+    }
+  }
+}
+
+# Get single project milestone by ID with full issue details
+#
+# Fetches a single project milestone by its unique identifier.
+query GetProjectMilestoneById($id: String!, $issuesFirst: Int) {
+  projectMilestone(id: $id) {
+    id
+    name
+    description
+    targetDate
+    sortOrder
+    createdAt
+    updatedAt
+    project {
+      id
+      name
+    }
+    issues(first: $issuesFirst) {
+      nodes {
+        ...CompleteIssueFields
+      }
+    }
+  }
+}
+
+# Find project milestone by name within project context (scoped lookup)
+#
+# Searches for a project milestone by name within a specific project.
+query FindProjectMilestoneScoped($name: String!, $projectId: String!) {
+  project(id: $projectId) {
+    projectMilestones(filter: { name: { eq: $name } }, first: 10) {
+      nodes {
+        id
+        name
+        targetDate
+        sortOrder
+        project {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+
+# Find project milestone by name globally (fallback)
+#
+# Searches for a project milestone by name across all projects.
+query FindProjectMilestoneGlobal($name: String!) {
+  projectMilestones(filter: { name: { eq: $name } }, first: 10) {
+    nodes {
+      id
+      name
+      targetDate
+      sortOrder
+      project {
+        id
+        name
+      }
+    }
+  }
+}
+
+# Create a new project milestone
+#
+# Creates a new project milestone and returns the created project milestone data.
+mutation CreateProjectMilestone(
+  $projectId: String!
+  $name: String!
+  $description: String
+  $targetDate: TimelessDate
+) {
+  projectMilestoneCreate(
+    input: {
+      projectId: $projectId
+      name: $name
+      description: $description
+      targetDate: $targetDate
+    }
+  ) {
+    success
+    projectMilestone {
+      id
+      name
+      description
+      targetDate
+      sortOrder
+      createdAt
+      updatedAt
+      project {
+        id
+        name
+      }
+    }
+  }
+}
+
+# Update an existing project milestone
+#
+# Updates an existing project milestone and returns the updated project milestone data.
+mutation UpdateProjectMilestone(
+  $id: String!
+  $name: String
+  $description: String
+  $targetDate: TimelessDate
+  $sortOrder: Float
+) {
+  projectMilestoneUpdate(
+    id: $id
+    input: {
+      name: $name
+      description: $description
+      targetDate: $targetDate
+      sortOrder: $sortOrder
+    }
+  ) {
+    success
+    projectMilestone {
+      id
+      name
+      description
+      targetDate
+      sortOrder
+      updatedAt
+      project {
+        id
+        name
+      }
+    }
+  }
+}

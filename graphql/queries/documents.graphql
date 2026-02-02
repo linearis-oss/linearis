@@ -1,0 +1,75 @@
+# ------------------------------------------------------------
+# GraphQL queries and mutations for Linear documents
+#
+# Documents are standalone entities that can be associated with projects,
+# initiatives, or teams. To link a document to an issue, use the
+# attachments API (see attachments.ts).
+# ------------------------------------------------------------
+
+# Document fields fragment
+#
+# Defines the basic fields for a document entity.
+fragment DocumentFields on Document {
+  id
+  title
+  content
+  slugId
+  url
+  icon
+  color
+  createdAt
+  updatedAt
+}
+
+# Get a single document by ID
+#
+# Fetches a document by its unique identifier.
+query GetDocument($id: String!) {
+  document(id: $id) {
+    ...DocumentFields
+  }
+}
+
+# List documents with optional filtering
+#
+# Fetches a list of documents with optional filtering criteria.
+query ListDocuments($first: Int!, $filter: DocumentFilter) {
+  documents(first: $first, filter: $filter) {
+    nodes {
+      ...DocumentFields
+    }
+  }
+}
+
+# Create a new document mutation
+#
+# Creates a new document and returns the created document data.
+mutation DocumentCreate($input: DocumentCreateInput!) {
+  documentCreate(input: $input) {
+    success
+    document {
+      ...DocumentFields
+    }
+  }
+}
+
+# Update an existing document mutation
+#
+# Updates an existing document and returns the updated document data.
+mutation DocumentUpdate($id: String!, $input: DocumentUpdateInput!) {
+  documentUpdate(id: $id, input: $input) {
+    success,
+    document {
+      ...DocumentFields
+    }
+  }
+}
+
+# Delete a document mutation
+#
+# Deletes a document and returns success status.
+mutation DocumentDelete($id: String!) {
+  documentDelete(id: $id) {
+    success
+  }
+}
