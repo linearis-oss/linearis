@@ -1,17 +1,19 @@
+import { print } from "graphql";
 import { GraphQLService, createGraphQLService } from "./graphql-service.js";
 import { CommandOptions } from "./auth.js";
 import {
-  CREATE_ATTACHMENT_MUTATION,
-  DELETE_ATTACHMENT_MUTATION,
-  LIST_ATTACHMENTS_QUERY,
-} from "../queries/attachments.js";
-import { LinearAttachment, AttachmentCreateInput } from "./linear-types.js";
+  AttachmentCreateDocument,
+  AttachmentCreateMutation,
+  AttachmentCreateInput,
+  AttachmentDeleteDocument,
+  AttachmentDeleteMutation,
+  ListAttachmentsDocument,
+  ListAttachmentsQuery,
+} from "../gql/graphql.js";
 
-/**
- * Attachment entity returned from GraphQL queries
- * Re-exported from linear-types for convenience
- */
-export type Attachment = LinearAttachment;
+// Type aliases for cleaner method signatures
+type AttachmentFromCreate = AttachmentCreateMutation["attachmentCreate"]["attachment"];
+type AttachmentFromList = ListAttachmentsQuery["issue"]["attachments"]["nodes"][0];
 
 /**
  * GraphQL-optimized attachments service for single API call operations
@@ -35,14 +37,21 @@ export class GraphQLAttachmentsService {
    * @param input Attachment creation parameters
    * @returns Created or updated attachment
    */
-  async createAttachment(input: AttachmentCreateInput): Promise<Attachment> {
-    const result = await this.graphqlService.rawRequest<{
-      attachmentCreate: { success: boolean; attachment: Attachment };
-    }>(CREATE_ATTACHMENT_MUTATION, { input });
+  async createAttachment(
+    input: AttachmentCreateInput
+  ): Promise<AttachmentFromCreate> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (AttachmentCreateDocument) with the appropriate return type parameter.
+    const result =
+      await this.graphqlService.rawRequest<AttachmentCreateMutation>(
+        print(AttachmentCreateDocument),
+        { input }
+      );
 
     if (!result.attachmentCreate.success) {
       throw new Error(
-        `Failed to create attachment on issue ${input.issueId} for URL "${input.url}"`,
+        `Failed to create attachment on issue ${input.issueId} for URL "${input.url}"`
       );
     }
 
@@ -56,10 +65,17 @@ export class GraphQLAttachmentsService {
    * @returns true if deletion was successful
    * @throws Error if deletion fails
    */
-  async deleteAttachment(id: string): Promise<boolean> {
-    const result = await this.graphqlService.rawRequest<{
-      attachmentDelete: { success: boolean };
-    }>(DELETE_ATTACHMENT_MUTATION, { id });
+  async deleteAttachment(
+    id: string
+  ): Promise<AttachmentDeleteMutation["attachmentDelete"]["success"]> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (AttachmentDeleteDocument) with the appropriate return type parameter.
+    const result =
+      await this.graphqlService.rawRequest<AttachmentDeleteMutation>(
+        print(AttachmentDeleteDocument),
+        { id }
+      );
 
     if (!result.attachmentDelete.success) {
       throw new Error(`Failed to delete attachment: ${id}`);
@@ -75,10 +91,16 @@ export class GraphQLAttachmentsService {
    * @returns Array of attachments
    * @throws Error if issue not found
    */
-  async listAttachments(issueId: string): Promise<Attachment[]> {
-    const result = await this.graphqlService.rawRequest<{
-      issue: { attachments: { nodes: Attachment[] } } | null;
-    }>(LIST_ATTACHMENTS_QUERY, { issueId });
+  async listAttachments(
+    issueId: string
+  ): Promise<ListAttachmentsQuery["issue"]["attachments"]["nodes"]> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (ListAttachmentsDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<ListAttachmentsQuery>(
+      print(ListAttachmentsDocument),
+      { issueId }
+    );
 
     if (!result.issue) {
       throw new Error(`Issue not found: ${issueId}`);
@@ -92,7 +114,7 @@ export class GraphQLAttachmentsService {
  * Create GraphQLAttachmentsService instance with authentication
  */
 export async function createGraphQLAttachmentsService(
-  options: CommandOptions,
+  options: CommandOptions
 ): Promise<GraphQLAttachmentsService> {
   const graphqlService = await createGraphQLService(options);
   return new GraphQLAttachmentsService(graphqlService);
