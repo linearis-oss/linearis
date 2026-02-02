@@ -7,7 +7,7 @@ import {
   parseIssueIdentifier,
   tryParseIssueIdentifier,
 } from "./identifier-parser.js";
-import { BatchResolveForCreateDocument, BatchResolveForCreateQuery, BatchResolveForUpdateDocument, BatchResolveForUpdateQuery, CreateIssueDocument, CreateIssueMutation, FindCycleGlobalDocument, FindCycleGlobalQuery, FindCycleScopedDocument, FindCycleScopedQuery, GetIssueByIdDocument, GetIssueByIdentifierDocument, GetIssueByIdentifierQuery, GetIssueByIdQuery, GetIssuesDocument, GetIssuesQuery, GetIssueTeamDocument, GetIssueTeamQuery, IssueCreateInput, IssueUpdateInput, QuerySearchIssuesArgs, SearchIssuesQuery, SearchIssuesQueryVariables, UpdateIssueDocument, UpdateIssueMutation, UpdateIssueMutationVariables } from "../gql/graphql.js";
+import { BatchResolveForCreateDocument, BatchResolveForCreateQuery, BatchResolveForUpdateDocument, BatchResolveForUpdateQuery, CreateIssueDocument, CreateIssueMutation, FindCycleGlobalDocument, FindCycleGlobalQuery, FindCycleScopedDocument, FindCycleScopedQuery, GetIssueByIdDocument, GetIssueByIdentifierDocument, GetIssueByIdentifierQuery, GetIssueByIdQuery, GetIssuesDocument, GetIssuesQuery, GetIssueTeamDocument, GetIssueTeamQuery, IssueCreateInput, IssueUpdateInput, QuerySearchIssuesArgs, SearchIssuesDocument, SearchIssuesQuery, SearchIssuesQueryVariables, UpdateIssueDocument, UpdateIssueMutation, UpdateIssueMutationVariables } from "../gql/graphql.js";
 
 // Type aliases for cleaner method signatures
 type IssueFromId = NonNullable<GetIssueByIdQuery["issue"]>;
@@ -660,158 +660,22 @@ export class GraphQLIssuesService {
    * Search issues with all relationships in optimized GraphQL queries
    * Reduces from 1 + (6 × N) API calls to 1-2 API calls total
    *
-   * @param input Search arguments with optional filters
+   * @param searchArgs Search arguments with optional filters
    */
-  async searchIssues(input: SearchIssuesQuery): Promise<SearchIssuesQuery["searchIssues"]["nodes"]> {
-    // Step 1: Resolve filter IDs if needed
-    const resolveVariables: any = {};
-    let needsResolve = false;
+  async searchIssues(
+    searchArgs: QuerySearchIssuesArgs & { limit?: number }
+  ): Promise<IssueFromSearch[]> {
+    const limit = searchArgs.limit ?? 25;
 
-    // Parse team if not a UUID
-    if (input.teamId && !isUuid(input.teamId)) {
-      needsResolve = true;
-      // Check if it looks like a team key (short, usually 2-5 chars, alphanumeric)
-      // IMPORTANT: Must explicitly set both teamKey and teamName (one to value, one to null)
-      // Linear's GraphQL `or` filter with undefined variables matches incorrectly
-      if (input.teamId.length <= 5 && /^[A-Z0-9]+$/i.test(input.teamId)) {
-        resolveVariables.teamKey = input.teamId;
-        resolveVariables.teamName = null;
-      } else {
-        resolveVariables.teamKey = null;
-        resolveVariables.teamName = input.teamId;
+    const result = await this.graphQLService.rawRequest<SearchIssuesQuery>(
+      print(SearchIssuesDocument),
+      {
+        ...searchArgs,
+        first: limit,
       }
-    }
+    );
 
-    // Add project name for resolution if provided and not a UUID
-    if (input.projectId && !isUuid(input.projectId)) {
-      needsResolve = true;
-      resolveVariables.projectName = input.projectId;
-    }
-
-    // Add assignee email for resolution if provided and not a UUID
-    if (input.assigneeId && !isUuid(input.assigneeId)) {
-      needsResolve = true;
-      // Assume it's an email if it contains @
-      if (input.assigneeId.includes("@")) {
-        resolveVariables.assigneeEmail = input.assigneeId;
-      }
-    }
-
-    // Execute batch resolve query if we have anything to resolve
-    let resolveResult: any = {};
-    if (needsResolve) {
-      resolveResult = await this.graphQLService.rawRequest(
-        BATCH_RESOLVE_FOR_SEARCH_QUERY,
-        resolveVariables
-      );
-    }
-
-    // Resolve filter IDs
-    let finalTeamId = input.teamId;
-    if (input.teamId && !isUuid(input.teamId)) {
-      const resolvedTeam = resolveResult.teams?.nodes?.[0];
-      // Validate the returned team actually matches the requested identifier
-      // (GraphQL `or` filter with undefined variables matches anything)
-      if (
-        !resolvedTeam ||
-        (resolvedTeam.key.toUpperCase() !== input.teamId.toUpperCase() &&
-          resolvedTeam.name.toLowerCase() !== input.teamId.toLowerCase())
-      ) {
-        throw new Error(`Team "${input.teamId}" not found`);
-      }
-      finalTeamId = resolvedTeam.id;
-    }
-
-    let finalProjectId = input.projectId;
-    if (input.projectId && !isUuid(input.projectId)) {
-      if (!resolveResult.projects?.nodes?.length) {
-        throw new Error(`Project "${input.projectId}" not found`);
-      }
-      finalProjectId = resolveResult.projects.nodes[0].id;
-    }
-
-    let finalAssigneeId = input.assigneeId;
-    if (
-      input.assigneeId &&
-      !isUuid(input.assigneeId) &&
-      input.assigneeId.includes("@")
-    ) {
-      if (!resolveResult.users?.nodes?.length) {
-        throw new Error(`User "${input.assigneeId}" not found`);
-      }
-      finalAssigneeId = resolveResult.users.nodes[0].id;
-    }
-
-    // Step 2: Execute search query
-    if (input.query) {
-      // Use text search
-      const searchResult = await this.graphQLService.rawRequest(
-        SEARCH_ISSUES_QUERY,
-        {
-          term: input.query,
-          first: input.limit || 10,
-        }
-      );
-
-      if (!searchResult.searchIssues?.nodes) {
-        return [];
-      }
-
-      let results = searchResult.searchIssues.nodes.map((issue: any) =>
-        this.transformIssueData(issue)
-      );
-
-      // Apply additional filters if provided
-      if (finalTeamId) {
-        results = results.filter(
-          (issue: LinearIssue) => issue.team.id === finalTeamId
-        );
-      }
-      if (finalAssigneeId) {
-        results = results.filter(
-          (issue: LinearIssue) => issue.assignee?.id === finalAssigneeId
-        );
-      }
-      if (finalProjectId) {
-        results = results.filter(
-          (issue: LinearIssue) => issue.project?.id === finalProjectId
-        );
-      }
-      if (input.status && input.status.length > 0) {
-        results = results.filter((issue: LinearIssue) =>
-          input.status!.includes(issue.state.name)
-        );
-      }
-
-      return results;
-    } else {
-      // Use filtered search
-      const filter: any = {};
-
-      if (finalTeamId) filter.team = { id: { eq: finalTeamId } };
-      if (finalAssigneeId) filter.assignee = { id: { eq: finalAssigneeId } };
-      if (finalProjectId) filter.project = { id: { eq: finalProjectId } };
-      if (input.status && input.status.length > 0) {
-        filter.state = { name: { in: input.status } };
-      }
-
-      const searchResult = await this.graphQLService.rawRequest(
-        FILTERED_SEARCH_ISSUES_QUERY,
-        {
-          first: input.limit || 10,
-          filter: Object.keys(filter).length > 0 ? filter : undefined,
-          orderBy: "updatedAt" as any,
-        }
-      );
-
-      if (!searchResult.issues?.nodes) {
-        return [];
-      }
-
-      return searchResult.issues.nodes.map((issue: any) =>
-        this.transformIssueData(issue)
-      );
-    }
+    return result.searchIssues?.nodes ?? [];
   }
 
   /**
