@@ -110,12 +110,14 @@ export class GraphQLIssuesService {
    * ```
    */
   async updateIssue(
-    id: string,
-    input: IssueUpdateInput,
-    labelMode: "adding" | "overwriting" = "overwriting"
-  ): Promise<UpdateIssueMutation["issueUpdate"]["issue"]> {
-    let resolvedIssueId = id;
+    input: IssueUpdateInput & {
+      id: string;
+      labelMode?: "adding" | "overwriting";
+    }
+  ): Promise<IssueFromUpdate> {
+    let resolvedIssueId = input.id;
     let currentIssueLabels: string[] = [];
+    const labelMode = input.labelMode ?? "overwriting";
 
     // Step 1: Batch resolve all IDs and get current issue data if needed
     const resolveVariables: any = {};
@@ -411,7 +413,7 @@ export class GraphQLIssuesService {
       throw new Error("Failed to retrieve updated issue");
     }
 
-    return this.transformIssueData(updateResult.issueUpdate.issue);
+    return updateResult.issueUpdate.issue;
   }
 
   /**
