@@ -1,29 +1,21 @@
+import { print } from "graphql";
 import { GraphQLService } from "./graphql-service.js";
 import { LinearService } from "./linear-service.js";
-import {
-  BATCH_RESOLVE_FOR_CREATE_QUERY,
-  BATCH_RESOLVE_FOR_SEARCH_QUERY,
-  BATCH_RESOLVE_FOR_UPDATE_QUERY,
-  CREATE_ISSUE_MUTATION,
-  FILTERED_SEARCH_ISSUES_QUERY,
-  GET_ISSUE_BY_ID_QUERY,
-  GET_ISSUE_BY_IDENTIFIER_QUERY,
-  GET_ISSUES_QUERY,
-  SEARCH_ISSUES_QUERY,
-  UPDATE_ISSUE_MUTATION,
-} from "../queries/issues.js";
-import type {
-  CreateIssueArgs,
-  LinearIssue,
-  SearchIssuesArgs,
-  UpdateIssueArgs,
-} from "./linear-types.js";
 import { extractEmbeds } from "./embed-parser.js";
 import { isUuid } from "./uuid.js";
 import {
   parseIssueIdentifier,
   tryParseIssueIdentifier,
 } from "./identifier-parser.js";
+import { BatchResolveForCreateDocument, BatchResolveForCreateQuery, BatchResolveForUpdateDocument, BatchResolveForUpdateQuery, CreateIssueDocument, CreateIssueMutation, FindCycleGlobalDocument, FindCycleGlobalQuery, FindCycleScopedDocument, FindCycleScopedQuery, GetIssueByIdDocument, GetIssueByIdentifierDocument, GetIssueByIdentifierQuery, GetIssueByIdQuery, GetIssuesDocument, GetIssuesQuery, GetIssueTeamDocument, GetIssueTeamQuery, IssueCreateInput, IssueUpdateInput, QuerySearchIssuesArgs, SearchIssuesQuery, SearchIssuesQueryVariables, UpdateIssueDocument, UpdateIssueMutation, UpdateIssueMutationVariables } from "../gql/graphql.js";
+
+// Type aliases for cleaner method signatures
+type IssueFromId = NonNullable<GetIssueByIdQuery["issue"]>;
+type IssueFromIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
+type IssueFromSearch = SearchIssuesQuery["searchIssues"]["nodes"][0];
+type IssueFromList = GetIssuesQuery["issues"]["nodes"][0];
+type IssueFromUpdate = NonNullable<UpdateIssueMutation["issueUpdate"]["issue"]>;
+type IssueFromCreate = NonNullable<CreateIssueMutation["issueCreate"]["issue"]>;
 
 /**
  * GraphQL-optimized issues service for single API call operations
@@ -31,18 +23,26 @@ import {
 export class GraphQLIssuesService {
   constructor(
     private graphQLService: GraphQLService,
-    private linearService: LinearService,
+    private linearService: LinearService
   ) {}
 
   /**
    * Get issues list with all relationships in single query
    * Reduces from 1 + (5 × N issues) API calls to 1 API call
    */
-  async getIssues(limit: number = 25): Promise<LinearIssue[]> {
-    const result = await this.graphQLService.rawRequest(GET_ISSUES_QUERY, {
-      first: limit,
-      orderBy: "updatedAt" as any,
-    });
+  async getIssues(
+    limit: number = 25
+  ): Promise<GetIssuesQuery["issues"]["nodes"]> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (GetIssuesDocument) with the appropriate return type parameter.
+    const result = await this.graphQLService.rawRequest<GetIssuesQuery>(
+      print(GetIssuesDocument),
+      {
+        first: limit,
+        orderBy: "updatedAt" as any,
+      }
+    );
 
     if (!result.issues?.nodes) {
       return [];
@@ -58,7 +58,7 @@ export class GraphQLIssuesService {
    * Get issue by ID with all relationships and comments in single query
    * Reduces from 7 API calls to 1 API call
    *
-   * @param issueId - Either a UUID string or TEAM-123 format identifier
+   * @param id - Either a UUID string or TEAM-123 format identifier
    * @returns Complete issue data with all relationships resolved
    * @throws Error if issue is not found
    *
@@ -71,36 +71,43 @@ export class GraphQLIssuesService {
    * const issue2 = await getIssueById("ABC-123");
    * ```
    */
-  async getIssueById(issueId: string): Promise<LinearIssue> {
+  async getIssueById(id: string): Promise<GetIssueByIdQuery["issue"] | GetIssueByIdentifierQuery["issues"]["nodes"][0]> {
     let issueData;
 
-    if (isUuid(issueId)) {
+    if (isUuid(id)) {
       // Direct UUID lookup
-      const result = await this.graphQLService.rawRequest(
-        GET_ISSUE_BY_ID_QUERY,
+      //
+      // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+      // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+      // * (GetIssueByIdDocument) with the appropriate return type parameter.
+      const result = await this.graphQLService.rawRequest<GetIssueByIdQuery>(
+        print(GetIssueByIdDocument),
         {
-          id: issueId,
-        },
+          id: id,
+        }
       );
 
       if (!result.issue) {
-        throw new Error(`Issue with ID "${issueId}" not found`);
+        throw new Error(`Issue with ID "${id}" not found`);
       }
       issueData = result.issue;
     } else {
       // Parse identifier (ABC-123 format)
-      const { teamKey, issueNumber } = parseIssueIdentifier(issueId);
+      const { teamKey, issueNumber } = parseIssueIdentifier(id);
 
-      const result = await this.graphQLService.rawRequest(
-        GET_ISSUE_BY_IDENTIFIER_QUERY,
+      // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+      // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+      // * (GetIssueByIdentifierDocument) with the appropriate return type parameter.
+      const result = await this.graphQLService.rawRequest<GetIssueByIdentifierQuery>(
+        print(GetIssueByIdentifierDocument),
         {
           teamKey,
           number: issueNumber,
-        },
+        }
       );
 
       if (!result.issues.nodes.length) {
-        throw new Error(`Issue with identifier "${issueId}" not found`);
+        throw new Error(`Issue with identifier "${id}" not found`);
       }
       issueData = result.issues.nodes[0];
     }
@@ -113,7 +120,7 @@ export class GraphQLIssuesService {
    * Update issue with all relationships in optimized GraphQL queries
    * Reduces from 5 API calls to 2 API calls (resolve + update)
    *
-   * @param args Update arguments (supports label names and handles adding vs overwriting modes)
+   * @param input Update arguments (supports label names and handles adding vs overwriting modes)
    * @param labelMode How to handle labels: 'adding' (merge with existing) or 'overwriting' (replace all)
    * @returns Updated issue with all relationships resolved
    *
@@ -130,74 +137,80 @@ export class GraphQLIssuesService {
    * ```
    */
   async updateIssue(
-    args: UpdateIssueArgs,
-    labelMode: "adding" | "overwriting" = "overwriting",
-  ): Promise<LinearIssue> {
-    let resolvedIssueId = args.id;
+    id: string,
+    input: IssueUpdateInput,
+    labelMode: "adding" | "overwriting" = "overwriting"
+  ): Promise<UpdateIssueMutation["issueUpdate"]["issue"]> {
+    let resolvedIssueId = id;
     let currentIssueLabels: string[] = [];
 
     // Step 1: Batch resolve all IDs and get current issue data if needed
     const resolveVariables: any = {};
 
     // Parse issue ID if it's an identifier
-    if (!isUuid(args.id)) {
-      const { teamKey, issueNumber } = parseIssueIdentifier(args.id);
+    if (!isUuid(resolvedIssueId)) {
+      const { teamKey, issueNumber } = parseIssueIdentifier(resolvedIssueId);
       resolveVariables.teamKey = teamKey;
       resolveVariables.issueNumber = issueNumber;
     }
 
     // Add label names for resolution if provided
-    if (args.labelIds && Array.isArray(args.labelIds)) {
+    if (input.labelIds && Array.isArray(input.labelIds)) {
       // Filter out UUIDs and collect label names for resolution
-      const labelNames = args.labelIds.filter((id) => !isUuid(id));
+      const labelNames = input.labelIds.filter((id) => !isUuid(id));
       if (labelNames.length > 0) {
         resolveVariables.labelNames = labelNames;
       }
     }
 
     // Add project name for resolution if provided and not a UUID
-    if (args.projectId && !isUuid(args.projectId)) {
-      resolveVariables.projectName = args.projectId;
+    if (input.projectId && !isUuid(input.projectId)) {
+      resolveVariables.projectName = input.projectId;
     }
 
     // Add milestone name for resolution if provided and not a UUID
     if (
-      args.milestoneId && typeof args.milestoneId === "string" &&
-      !isUuid(args.milestoneId)
+      input.projectMilestoneId &&
+      typeof input.projectMilestoneId === "string" &&
+      !isUuid(input.projectMilestoneId)
     ) {
-      resolveVariables.milestoneName = args.milestoneId;
+      resolveVariables.milestoneName = input.projectMilestoneId;
     }
 
     // Execute batch resolve query
-    const resolveResult = await this.graphQLService.rawRequest(
-      BATCH_RESOLVE_FOR_UPDATE_QUERY,
-      resolveVariables,
+    //
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (BatchResolveForUpdateDocument) with the appropriate return type parameter.
+    const resolveResult = await this.graphQLService.rawRequest<BatchResolveForUpdateQuery>(
+      print(BatchResolveForUpdateDocument),
+      resolveVariables
     );
 
     // Process resolution results
-    if (!isUuid(args.id)) {
+    if (!isUuid(id)) {
       if (!resolveResult.issues.nodes.length) {
-        throw new Error(`Issue with identifier "${args.id}" not found`);
+        throw new Error(`Issue with identifier "${id}" not found`);
       }
       resolvedIssueId = resolveResult.issues.nodes[0].id;
-      currentIssueLabels = resolveResult.issues.nodes[0].labels.nodes.map((
-        l: any,
-      ) => l.id);
+      currentIssueLabels = resolveResult.issues.nodes[0].labels.nodes.map(
+        (l: any) => l.id
+      );
     }
 
     // Resolve label IDs
-    let finalLabelIds = args.labelIds;
-    if (args.labelIds && Array.isArray(args.labelIds)) {
+    let finalLabelIds = input.labelIds;
+    if (input.labelIds && Array.isArray(input.labelIds)) {
       const resolvedLabels: string[] = [];
 
       // Process each label ID/name
-      for (const labelIdOrName of args.labelIds) {
+      for (const labelIdOrName of input.labelIds) {
         if (isUuid(labelIdOrName)) {
           resolvedLabels.push(labelIdOrName);
         } else {
           // Find resolved label
-          const label = resolveResult.labels.nodes.find((l: any) =>
-            l.name === labelIdOrName
+          const label = resolveResult.labels.nodes.find(
+            (l: any) => l.name === labelIdOrName
           );
           if (!label) {
             throw new Error(`Label "${labelIdOrName}" not found`);
@@ -219,30 +232,32 @@ export class GraphQLIssuesService {
     }
 
     // Resolve project ID
-    let finalProjectId = args.projectId;
-    if (args.projectId && !isUuid(args.projectId)) {
+    let finalProjectId = input.projectId;
+    if (input.projectId && !isUuid(input.projectId)) {
       if (!resolveResult.projects.nodes.length) {
-        throw new Error(`Project "${args.projectId}" not found`);
+        throw new Error(`Project "${input.projectId}" not found`);
       }
       finalProjectId = resolveResult.projects.nodes[0].id;
     }
 
     // Resolve milestone ID if provided and not a UUID
-    let finalMilestoneId = args.milestoneId;
+    let finalMilestoneId = input.projectMilestoneId;
     if (
-      args.milestoneId && typeof args.milestoneId === "string" &&
-      !isUuid(args.milestoneId)
+      input.projectMilestoneId &&
+      typeof input.projectMilestoneId === "string" &&
+      !isUuid(input.projectMilestoneId)
     ) {
       // First try to find milestone in project being set (if --project is provided)
       // IMPORTANT: Only check resolveResult.projects if we actually asked for a project
       // (the batch query may return unrelated project data when projectName is undefined)
       if (
-        args.projectId &&
+        input.projectId &&
         resolveResult.projects?.nodes[0]?.projectMilestones?.nodes
       ) {
-        const projectMilestone = resolveResult.projects.nodes[0]
-          .projectMilestones.nodes
-          .find((m: any) => m.name === args.milestoneId);
+        const projectMilestone =
+          resolveResult.projects.nodes[0].projectMilestones.nodes.find(
+            (m: any) => m.name === input.projectMilestoneId
+          );
         if (projectMilestone) {
           finalMilestoneId = projectMilestone.id;
         }
@@ -250,12 +265,14 @@ export class GraphQLIssuesService {
 
       // If not found in project being set, try the issue's current project
       if (
-        finalMilestoneId && !isUuid(finalMilestoneId) &&
+        finalMilestoneId &&
+        !isUuid(finalMilestoneId) &&
         resolveResult.issues?.nodes[0]?.project?.projectMilestones?.nodes
       ) {
-        const issueMilestone = resolveResult.issues.nodes[0].project
-          .projectMilestones.nodes
-          .find((m: any) => m.name === args.milestoneId);
+        const issueMilestone =
+          resolveResult.issues.nodes[0].project.projectMilestones.nodes.find(
+            (m: any) => m.name === input.projectMilestoneId
+          );
         if (issueMilestone) {
           finalMilestoneId = issueMilestone.id;
         }
@@ -263,122 +280,138 @@ export class GraphQLIssuesService {
 
       // If still not found, try global milestone lookup (may be ambiguous)
       if (
-        finalMilestoneId && !isUuid(finalMilestoneId) &&
+        finalMilestoneId &&
+        !isUuid(finalMilestoneId) &&
         resolveResult.milestones?.nodes?.length
       ) {
         finalMilestoneId = resolveResult.milestones.nodes[0].id;
       }
 
       if (!finalMilestoneId || !isUuid(finalMilestoneId)) {
-        throw new Error(`Milestone "${args.milestoneId}" not found`);
+        throw new Error(`Milestone "${input.projectMilestoneId}" not found`);
       }
     }
 
     // Resolve cycle ID if provided (supports name resolution scoped to the issue's team)
-    let finalCycleId = args.cycleId;
-    if (args.cycleId !== undefined && args.cycleId !== null) {
-      if (args.cycleId === null) {
+    let finalCycleId = input.cycleId;
+    if (input.cycleId !== undefined && input.cycleId !== null) {
+      if (input.cycleId === null) {
         finalCycleId = null; // explicit clear
-      } else if (typeof args.cycleId === "string" && !isUuid(args.cycleId)) {
+      } else if (typeof input.cycleId === "string" && !isUuid(input.cycleId)) {
         // Try to get team context from resolved issue (if available)
-        let teamIdForCycle: string | undefined = resolveResult.issues?.nodes
-          ?.[0]?.team?.id;
+        let teamIdForCycle: string | undefined =
+          resolveResult.issues?.nodes?.[0]?.team?.id;
 
         // If we don't have team from batch result but we have resolvedIssueId, fetch issue team
         if (!teamIdForCycle && resolvedIssueId && isUuid(resolvedIssueId)) {
-          const issueTeamRes = await this.graphQLService.rawRequest(
-            `query GetIssueTeam($issueId: String!) { issue(id: $issueId) { team { id } } }`,
-            { issueId: resolvedIssueId },
+          // * NOTE: We must enforce the return type here and ensure it matches the query document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (GetIssueTeamDocument) with the appropriate return type parameter.
+          const issueTeamRes = await this.graphQLService.rawRequest<GetIssueTeamQuery>(
+            print(GetIssueTeamDocument),
+            { issueId: resolvedIssueId }
           );
           teamIdForCycle = issueTeamRes.issue?.team?.id;
         }
 
         // Try scoped lookup by team first
         if (teamIdForCycle) {
-          const scopedRes = await this.graphQLService.rawRequest(
-            `query FindCycleScoped($name: String!, $teamId: ID!) { cycles(filter: { and: [ { name: { eq: $name } }, { team: { id: { eq: $teamId } } } ] }, first: 10) { nodes { id name number startsAt isActive isNext isPrevious team { id key } } } }`,
-            { name: args.cycleId, teamId: teamIdForCycle },
+          // * NOTE: We must enforce the return type here and ensure it matches the query document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (FindCycleScopedDocument) with the appropriate return type parameter.
+          const scopedRes = await this.graphQLService.rawRequest<FindCycleScopedQuery>(
+            print(FindCycleScopedDocument),
+            { name: input.cycleId, teamId: teamIdForCycle }
           );
           const scopedNodes = scopedRes.cycles?.nodes || [];
           if (scopedNodes.length === 1) {
             finalCycleId = scopedNodes[0].id;
           } else if (scopedNodes.length > 1) {
             // prefer active, next, previous
-            let chosen = scopedNodes.find((n: any) => n.isActive) ||
+            let chosen =
+              scopedNodes.find((n: any) => n.isActive) ||
               scopedNodes.find((n: any) => n.isNext) ||
               scopedNodes.find((n: any) => n.isPrevious);
             if (chosen) finalCycleId = chosen.id;
-            else {throw new Error(
-                `Ambiguous cycle name "${args.cycleId}" for team ${teamIdForCycle}. Use ID or disambiguate.`,
-              );}
+            else {
+              throw new Error(
+                `Ambiguous cycle name "${input.cycleId}" for team ${teamIdForCycle}. Use ID or disambiguate.`
+              );
+            }
           }
         }
 
         // Fallback to global lookup by name
         if (!finalCycleId) {
-          const globalRes = await this.graphQLService.rawRequest(
-            `query FindCycleGlobal($name: String!) { cycles(filter: { name: { eq: $name } }, first: 10) { nodes { id name number startsAt isActive isNext isPrevious team { id key } } } }`,
-            { name: args.cycleId },
+          // * NOTE: We must enforce the return type here and ensure it matches the query document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (FindCycleGlobalDocument) with the appropriate return type parameter.
+          const globalRes = await this.graphQLService.rawRequest<FindCycleGlobalQuery>(
+            print(FindCycleGlobalDocument),
+            { name: input.cycleId }
           );
           const globalNodes = globalRes.cycles?.nodes || [];
           if (globalNodes.length === 1) {
             finalCycleId = globalNodes[0].id;
           } else if (globalNodes.length > 1) {
-            let chosen = globalNodes.find((n: any) => n.isActive) ||
+            let chosen =
+              globalNodes.find((n: any) => n.isActive) ||
               globalNodes.find((n: any) => n.isNext) ||
               globalNodes.find((n: any) => n.isPrevious);
             if (chosen) finalCycleId = chosen.id;
-            else {throw new Error(
-                `Ambiguous cycle name "${args.cycleId}" — multiple matches found across teams. Use ID or scope with team.`,
-              );}
+            else {
+              throw new Error(
+                `Ambiguous cycle name "${input.cycleId}" — multiple matches found across teams. Use ID or scope with team.`
+              );
+            }
           }
         }
 
         if (!finalCycleId) {
-          throw new Error(`Cycle "${args.cycleId}" not found`);
+          throw new Error(`Cycle "${input.cycleId}" not found`);
         }
       }
     }
 
     // Resolve status ID if provided and not a UUID
-    let resolvedStatusId = args.statusId;
-    if (args.statusId && !isUuid(args.statusId)) {
+    let resolvedStatusId = input.stateId;
+    if (input.stateId && !isUuid(input.stateId)) {
       // Get team ID from the issue for status context
       let teamId: string | undefined;
       if (resolvedIssueId && isUuid(resolvedIssueId)) {
         // We have the resolved issue ID, get the team context
-        const issueResult = await this.graphQLService.rawRequest(
-          `query GetIssueTeam($issueId: String!) {
-            issue(id: $issueId) {
-              team { id }
-            }
-          }`,
-          { issueId: resolvedIssueId },
+        //
+        // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+        // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+        // * (GetIssueTeamDocument) with the appropriate return type parameter.
+        const issueResult = await this.graphQLService.rawRequest<GetIssueTeamQuery>(
+          print(GetIssueTeamDocument),
+          { issueId: resolvedIssueId }
         );
         teamId = issueResult.issue?.team?.id;
       }
       resolvedStatusId = await this.linearService.resolveStatusId(
-        args.statusId,
-        teamId,
+        input.stateId,
+        teamId
       );
     }
 
     // Step 2: Execute update mutation with resolved IDs
     const updateInput: any = {};
 
-    if (args.title !== undefined) updateInput.title = args.title;
-    if (args.description !== undefined) {
-      updateInput.description = args.description;
+    if (input.title !== undefined) updateInput.title = input.title;
+    if (input.description !== undefined) {
+      updateInput.description = input.description;
     }
     if (resolvedStatusId !== undefined) updateInput.stateId = resolvedStatusId;
-    if (args.priority !== undefined) updateInput.priority = args.priority;
-    if (args.assigneeId !== undefined) {
-      updateInput.assigneeId = args.assigneeId;
+    if (input.priority !== undefined) updateInput.priority = input.priority;
+    if (input.assigneeId !== undefined) {
+      updateInput.assigneeId = input.assigneeId;
     }
     if (finalProjectId !== undefined) updateInput.projectId = finalProjectId;
     if (finalCycleId !== undefined) updateInput.cycleId = finalCycleId;
-    if (args.estimate !== undefined) updateInput.estimate = args.estimate;
-    if (args.parentId !== undefined) updateInput.parentId = args.parentId;
+    if (input.estimate !== undefined) updateInput.estimate = input.estimate;
+    if (input.parentId !== undefined) updateInput.parentId = input.parentId;
     if (finalMilestoneId !== undefined) {
       updateInput.projectMilestoneId = finalMilestoneId;
     }
@@ -386,12 +419,15 @@ export class GraphQLIssuesService {
       updateInput.labelIds = finalLabelIds;
     }
 
-    const updateResult = await this.graphQLService.rawRequest(
-      UPDATE_ISSUE_MUTATION,
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (UpdateIssueDocument) with the appropriate return type parameter.
+    const updateResult = await this.graphQLService.rawRequest<UpdateIssueMutation>(
+      print(UpdateIssueDocument),
       {
         id: resolvedIssueId,
         input: updateInput,
-      },
+      }
     );
 
     if (!updateResult.issueUpdate.success) {
@@ -409,42 +445,42 @@ export class GraphQLIssuesService {
    * Create issue with all relationships in optimized GraphQL queries
    * Reduces from 7+ API calls to 2 API calls (resolve + create)
    *
-   * @param args Create arguments (supports team names, project names, label names, parent identifiers)
+   * @param input Create arguments (supports team names, project names, label names, parent identifiers)
    */
-  async createIssue(args: CreateIssueArgs): Promise<LinearIssue> {
+  async createIssue(input: IssueCreateInput): Promise<CreateIssueMutation["issueCreate"]["issue"]> {
     // Step 1: Batch resolve all IDs
     const resolveVariables: any = {};
 
     // Parse team if not a UUID
-    if (args.teamId && !isUuid(args.teamId)) {
+    if (input.teamId && !isUuid(input.teamId)) {
       // Check if it looks like a team key (short, usually 2-5 chars, alphanumeric)
-      const isTeamKey = args.teamId.length <= 5 &&
-        /^[A-Z0-9]+$/i.test(args.teamId);
+      const isTeamKey =
+        input.teamId.length <= 5 && /^[A-Z0-9]+$/i.test(input.teamId);
       // IMPORTANT: Must explicitly set both teamKey and teamName (one to value, one to null)
       // Linear's GraphQL `or` filter with undefined variables matches incorrectly
       if (isTeamKey) {
-        resolveVariables.teamKey = args.teamId;
+        resolveVariables.teamKey = input.teamId;
         resolveVariables.teamName = null;
       } else {
         resolveVariables.teamKey = null;
-        resolveVariables.teamName = args.teamId;
+        resolveVariables.teamName = input.teamId;
       }
     }
 
     // Add project name for resolution if provided and not a UUID
-    if (args.projectId && !isUuid(args.projectId)) {
-      resolveVariables.projectName = args.projectId;
+    if (input.projectId && !isUuid(input.projectId)) {
+      resolveVariables.projectName = input.projectId;
     }
 
     // Add milestone name for resolution if provided and not a UUID
-    if (args.milestoneId && !isUuid(args.milestoneId)) {
-      resolveVariables.milestoneName = args.milestoneId;
+    if (input.projectMilestoneId && !isUuid(input.projectMilestoneId)) {
+      resolveVariables.milestoneName = input.projectMilestoneId;
     }
 
     // Add label names for resolution if provided
-    if (args.labelIds && Array.isArray(args.labelIds)) {
+    if (input.labelIds && Array.isArray(input.labelIds)) {
       // Filter out UUIDs and collect label names for resolution
-      const labelNames = args.labelIds.filter((id) => !isUuid(id));
+      const labelNames = input.labelIds.filter((id) => !isUuid(id));
       if (labelNames.length > 0) {
         resolveVariables.labelNames = labelNames;
       }
@@ -452,8 +488,8 @@ export class GraphQLIssuesService {
 
     // Parse parent issue identifier if provided
     // Uses tryParseIssueIdentifier to silently handle invalid formats (parent will be ignored)
-    if (args.parentId && !isUuid(args.parentId)) {
-      const parentParsed = tryParseIssueIdentifier(args.parentId);
+    if (input.parentId && !isUuid(input.parentId)) {
+      const parentParsed = tryParseIssueIdentifier(input.parentId);
       if (parentParsed) {
         resolveVariables.parentTeamKey = parentParsed.teamKey;
         resolveVariables.parentIssueNumber = parentParsed.issueNumber;
@@ -461,26 +497,32 @@ export class GraphQLIssuesService {
     }
 
     // Execute batch resolve query if we have anything to resolve
-    let resolveResult: any = {};
+    let resolveResult: BatchResolveForCreateQuery = {
+      teams: { nodes: [] },
+      projects: { nodes: [] },
+      labels: { nodes: [] },
+      parentIssues: { nodes: [] },
+    };
+
     if (Object.keys(resolveVariables).length > 0) {
-      resolveResult = await this.graphQLService.rawRequest(
-        BATCH_RESOLVE_FOR_CREATE_QUERY,
-        resolveVariables,
+      resolveResult = await this.graphQLService.rawRequest<BatchResolveForCreateQuery>(
+        print(BatchResolveForCreateDocument),
+        resolveVariables
       );
     }
 
     // Resolve team ID
-    let finalTeamId = args.teamId;
-    if (args.teamId && !isUuid(args.teamId)) {
+    let finalTeamId = input.teamId;
+    if (input.teamId && !isUuid(input.teamId)) {
       const resolvedTeam = resolveResult.teams?.nodes?.[0];
       // Validate the returned team actually matches the requested identifier
       // (GraphQL `or` filter with undefined variables matches anything)
       if (
         !resolvedTeam ||
-        (resolvedTeam.key.toUpperCase() !== args.teamId.toUpperCase() &&
-          resolvedTeam.name.toLowerCase() !== args.teamId.toLowerCase())
+        (resolvedTeam.key.toUpperCase() !== input.teamId.toUpperCase() &&
+          resolvedTeam.name.toLowerCase() !== input.teamId.toLowerCase())
       ) {
-        throw new Error(`Team "${args.teamId}" not found`);
+        throw new Error(`Team "${input.teamId}" not found`);
       }
       finalTeamId = resolvedTeam.id;
     } else if (!finalTeamId) {
@@ -489,26 +531,26 @@ export class GraphQLIssuesService {
     }
 
     // Resolve project ID
-    let finalProjectId = args.projectId;
-    if (args.projectId && !isUuid(args.projectId)) {
+    let finalProjectId = input.projectId;
+    if (input.projectId && !isUuid(input.projectId)) {
       if (!resolveResult.projects?.nodes?.length) {
-        throw new Error(`Project "${args.projectId}" not found`);
+        throw new Error(`Project "${input.projectId}" not found`);
       }
       finalProjectId = resolveResult.projects.nodes[0].id;
     }
 
     // Resolve label IDs
-    let finalLabelIds = args.labelIds;
-    if (args.labelIds && Array.isArray(args.labelIds)) {
+    let finalLabelIds = input.labelIds;
+    if (input.labelIds && Array.isArray(input.labelIds)) {
       const resolvedLabels: string[] = [];
 
-      for (const labelIdOrName of args.labelIds) {
+      for (const labelIdOrName of input.labelIds) {
         if (isUuid(labelIdOrName)) {
           resolvedLabels.push(labelIdOrName);
         } else {
           // Find resolved label
-          const label = resolveResult.labels?.nodes?.find((l: any) =>
-            l.name === labelIdOrName
+          const label = resolveResult.labels?.nodes?.find(
+            (l: any) => l.name === labelIdOrName
           );
           if (!label) {
             throw new Error(`Label "${labelIdOrName}" not found`);
@@ -521,22 +563,23 @@ export class GraphQLIssuesService {
     }
 
     // Resolve parent ID
-    let finalParentId = args.parentId;
-    if (args.parentId && !isUuid(args.parentId)) {
+    let finalParentId = input.parentId;
+    if (input.parentId && !isUuid(input.parentId)) {
       if (!resolveResult.parentIssues?.nodes?.length) {
-        throw new Error(`Parent issue "${args.parentId}" not found`);
+        throw new Error(`Parent issue "${input.parentId}" not found`);
       }
       finalParentId = resolveResult.parentIssues.nodes[0].id;
     }
 
     // Resolve milestone ID if provided and not a UUID
-    let finalMilestoneId = args.milestoneId;
-    if (args.milestoneId && !isUuid(args.milestoneId)) {
+    let finalMilestoneId = input.projectMilestoneId;
+    if (input.projectMilestoneId && !isUuid(input.projectMilestoneId)) {
       // Try to find milestone in project context (milestones must be in same project as issue)
       if (resolveResult.projects?.nodes[0]?.projectMilestones?.nodes) {
-        const projectMilestone = resolveResult.projects.nodes[0]
-          .projectMilestones.nodes
-          .find((m: any) => m.name === args.milestoneId);
+        const projectMilestone =
+          resolveResult.projects.nodes[0].projectMilestones.nodes.find(
+            (m: any) => m.name === input.projectMilestoneId
+          );
         if (projectMilestone) {
           finalMilestoneId = projectMilestone.id;
         }
@@ -551,20 +594,22 @@ export class GraphQLIssuesService {
         const hint = finalProjectId
           ? ` in project`
           : ` (consider specifying --project)`;
-        throw new Error(`Milestone "${args.milestoneId}" not found${hint}`);
+        throw new Error(`Milestone "${input.milestoneId}" not found${hint}`);
       }
     }
 
     // Resolve cycle ID if provided (supports name resolution scoped to team)
-    let finalCycleId = args.cycleId;
+    let finalCycleId = input.cycleId;
     if (
-      args.cycleId && typeof args.cycleId === "string" && !isUuid(args.cycleId)
+      input.cycleId &&
+      typeof input.cycleId === "string" &&
+      !isUuid(input.cycleId)
     ) {
       // Try scoped lookup within finalTeamId first
       if (finalTeamId) {
         const scopedRes = await this.graphQLService.rawRequest(
           `query FindCycleScoped($name: String!, $teamId: ID!) { cycles(filter: { and: [ { name: { eq: $name } }, { team: { id: { eq: $teamId } } } ] }, first: 1) { nodes { id name } } }`,
-          { name: args.cycleId, teamId: finalTeamId },
+          { name: input.cycleId, teamId: finalTeamId }
         );
         if (scopedRes.cycles?.nodes?.length) {
           finalCycleId = scopedRes.cycles.nodes[0].id;
@@ -575,7 +620,7 @@ export class GraphQLIssuesService {
       if (!finalCycleId) {
         const globalRes = await this.graphQLService.rawRequest(
           `query FindCycleGlobal($name: String!) { cycles(filter: { name: { eq: $name } }, first: 1) { nodes { id name } } }`,
-          { name: args.cycleId },
+          { name: input.cycleId }
         );
         if (globalRes.cycles?.nodes?.length) {
           finalCycleId = globalRes.cycles.nodes[0].id;
@@ -583,43 +628,46 @@ export class GraphQLIssuesService {
       }
 
       if (!finalCycleId) {
-        throw new Error(`Cycle "${args.cycleId}" not found`);
+        throw new Error(`Cycle "${input.cycleId}" not found`);
       }
     }
 
     // Resolve status ID if provided and not a UUID
-    let resolvedStatusId = args.statusId;
-    if (args.statusId && !isUuid(args.statusId)) {
+    let resolvedStatusId = input.stateId;
+    if (input.stateId && !isUuid(input.stateId)) {
       resolvedStatusId = await this.linearService.resolveStatusId(
-        args.statusId,
-        finalTeamId,
+        input.stateId,
+        finalTeamId
       );
     }
 
     // Step 2: Execute create mutation with resolved IDs
     const createInput: any = {
-      title: args.title,
+      title: input.title,
     };
 
     if (finalTeamId) createInput.teamId = finalTeamId;
-    if (args.description) createInput.description = args.description;
-    if (args.assigneeId) createInput.assigneeId = args.assigneeId;
-    if (args.priority !== undefined) createInput.priority = args.priority;
+    if (input.description) createInput.description = input.description;
+    if (input.assigneeId) createInput.assigneeId = input.assigneeId;
+    if (input.priority !== undefined) createInput.priority = input.priority;
     if (finalProjectId) createInput.projectId = finalProjectId;
     if (resolvedStatusId) createInput.stateId = resolvedStatusId;
     if (finalLabelIds && finalLabelIds.length > 0) {
       createInput.labelIds = finalLabelIds;
     }
-    if (args.estimate !== undefined) createInput.estimate = args.estimate;
+    if (input.estimate !== undefined) createInput.estimate = input.estimate;
     if (finalParentId) createInput.parentId = finalParentId;
     if (finalMilestoneId) createInput.projectMilestoneId = finalMilestoneId;
     if (finalCycleId) createInput.cycleId = finalCycleId;
 
-    const createResult = await this.graphQLService.rawRequest(
-      CREATE_ISSUE_MUTATION,
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (CreateIssueDocument) with the appropriate return type parameter.
+    const createResult = await this.graphQLService.rawRequest<CreateIssueMutation>(
+      print(CreateIssueDocument),
       {
         input: createInput,
-      },
+      }
     );
 
     if (!createResult.issueCreate.success) {
@@ -637,40 +685,40 @@ export class GraphQLIssuesService {
    * Search issues with all relationships in optimized GraphQL queries
    * Reduces from 1 + (6 × N) API calls to 1-2 API calls total
    *
-   * @param args Search arguments with optional filters
+   * @param input Search arguments with optional filters
    */
-  async searchIssues(args: SearchIssuesArgs): Promise<LinearIssue[]> {
+  async searchIssues(input: SearchIssuesQuery): Promise<SearchIssuesQuery["searchIssues"]["nodes"]> {
     // Step 1: Resolve filter IDs if needed
     const resolveVariables: any = {};
     let needsResolve = false;
 
     // Parse team if not a UUID
-    if (args.teamId && !isUuid(args.teamId)) {
+    if (input.teamId && !isUuid(input.teamId)) {
       needsResolve = true;
       // Check if it looks like a team key (short, usually 2-5 chars, alphanumeric)
       // IMPORTANT: Must explicitly set both teamKey and teamName (one to value, one to null)
       // Linear's GraphQL `or` filter with undefined variables matches incorrectly
-      if (args.teamId.length <= 5 && /^[A-Z0-9]+$/i.test(args.teamId)) {
-        resolveVariables.teamKey = args.teamId;
+      if (input.teamId.length <= 5 && /^[A-Z0-9]+$/i.test(input.teamId)) {
+        resolveVariables.teamKey = input.teamId;
         resolveVariables.teamName = null;
       } else {
         resolveVariables.teamKey = null;
-        resolveVariables.teamName = args.teamId;
+        resolveVariables.teamName = input.teamId;
       }
     }
 
     // Add project name for resolution if provided and not a UUID
-    if (args.projectId && !isUuid(args.projectId)) {
+    if (input.projectId && !isUuid(input.projectId)) {
       needsResolve = true;
-      resolveVariables.projectName = args.projectId;
+      resolveVariables.projectName = input.projectId;
     }
 
     // Add assignee email for resolution if provided and not a UUID
-    if (args.assigneeId && !isUuid(args.assigneeId)) {
+    if (input.assigneeId && !isUuid(input.assigneeId)) {
       needsResolve = true;
       // Assume it's an email if it contains @
-      if (args.assigneeId.includes("@")) {
-        resolveVariables.assigneeEmail = args.assigneeId;
+      if (input.assigneeId.includes("@")) {
+        resolveVariables.assigneeEmail = input.assigneeId;
       }
     }
 
@@ -679,54 +727,55 @@ export class GraphQLIssuesService {
     if (needsResolve) {
       resolveResult = await this.graphQLService.rawRequest(
         BATCH_RESOLVE_FOR_SEARCH_QUERY,
-        resolveVariables,
+        resolveVariables
       );
     }
 
     // Resolve filter IDs
-    let finalTeamId = args.teamId;
-    if (args.teamId && !isUuid(args.teamId)) {
+    let finalTeamId = input.teamId;
+    if (input.teamId && !isUuid(input.teamId)) {
       const resolvedTeam = resolveResult.teams?.nodes?.[0];
       // Validate the returned team actually matches the requested identifier
       // (GraphQL `or` filter with undefined variables matches anything)
       if (
         !resolvedTeam ||
-        (resolvedTeam.key.toUpperCase() !== args.teamId.toUpperCase() &&
-          resolvedTeam.name.toLowerCase() !== args.teamId.toLowerCase())
+        (resolvedTeam.key.toUpperCase() !== input.teamId.toUpperCase() &&
+          resolvedTeam.name.toLowerCase() !== input.teamId.toLowerCase())
       ) {
-        throw new Error(`Team "${args.teamId}" not found`);
+        throw new Error(`Team "${input.teamId}" not found`);
       }
       finalTeamId = resolvedTeam.id;
     }
 
-    let finalProjectId = args.projectId;
-    if (args.projectId && !isUuid(args.projectId)) {
+    let finalProjectId = input.projectId;
+    if (input.projectId && !isUuid(input.projectId)) {
       if (!resolveResult.projects?.nodes?.length) {
-        throw new Error(`Project "${args.projectId}" not found`);
+        throw new Error(`Project "${input.projectId}" not found`);
       }
       finalProjectId = resolveResult.projects.nodes[0].id;
     }
 
-    let finalAssigneeId = args.assigneeId;
+    let finalAssigneeId = input.assigneeId;
     if (
-      args.assigneeId && !isUuid(args.assigneeId) &&
-      args.assigneeId.includes("@")
+      input.assigneeId &&
+      !isUuid(input.assigneeId) &&
+      input.assigneeId.includes("@")
     ) {
       if (!resolveResult.users?.nodes?.length) {
-        throw new Error(`User "${args.assigneeId}" not found`);
+        throw new Error(`User "${input.assigneeId}" not found`);
       }
       finalAssigneeId = resolveResult.users.nodes[0].id;
     }
 
     // Step 2: Execute search query
-    if (args.query) {
+    if (input.query) {
       // Use text search
       const searchResult = await this.graphQLService.rawRequest(
         SEARCH_ISSUES_QUERY,
         {
-          term: args.query,
-          first: args.limit || 10,
-        },
+          term: input.query,
+          first: input.limit || 10,
+        }
       );
 
       if (!searchResult.searchIssues?.nodes) {
@@ -739,23 +788,23 @@ export class GraphQLIssuesService {
 
       // Apply additional filters if provided
       if (finalTeamId) {
-        results = results.filter((issue: LinearIssue) =>
-          issue.team.id === finalTeamId
+        results = results.filter(
+          (issue: LinearIssue) => issue.team.id === finalTeamId
         );
       }
       if (finalAssigneeId) {
-        results = results.filter((issue: LinearIssue) =>
-          issue.assignee?.id === finalAssigneeId
+        results = results.filter(
+          (issue: LinearIssue) => issue.assignee?.id === finalAssigneeId
         );
       }
       if (finalProjectId) {
-        results = results.filter((issue: LinearIssue) =>
-          issue.project?.id === finalProjectId
+        results = results.filter(
+          (issue: LinearIssue) => issue.project?.id === finalProjectId
         );
       }
-      if (args.status && args.status.length > 0) {
+      if (input.status && input.status.length > 0) {
         results = results.filter((issue: LinearIssue) =>
-          args.status!.includes(issue.state.name)
+          input.status!.includes(issue.state.name)
         );
       }
 
@@ -767,17 +816,17 @@ export class GraphQLIssuesService {
       if (finalTeamId) filter.team = { id: { eq: finalTeamId } };
       if (finalAssigneeId) filter.assignee = { id: { eq: finalAssigneeId } };
       if (finalProjectId) filter.project = { id: { eq: finalProjectId } };
-      if (args.status && args.status.length > 0) {
-        filter.state = { name: { in: args.status } };
+      if (input.status && input.status.length > 0) {
+        filter.state = { name: { in: input.status } };
       }
 
       const searchResult = await this.graphQLService.rawRequest(
         FILTERED_SEARCH_ISSUES_QUERY,
         {
-          first: args.limit || 10,
+          first: input.limit || 10,
           filter: Object.keys(filter).length > 0 ? filter : undefined,
           orderBy: "updatedAt" as any,
-        },
+        }
       );
 
       if (!searchResult.issues?.nodes) {
@@ -793,7 +842,7 @@ export class GraphQLIssuesService {
   /**
    * Transform GraphQL issue response to LinearIssue format
    */
-  private transformIssueData(issue: any): LinearIssue {
+  private transformIssueData(issue: GetIssueByIdQuery["issue"] | GetIssueByIdentifierQuery["issues"]["nodes"][0]): LinearIssue {
     try {
       return this.doTransformIssueData(issue);
     } catch (error: any) {
@@ -807,7 +856,7 @@ export class GraphQLIssuesService {
       console.error(
         "\n[DEBUG] Issue transform failed. Raw API response:\n" +
           JSON.stringify(diagnostic, null, 2) +
-          "\n\nPlease report this output at: https://github.com/czottmann/linearis/issues\n",
+          "\n\nPlease report this output at: https://github.com/czottmann/linearis/issues\n"
       );
       throw error;
     }
@@ -816,7 +865,7 @@ export class GraphQLIssuesService {
   /**
    * Internal transform implementation
    */
-  private doTransformIssueData(issue: any): LinearIssue {
+  private doTransformIssueData(issue: GetIssueByIdQuery['issue'] | GetIssueByIdentifierQuery["issues"]["nodes"][0]): LinearIssue {
     return {
       id: issue.id,
       identifier: issue.identifier,
@@ -830,9 +879,9 @@ export class GraphQLIssuesService {
       },
       assignee: issue.assignee
         ? {
-          id: issue.assignee.id,
-          name: issue.assignee.name,
-        }
+            id: issue.assignee.id,
+            name: issue.assignee.name,
+          }
         : undefined,
       team: {
         id: issue.team.id,
@@ -841,23 +890,23 @@ export class GraphQLIssuesService {
       },
       project: issue.project
         ? {
-          id: issue.project.id,
-          name: issue.project.name,
-        }
+            id: issue.project.id,
+            name: issue.project.name,
+          }
         : undefined,
       cycle: issue.cycle
         ? {
-          id: issue.cycle.id,
-          name: issue.cycle.name,
-          number: issue.cycle.number,
-        }
+            id: issue.cycle.id,
+            name: issue.cycle.name,
+            number: issue.cycle.number,
+          }
         : undefined,
       projectMilestone: issue.projectMilestone
         ? {
-          id: issue.projectMilestone.id,
-          name: issue.projectMilestone.name,
-          targetDate: issue.projectMilestone.targetDate || undefined,
-        }
+            id: issue.projectMilestone.id,
+            name: issue.projectMilestone.name,
+            targetDate: issue.projectMilestone.targetDate || undefined,
+          }
         : undefined,
       priority: issue.priority,
       estimate: issue.estimate || undefined,
@@ -867,45 +916,51 @@ export class GraphQLIssuesService {
       })),
       parentIssue: issue.parent
         ? {
-          id: issue.parent.id,
-          identifier: issue.parent.identifier,
-          title: issue.parent.title,
-        }
+            id: issue.parent.id,
+            identifier: issue.parent.identifier,
+            title: issue.parent.title,
+          }
         : undefined,
-      subIssues: issue.children?.nodes.map((child: any) => ({
-        id: child.id,
-        identifier: child.identifier,
-        title: child.title,
-      })) || undefined,
-      comments: issue.comments?.nodes.map((comment: any) => ({
-        id: comment.id,
-        body: comment.body,
-        embeds: extractEmbeds(comment.body),
-        user: {
-          id: comment.user.id,
-          name: comment.user.name,
-        },
-        createdAt: comment.createdAt instanceof Date
-          ? comment.createdAt.toISOString()
-          : (comment.createdAt
-            ? new Date(comment.createdAt).toISOString()
-            : new Date().toISOString()),
-        updatedAt: comment.updatedAt instanceof Date
-          ? comment.updatedAt.toISOString()
-          : (comment.updatedAt
-            ? new Date(comment.updatedAt).toISOString()
-            : new Date().toISOString()),
-      })) || [],
-      createdAt: issue.createdAt instanceof Date
-        ? issue.createdAt.toISOString()
-        : (issue.createdAt
+      subIssues:
+        issue.children?.nodes.map((child: any) => ({
+          id: child.id,
+          identifier: child.identifier,
+          title: child.title,
+        })) || undefined,
+      comments:
+        issue.comments?.nodes.map((comment: any) => ({
+          id: comment.id,
+          body: comment.body,
+          embeds: extractEmbeds(comment.body),
+          user: {
+            id: comment.user.id,
+            name: comment.user.name,
+          },
+          createdAt:
+            comment.createdAt instanceof Date
+              ? comment.createdAt.toISOString()
+              : comment.createdAt
+              ? new Date(comment.createdAt).toISOString()
+              : new Date().toISOString(),
+          updatedAt:
+            comment.updatedAt instanceof Date
+              ? comment.updatedAt.toISOString()
+              : comment.updatedAt
+              ? new Date(comment.updatedAt).toISOString()
+              : new Date().toISOString(),
+        })) || [],
+      createdAt:
+        issue.createdAt instanceof Date
+          ? issue.createdAt.toISOString()
+          : issue.createdAt
           ? new Date(issue.createdAt).toISOString()
-          : new Date().toISOString()),
-      updatedAt: issue.updatedAt instanceof Date
-        ? issue.updatedAt.toISOString()
-        : (issue.updatedAt
+          : new Date().toISOString(),
+      updatedAt:
+        issue.updatedAt instanceof Date
+          ? issue.updatedAt.toISOString()
+          : issue.updatedAt
           ? new Date(issue.updatedAt).toISOString()
-          : new Date().toISOString()),
+          : new Date().toISOString(),
     };
   }
 }
