@@ -1,23 +1,25 @@
+import { print } from "graphql";
 import { GraphQLService, createGraphQLService } from "./graphql-service.js";
 import { CommandOptions } from "./auth.js";
 import {
-  CREATE_DOCUMENT_MUTATION,
-  UPDATE_DOCUMENT_MUTATION,
-  GET_DOCUMENT_QUERY,
-  LIST_DOCUMENTS_QUERY,
-  DELETE_DOCUMENT_MUTATION,
-} from "../queries/documents.js";
-import {
-  LinearDocument,
+  DocumentCreateDocument,
+  DocumentCreateMutation,
+  DocumentDeleteDocument,
+  DocumentDeleteMutation,
+  DocumentUpdateDocument,
+  DocumentUpdateMutation,
+  GetDocumentDocument,
+  GetDocumentQuery,
+  ListDocumentsDocument,
+  ListDocumentsQuery,
   DocumentCreateInput,
   DocumentUpdateInput,
-} from "./linear-types.js";
+} from "../gql/graphql.js";
 
-/**
- * Document entity returned from GraphQL queries
- * Re-exported from linear-types for convenience
- */
-export type Document = LinearDocument;
+// Type aliases for cleaner method signatures
+type DocumentFromCreate = DocumentCreateMutation["documentCreate"]["document"];
+type DocumentFromUpdate = DocumentUpdateMutation["documentUpdate"]["document"];
+type DocumentFromQuery = GetDocumentQuery["document"];
 
 /**
  * GraphQL-optimized documents service for single API call operations
@@ -35,14 +37,20 @@ export class GraphQLDocumentsService {
    * @param input Document creation parameters
    * @returns Created document with all fields
    */
-  async createDocument(input: DocumentCreateInput): Promise<Document> {
-    const result = await this.graphqlService.rawRequest<{
-      documentCreate: { success: boolean; document: Document };
-    }>(CREATE_DOCUMENT_MUTATION, { input });
+  async createDocument(input: DocumentCreateInput): Promise<DocumentFromCreate> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (DocumentCreateDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<DocumentCreateMutation>(
+      print(DocumentCreateDocument),
+      { input }
+    );
 
     if (!result.documentCreate.success) {
       throw new Error(
-        `Failed to create document "${input.title}"${input.projectId ? ` in project ${input.projectId}` : ""}${input.teamId ? ` for team ${input.teamId}` : ""}`,
+        `Failed to create document "${input.title}"${
+          input.projectId ? ` in project ${input.projectId}` : ""
+        }${input.teamId ? ` for team ${input.teamId}` : ""}`
       );
     }
 
@@ -58,11 +66,15 @@ export class GraphQLDocumentsService {
    */
   async updateDocument(
     id: string,
-    input: DocumentUpdateInput,
-  ): Promise<Document> {
-    const result = await this.graphqlService.rawRequest<{
-      documentUpdate: { success: boolean; document: Document };
-    }>(UPDATE_DOCUMENT_MUTATION, { id, input });
+    input: DocumentUpdateInput
+  ): Promise<DocumentFromUpdate> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (DocumentUpdateDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<DocumentUpdateMutation>(
+      print(DocumentUpdateDocument),
+      { id, input }
+    );
 
     if (!result.documentUpdate.success) {
       throw new Error(`Failed to update document: ${id}`);
@@ -78,10 +90,14 @@ export class GraphQLDocumentsService {
    * @returns Document with all fields
    * @throws Error if document not found
    */
-  async getDocument(id: string): Promise<Document> {
-    const result = await this.graphqlService.rawRequest<{
-      document: Document | null;
-    }>(GET_DOCUMENT_QUERY, { id });
+  async getDocument(id: string): Promise<DocumentFromQuery> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (GetDocumentDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<GetDocumentQuery>(
+      print(GetDocumentDocument),
+      { id }
+    );
 
     if (!result.document) {
       throw new Error(`Document not found: ${id}`);
@@ -99,17 +115,21 @@ export class GraphQLDocumentsService {
   async listDocuments(options?: {
     projectId?: string;
     first?: number;
-  }): Promise<Document[]> {
+  }): Promise<ListDocumentsQuery["documents"]["nodes"]> {
     const filter = options?.projectId
       ? { project: { id: { eq: options.projectId } } }
       : undefined;
 
-    const result = await this.graphqlService.rawRequest<{
-      documents: { nodes: Document[] };
-    }>(LIST_DOCUMENTS_QUERY, {
-      first: options?.first ?? 50,
-      filter,
-    });
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (ListDocumentsDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<ListDocumentsQuery>(
+      print(ListDocumentsDocument),
+      {
+        first: options?.first ?? 50,
+        filter,
+      }
+    );
 
     return result.documents.nodes;
   }
@@ -123,10 +143,16 @@ export class GraphQLDocumentsService {
    * @returns true if deletion was successful
    * @throws Error if deletion fails
    */
-  async deleteDocument(id: string): Promise<boolean> {
-    const result = await this.graphqlService.rawRequest<{
-      documentDelete: { success: boolean };
-    }>(DELETE_DOCUMENT_MUTATION, { id });
+  async deleteDocument(
+    id: string
+  ): Promise<DocumentDeleteMutation["documentDelete"]["success"]> {
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (DocumentDeleteDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<DocumentDeleteMutation>(
+      print(DocumentDeleteDocument),
+      { id }
+    );
 
     if (!result.documentDelete.success) {
       throw new Error(`Failed to delete document: ${id}`);
@@ -147,8 +173,8 @@ export class GraphQLDocumentsService {
    */
   async listDocumentsBySlugIds(
     slugIds: string[],
-    limit?: number,
-  ): Promise<Document[]> {
+    limit?: number
+  ): Promise<ListDocumentsQuery["documents"]["nodes"]> {
     if (slugIds.length === 0) {
       return [];
     }
@@ -157,12 +183,16 @@ export class GraphQLDocumentsService {
       or: slugIds.map((slugId) => ({ slugId: { eq: slugId } })),
     };
 
-    const result = await this.graphqlService.rawRequest<{
-      documents: { nodes: Document[] };
-    }>(LIST_DOCUMENTS_QUERY, {
-      first: limit ?? slugIds.length,
-      filter,
-    });
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (ListDocumentsDocument) with the appropriate return type parameter.
+    const result = await this.graphqlService.rawRequest<ListDocumentsQuery>(
+      print(ListDocumentsDocument),
+      {
+        first: limit ?? slugIds.length,
+        filter,
+      }
+    );
 
     return result.documents.nodes;
   }
@@ -172,7 +202,7 @@ export class GraphQLDocumentsService {
  * Create GraphQLDocumentsService instance with authentication
  */
 export async function createGraphQLDocumentsService(
-  options: CommandOptions,
+  options: CommandOptions
 ): Promise<GraphQLDocumentsService> {
   const graphqlService = await createGraphQLService(options);
   return new GraphQLDocumentsService(graphqlService);
