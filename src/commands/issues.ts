@@ -322,27 +322,23 @@ export function setupIssuesCommands(program: Command): void {
             labelIds = labelNames;
           }
 
-          const updateArgs = {
-            id: issueId, // GraphQL service handles ID resolution
+          const labelMode = options.labelBy || "adding";
+          const result = await issuesService.updateIssue({
+            id: issueId,
             title: options.title,
             description: options.description,
-            statusId: options.status,
+            stateId: options.status,
             priority: options.priority ? parseInt(options.priority) : undefined,
             assigneeId: options.assignee,
-            projectId: options.project, // GraphQL service handles project resolution
+            projectId: options.project,
             labelIds,
             parentId: options.parentTicket ||
               (options.clearParentTicket ? null : undefined),
-            milestoneId: options.projectMilestone ||
+            projectMilestoneId: options.projectMilestone ||
               (options.clearProjectMilestone ? null : undefined),
             cycleId: options.cycle || (options.clearCycle ? null : undefined),
-          };
-
-          const labelMode = options.labelBy || "adding";
-          const result = await issuesService.updateIssue(
-            updateArgs,
-            labelMode as "adding" | "overwriting",
-          );
+            labelMode: labelMode as "adding" | "overwriting",
+          });
           outputSuccess(result);
         },
       ),
