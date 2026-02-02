@@ -422,7 +422,7 @@ export class GraphQLIssuesService {
    *
    * @param input Create arguments (supports team names, project names, label names, parent identifiers)
    */
-  async createIssue(input: IssueCreateInput): Promise<CreateIssueMutation["issueCreate"]["issue"]> {
+  async createIssue(input: IssueCreateInput): Promise<IssueFromCreate> {
     // Step 1: Batch resolve all IDs
     const resolveVariables: any = {};
 
@@ -653,7 +653,7 @@ export class GraphQLIssuesService {
       throw new Error("Failed to retrieve created issue");
     }
 
-    return this.transformIssueData(createResult.issueCreate.issue);
+    return createResult.issueCreate.issue;
   }
 
   /**
