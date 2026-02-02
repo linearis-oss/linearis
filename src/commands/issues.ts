@@ -87,15 +87,12 @@ export function setupIssuesCommands(program: Command): void {
             linearService,
           );
 
-          const searchArgs = {
-            query,
-            teamId: options.team, // GraphQL service handles team resolution
-            assigneeId: options.assignee, // GraphQL service handles assignee resolution
-            projectId: options.project, // GraphQL service handles project resolution
-            status: options.status ? options.status.split(",") : undefined,
+          const result = await issuesService.searchIssues({
+            term: query,
+            teamId: options.team,
+            includeArchived: options.status === "all",
             limit: parseInt(options.limit),
-          };
-          const result = await issuesService.searchIssues(searchArgs);
+          });
           outputSuccess(result);
         },
       ),
