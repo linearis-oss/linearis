@@ -59,20 +59,13 @@ export class GraphQLIssuesService {
    * const issue2 = await getIssueById("ABC-123");
    * ```
    */
-  async getIssueById(id: string): Promise<GetIssueByIdQuery["issue"] | GetIssueByIdentifierQuery["issues"]["nodes"][0]> {
-    let issueData;
+  async getIssueById(id: string): Promise<IssueFromId | IssueFromIdentifier> {
+    let issueData: IssueFromId | IssueFromIdentifier;
 
     if (isUuid(id)) {
-      // Direct UUID lookup
-      //
-      // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
-      // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
-      // * (GetIssueByIdDocument) with the appropriate return type parameter.
       const result = await this.graphQLService.rawRequest<GetIssueByIdQuery>(
         print(GetIssueByIdDocument),
-        {
-          id: id,
-        }
+        { id: id }
       );
 
       if (!result.issue) {
@@ -80,18 +73,11 @@ export class GraphQLIssuesService {
       }
       issueData = result.issue;
     } else {
-      // Parse identifier (ABC-123 format)
       const { teamKey, issueNumber } = parseIssueIdentifier(id);
 
-      // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
-      // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
-      // * (GetIssueByIdentifierDocument) with the appropriate return type parameter.
       const result = await this.graphQLService.rawRequest<GetIssueByIdentifierQuery>(
         print(GetIssueByIdentifierDocument),
-        {
-          teamKey,
-          number: issueNumber,
-        }
+        { teamKey, number: issueNumber }
       );
 
       if (!result.issues.nodes.length) {
@@ -100,8 +86,7 @@ export class GraphQLIssuesService {
       issueData = result.issues.nodes[0];
     }
 
-    // Transform GraphQL response to LinearIssue format
-    return this.transformIssueData(issueData);
+    return issueData;
   }
 
   /**
