@@ -1,0 +1,54 @@
+# ------------------------------------------------------------
+# GraphQL queries and mutations for Linear cycles
+#
+# Cycles are sprint/event containers within teams. They can be
+# queried by name (global or team-scoped), and are associated
+# with issues and teams.
+# ------------------------------------------------------------
+
+# Find a cycle by name and team ID
+#
+# Fetches a cycle by its name and team ID.
+query FindCycleScoped($name: String!, $teamId: ID!) {
+  cycles(
+    filter: {
+      and: [{ name: { eq: $name } }, { team: { id: { eq: $teamId } } }]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      number
+      startsAt
+      isActive
+      isNext
+      isPrevious
+      team {
+        id
+        key
+      }
+    }
+  }
+}
+
+# Find a cycle by name
+#
+# Fetches a cycle by its name.
+query FindCycleGlobal($name: String!) {
+  cycles(filter: { name: { eq: $name } }, first: 10) {
+    nodes {
+      id
+      name
+      number
+      startsAt
+      isActive
+      isNext
+      isPrevious
+      team {
+        id
+        key
+      }
+    }
+  }
+}

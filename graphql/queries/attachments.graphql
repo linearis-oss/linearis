@@ -1,0 +1,35 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear attachments
+#
+# Attachments allow linking any URL to an issue. This is the mechanism
+# to associate documents (or any external resource) with issues, since
+# documents cannot be directly linked to issues in Linear's data model.
+#
+# Key behavior: Attachments are idempotent - creating an attachment with
+# the same url + issueId will update the existing attachment.
+# ------------------------------------------------------------
+
+# Attachment fields fragment
+#
+# Defines the basic fields for an attachment entity.
+fragment AttachmentFields on Attachment {
+  id
+  title
+  subtitle
+  url
+  createdAt
+  updatedAt
+}
+
+# List attachments on an issue
+#
+# Fetches a list of attachments for a given issue.
+query ListAttachments($issueId: String!) {
+  issue(id: $issueId) {
+    attachments {
+      nodes {
+        ...AttachmentFields
+      }
+    }
+  }
+}

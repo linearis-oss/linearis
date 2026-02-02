@@ -1,0 +1,34 @@
+# ------------------------------------------------------------
+# Optimized GraphQL mutations for issue operations
+#
+# This module contains highly optimized GraphQL mutations that create
+# and update issues with complete response data including all relationships.
+# ------------------------------------------------------------
+
+# Create issue mutation with complete response
+#
+# Creates a new issue and returns complete issue data including
+# all relationships. Uses the comprehensive fragment to ensure
+# consistent data structure with read operations.
+mutation CreateIssue($input: IssueCreateInput!) {
+  issueCreate(input: $input) {
+    success
+    issue {
+      ...CompleteIssueWithCommentsFields
+    }
+  }
+}
+
+# Update issue mutation with complete response
+#
+# Updates an existing issue and returns complete issue data with
+# all relationships. Ensures consistency between update and read
+# operations by using the same fragment structure.
+mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) {
+    success
+    issue {
+      ...CompleteIssueWithCommentsFields
+    }
+  }
+}
