@@ -1,63 +1,99 @@
 import { Command } from "commander";
+import { print } from "graphql";
 import { createGraphQLService } from "../utils/graphql-service.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
-import {
-  CREATE_PROJECT_MILESTONE_MUTATION,
-  FIND_PROJECT_MILESTONE_BY_NAME_GLOBAL,
-  FIND_PROJECT_MILESTONE_BY_NAME_SCOPED,
-  GET_PROJECT_MILESTONE_BY_ID_QUERY,
-  LIST_PROJECT_MILESTONES_QUERY,
-  UPDATE_PROJECT_MILESTONE_MUTATION,
-} from "../queries/project-milestones.js";
 import { isUuid } from "../utils/uuid.js";
-import type {
-  LinearProjectMilestone,
-  MilestoneCreateOptions,
-  MilestoneListOptions,
-  MilestoneReadOptions,
-  MilestoneUpdateOptions,
-} from "../utils/linear-types.js";
 import type { GraphQLService } from "../utils/graphql-service.js";
 import {
   multipleMatchesError,
   notFoundError,
 } from "../utils/error-messages.js";
+import {
+  CreateProjectMilestoneDocument,
+  CreateProjectMilestoneMutation,
+  FindProjectMilestoneGlobalDocument,
+  FindProjectMilestoneGlobalQuery,
+  FindProjectMilestoneScopedDocument,
+  FindProjectMilestoneScopedQuery,
+  GetProjectMilestoneByIdDocument,
+  GetProjectMilestoneByIdQuery,
+  ListProjectMilestonesDocument,
+  ListProjectMilestonesQuery,
+  UpdateProjectMilestoneDocument,
+  UpdateProjectMilestoneMutation,
+  ProjectMilestoneUpdateInput,
+} from "../gql/graphql.js";
+
+// Option interfaces for commands
+interface MilestoneListOptions {
+  project: string;
+  limit?: string;
+}
+
+interface MilestoneReadOptions {
+  project?: string;
+  issuesFirst?: string;
+}
+
+interface MilestoneCreateOptions {
+  project: string;
+  description?: string;
+  targetDate?: string;
+}
+
+interface MilestoneUpdateOptions {
+  project?: string;
+  name?: string;
+  description?: string;
+  targetDate?: string;
+  sortOrder?: string;
+}
 
 // Helper function to resolve milestone ID from name
 async function resolveMilestoneId(
   milestoneNameOrId: string,
   graphQLService: GraphQLService,
   linearService: any,
-  projectNameOrId?: string,
+  projectNameOrId?: string
 ): Promise<string> {
   if (isUuid(milestoneNameOrId)) {
     return milestoneNameOrId;
   }
 
-  let nodes: LinearProjectMilestone[] = [];
+  let nodes: FindProjectMilestoneScopedQuery["project"]["projectMilestones"]["nodes"] =
+    [];
 
   if (projectNameOrId) {
     // Resolve project ID using LinearService
     const projectId = await linearService.resolveProjectId(projectNameOrId);
 
     // Scoped lookup
-    const findRes = await graphQLService.rawRequest(
-      FIND_PROJECT_MILESTONE_BY_NAME_SCOPED,
-      {
-        name: milestoneNameOrId,
-        projectId,
-      },
-    );
+    //
+    // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (FindProjectMilestoneScopedDocument) with the appropriate return type parameter.
+    const findRes =
+      await graphQLService.rawRequest<FindProjectMilestoneScopedQuery>(
+        print(FindProjectMilestoneScopedDocument),
+        {
+          name: milestoneNameOrId,
+          projectId,
+        }
+      );
     nodes = findRes.project?.projectMilestones?.nodes || [];
   }
 
   // Fall back to global search if no project scope or not found
   if (nodes.length === 0) {
-    const globalRes = await graphQLService.rawRequest(
-      FIND_PROJECT_MILESTONE_BY_NAME_GLOBAL,
-      { name: milestoneNameOrId },
-    );
+    // * NOTE: We must enforce the return type here and ensure it matches the query document,
+    // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+    // * (FindProjectMilestoneGlobalDocument) with the appropriate return type parameter.
+    const globalRes =
+      await graphQLService.rawRequest<FindProjectMilestoneGlobalQuery>(
+        print(FindProjectMilestoneGlobalDocument),
+        { name: milestoneNameOrId }
+      );
     nodes = globalRes.projectMilestones?.nodes || [];
   }
 
@@ -66,14 +102,14 @@ async function resolveMilestoneId(
   }
 
   if (nodes.length > 1) {
-    const matches = nodes.map((m: LinearProjectMilestone) =>
-      `"${m.name}" in project "${m.project?.name}"`
+    const matches = nodes.map(
+      (m) => `"${m.name}" in project "${m.project?.name}"`
     );
     throw multipleMatchesError(
       "milestone",
       milestoneNameOrId,
       matches,
-      "specify --project or use the milestone ID",
+      "specify --project or use the milestone ID"
     );
   }
 
@@ -103,27 +139,31 @@ export function setupProjectMilestonesCommands(program: Command): void {
 
           // Resolve project ID using LinearService
           const projectId = await linearService.resolveProjectId(
-            options.project,
+            options.project
           );
 
-          const result = await graphQLService.rawRequest(
-            LIST_PROJECT_MILESTONES_QUERY,
-            {
-              projectId,
-              first: parseInt(options.limit || "50"),
-            },
-          );
+          // * NOTE: We must enforce the return type here and ensure it matches the query document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (ListProjectMilestonesDocument) with the appropriate return type parameter.
+          const result =
+            await graphQLService.rawRequest<ListProjectMilestonesQuery>(
+              print(ListProjectMilestonesDocument),
+              {
+                projectId,
+                first: parseInt(options.limit || "50"),
+              }
+            );
 
           outputSuccess(result.project?.projectMilestones?.nodes || []);
-        },
-      ),
+        }
+      )
     );
 
   // Get milestone details with issues
   projectMilestones
     .command("read <milestoneIdOrName>")
     .description(
-      "Get milestone details including issues. Accepts UUID or milestone name (optionally scoped by --project)",
+      "Get milestone details including issues. Accepts UUID or milestone name (optionally scoped by --project)"
     )
     .option("--project <project>", "project name or ID to scope name lookup")
     .option("--issues-first <n>", "how many issues to fetch (default 50)", "50")
@@ -132,7 +172,7 @@ export function setupProjectMilestonesCommands(program: Command): void {
         async (
           milestoneIdOrName: string,
           options: MilestoneReadOptions,
-          command: Command,
+          command: Command
         ) => {
           const [graphQLService, linearService] = await Promise.all([
             createGraphQLService(command.parent!.parent!.opts()),
@@ -143,20 +183,24 @@ export function setupProjectMilestonesCommands(program: Command): void {
             milestoneIdOrName,
             graphQLService,
             linearService,
-            options.project,
+            options.project
           );
 
-          const result = await graphQLService.rawRequest(
-            GET_PROJECT_MILESTONE_BY_ID_QUERY,
-            {
-              id: milestoneId,
-              issuesFirst: parseInt(options.issuesFirst || "50"),
-            },
-          );
+          // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (GetProjectMilestoneByIdDocument) with the appropriate return type parameter.
+          const result =
+            await graphQLService.rawRequest<GetProjectMilestoneByIdQuery>(
+              print(GetProjectMilestoneByIdDocument),
+              {
+                id: milestoneId,
+                issuesFirst: parseInt(options.issuesFirst || "50"),
+              }
+            );
 
           outputSuccess(result.projectMilestone);
-        },
-      ),
+        }
+      )
     );
 
   // Create a new milestone
@@ -171,7 +215,7 @@ export function setupProjectMilestonesCommands(program: Command): void {
         async (
           name: string,
           options: MilestoneCreateOptions,
-          command: Command,
+          command: Command
         ) => {
           const [graphQLService, linearService] = await Promise.all([
             createGraphQLService(command.parent!.parent!.opts()),
@@ -180,40 +224,44 @@ export function setupProjectMilestonesCommands(program: Command): void {
 
           // Resolve project ID using LinearService
           const projectId = await linearService.resolveProjectId(
-            options.project,
+            options.project
           );
 
-          const result = await graphQLService.rawRequest(
-            CREATE_PROJECT_MILESTONE_MUTATION,
-            {
-              projectId,
-              name,
-              description: options.description,
-              targetDate: options.targetDate,
-            },
-          );
+          // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (CreateProjectMilestoneDocument) with the appropriate return type parameter.
+          const result =
+            await graphQLService.rawRequest<CreateProjectMilestoneMutation>(
+              print(CreateProjectMilestoneDocument),
+              {
+                projectId,
+                name,
+                description: options.description,
+                targetDate: options.targetDate,
+              }
+            );
 
           if (!result.projectMilestoneCreate?.success) {
             throw new Error("Failed to create project milestone");
           }
 
           outputSuccess(result.projectMilestoneCreate.projectMilestone);
-        },
-      ),
+        }
+      )
     );
 
   // Update an existing milestone
   projectMilestones
     .command("update <milestoneIdOrName>")
     .description(
-      "Update an existing project milestone. Accepts UUID or milestone name (optionally scoped by --project)",
+      "Update an existing project milestone. Accepts UUID or milestone name (optionally scoped by --project)"
     )
     .option("--project <project>", "project name or ID to scope name lookup")
     .option("-n, --name <name>", "new milestone name")
     .option("-d, --description <description>", "new milestone description")
     .option(
       "--target-date <date>",
-      "new target date in ISO format (YYYY-MM-DD)",
+      "new target date in ISO format (YYYY-MM-DD)"
     )
     .option("--sort-order <number>", "new sort order")
     .action(
@@ -221,7 +269,7 @@ export function setupProjectMilestonesCommands(program: Command): void {
         async (
           milestoneIdOrName: string,
           options: MilestoneUpdateOptions,
-          command: Command,
+          command: Command
         ) => {
           const [graphQLService, linearService] = await Promise.all([
             createGraphQLService(command.parent!.parent!.opts()),
@@ -232,11 +280,11 @@ export function setupProjectMilestonesCommands(program: Command): void {
             milestoneIdOrName,
             graphQLService,
             linearService,
-            options.project,
+            options.project
           );
 
           // Build update input (only include provided fields)
-          const updateVars: Partial<LinearProjectMilestone> & { id: string } = {
+          const updateVars: ProjectMilestoneUpdateInput & { id: string } = {
             id: milestoneId,
           };
           if (options.name !== undefined) updateVars.name = options.name;
@@ -250,17 +298,21 @@ export function setupProjectMilestonesCommands(program: Command): void {
             updateVars.sortOrder = parseFloat(options.sortOrder);
           }
 
-          const result = await graphQLService.rawRequest(
-            UPDATE_PROJECT_MILESTONE_MUTATION,
-            updateVars,
-          );
+          // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
+          // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+          // * (UpdateProjectMilestoneDocument) with the appropriate return type parameter.
+          const result =
+            await graphQLService.rawRequest<UpdateProjectMilestoneMutation>(
+              print(UpdateProjectMilestoneDocument),
+              updateVars
+            );
 
           if (!result.projectMilestoneUpdate?.success) {
             throw new Error("Failed to update project milestone");
           }
 
           outputSuccess(result.projectMilestoneUpdate.projectMilestone);
-        },
-      ),
+        }
+      )
     );
 }
