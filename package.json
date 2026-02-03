@@ -22,8 +22,9 @@
     "test:coverage": "vitest run --coverage",
     "test:commands": "tsx tests/command-coverage.ts",
     "generate": "graphql-codegen --config codegen.config.ts",
-    "prestart": "generate",
-    "predev": "generate",
+    "prestart": "npm run generate",
+    "predev": "npm run generate",
+    "postinstall": "npm run generate",
     "prepublishOnly": "npm run build && npm run test && test -x dist/main.js"
   },
   "engines": {
