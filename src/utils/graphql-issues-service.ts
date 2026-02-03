@@ -7,7 +7,33 @@ import {
   parseIssueIdentifier,
   tryParseIssueIdentifier,
 } from "./identifier-parser.js";
-import { BatchResolveForCreateDocument, BatchResolveForCreateQuery, BatchResolveForUpdateDocument, BatchResolveForUpdateQuery, CreateIssueDocument, CreateIssueMutation, FindCycleGlobalDocument, FindCycleGlobalQuery, FindCycleScopedDocument, FindCycleScopedQuery, GetIssueByIdDocument, GetIssueByIdentifierDocument, GetIssueByIdentifierQuery, GetIssueByIdQuery, GetIssuesDocument, GetIssuesQuery, GetIssueTeamDocument, GetIssueTeamQuery, IssueCreateInput, IssueUpdateInput, QuerySearchIssuesArgs, SearchIssuesDocument, SearchIssuesQuery, SearchIssuesQueryVariables, UpdateIssueDocument, UpdateIssueMutation, UpdateIssueMutationVariables } from "../gql/graphql.js";
+import {
+  BatchResolveForCreateDocument,
+  BatchResolveForCreateQuery,
+  BatchResolveForUpdateDocument,
+  BatchResolveForUpdateQuery,
+  CreateIssueDocument,
+  CreateIssueMutation,
+  FindCycleGlobalDocument,
+  FindCycleGlobalQuery,
+  FindCycleScopedDocument,
+  FindCycleScopedQuery,
+  GetIssueByIdDocument,
+  GetIssueByIdentifierDocument,
+  GetIssueByIdentifierQuery,
+  GetIssueByIdQuery,
+  GetIssuesDocument,
+  GetIssuesQuery,
+  GetIssueTeamDocument,
+  GetIssueTeamQuery,
+  IssueCreateInput,
+  IssueUpdateInput,
+  QuerySearchIssuesArgs,
+  SearchIssuesDocument,
+  SearchIssuesQuery,
+  UpdateIssueDocument,
+  UpdateIssueMutation,
+} from "../gql/graphql.js";
 
 // Type aliases for cleaner method signatures
 type IssueFromId = NonNullable<GetIssueByIdQuery["issue"]>;
@@ -75,10 +101,11 @@ export class GraphQLIssuesService {
     } else {
       const { teamKey, issueNumber } = parseIssueIdentifier(id);
 
-      const result = await this.graphQLService.rawRequest<GetIssueByIdentifierQuery>(
-        print(GetIssueByIdentifierDocument),
-        { teamKey, number: issueNumber }
-      );
+      const result =
+        await this.graphQLService.rawRequest<GetIssueByIdentifierQuery>(
+          print(GetIssueByIdentifierDocument),
+          { teamKey, number: issueNumber }
+        );
 
       if (!result.issues.nodes.length) {
         throw new Error(`Issue with identifier "${id}" not found`);
@@ -157,10 +184,11 @@ export class GraphQLIssuesService {
     // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
     // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
     // * (BatchResolveForUpdateDocument) with the appropriate return type parameter.
-    const resolveResult = await this.graphQLService.rawRequest<BatchResolveForUpdateQuery>(
-      print(BatchResolveForUpdateDocument),
-      resolveVariables
-    );
+    const resolveResult =
+      await this.graphQLService.rawRequest<BatchResolveForUpdateQuery>(
+        print(BatchResolveForUpdateDocument),
+        resolveVariables
+      );
 
     // Process resolution results
     if (!isUuid(resolvedIssueId)) {
@@ -282,10 +310,11 @@ export class GraphQLIssuesService {
           // * NOTE: We must enforce the return type here and ensure it matches the query document,
           // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
           // * (GetIssueTeamDocument) with the appropriate return type parameter.
-          const issueTeamRes = await this.graphQLService.rawRequest<GetIssueTeamQuery>(
-            print(GetIssueTeamDocument),
-            { issueId: resolvedIssueId }
-          );
+          const issueTeamRes =
+            await this.graphQLService.rawRequest<GetIssueTeamQuery>(
+              print(GetIssueTeamDocument),
+              { issueId: resolvedIssueId }
+            );
           teamIdForCycle = issueTeamRes.issue?.team?.id;
         }
 
@@ -294,10 +323,11 @@ export class GraphQLIssuesService {
           // * NOTE: We must enforce the return type here and ensure it matches the query document,
           // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
           // * (FindCycleScopedDocument) with the appropriate return type parameter.
-          const scopedRes = await this.graphQLService.rawRequest<FindCycleScopedQuery>(
-            print(FindCycleScopedDocument),
-            { name: input.cycleId, teamId: teamIdForCycle }
-          );
+          const scopedRes =
+            await this.graphQLService.rawRequest<FindCycleScopedQuery>(
+              print(FindCycleScopedDocument),
+              { name: input.cycleId, teamId: teamIdForCycle }
+            );
           const scopedNodes = scopedRes.cycles?.nodes || [];
           if (scopedNodes.length === 1) {
             finalCycleId = scopedNodes[0].id;
@@ -321,10 +351,11 @@ export class GraphQLIssuesService {
           // * NOTE: We must enforce the return type here and ensure it matches the query document,
           // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
           // * (FindCycleGlobalDocument) with the appropriate return type parameter.
-          const globalRes = await this.graphQLService.rawRequest<FindCycleGlobalQuery>(
-            print(FindCycleGlobalDocument),
-            { name: input.cycleId }
-          );
+          const globalRes =
+            await this.graphQLService.rawRequest<FindCycleGlobalQuery>(
+              print(FindCycleGlobalDocument),
+              { name: input.cycleId }
+            );
           const globalNodes = globalRes.cycles?.nodes || [];
           if (globalNodes.length === 1) {
             finalCycleId = globalNodes[0].id;
@@ -359,10 +390,11 @@ export class GraphQLIssuesService {
         // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
         // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
         // * (GetIssueTeamDocument) with the appropriate return type parameter.
-        const issueResult = await this.graphQLService.rawRequest<GetIssueTeamQuery>(
-          print(GetIssueTeamDocument),
-          { issueId: resolvedIssueId }
-        );
+        const issueResult =
+          await this.graphQLService.rawRequest<GetIssueTeamQuery>(
+            print(GetIssueTeamDocument),
+            { issueId: resolvedIssueId }
+          );
         teamId = issueResult.issue?.team?.id;
       }
       resolvedStatusId = await this.linearService.resolveStatusId(
@@ -397,13 +429,14 @@ export class GraphQLIssuesService {
     // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
     // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
     // * (UpdateIssueDocument) with the appropriate return type parameter.
-    const updateResult = await this.graphQLService.rawRequest<UpdateIssueMutation>(
-      print(UpdateIssueDocument),
-      {
-        id: resolvedIssueId,
-        input: updateInput,
-      }
-    );
+    const updateResult =
+      await this.graphQLService.rawRequest<UpdateIssueMutation>(
+        print(UpdateIssueDocument),
+        {
+          id: resolvedIssueId,
+          input: updateInput,
+        }
+      );
 
     if (!updateResult.issueUpdate.success) {
       throw new Error("Failed to update issue");
@@ -480,10 +513,11 @@ export class GraphQLIssuesService {
     };
 
     if (Object.keys(resolveVariables).length > 0) {
-      resolveResult = await this.graphQLService.rawRequest<BatchResolveForCreateQuery>(
-        print(BatchResolveForCreateDocument),
-        resolveVariables
-      );
+      resolveResult =
+        await this.graphQLService.rawRequest<BatchResolveForCreateQuery>(
+          print(BatchResolveForCreateDocument),
+          resolveVariables
+        );
     }
 
     // Resolve team ID
@@ -564,7 +598,9 @@ export class GraphQLIssuesService {
         const hint = finalProjectId
           ? ` in project`
           : ` (consider specifying --project)`;
-        throw new Error(`Milestone "${input.projectMilestoneId}" not found${hint}`);
+        throw new Error(
+          `Milestone "${input.projectMilestoneId}" not found${hint}`
+        );
       }
     }
 
@@ -580,10 +616,11 @@ export class GraphQLIssuesService {
         // * NOTE: We must enforce the return type here and ensure it matches the query document,
         // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
         // * (FindCycleScopedDocument) with the appropriate return type parameter.
-        const scopedRes = await this.graphQLService.rawRequest<FindCycleScopedQuery>(
-          print(FindCycleScopedDocument),
-          { name: input.cycleId, teamId: finalTeamId }
-        );
+        const scopedRes =
+          await this.graphQLService.rawRequest<FindCycleScopedQuery>(
+            print(FindCycleScopedDocument),
+            { name: input.cycleId, teamId: finalTeamId }
+          );
         if (scopedRes.cycles?.nodes?.length) {
           finalCycleId = scopedRes.cycles.nodes[0].id;
         }
@@ -594,10 +631,11 @@ export class GraphQLIssuesService {
         // * NOTE: We must enforce the return type here and ensure it matches the query document,
         // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
         // * (FindCycleGlobalDocument) with the appropriate return type parameter.
-        const globalRes = await this.graphQLService.rawRequest<FindCycleGlobalQuery>(
-          print(FindCycleGlobalDocument),
-          { name: input.cycleId }
-        );
+        const globalRes =
+          await this.graphQLService.rawRequest<FindCycleGlobalQuery>(
+            print(FindCycleGlobalDocument),
+            { name: input.cycleId }
+          );
         if (globalRes.cycles?.nodes?.length) {
           finalCycleId = globalRes.cycles.nodes[0].id;
         }
@@ -639,12 +677,13 @@ export class GraphQLIssuesService {
     // * NOTE: We must enforce the return type here and ensure it matches the mutation document,
     // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
     // * (CreateIssueDocument) with the appropriate return type parameter.
-    const createResult = await this.graphQLService.rawRequest<CreateIssueMutation>(
-      print(CreateIssueDocument),
-      {
-        input: createInput,
-      }
-    );
+    const createResult =
+      await this.graphQLService.rawRequest<CreateIssueMutation>(
+        print(CreateIssueDocument),
+        {
+          input: createInput,
+        }
+      );
 
     if (!createResult.issueCreate.success) {
       throw new Error("Failed to create issue");
