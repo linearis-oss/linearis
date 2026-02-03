@@ -1,5 +1,5 @@
 # ------------------------------------------------------------
-# GraphQL queries and mutations for Linear attachments
+# GraphQL queries for Linear attachments
 #
 # Attachments allow linking any URL to an issue. This is the mechanism
 # to associate documents (or any external resource) with issues, since
@@ -19,28 +19,6 @@ fragment AttachmentFields on Attachment {
   url
   createdAt
   updatedAt
-}
-
-# Create an attachment on an issue
-#
-# If an attachment with the same url and issueId already exists,
-# the existing record is updated instead of creating a duplicate.
-mutation AttachmentCreate($input: AttachmentCreateInput!) {
-  attachmentCreate(input: $input) {
-    success
-    attachment {
-      ...AttachmentFields
-    }
-  }
-}
-
-# Delete an attachment
-#
-# Deletes an attachment and returns success status.
-mutation AttachmentDelete($id: String!) {
-  attachmentDelete(id: $id) {
-    success
-  }
 }
 
 # List attachments on an issue

@@ -1,13 +1,11 @@
 # ------------------------------------------------------------
-# ------------------------------------------------------------
-# Common GraphQL fragments for reuse across queries
+# GraphQL queries for Linear project milestones
 #
 # These fragments define reusable field selections for Linear entities,
-# ensuring consistent data structure and reducing duplication. Place
-# all shared fragments for project-milestone-related queries here.
+# ensuring consistent data structure and reducing duplication.
 # ------------------------------------------------------------
 
-# List project milestones in a project with minimal fields (optimized)
+# List project milestones in a project
 #
 # Fetches a list of project milestones for a given project.
 query ListProjectMilestones($projectId: String!, $first: Int!) {
@@ -82,75 +80,6 @@ query FindProjectMilestoneGlobal($name: String!) {
       name
       targetDate
       sortOrder
-      project {
-        id
-        name
-      }
-    }
-  }
-}
-
-# Create a new project milestone
-#
-# Creates a new project milestone and returns the created project milestone data.
-mutation CreateProjectMilestone(
-  $projectId: String!
-  $name: String!
-  $description: String
-  $targetDate: TimelessDate
-) {
-  projectMilestoneCreate(
-    input: {
-      projectId: $projectId
-      name: $name
-      description: $description
-      targetDate: $targetDate
-    }
-  ) {
-    success
-    projectMilestone {
-      id
-      name
-      description
-      targetDate
-      sortOrder
-      createdAt
-      updatedAt
-      project {
-        id
-        name
-      }
-    }
-  }
-}
-
-# Update an existing project milestone
-#
-# Updates an existing project milestone and returns the updated project milestone data.
-mutation UpdateProjectMilestone(
-  $id: String!
-  $name: String
-  $description: String
-  $targetDate: TimelessDate
-  $sortOrder: Float
-) {
-  projectMilestoneUpdate(
-    id: $id
-    input: {
-      name: $name
-      description: $description
-      targetDate: $targetDate
-      sortOrder: $sortOrder
-    }
-  ) {
-    success
-    projectMilestone {
-      id
-      name
-      description
-      targetDate
-      sortOrder
-      updatedAt
       project {
         id
         name

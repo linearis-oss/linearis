@@ -1,0 +1,74 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear project milestones
+#
+# Creates and updates project milestones with complete response data including all relationships.
+# ------------------------------------------------------------
+
+# Create a new project milestone
+#
+# Creates a new project milestone and returns the created project milestone data.
+mutation CreateProjectMilestone(
+  $projectId: String!
+  $name: String!
+  $description: String
+  $targetDate: TimelessDate
+) {
+  projectMilestoneCreate(
+    input: {
+      projectId: $projectId
+      name: $name
+      description: $description
+      targetDate: $targetDate
+    }
+  ) {
+    success
+    projectMilestone {
+      id
+      name
+      description
+      targetDate
+      sortOrder
+      createdAt
+      updatedAt
+      project {
+        id
+        name
+      }
+    }
+  }
+}
+
+# Update an existing project milestone
+#
+# Updates an existing project milestone and returns the updated project milestone data.
+mutation UpdateProjectMilestone(
+  $id: String!
+  $name: String
+  $description: String
+  $targetDate: TimelessDate
+  $sortOrder: Float
+) {
+  projectMilestoneUpdate(
+    id: $id
+    input: {
+      name: $name
+      description: $description
+      targetDate: $targetDate
+      sortOrder: $sortOrder
+    }
+  ) {
+    success
+    projectMilestone {
+      id
+      name
+      description
+      targetDate
+      sortOrder
+      updatedAt
+      project {
+        id
+        name
+      }
+    }
+  }
+}
