@@ -577,8 +577,11 @@ export class GraphQLIssuesService {
     ) {
       // Try scoped lookup within finalTeamId first
       if (finalTeamId) {
-        const scopedRes = await this.graphQLService.rawRequest(
-          `query FindCycleScoped($name: String!, $teamId: ID!) { cycles(filter: { and: [ { name: { eq: $name } }, { team: { id: { eq: $teamId } } } ] }, first: 1) { nodes { id name } } }`,
+        // * NOTE: We must enforce the return type here and ensure it matches the query document,
+        // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+        // * (FindCycleScopedDocument) with the appropriate return type parameter.
+        const scopedRes = await this.graphQLService.rawRequest<FindCycleScopedQuery>(
+          print(FindCycleScopedDocument),
           { name: input.cycleId, teamId: finalTeamId }
         );
         if (scopedRes.cycles?.nodes?.length) {
@@ -588,8 +591,11 @@ export class GraphQLIssuesService {
 
       // Fallback to global lookup by name
       if (!finalCycleId) {
-        const globalRes = await this.graphQLService.rawRequest(
-          `query FindCycleGlobal($name: String!) { cycles(filter: { name: { eq: $name } }, first: 1) { nodes { id name } } }`,
+        // * NOTE: We must enforce the return type here and ensure it matches the query document,
+        // * as a string is expected in return type. Be extremely careful to use the correct GraphQL document
+        // * (FindCycleGlobalDocument) with the appropriate return type parameter.
+        const globalRes = await this.graphQLService.rawRequest<FindCycleGlobalQuery>(
+          print(FindCycleGlobalDocument),
           { name: input.cycleId }
         );
         if (globalRes.cycles?.nodes?.length) {
