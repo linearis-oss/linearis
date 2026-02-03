@@ -13,7 +13,6 @@ import {
 
 // Type aliases for cleaner method signatures
 type AttachmentFromCreate = AttachmentCreateMutation["attachmentCreate"]["attachment"];
-type AttachmentFromList = ListAttachmentsQuery["issue"]["attachments"]["nodes"][0];
 
 /**
  * GraphQL-optimized attachments service for single API call operations
