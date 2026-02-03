@@ -35,7 +35,7 @@ export class GraphQLIssuesService {
       print(GetIssuesDocument),
       {
         first: limit,
-        orderBy: "updatedAt" as any,
+        orderBy: "updatedAt",
       }
     );
 
