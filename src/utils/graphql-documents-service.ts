@@ -20,7 +20,6 @@ import {
 type DocumentFromCreate = DocumentCreateMutation["documentCreate"]["document"];
 type DocumentFromUpdate = DocumentUpdateMutation["documentUpdate"]["document"];
 type DocumentFromQuery = GetDocumentQuery["document"];
-type DocumentFromList = ListDocumentsQuery["documents"]["nodes"][0];
 
 /**
  * GraphQL-optimized documents service for single API call operations
