@@ -1,0 +1,22 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear files
+#
+# Uploads a file to Linear's cloud storage.
+# ------------------------------------------------------------
+
+# Upload a file to Linear's cloud storage.
+#
+# Returns the upload URL and asset URL for the uploaded file.
+mutation FileUpload($contentType: String!, $filename: String!, $size: Int!) {
+  fileUpload(contentType: $contentType, filename: $filename, size: $size) {
+    success
+    uploadFile {
+      uploadUrl
+      assetUrl
+      headers {
+        key
+        value
+      }
+    }
+  }
+}
