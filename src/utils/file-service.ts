@@ -10,9 +10,11 @@
  * - Comprehensive error handling and status reporting
  */
 
+import { print } from "graphql";
 import { access, mkdir, readFile, stat, writeFile } from "fs/promises";
 import { basename, dirname, extname } from "path";
 import { extractFilenameFromUrl, isLinearUploadUrl } from "./embed-parser.js";
+import { FileUploadDocument } from "../gql/graphql.js";
 
 /**
  * Maximum file size for uploads (20MB)
@@ -289,23 +291,6 @@ export class FileService {
 
     const contentType = getMimeType(filePath);
 
-    // Step 1: Request upload URL via GraphQL fileUpload mutation
-    const query = `
-      mutation FileUpload($contentType: String!, $filename: String!, $size: Int!) {
-        fileUpload(contentType: $contentType, filename: $filename, size: $size) {
-          success
-          uploadFile {
-            uploadUrl
-            assetUrl
-            headers {
-              key
-              value
-            }
-          }
-        }
-      }
-    `;
-
     try {
       // Make GraphQL request
       const graphqlResponse = await fetch("https://api.linear.app/graphql", {
@@ -315,7 +300,7 @@ export class FileService {
           Authorization: this.apiToken,
         },
         body: JSON.stringify({
-          query,
+          query: print(FileUploadDocument),
           variables: {
             contentType,
             filename,
