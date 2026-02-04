@@ -19,7 +19,7 @@ interface MilestoneListOptions {
 
 interface MilestoneReadOptions {
   project?: string;
-  issuesFirst?: string;
+  limit?: string;
 }
 
 interface MilestoneCreateOptions {
@@ -36,19 +36,19 @@ interface MilestoneUpdateOptions {
   sortOrder?: string;
 }
 
-export function setupProjectMilestonesCommands(program: Command): void {
-  const projectMilestones = program
-    .command("project-milestones")
+export function setupMilestonesCommands(program: Command): void {
+  const milestones = program
+    .command("milestones")
     .description("Project milestone operations");
 
-  projectMilestones.action(() => projectMilestones.help());
+  milestones.action(() => milestones.help());
 
   // List milestones in a project
-  projectMilestones
+  milestones
     .command("list")
-    .description("List milestones in a project")
-    .requiredOption("--project <project>", "project name or ID")
-    .option("-l, --limit <number>", "limit results", "50")
+    .description("list milestones in a project")
+    .requiredOption("--project <project>", "target project (required)")
+    .option("-l, --limit <n>", "max results", "50")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
@@ -70,17 +70,15 @@ export function setupProjectMilestonesCommands(program: Command): void {
     );
 
   // Get milestone details with issues
-  projectMilestones
-    .command("read <milestoneIdOrName>")
-    .description(
-      "Get milestone details including issues. Accepts UUID or milestone name (optionally scoped by --project)"
-    )
-    .option("--project <project>", "project name or ID to scope name lookup")
-    .option("--issues-first <n>", "how many issues to fetch (default 50)", "50")
+  milestones
+    .command("read <milestone>")
+    .description("get milestone details including issues")
+    .option("--project <project>", "scope name lookup to project")
+    .option("--limit <n>", "max issues to fetch", "50")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
-          const [milestoneIdOrName, options, command] = args as [
+          const [milestone, options, command] = args as [
             string,
             MilestoneReadOptions,
             Command
@@ -90,27 +88,27 @@ export function setupProjectMilestonesCommands(program: Command): void {
           const milestoneId = await resolveMilestoneId(
             ctx.gql,
             ctx.sdk,
-            milestoneIdOrName,
+            milestone,
             options.project
           );
 
-          const milestone = await getMilestone(
+          const milestoneResult = await getMilestone(
             ctx.gql,
             milestoneId,
-            parseInt(options.issuesFirst || "50")
+            parseInt(options.limit || "50")
           );
 
-          outputSuccess(milestone);
+          outputSuccess(milestoneResult);
         }
       )
     );
 
   // Create a new milestone
-  projectMilestones
+  milestones
     .command("create <name>")
-    .description("Create a new project milestone")
-    .requiredOption("--project <project>", "project name or ID")
-    .option("-d, --description <description>", "milestone description")
+    .description("create a new milestone")
+    .requiredOption("--project <project>", "target project (required)")
+    .option("-d, --description <text>", "milestone description")
     .option("--target-date <date>", "target date in ISO format (YYYY-MM-DD)")
     .action(
       handleCommand(
@@ -138,23 +136,21 @@ export function setupProjectMilestonesCommands(program: Command): void {
     );
 
   // Update an existing milestone
-  projectMilestones
-    .command("update <milestoneIdOrName>")
-    .description(
-      "Update an existing project milestone. Accepts UUID or milestone name (optionally scoped by --project)"
-    )
-    .option("--project <project>", "project name or ID to scope name lookup")
-    .option("-n, --name <name>", "new milestone name")
-    .option("-d, --description <description>", "new milestone description")
+  milestones
+    .command("update <milestone>")
+    .description("update an existing milestone")
+    .option("--project <project>", "scope name lookup to project")
+    .option("-n, --name <name>", "new name")
+    .option("--description <text>", "new description")
     .option(
       "--target-date <date>",
       "new target date in ISO format (YYYY-MM-DD)"
     )
-    .option("--sort-order <number>", "new sort order")
+    .option("--sort-order <n>", "display order")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
-          const [milestoneIdOrName, options, command] = args as [
+          const [milestone, options, command] = args as [
             string,
             MilestoneUpdateOptions,
             Command
@@ -164,7 +160,7 @@ export function setupProjectMilestonesCommands(program: Command): void {
           const milestoneId = await resolveMilestoneId(
             ctx.gql,
             ctx.sdk,
-            milestoneIdOrName,
+            milestone,
             options.project
           );
 
