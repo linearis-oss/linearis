@@ -1,59 +1,51 @@
 import { Command } from "commander";
 
 /**
- * Generate usage information for all individual subcommands
- * 
- * This utility traverses the entire command tree and outputs formatted help
- * for each leaf command. It collects commands recursively, sorts them
- * alphabetically, and outputs their help blocks separated by dividers.
- * 
- * @param program - Commander.js program instance with registered commands
- * @returns void (outputs help text to console)
- * 
- * @example
- * ```typescript
- * // In main.ts usage command setup
- * program
- *   .command("usage")
- *   .description("show usage info for all tools")
- *   .action(() => outputUsageInfo(program));
- * ```
+ * Metadata for a CLI domain, used to generate token-optimized usage output.
  */
-export function outputUsageInfo(program: Command) {
-  const subcommands: { name: string; command: Command }[] = [];
+export interface DomainMeta {
+  /** Domain command name (e.g. "issues") */
+  name: string;
+  /** One-line summary shown in overview (e.g. "work items with status, priority, assignee, labels") */
+  summary: string;
+  /** Multi-line context explaining the domain's data model for LLM agents */
+  context: string;
+  /** Argument descriptions keyed by argument name without brackets (e.g. { issue: "issue identifier (UUID or ABC-123)" }) */
+  arguments: Record<string, string>;
+  /** Cross-references to related commands (e.g. ["comments create <issue>"]) */
+  seeAlso: string[];
+}
 
-  /**
-   * Recursively collect all leaf subcommands (not parent commands)
-   * 
-   * @param cmd - Current command to process
-   * @param prefix - Accumulated command name prefix
-   */
-  function collectSubcommands(cmd: Command, prefix: string = "") {
-    const currentName = prefix ? `${prefix} ${cmd.name()}` : cmd.name();
-
-    // Get all subcommands
-    const commands = cmd.commands;
-
-    if (commands.length === 0) {
-      // This is a leaf command (actual subcommand)
-      if (prefix) { // Only include commands with a prefix (exclude root)
-        subcommands.push({ name: currentName, command: cmd });
-      }
-    } else {
-      // This is a parent command, recurse into its subcommands
-      commands.forEach((subcmd) => collectSubcommands(subcmd, currentName));
-    }
+/**
+ * Format tier 1 overview: all domains with one-line summaries.
+ *
+ * @param version - CLI version string
+ * @param metas - Domain metadata array
+ * @returns Formatted plain text overview
+ */
+export function formatOverview(version: string, metas: DomainMeta[]): string {
+  const lines: string[] = [];
+  lines.push(
+    `linearis v${version} — CLI for Linear.app (project management / issue tracking)`,
+  );
+  lines.push(
+    "auth: --api-token <token> | LINEAR_API_TOKEN | ~/.linear_api_token",
+  );
+  lines.push("output: JSON");
+  lines.push("ids: UUID or human-readable (team key, issue ABC-123, name)");
+  lines.push("");
+  lines.push("domains:");
+  for (const meta of metas) {
+    lines.push(`  ${meta.name.padEnd(14)}${meta.summary}`);
   }
+  lines.push("");
+  lines.push("detail: linearis <domain> usage");
+  return lines.join("\n");
+}
 
-  // Start collection from root program
-  collectSubcommands(program);
-
-  // Sort subcommands alphabetically by full name
-  subcommands.sort((a, b) => a.name.localeCompare(b.name));
-
-  // Output full (incl. `.addHelpText()` blocks) help text for each subcommand
-  subcommands.forEach(({ command }) => {
-    command.outputHelp();
-    console.log("\n---\n")
-  });
+/**
+ * @deprecated Will be removed in Task 8 when main.ts is updated.
+ */
+export function outputUsageInfo(_program: Command): void {
+  // Stub — replaced by formatOverview + formatDomainUsage
 }
