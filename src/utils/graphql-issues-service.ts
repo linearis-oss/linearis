@@ -569,7 +569,7 @@ export class GraphQLIssuesService {
         const hint = finalProjectId
           ? ` in project`
           : ` (consider specifying --project)`;
-        throw new Error(`Milestone "${input.milestoneId}" not found${hint}`);
+        throw new Error(`Milestone "${input.projectMilestoneId}" not found${hint}`);
       }
     }
 
