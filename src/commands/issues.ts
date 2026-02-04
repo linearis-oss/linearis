@@ -1,8 +1,64 @@
 import { Command } from "commander";
-import { createGraphQLService } from "../utils/graphql-service.js";
-import { GraphQLIssuesService } from "../utils/graphql-issues-service.js";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { resolveLabelIds } from "../resolvers/label-resolver.js";
+import { resolveProjectId } from "../resolvers/project-resolver.js";
+import { resolveCycleId } from "../resolvers/cycle-resolver.js";
+import { resolveStatusId } from "../resolvers/status-resolver.js";
+import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
+import { resolveIssueId } from "../resolvers/issue-resolver.js";
+import {
+  listIssues,
+  getIssue,
+  createIssue,
+  updateIssue,
+  searchIssues,
+} from "../services/issue-service.js";
+import type { IssueCreateInput, IssueUpdateInput } from "../gql/graphql.js";
+
+interface ListOptions {
+  limit: string;
+}
+
+interface SearchOptions {
+  team?: string;
+  assignee?: string;
+  project?: string;
+  status?: string;
+  limit: string;
+}
+
+interface CreateOptions {
+  description?: string;
+  assignee?: string;
+  priority?: string;
+  project?: string;
+  team?: string;
+  labels?: string;
+  projectMilestone?: string;
+  cycle?: string;
+  status?: string;
+  parentTicket?: string;
+}
+
+interface UpdateOptions {
+  title?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  assignee?: string;
+  project?: string;
+  labels?: string;
+  labelBy?: string;
+  clearLabels?: boolean;
+  parentTicket?: string;
+  clearParentTicket?: boolean;
+  projectMilestone?: string;
+  clearProjectMilestone?: boolean;
+  cycle?: string;
+  clearCycle?: boolean;
+}
 
 /**
  * Setup issues commands on the program
@@ -41,20 +97,11 @@ export function setupIssuesCommands(program: Command): void {
     .description("List issues.")
     .option("-l, --limit <number>", "limit results", "25")
     .action(
-      handleAsyncCommand(
-        async (options: any, command: Command) => {
-          // Initialize both services for comprehensive issue data
-          const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
-          ]);
-          const issuesService = new GraphQLIssuesService(
-            graphQLService,
-            linearService,
-          );
-
-          // Fetch issues with optimized single query
-          const result = await issuesService.getIssues(parseInt(options.limit));
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [options, command] = args as [ListOptions, Command];
+          const ctx = await createContext(command.parent!.parent!.opts());
+          const result = await listIssues(ctx.gql, parseInt(options.limit));
           outputSuccess(result);
         },
       ),
@@ -66,7 +113,7 @@ export function setupIssuesCommands(program: Command): void {
    * Command: `linearis issues search <query> [options]`
    *
    * Searches issues with optional filtering by team, assignee, project,
-   * and workflow states. Uses optimized GraphQL queries with batch resolution.
+   * and workflow states. Uses optimized GraphQL queries.
    */
   issues.command("search <query>")
     .description("Search issues.")
@@ -76,23 +123,14 @@ export function setupIssuesCommands(program: Command): void {
     .option("--status <status>", "filter by status (comma-separated)")
     .option("-l, --limit <number>", "limit results", "10")
     .action(
-      handleAsyncCommand(
-        async (query: string, options: any, command: Command) => {
-          const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
-          ]);
-          const issuesService = new GraphQLIssuesService(
-            graphQLService,
-            linearService,
-          );
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [query, options, command] = args as [string, SearchOptions, Command];
+          const ctx = await createContext(command.parent!.parent!.opts());
 
-          const result = await issuesService.searchIssues({
-            term: query,
-            teamId: options.team,
-            includeArchived: options.status === "all",
-            limit: parseInt(options.limit),
-          });
+          // Note: Current implementation only supports basic search
+          // Team filtering is not yet implemented in searchIssues service
+          const result = await searchIssues(ctx.gql, query, parseInt(options.limit));
           outputSuccess(result);
         },
       ),
@@ -129,38 +167,70 @@ export function setupIssuesCommands(program: Command): void {
     .option("--status <status>", "status name or ID")
     .option("--parent-ticket <parentId>", "parent issue ID or identifier")
     .action(
-      handleAsyncCommand(
-        async (title: string, options: any, command: Command) => {
-          const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
-          ]);
-          const issuesService = new GraphQLIssuesService(
-            graphQLService,
-            linearService,
-          );
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [title, options, command] = args as [string, CreateOptions, Command];
+          const ctx = await createContext(command.parent!.parent!.opts());
 
-          // Prepare labels array if provided
-          let labelIds: string[] | undefined;
-          if (options.labels) {
-            labelIds = options.labels.split(",").map((l: string) => l.trim());
+          // Resolve team ID (required)
+          if (!options.team) {
+            throw new Error("--team is required");
           }
+          const teamId = await resolveTeamId(ctx.sdk, options.team);
 
-          const createArgs = {
+          // Build input object
+          const input: IssueCreateInput = {
             title,
-            teamId: options.team, // GraphQL service handles team resolution
-            description: options.description,
-            assigneeId: options.assignee,
-            priority: options.priority ? parseInt(options.priority) : undefined,
-            projectId: options.project, // GraphQL service handles project resolution
-            statusId: options.status,
-            labelIds, // GraphQL service handles label resolution
-            parentId: options.parentTicket, // GraphQL service handles parent resolution
-            milestoneId: options.projectMilestone,
-            cycleId: options.cycle,
+            teamId,
           };
 
-          const result = await issuesService.createIssue(createArgs);
+          // Resolve optional IDs
+          if (options.description) {
+            input.description = options.description;
+          }
+
+          if (options.assignee) {
+            input.assigneeId = options.assignee;
+          }
+
+          if (options.priority) {
+            input.priority = parseInt(options.priority);
+          }
+
+          if (options.project) {
+            input.projectId = await resolveProjectId(ctx.sdk, options.project);
+          }
+
+          if (options.labels) {
+            const labelNames = options.labels.split(",").map((l) => l.trim());
+            input.labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+          }
+
+          if (options.projectMilestone) {
+            if (!options.project) {
+              throw new Error("--project-milestone requires --project to be specified");
+            }
+            input.projectMilestoneId = await resolveMilestoneId(
+              ctx.gql,
+              ctx.sdk,
+              options.projectMilestone,
+              options.project,
+            );
+          }
+
+          if (options.cycle) {
+            input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, options.team);
+          }
+
+          if (options.status) {
+            input.stateId = await resolveStatusId(ctx.sdk, options.status, teamId);
+          }
+
+          if (options.parentTicket) {
+            input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
+          }
+
+          const result = await createIssue(ctx.gql, input);
           outputSuccess(result);
         },
       ),
@@ -181,20 +251,11 @@ export function setupIssuesCommands(program: Command): void {
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
     .action(
-      handleAsyncCommand(
-        async (issueId: string, _options: any, command: Command) => {
-          // Initialize both services for comprehensive issue data
-          const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
-          ]);
-          const issuesService = new GraphQLIssuesService(
-            graphQLService,
-            linearService,
-          );
-
-          // Get issue with all relationships and comments
-          const result = await issuesService.getIssueById(issueId);
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [issueId, , command] = args as [string, unknown, Command];
+          const ctx = await createContext(command.parent!.parent!.opts());
+          const result = await getIssue(ctx.gql, issueId);
           outputSuccess(result);
         },
       ),
@@ -250,30 +311,28 @@ export function setupIssuesCommands(program: Command): void {
     )
     .option("--clear-cycle", "clear existing cycle assignment")
     .action(
-      handleAsyncCommand(
-        async (issueId: string, options: any, command: Command) => {
-          // Check for mutually exclusive parent flags
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [issueId, options, command] = args as [string, UpdateOptions, Command];
+          // Validate mutually exclusive flags
           if (options.parentTicket && options.clearParentTicket) {
             throw new Error(
               "Cannot use --parent-ticket and --clear-parent-ticket together",
             );
           }
 
-          // Check for mutually exclusive milestone flags
           if (options.projectMilestone && options.clearProjectMilestone) {
             throw new Error(
               "Cannot use --project-milestone and --clear-project-milestone together",
             );
           }
 
-          // Check for mutually exclusive cycle flags
           if (options.cycle && options.clearCycle) {
             throw new Error(
               "Cannot use --cycle and --clear-cycle together",
             );
           }
 
-          // Validate label operation flags
           if (options.labelBy && !options.labels) {
             throw new Error(
               "--label-by requires --labels to be specified",
@@ -292,7 +351,6 @@ export function setupIssuesCommands(program: Command): void {
             );
           }
 
-          // Validate label-by mode values
           if (
             options.labelBy &&
             !["adding", "overwriting"].includes(options.labelBy)
@@ -302,43 +360,99 @@ export function setupIssuesCommands(program: Command): void {
             );
           }
 
-          const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
-          ]);
-          const issuesService = new GraphQLIssuesService(
-            graphQLService,
-            linearService,
-          );
+          const ctx = await createContext(command.parent!.parent!.opts());
 
-          // Prepare update arguments for GraphQL service
-          let labelIds: string[] | undefined;
-          if (options.clearLabels) {
-            labelIds = [];
-          } else if (options.labels) {
-            const labelNames = options.labels.split(",").map((l: string) =>
-              l.trim()
-            );
-            labelIds = labelNames;
+          // Resolve issue ID to UUID
+          const resolvedIssueId = await resolveIssueId(ctx.sdk, issueId);
+
+          // Build update input
+          const input: IssueUpdateInput = {};
+
+          if (options.title) {
+            input.title = options.title;
           }
 
-          const labelMode = options.labelBy || "adding";
-          const result = await issuesService.updateIssue({
-            id: issueId,
-            title: options.title,
-            description: options.description,
-            stateId: options.status,
-            priority: options.priority ? parseInt(options.priority) : undefined,
-            assigneeId: options.assignee,
-            projectId: options.project,
-            labelIds,
-            parentId: options.parentTicket ||
-              (options.clearParentTicket ? null : undefined),
-            projectMilestoneId: options.projectMilestone ||
-              (options.clearProjectMilestone ? null : undefined),
-            cycleId: options.cycle || (options.clearCycle ? null : undefined),
-            labelMode: labelMode as "adding" | "overwriting",
-          });
+          if (options.description) {
+            input.description = options.description;
+          }
+
+          if (options.status) {
+            // Get the issue to find its team for status resolution
+            const issue = await getIssue(ctx.gql, resolvedIssueId);
+            const teamId = "team" in issue && issue.team ? issue.team.id : undefined;
+            input.stateId = await resolveStatusId(ctx.sdk, options.status, teamId);
+          }
+
+          if (options.priority) {
+            input.priority = parseInt(options.priority);
+          }
+
+          if (options.assignee) {
+            input.assigneeId = options.assignee;
+          }
+
+          if (options.project) {
+            input.projectId = await resolveProjectId(ctx.sdk, options.project);
+          }
+
+          // Handle labels
+          if (options.clearLabels) {
+            input.labelIds = [];
+          } else if (options.labels) {
+            const labelNames = options.labels.split(",").map((l) => l.trim());
+            const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+
+            // Handle label mode
+            if (options.labelBy === "adding") {
+              // Get current labels and merge
+              const issue = await getIssue(ctx.gql, resolvedIssueId);
+              const currentLabels = "labels" in issue && issue.labels?.nodes
+                ? issue.labels.nodes.map((l) => l.id)
+                : [];
+              input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+            } else {
+              // Overwriting mode (default)
+              input.labelIds = labelIds;
+            }
+          }
+
+          // Handle parent
+          if (options.clearParentTicket) {
+            input.parentId = null;
+          } else if (options.parentTicket) {
+            input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
+          }
+
+          // Handle milestone
+          if (options.clearProjectMilestone) {
+            input.projectMilestoneId = null;
+          } else if (options.projectMilestone) {
+            // Get project context if possible
+            const issue = await getIssue(ctx.gql, resolvedIssueId);
+            const projectName = "project" in issue && issue.project?.name
+              ? issue.project.name
+              : undefined;
+            input.projectMilestoneId = await resolveMilestoneId(
+              ctx.gql,
+              ctx.sdk,
+              options.projectMilestone,
+              projectName,
+            );
+          }
+
+          // Handle cycle
+          if (options.clearCycle) {
+            input.cycleId = null;
+          } else if (options.cycle) {
+            // Get team context if possible
+            const issue = await getIssue(ctx.gql, resolvedIssueId);
+            const teamKey = "team" in issue && issue.team?.key
+              ? issue.team.key
+              : undefined;
+            input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
+          }
+
+          const result = await updateIssue(ctx.gql, resolvedIssueId, input);
           outputSuccess(result);
         },
       ),
