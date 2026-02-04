@@ -256,11 +256,10 @@ dist
 *mies
 
 # Other names that would make sense
-*tests
+# Allow tests/ directory for unit/integration tests
 *testsdir
 *testsfile
 *testsfiles
-*test
 *testdir
 *testfile
 *testfiles
