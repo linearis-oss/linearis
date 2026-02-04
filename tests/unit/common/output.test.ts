@@ -1,0 +1,54 @@
+// tests/unit/common/output.test.ts
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { outputSuccess, outputError, handleCommand } from "../../../src/common/output.js";
+
+describe("outputSuccess", () => {
+  it("writes JSON to stdout", () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    outputSuccess({ id: "123", title: "Test" });
+    expect(spy).toHaveBeenCalledWith(JSON.stringify({ id: "123", title: "Test" }, null, 2));
+    spy.mockRestore();
+  });
+});
+
+describe("outputError", () => {
+  it("writes error JSON to stderr and exits", () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    outputError(new Error("something failed"));
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      JSON.stringify({ error: "something failed" }, null, 2),
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
+
+describe("handleCommand", () => {
+  it("calls the wrapped function", async () => {
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const wrapped = handleCommand(fn);
+    await wrapped("arg1", "arg2");
+    expect(fn).toHaveBeenCalledWith("arg1", "arg2");
+  });
+
+  it("catches errors and outputs them", async () => {
+    const fn = vi.fn().mockRejectedValue(new Error("boom"));
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const wrapped = handleCommand(fn);
+    await wrapped();
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      JSON.stringify({ error: "boom" }, null, 2),
+    );
+
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
