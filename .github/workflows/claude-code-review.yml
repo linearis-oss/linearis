@@ -24,6 +24,9 @@ jobs:
       pull-requests: read
       issues: read
       id-token: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout repository
