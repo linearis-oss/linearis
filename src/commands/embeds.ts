@@ -3,6 +3,12 @@ import { getApiToken, type CommandOptions } from "../common/auth.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { FileService } from "../services/file-service.js";
 
+interface ErrorResponse {
+  success: false;
+  error: string;
+  statusCode?: number;
+}
+
 /**
  * Setup embeds commands on the program
  *
@@ -68,13 +74,11 @@ export function setupEmbedsCommands(program: Command): void {
             });
           } else {
             // Include status code for debugging authentication issues
-            const error: any = {
+            const error: ErrorResponse = {
               success: false,
-              error: result.error,
+              error: result.error || "Download failed",
+              statusCode: result.statusCode,
             };
-            if (result.statusCode) {
-              error.statusCode = result.statusCode;
-            }
             outputSuccess(error);
           }
         },
@@ -114,13 +118,11 @@ export function setupEmbedsCommands(program: Command): void {
             });
           } else {
             // Include status code for debugging
-            const error: any = {
+            const error: ErrorResponse = {
               success: false,
-              error: result.error,
+              error: result.error || "Upload failed",
+              statusCode: result.statusCode,
             };
-            if (result.statusCode) {
-              error.statusCode = result.statusCode;
-            }
             outputSuccess(error);
           }
         },

@@ -26,19 +26,44 @@ Linearis is a CLI tool for Linear.app that outputs structured JSON data, designe
 
 ## Architecture
 
-### Two-Layer Service Architecture
+### Five-Layer Architecture
 
-The codebase uses a dual-service pattern optimized for performance:
+The codebase uses a layered architecture that separates concerns and eliminates code duplication:
 
-1. **GraphQLService** (`src/utils/graphql-service.ts`) - Direct GraphQL queries with batch operations
-   - Eliminates N+1 query problems
-   - Single-query fetches for complex relationships
-   - Used by all primary commands (issues list/search/read/update/create)
+1. **Client Layer** (`src/client/`) - GraphQL and SDK wrappers
+   - `graphql-client.ts` - Typed GraphQL client for direct queries
+   - `linear-client.ts` - Thin wrapper for Linear SDK access
+   - Takes `DocumentNode` types from codegen, returns typed results
+   - No business logic or ID resolution
 
-2. **LinearService** (`src/utils/linear-service.ts`) - SDK-based operations and smart ID resolution
-   - Human-friendly ID conversions (ABC-123 → UUID, "Bug" → label UUID)
-   - Fallback operations for complex workflows
-   - Used for ID resolution and helper operations
+2. **Resolver Layer** (`src/resolvers/`) - Human-friendly ID → UUID resolution
+   - Pure functions: `resolveTeamId()`, `resolveProjectId()`, `resolveLabelId()`, etc.
+   - Converts human inputs (ABC-123, "Bug", "My Team") to UUIDs
+   - Uses SDK for lookups with smart fallbacks (key → name)
+   - Example: `resolveCycleId(client, "Sprint 1", "ENG")` → UUID with disambiguation
+
+3. **Service Layer** (`src/services/`) - Business logic functions
+   - Pure, typed functions for CRUD operations
+   - Receives pre-resolved UUIDs, no ID resolution
+   - Uses GraphQL client for data operations
+   - Example: `createIssue(client, { teamId: "uuid", title: "..." })`
+   - Services: issue, document, attachment, milestone, cycle, team, user, project, label, comment, file
+
+4. **Command Layer** (`src/commands/`) - CLI orchestration
+   - Thin command handlers that compose resolvers and services
+   - Pattern: create context → resolve IDs → call service → output result
+   - All commands use `handleCommand()` wrapper for error handling
+   - Current commands: issues, documents, comments, labels, projects, cycles, project-milestones, embeds, teams, users
+
+5. **Common Layer** (`src/common/`) - Shared utilities
+   - `context.ts` - Creates clients (gql + sdk) from auth options
+   - `auth.ts` - Multi-source authentication (flag, env var, file)
+   - `output.ts` - JSON formatting (`outputSuccess`, `handleCommand`)
+   - `errors.ts` - Typed error factories (`notFoundError`, `multipleMatchesError`)
+   - `identifier.ts` - UUID/identifier utilities (`isUuid`, `parseIssueIdentifier`)
+   - `types.ts` - Type aliases derived from codegen types
+   - `embed-parser.ts` - Linear upload URL parsing
+   - `usage.ts` - CLI usage information
 
 ### Core Components
 
@@ -46,28 +71,22 @@ The codebase uses a dual-service pattern optimized for performance:
 
 - Each command file exports a `setup*Commands(program)` function
 - Commands registered in `src/main.ts` with Commander.js
-- All commands use `handleAsyncCommand()` wrapper for consistent error handling
-- Current commands: issues, comments, labels, projects, cycles, project-milestones, embeds, teams, users
-
-**Service Layer** (`src/utils/`)
-
-- `graphql-service.ts` - Raw GraphQL execution and batch operations
-- `graphql-issues-service.ts` - Optimized single-query issue operations
-- `linear-service.ts` - Smart ID resolution and SDK fallback operations
-- `auth.ts` - Multi-source authentication (flag, env var, file)
-- `output.ts` - JSON formatting and error handling
+- All commands use `handleCommand()` wrapper for consistent error handling
+- Pattern: `const ctx = await createContext(opts)` → resolve IDs → call services
 
 **Query Definitions**
 
 - **GraphQL Files** (`graphql/queries/` and `graphql/mutations/`) - Raw GraphQL operation definitions with fragments
-- **Query Loaders** (`src/queries/`) - TypeScript modules that load and parse GraphQL files, extracting operations with their dependencies
-- Query files organized by entity (issues.ts, documents.ts, attachments.ts, project-milestones.ts)
-- Each loader reads the `.graphql` files and exports query/mutation strings for use with GraphQLService
+- **Codegen Output** (`src/gql/graphql.ts`) - TypeScript types and `DocumentNode` exports
+- Query files organized by entity (issues, documents, attachments, project-milestones)
+- Run `npm run generate` to regenerate types from GraphQL schema
 
-**Type System** (`src/utils/linear-types.d.ts`)
+**Type System**
 
-- TypeScript interfaces for all Linear entities
-- Ensures type safety across service layers
+- All types derived from GraphQL codegen (`src/gql/graphql.ts`)
+- Type aliases in `src/common/types.ts` for convenience
+- Strict TypeScript - no `any` types in new architecture
+- Ensures type safety across all layers
 
 ### Authentication Flow
 
@@ -77,17 +96,20 @@ Three authentication methods (checked in order):
 2. `LINEAR_API_TOKEN` environment variable
 3. Plain text file at `$HOME/.linear_api_token`
 
+Implemented in `src/common/auth.ts` via `getApiToken()` function.
+
 ### Smart ID Resolution
 
-Users can provide human-friendly identifiers that get automatically resolved:
+Users can provide human-friendly identifiers that get automatically resolved in the resolver layer:
 
 - **Issue IDs**: `ABC-123` → UUID (parses team key + issue number)
 - **Project names**: `"Mobile App"` → project UUID
 - **Label names**: `"Bug", "Enhancement"` → label UUIDs
 - **Team identifiers**: `"ABC"` (key) or `"My Team"` (name) → team UUID
 - **Cycle names**: `"Sprint 2025-10"` → cycle UUID (with team disambiguation)
+- **Milestone names**: With optional project scoping for disambiguation
 
-All resolution happens in `LinearService` via `resolve*Id()` methods.
+All resolution happens in `src/resolvers/` via standalone `resolve*Id()` functions.
 
 ### GraphQL Optimization Pattern
 
@@ -100,7 +122,7 @@ Example - listing issues:
 - SDK approach: 1 query for issues + 5 queries per issue (team, assignee, state, project, labels) = 1 + (5 × N) queries
 - GraphQL approach: 1 query with all relationships embedded = 1 query total
 
-See `graphql/queries/issues.graphql` for fragment definitions and query operations, and `src/utils/graphql-issues-service.ts` for usage.
+See `graphql/queries/issues.graphql` for fragment definitions and query operations.
 
 ### File Download Features
 
@@ -118,38 +140,64 @@ The CLI can extract and download files uploaded to Linear's private cloud storag
 
 1. Create command file in `src/commands/` (e.g., `milestones.ts`)
 2. Export `setup*Commands(program: Command)` function
-3. Register in `src/main.ts` by importing and calling setup function
-4. Use `handleAsyncCommand()` wrapper for all async actions
-5. Create services with `createGraphQLService()` and/or `createLinearService()`
-6. Output results with `outputSuccess(data)` or let errors propagate
+3. Import types: `createContext`, `handleCommand`, `outputSuccess` from `src/common/`
+4. Import resolvers from `src/resolvers/` (e.g., `resolveProjectId`, `resolveMilestoneId`)
+5. Import services from `src/services/` (e.g., `createMilestone`, `listMilestones`)
+6. Implement command pattern:
+   ```typescript
+   .action(
+     handleCommand(
+       async (...args: unknown[]) => {
+         const [options, command] = args as [OptionsType, Command];
+         const ctx = await createContext(command.parent!.parent!.opts());
+
+         // Resolve IDs if needed
+         const projectId = await resolveProjectId(ctx.sdk, options.project);
+
+         // Call service
+         const result = await createMilestone(ctx.gql, { projectId, ... });
+
+         outputSuccess(result);
+       }
+     )
+   )
+   ```
+7. Register in `src/main.ts` by importing and calling setup function
 
 ### Adding GraphQL Queries
 
 1. Define operations in `graphql/queries/<entity>.graphql` or `graphql/mutations/<entity>.graphql`
 2. Define reusable fragments in the same file or reference fragments from other files
 3. Run `npm run generate` to regenerate TypeScript types from GraphQL schema
-4. The query loader in `src/queries/<entity>.ts` will automatically extract the new operation
-5. Add corresponding method in a GraphQL service (e.g., `GraphQLIssuesService`) or create new service
+4. Import `DocumentNode` and types from `src/gql/graphql.ts`
+5. Create or update service in `src/services/` to use the new operation:
+   ```typescript
+   const result = await client.request<QueryType>(
+     QueryDocument,
+     { variables }
+   );
+   ```
 6. Test that all nested relationships are fetched in single query
 
 The GraphQL codegen workflow:
 - GraphQL operations are defined in `.graphql` files (human-readable, version-controlled)
 - `npm run generate` runs GraphQL codegen to generate TypeScript types in `src/gql/`
-- Query loaders in `src/queries/` read the `.graphql` files at runtime and extract operations as strings
-- Services use the query strings with `GraphQLService.rawRequest()` for execution
+- Services import `DocumentNode` and types directly from codegen
+- GraphQLClient accepts `DocumentNode` and returns typed results
 
 ### Error Handling
 
-- All commands wrapped with `handleAsyncCommand()` which catches and formats errors
-- Service methods throw descriptive errors: `throw new Error("Team 'ABC' not found")`
-- GraphQL errors transformed to match service error patterns in `GraphQLService.rawRequest()`
+- All commands wrapped with `handleCommand()` which catches and formats errors
+- Service and resolver functions throw descriptive errors: `throw new Error("Team 'ABC' not found")`
+- Error factory functions in `src/common/errors.ts`: `notFoundError()`, `multipleMatchesError()`, etc.
+- GraphQL errors transformed in `GraphQLClient.request()`
 
 ## Technical Requirements
 
 - Node.js >= 22.0.0
 - ES modules (type: "module" in package.json)
 - All CLI output must be JSON format (except help/usage text)
-- TypeScript with full type safety
+- TypeScript with strict mode - no `any` types
 
 ## Dependencies
 
