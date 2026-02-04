@@ -1,10 +1,21 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { createGraphQLDocumentsService } from "../utils/graphql-documents-service.js";
+import { createContext } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { resolveProjectId } from "../resolvers/project-resolver.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
-  createGraphQLAttachmentsService,
-} from "../utils/graphql-attachments-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+  getDocument,
+  createDocument,
+  updateDocument,
+  listDocuments,
+  listDocumentsBySlugIds,
+  deleteDocument,
+} from "../services/document-service.js";
+import {
+  createAttachment,
+  listAttachments,
+} from "../services/attachment-service.js";
 
 /**
  * Options for document create command
@@ -118,28 +129,26 @@ export function setupDocumentsCommands(program: Command): void {
       "also attach document to issue (e.g., ABC-123)",
     )
     .action(
-      handleAsyncCommand(
-        async (options: DocumentCreateOptions, command: Command) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [options, command] = args as [DocumentCreateOptions, Command];
           const rootOpts = command.parent!.parent!.opts();
-          const [documentsService, linearService] = await Promise.all([
-            createGraphQLDocumentsService(rootOpts),
-            createLinearService(rootOpts),
-          ]);
+          const ctx = await createContext(rootOpts);
 
           // Resolve project ID if provided
           let projectId: string | undefined;
           if (options.project) {
-            projectId = await linearService.resolveProjectId(options.project);
+            projectId = await resolveProjectId(ctx.sdk, options.project);
           }
 
           // Resolve team ID if provided
           let teamId: string | undefined;
           if (options.team) {
-            teamId = await linearService.resolveTeamId(options.team);
+            teamId = await resolveTeamId(ctx.sdk, options.team);
           }
 
           // Create the document
-          const document = await documentsService.createDocument({
+          const document = await createDocument(ctx.gql, {
             title: options.title,
             content: options.content,
             projectId,
@@ -150,12 +159,10 @@ export function setupDocumentsCommands(program: Command): void {
 
           // Optionally attach to issue
           if (options.attachTo) {
-            const attachmentsService =
-              await createGraphQLAttachmentsService(rootOpts);
-            const issueId = await linearService.resolveIssueId(options.attachTo);
+            const issueId = await resolveIssueId(ctx.sdk, options.attachTo);
 
             try {
-              await attachmentsService.createAttachment({
+              await createAttachment(ctx.gql, {
                 issueId,
                 url: document.url,
                 title: document.title,
@@ -191,31 +198,31 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--icon <icon>", "document icon")
     .option("--color <color>", "icon color")
     .action(
-      handleAsyncCommand(
-        async (
-          documentId: string,
-          options: DocumentUpdateOptions,
-          command: Command,
-        ) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [documentId, options, command] = args as [
+            string,
+            DocumentUpdateOptions,
+            Command,
+          ];
           const rootOpts = command.parent!.parent!.opts();
-          const [documentsService, linearService] = await Promise.all([
-            createGraphQLDocumentsService(rootOpts),
-            createLinearService(rootOpts),
-          ]);
+          const ctx = await createContext(rootOpts);
 
           // Build input with only provided fields
           const input: Record<string, unknown> = {};
           if (options.title) input.title = options.title;
           if (options.content) input.content = options.content;
           if (options.project) {
-            input.projectId = await linearService.resolveProjectId(
+            input.projectId = await resolveProjectId(
+              ctx.sdk,
               options.project,
             );
           }
           if (options.icon) input.icon = options.icon;
           if (options.color) input.color = options.color;
 
-          const document = await documentsService.updateDocument(
+          const document = await updateDocument(
+            ctx.gql,
             documentId,
             input,
           );
@@ -234,11 +241,12 @@ export function setupDocumentsCommands(program: Command): void {
     .description("Read a document")
     .action(
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
-      handleAsyncCommand(async (documentId: string, _options: unknown, command: Command) => {
+      handleCommand(async (...args: unknown[]) => {
+        const [documentId, , command] = args as [string, unknown, Command];
         const rootOpts = command.parent!.parent!.opts();
-        const documentsService = await createGraphQLDocumentsService(rootOpts);
+        const ctx = await createContext(rootOpts);
 
-        const document = await documentsService.getDocument(documentId);
+        const document = await getDocument(ctx.gql, documentId);
         outputSuccess(document);
       }),
     );
@@ -259,8 +267,9 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--issue <issue>", "filter by issue (shows documents attached to the issue)")
     .option("-l, --limit <limit>", "maximum number of documents", "50")
     .action(
-      handleAsyncCommand(
-        async (options: DocumentListOptions, command: Command) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [options, command] = args as [DocumentListOptions, Command];
           // Validate mutually exclusive options
           if (options.project && options.issue) {
             throw new Error(
@@ -269,10 +278,7 @@ export function setupDocumentsCommands(program: Command): void {
           }
 
           const rootOpts = command.parent!.parent!.opts();
-          const [documentsService, linearService] = await Promise.all([
-            createGraphQLDocumentsService(rootOpts),
-            createLinearService(rootOpts),
-          ]);
+          const ctx = await createContext(rootOpts);
 
           // Validate limit option
           const limit = parseInt(options.limit || "50", 10);
@@ -284,10 +290,8 @@ export function setupDocumentsCommands(program: Command): void {
 
           // Handle --issue filter: find documents via attachments
           if (options.issue) {
-            const attachmentsService =
-              await createGraphQLAttachmentsService(rootOpts);
-            const issueId = await linearService.resolveIssueId(options.issue);
-            const attachments = await attachmentsService.listAttachments(issueId);
+            const issueId = await resolveIssueId(ctx.sdk, options.issue);
+            const attachments = await listAttachments(ctx.gql, issueId);
 
             // Extract document slug IDs from Linear document URLs and deduplicate
             const documentSlugIds = [
@@ -303,9 +307,9 @@ export function setupDocumentsCommands(program: Command): void {
               return;
             }
 
-            const documents = await documentsService.listDocumentsBySlugIds(
+            const documents = await listDocumentsBySlugIds(
+              ctx.gql,
               documentSlugIds,
-              limit,
             );
             outputSuccess(documents);
             return;
@@ -314,12 +318,12 @@ export function setupDocumentsCommands(program: Command): void {
           // Handle --project filter or no filter
           let projectId: string | undefined;
           if (options.project) {
-            projectId = await linearService.resolveProjectId(options.project);
+            projectId = await resolveProjectId(ctx.sdk, options.project);
           }
 
-          const documents = await documentsService.listDocuments({
-            projectId,
-            first: limit,
+          const documents = await listDocuments(ctx.gql, {
+            limit,
+            filter: projectId ? { project: { id: { eq: projectId } } } : undefined,
           });
 
           outputSuccess(documents);
@@ -339,12 +343,13 @@ export function setupDocumentsCommands(program: Command): void {
     .description("Delete (trash) a document")
     .action(
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
-      handleAsyncCommand(
-        async (documentId: string, _options: unknown, command: Command) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [documentId, , command] = args as [string, unknown, Command];
           const rootOpts = command.parent!.parent!.opts();
-          const documentsService = await createGraphQLDocumentsService(rootOpts);
+          const ctx = await createContext(rootOpts);
 
-          await documentsService.deleteDocument(documentId);
+          await deleteDocument(ctx.gql, documentId);
           outputSuccess({ success: true, message: "Document moved to trash" });
         },
       ),
