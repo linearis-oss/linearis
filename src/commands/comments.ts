@@ -36,19 +36,19 @@ export function setupCommentsCommands(program: Command): void {
   /**
    * Create new comment on issue
    *
-   * Command: `linearis comments create <issueId> --body <comment>`
+   * Command: `linearis comments create <issue> --body <text>`
    *
    * Supports both UUID and TEAM-123 format issue identifiers.
    * Resolves identifiers to UUIDs before creating the comment.
    */
-  comments.command("create <issueId>")
-    .description("Create new comment on issue.")
+  comments.command("create <issue>")
+    .description("create a comment on an issue")
     .addHelpText('after', `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`)
-    .option("--body <body>", "comment body (required)")
+    .option("--body <text>", "comment body (required, markdown supported)")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
-          const [issueId, options, command] = args as [string, CreateCommentOptions, Command];
+          const [issue, options, command] = args as [string, CreateCommentOptions, Command];
           const ctx = await createContext(command.parent!.parent!.opts());
 
           // Validate required body flag
@@ -57,7 +57,7 @@ export function setupCommentsCommands(program: Command): void {
           }
 
           // Resolve issue ID if it's an identifier (TEAM-123 -> UUID)
-          const resolvedIssueId = await resolveIssueId(ctx.sdk, issueId);
+          const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
 
           // Create comment using service
           const result = await createComment(ctx.sdk, {

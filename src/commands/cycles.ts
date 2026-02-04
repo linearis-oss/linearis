@@ -13,12 +13,12 @@ import { listCycles, getCycle, type Cycle } from "../services/cycle-service.js";
 interface CycleListOptions extends CommandOptions {
   team?: string;
   active?: boolean;
-  aroundActive?: string;
+  window?: string;
 }
 
 interface CycleReadOptions extends CommandOptions {
   team?: string;
-  issuesFirst?: string;
+  limit?: string;
 }
 
 export function setupCyclesCommands(program: Command): void {
@@ -27,21 +27,19 @@ export function setupCyclesCommands(program: Command): void {
   cycles.action(() => cycles.help());
 
   cycles.command("list")
-    .description("List cycles")
-    .option("--team <team>", "team key, name, or ID")
-    .option("--active", "only active cycles")
+    .description("list cycles")
+    .option("--team <team>", "filter by team (key, name, or UUID)")
+    .option("--active", "only show active cycles")
     .option(
-      "--around-active <n>",
-      "return active +/- n cycles (requires --team)",
+      "--window <n>",
+      "active cycle +/- n neighbors (requires --team)",
     )
     .action(
       handleCommand(
         async (...args: unknown[]) => {
           const [options, command] = args as [CycleListOptions, Command];
-          // around-active requires a team to determine the current team's active cycle
-          // Validate this before authentication to provide better error messages
-          if (options.aroundActive && !options.team) {
-            throw requiresParameterError("--around-active", "--team");
+          if (options.window && !options.team) {
+            throw requiresParameterError("--window", "--team");
           }
 
           const ctx = await createContext(command.parent!.parent!.opts());
@@ -58,12 +56,11 @@ export function setupCyclesCommands(program: Command): void {
             options.active || false,
           );
 
-          // If around-active is requested, filter by cycle number range
-          if (options.aroundActive) {
-            const n = parseInt(options.aroundActive);
+          if (options.window) {
+            const n = parseInt(options.window);
             if (isNaN(n) || n < 0) {
               throw invalidParameterError(
-                "--around-active",
+                "--window",
                 "requires a non-negative integer",
               );
             }
@@ -90,33 +87,29 @@ export function setupCyclesCommands(program: Command): void {
       ),
     );
 
-  cycles.command("read <cycleIdOrName>")
-    .description(
-      "Get cycle details including issues. Accepts UUID or cycle name (optionally scoped by --team)",
-    )
-    .option("--team <team>", "team key, name, or ID to scope name lookup")
-    .option("--issues-first <n>", "how many issues to fetch (default 50)", "50")
+  cycles.command("read <cycle>")
+    .description("get cycle details including issues")
+    .option("--team <team>", "scope name lookup to team")
+    .option("--limit <n>", "max issues to fetch", "50")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
-          const [cycleIdOrName, options, command] = args as [string, CycleReadOptions, Command];
+          const [cycle, options, command] = args as [string, CycleReadOptions, Command];
           const ctx = await createContext(command.parent!.parent!.opts());
 
-          // Resolve cycle ID (handles both UUID and name-based lookup)
           const cycleId = await resolveCycleId(
             ctx.sdk,
-            cycleIdOrName,
+            cycle,
             options.team,
           );
 
-          // Fetch cycle with issues
-          const cycle = await getCycle(
+          const cycleResult = await getCycle(
             ctx.sdk,
             cycleId,
-            parseInt(options.issuesFirst || "50"),
+            parseInt(options.limit || "50"),
           );
 
-          outputSuccess(cycle);
+          outputSuccess(cycleResult);
         },
       ),
     );

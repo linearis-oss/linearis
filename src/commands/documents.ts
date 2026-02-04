@@ -28,7 +28,7 @@ interface DocumentCreateOptions {
   team?: string;
   icon?: string;
   color?: string;
-  attachTo?: string;
+  issue?: string;
 }
 
 /**
@@ -99,7 +99,7 @@ export function extractDocumentIdFromUrl(url: string): string | null {
  *
  * Documents in Linear are standalone entities that can be associated with
  * projects, initiatives, or teams. They cannot be directly linked to issues.
- * To link a document to an issue, use the --attach-to option which creates
+ * To link a document to an issue, use the --issue option which creates
  * an attachment pointing to the document's URL.
  *
  * @param program - Commander.js program instance to register commands on
@@ -112,147 +112,6 @@ export function setupDocumentsCommands(program: Command): void {
   documents.action(() => documents.help());
 
   /**
-   * Create a new document
-   *
-   * Command: `linearis documents create --title <title> [options]`
-   */
-  documents
-    .command("create")
-    .description("Create a new document")
-    .requiredOption("--title <title>", "document title")
-    .option("--content <content>", "document content (markdown)")
-    .option("--project <project>", "project name or ID")
-    .option("--team <team>", "team key or name")
-    .option("--icon <icon>", "document icon")
-    .option("--color <color>", "icon color")
-    .option(
-      "--attach-to <issue>",
-      "also attach document to issue (e.g., ABC-123)",
-    )
-    .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [options, command] = args as [DocumentCreateOptions, Command];
-          const rootOpts = command.parent!.parent!.opts();
-          const ctx = await createContext(rootOpts);
-
-          // Resolve project ID if provided
-          let projectId: string | undefined;
-          if (options.project) {
-            projectId = await resolveProjectId(ctx.sdk, options.project);
-          }
-
-          // Resolve team ID if provided
-          let teamId: string | undefined;
-          if (options.team) {
-            teamId = await resolveTeamId(ctx.sdk, options.team);
-          }
-
-          // Create the document
-          const document = await createDocument(ctx.gql, {
-            title: options.title,
-            content: options.content,
-            projectId,
-            teamId,
-            icon: options.icon,
-            color: options.color,
-          });
-
-          // Optionally attach to issue
-          if (options.attachTo) {
-            const issueId = await resolveIssueId(ctx.sdk, options.attachTo);
-
-            try {
-              await createAttachment(ctx.gql, {
-                issueId,
-                url: document.url,
-                title: document.title,
-              });
-            } catch (attachError) {
-              // Document was created but attachment failed - provide actionable error
-              const errorMessage =
-                attachError instanceof Error
-                  ? attachError.message
-                  : String(attachError);
-              throw new Error(
-                `Document created (${document.id}) but failed to attach to issue "${options.attachTo}": ${errorMessage}.`,
-              );
-            }
-          }
-
-          outputSuccess(document);
-        },
-      ),
-    );
-
-  /**
-   * Update an existing document
-   *
-   * Command: `linearis documents update <document-id> [options]`
-   */
-  documents
-    .command("update <documentId>")
-    .description("Update an existing document")
-    .option("--title <title>", "new document title")
-    .option("--content <content>", "new document content (markdown)")
-    .option("--project <project>", "move to different project")
-    .option("--icon <icon>", "document icon")
-    .option("--color <color>", "icon color")
-    .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [documentId, options, command] = args as [
-            string,
-            DocumentUpdateOptions,
-            Command,
-          ];
-          const rootOpts = command.parent!.parent!.opts();
-          const ctx = await createContext(rootOpts);
-
-          // Build input with only provided fields
-          const input: DocumentUpdateInput = {};
-          if (options.title) input.title = options.title;
-          if (options.content) input.content = options.content;
-          if (options.project) {
-            input.projectId = await resolveProjectId(
-              ctx.sdk,
-              options.project,
-            );
-          }
-          if (options.icon) input.icon = options.icon;
-          if (options.color) input.color = options.color;
-
-          const document = await updateDocument(
-            ctx.gql,
-            documentId,
-            input,
-          );
-          outputSuccess(document);
-        },
-      ),
-    );
-
-  /**
-   * Read a document
-   *
-   * Command: `linearis documents read <document-id>`
-   */
-  documents
-    .command("read <documentId>")
-    .description("Read a document")
-    .action(
-      // Note: _options parameter is required by Commander.js signature (arg, options, command)
-      handleCommand(async (...args: unknown[]) => {
-        const [documentId, , command] = args as [string, unknown, Command];
-        const rootOpts = command.parent!.parent!.opts();
-        const ctx = await createContext(rootOpts);
-
-        const document = await getDocument(ctx.gql, documentId);
-        outputSuccess(document);
-      }),
-    );
-
-  /**
    * List documents
    *
    * Command: `linearis documents list [options]`
@@ -263,10 +122,10 @@ export function setupDocumentsCommands(program: Command): void {
    */
   documents
     .command("list")
-    .description("List documents")
+    .description("list documents")
     .option("--project <project>", "filter by project name or ID")
     .option("--issue <issue>", "filter by issue (shows documents attached to the issue)")
-    .option("-l, --limit <limit>", "maximum number of documents", "50")
+    .option("-l, --limit <n>", "max results", "50")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
@@ -333,6 +192,147 @@ export function setupDocumentsCommands(program: Command): void {
     );
 
   /**
+   * Read a document
+   *
+   * Command: `linearis documents read <document-id>`
+   */
+  documents
+    .command("read <document>")
+    .description("get document content")
+    .action(
+      // Note: _options parameter is required by Commander.js signature (arg, options, command)
+      handleCommand(async (...args: unknown[]) => {
+        const [document, , command] = args as [string, unknown, Command];
+        const rootOpts = command.parent!.parent!.opts();
+        const ctx = await createContext(rootOpts);
+
+        const documentResult = await getDocument(ctx.gql, document);
+        outputSuccess(documentResult);
+      }),
+    );
+
+  /**
+   * Create a new document
+   *
+   * Command: `linearis documents create --title <title> [options]`
+   */
+  documents
+    .command("create")
+    .description("create a new document")
+    .requiredOption("--title <title>", "document title (required)")
+    .option("--content <text>", "document content (markdown)")
+    .option("--project <project>", "project name or ID")
+    .option("--team <team>", "team key or name")
+    .option("--icon <icon>", "document icon")
+    .option("--color <color>", "icon color")
+    .option(
+      "--issue <issue>",
+      "also attach document to issue (e.g., ABC-123)",
+    )
+    .action(
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [options, command] = args as [DocumentCreateOptions, Command];
+          const rootOpts = command.parent!.parent!.opts();
+          const ctx = await createContext(rootOpts);
+
+          // Resolve project ID if provided
+          let projectId: string | undefined;
+          if (options.project) {
+            projectId = await resolveProjectId(ctx.sdk, options.project);
+          }
+
+          // Resolve team ID if provided
+          let teamId: string | undefined;
+          if (options.team) {
+            teamId = await resolveTeamId(ctx.sdk, options.team);
+          }
+
+          // Create the document
+          const document = await createDocument(ctx.gql, {
+            title: options.title,
+            content: options.content,
+            projectId,
+            teamId,
+            icon: options.icon,
+            color: options.color,
+          });
+
+          // Optionally attach to issue
+          if (options.issue) {
+            const issueId = await resolveIssueId(ctx.sdk, options.issue);
+
+            try {
+              await createAttachment(ctx.gql, {
+                issueId,
+                url: document.url,
+                title: document.title,
+              });
+            } catch (attachError) {
+              // Document was created but attachment failed - provide actionable error
+              const errorMessage =
+                attachError instanceof Error
+                  ? attachError.message
+                  : String(attachError);
+              throw new Error(
+                `Document created (${document.id}) but failed to attach to issue "${options.issue}": ${errorMessage}.`,
+              );
+            }
+          }
+
+          outputSuccess(document);
+        },
+      ),
+    );
+
+  /**
+   * Update an existing document
+   *
+   * Command: `linearis documents update <document-id> [options]`
+   */
+  documents
+    .command("update <document>")
+    .description("update an existing document")
+    .option("--title <title>", "new title")
+    .option("--content <text>", "new content (markdown)")
+    .option("--project <project>", "move to project")
+    .option("--icon <icon>", "new icon")
+    .option("--color <color>", "new icon color")
+    .action(
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [document, options, command] = args as [
+            string,
+            DocumentUpdateOptions,
+            Command,
+          ];
+          const rootOpts = command.parent!.parent!.opts();
+          const ctx = await createContext(rootOpts);
+
+          // Build input with only provided fields
+          const input: DocumentUpdateInput = {};
+          if (options.title) input.title = options.title;
+          if (options.content) input.content = options.content;
+          if (options.project) {
+            input.projectId = await resolveProjectId(
+              ctx.sdk,
+              options.project,
+            );
+          }
+          if (options.icon) input.icon = options.icon;
+          if (options.color) input.color = options.color;
+
+          const updatedDocument = await updateDocument(
+            ctx.gql,
+            document,
+            input,
+          );
+          outputSuccess(updatedDocument);
+        },
+      ),
+    );
+
+  /**
    * Delete (trash) a document
    *
    * Command: `linearis documents delete <document-id>`
@@ -340,17 +340,17 @@ export function setupDocumentsCommands(program: Command): void {
    * This is a soft delete - the document is moved to trash.
    */
   documents
-    .command("delete <documentId>")
-    .description("Delete (trash) a document")
+    .command("delete <document>")
+    .description("trash a document")
     .action(
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
       handleCommand(
         async (...args: unknown[]) => {
-          const [documentId, , command] = args as [string, unknown, Command];
+          const [document, , command] = args as [string, unknown, Command];
           const rootOpts = command.parent!.parent!.opts();
           const ctx = await createContext(rootOpts);
 
-          await deleteDocument(ctx.gql, documentId);
+          await deleteDocument(ctx.gql, document);
           outputSuccess({ success: true, message: "Document moved to trash" });
         },
       ),
