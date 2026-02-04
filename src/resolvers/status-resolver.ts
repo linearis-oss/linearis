@@ -1,0 +1,30 @@
+import type { LinearSdkClient } from "../client/linear-client.js";
+import { isUuid } from "../common/identifier.js";
+
+export async function resolveStatusId(
+  client: LinearSdkClient,
+  nameOrId: string,
+  teamId?: string,
+): Promise<string> {
+  if (isUuid(nameOrId)) return nameOrId;
+
+  const filter: Record<string, unknown> = {
+    name: { eqIgnoreCase: nameOrId },
+  };
+
+  if (teamId) {
+    filter.team = { id: { eq: teamId } };
+  }
+
+  const result = await client.sdk.workflowStates({
+    filter,
+    first: 1,
+  });
+
+  if (result.nodes.length === 0) {
+    const context = teamId ? ` for team ${teamId}` : "";
+    throw new Error(`Status "${nameOrId}"${context} not found`);
+  }
+
+  return result.nodes[0].id;
+}
