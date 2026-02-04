@@ -1,16 +1,22 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext, type CommandOptions } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { resolveIssueId } from "../resolvers/issue-resolver.js";
+import { createComment } from "../services/comment-service.js";
+
+interface CreateCommentOptions extends CommandOptions {
+  body?: string;
+}
 
 /**
  * Setup comments commands on the program
- * 
+ *
  * Registers the `comments` command group and its subcommands for managing
  * Linear issue comments. Provides create operations for adding comments
  * to issues with smart ID resolution.
- * 
+ *
  * @param program - Commander.js program instance to register commands on
- * 
+ *
  * @example
  * ```typescript
  * // In main.ts
@@ -29,9 +35,9 @@ export function setupCommentsCommands(program: Command): void {
 
   /**
    * Create new comment on issue
-   * 
+   *
    * Command: `linearis comments create <issueId> --body <comment>`
-   * 
+   *
    * Supports both UUID and TEAM-123 format issue identifiers.
    * Resolves identifiers to UUIDs before creating the comment.
    */
@@ -40,12 +46,10 @@ export function setupCommentsCommands(program: Command): void {
     .addHelpText('after', `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`)
     .option("--body <body>", "comment body (required)")
     .action(
-      handleAsyncCommand(
-        async (issueId: string, options: any, command: Command) => {
-          // Initialize Linear service with authentication
-          const service = await createLinearService(
-            command.parent!.parent!.opts(),
-          );
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [issueId, options, command] = args as [string, CreateCommentOptions, Command];
+          const ctx = await createContext(command.parent!.parent!.opts());
 
           // Validate required body flag
           if (!options.body) {
@@ -53,10 +57,10 @@ export function setupCommentsCommands(program: Command): void {
           }
 
           // Resolve issue ID if it's an identifier (TEAM-123 -> UUID)
-          const resolvedIssueId = await service.resolveIssueId(issueId);
+          const resolvedIssueId = await resolveIssueId(ctx.sdk, issueId);
 
-          // Create comment using Linear SDK
-          const result = await service.createComment({
+          // Create comment using service
+          const result = await createComment(ctx.sdk, {
             issueId: resolvedIssueId,
             body: options.body,
           });

@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext, type CommandOptions } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { listTeams } from "../services/team-service.js";
 
 /**
  * Setup teams commands on the program
@@ -38,12 +39,10 @@ export function setupTeamsCommands(program: Command): void {
     .command("list")
     .description("List all teams")
     .action(
-      handleAsyncCommand(async (options: any, command: Command) => {
-        // Initialize Linear service for team operations
-        const service = await createLinearService(command.parent!.parent!.opts());
-
-        // Fetch all teams from the workspace
-        const result = await service.getTeams();
+      handleCommand(async (...args: unknown[]) => {
+        const [, command] = args as [CommandOptions, Command];
+        const ctx = await createContext(command.parent!.parent!.opts());
+        const result = await listTeams(ctx.sdk);
         outputSuccess(result);
       })
     );

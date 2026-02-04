@@ -1,20 +1,22 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext, type CommandOptions } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
 import {
   invalidParameterError,
   notFoundError,
   requiresParameterError,
-} from "../utils/error-messages.js";
-import { Cycle } from "../gql/graphql.js";
+} from "../common/errors.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { resolveCycleId } from "../resolvers/cycle-resolver.js";
+import { listCycles, getCycle, type Cycle } from "../services/cycle-service.js";
 
-interface CycleListOptions {
+interface CycleListOptions extends CommandOptions {
   team?: string;
   active?: boolean;
   aroundActive?: string;
 }
 
-interface CycleReadOptions {
+interface CycleReadOptions extends CommandOptions {
   team?: string;
   issuesFirst?: string;
 }
@@ -33,22 +35,27 @@ export function setupCyclesCommands(program: Command): void {
       "return active +/- n cycles (requires --team)",
     )
     .action(
-      handleAsyncCommand(
-        async (options: CycleListOptions, command: Command) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [options, command] = args as [CycleListOptions, Command];
           // around-active requires a team to determine the current team's active cycle
           // Validate this before authentication to provide better error messages
           if (options.aroundActive && !options.team) {
             throw requiresParameterError("--around-active", "--team");
           }
 
-          const linearService = await createLinearService(
-            command.parent!.parent!.opts(),
-          );
+          const ctx = await createContext(command.parent!.parent!.opts());
 
-          // Fetch cycles with automatic pagination
-          const allCycles = await linearService.getCycles(
-            options.team,
-            options.active ? true : undefined,
+          // Resolve team filter if provided
+          const teamId = options.team
+            ? await resolveTeamId(ctx.sdk, options.team)
+            : undefined;
+
+          // Fetch cycles
+          const allCycles = await listCycles(
+            ctx.sdk,
+            teamId,
+            options.active || false,
           );
 
           // If around-active is requested, filter by cycle number range
@@ -66,15 +73,12 @@ export function setupCyclesCommands(program: Command): void {
               throw notFoundError("Active cycle", options.team!, "for team");
             }
 
-            const activeNumber = Number(activeCycle.number || 0);
+            const activeNumber = activeCycle.number;
             const min = activeNumber - n;
             const max = activeNumber + n;
 
             const filtered = allCycles
-              .filter((c: Cycle) =>
-                typeof c.number === "number" && c.number >= min &&
-                c.number <= max
-              )
+              .filter((c: Cycle) => c.number >= min && c.number <= max)
               .sort((a: Cycle, b: Cycle) => a.number - b.number);
 
             outputSuccess(filtered);
@@ -93,24 +97,21 @@ export function setupCyclesCommands(program: Command): void {
     .option("--team <team>", "team key, name, or ID to scope name lookup")
     .option("--issues-first <n>", "how many issues to fetch (default 50)", "50")
     .action(
-      handleAsyncCommand(
-        async (
-          cycleIdOrName: string,
-          options: CycleReadOptions,
-          command: Command,
-        ) => {
-          const linearService = await createLinearService(
-            command.parent!.parent!.opts(),
-          );
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [cycleIdOrName, options, command] = args as [string, CycleReadOptions, Command];
+          const ctx = await createContext(command.parent!.parent!.opts());
 
           // Resolve cycle ID (handles both UUID and name-based lookup)
-          const cycleId = await linearService.resolveCycleId(
+          const cycleId = await resolveCycleId(
+            ctx.sdk,
             cycleIdOrName,
             options.team,
           );
 
           // Fetch cycle with issues
-          const cycle = await linearService.getCycleById(
+          const cycle = await getCycle(
+            ctx.sdk,
             cycleId,
             parseInt(options.issuesFirst || "50"),
           );

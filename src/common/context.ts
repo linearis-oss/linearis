@@ -2,6 +2,8 @@ import { GraphQLClient } from "../client/graphql-client.js";
 import { LinearSdkClient } from "../client/linear-client.js";
 import { getApiToken, type CommandOptions } from "./auth.js";
 
+export type { CommandOptions };
+
 export interface CommandContext {
   gql: GraphQLClient;
   sdk: LinearSdkClient;

@@ -1,7 +1,7 @@
 import { Command } from "commander";
-import { getApiToken } from "../utils/auth.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
-import { FileService } from "../utils/file-service.js";
+import { getApiToken, type CommandOptions } from "../common/auth.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { FileService } from "../services/file-service.js";
 
 /**
  * Setup embeds commands on the program
@@ -46,8 +46,9 @@ export function setupEmbedsCommands(program: Command): void {
     .option("--output <path>", "output file path")
     .option("--overwrite", "overwrite existing file", false)
     .action(
-      handleAsyncCommand(
-        async (url: string, options: any, command: Command) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [url, options, command] = args as [string, CommandOptions & { output?: string; overwrite?: boolean }, Command];
           // Get API token from parent command options for authentication
           const apiToken = await getApiToken(command.parent!.parent!.opts());
 
@@ -93,8 +94,9 @@ export function setupEmbedsCommands(program: Command): void {
     .command("upload <file>")
     .description("Upload a file to Linear storage.")
     .action(
-      handleAsyncCommand(
-        async (filePath: string, _options: any, command: Command) => {
+      handleCommand(
+        async (...args: unknown[]) => {
+          const [filePath, , command] = args as [string, CommandOptions, Command];
           // Get API token from parent command options for authentication
           const apiToken = await getApiToken(command.parent!.parent!.opts());
 

@@ -1,6 +1,11 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext, type CommandOptions } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { listUsers } from "../services/user-service.js";
+
+interface ListUsersOptions extends CommandOptions {
+  active?: boolean;
+}
 
 /**
  * Setup users commands on the program
@@ -40,12 +45,10 @@ export function setupUsersCommands(program: Command): void {
     .description("List all users")
     .option("--active", "Only show active users")
     .action(
-      handleAsyncCommand(async (options: any, command: Command) => {
-        // Initialize Linear service for user operations
-        const service = await createLinearService(command.parent!.parent!.opts());
-
-        // Fetch all users from the workspace
-        const result = await service.getUsers(options.active);
+      handleCommand(async (...args: unknown[]) => {
+        const [options, command] = args as [ListUsersOptions, Command];
+        const ctx = await createContext(command.parent!.parent!.opts());
+        const result = await listUsers(ctx.sdk, options.active || false);
         outputSuccess(result);
       })
     );

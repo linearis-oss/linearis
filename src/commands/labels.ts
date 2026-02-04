@@ -1,15 +1,21 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext, type CommandOptions } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { listLabels } from "../services/label-service.js";
+
+interface ListLabelsOptions extends CommandOptions {
+  team?: string;
+}
 
 /**
  * Setup labels commands on the program
- * 
+ *
  * Registers `labels` command group for listing and managing Linear issue labels.
  * Provides filtering capabilities by team and comprehensive label information.
- * 
+ *
  * @param program - Commander.js program instance to register commands on
- * 
+ *
  * @example
  * ```typescript
  * // In main.ts
@@ -28,21 +34,26 @@ export function setupLabelsCommands(program: Command): void {
 
   /**
    * List all available labels
-   * 
+   *
    * Command: `linearis labels list [--team <team>]`
-   * 
+   *
    * Lists all workspace and team-specific labels with optional team filtering.
    * Excludes group labels (containers) and includes parent relationships.
    */
   labels.command("list")
     .description("List all available labels")
     .option("--team <team>", "filter by team key, name, or ID")
-    .action(handleAsyncCommand(async (options: any, command: Command) => {
-      // Initialize Linear service for label operations
-      const service = await createLinearService(command.parent!.parent!.opts());
-      
+    .action(handleCommand(async (...args: unknown[]) => {
+      const [options, command] = args as [ListLabelsOptions, Command];
+      const ctx = await createContext(command.parent!.parent!.opts());
+
+      // Resolve team filter if provided
+      const teamId = options.team
+        ? await resolveTeamId(ctx.sdk, options.team)
+        : undefined;
+
       // Fetch labels with optional team filtering
-      const result = await service.getLabels(options.team);
+      const result = await listLabels(ctx.sdk, teamId);
       outputSuccess(result);
     }));
 }

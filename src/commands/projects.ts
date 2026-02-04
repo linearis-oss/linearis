@@ -1,16 +1,17 @@
 import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import { createContext, type CommandOptions } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { listProjects } from "../services/project-service.js";
 
 /**
  * Setup projects commands on the program
- * 
+ *
  * Registers `projects` command group for Linear project management.
  * Provides listing functionality with comprehensive project information
  * including teams, progress, and leadership details.
- * 
+ *
  * @param program - Commander.js program instance to register commands on
- * 
+ *
  * @example
  * ```typescript
  * // In main.ts
@@ -29,9 +30,9 @@ export function setupProjectsCommands(program: Command): void {
 
   /**
    * List projects
-   * 
+   *
    * Command: `linearis projects list [--limit <number>]`
-   * 
+   *
    * Lists all projects with their teams, leads, and progress information.
    * Note: Linear SDK doesn't implement pagination, so all projects are shown.
    */
@@ -42,12 +43,10 @@ export function setupProjectsCommands(program: Command): void {
       "limit results (not implemented by Linear SDK, showing all)",
       "100",
     )
-    .action(handleAsyncCommand(async (_options: any, command: Command) => {
-      // Initialize Linear service for project operations
-      const service = await createLinearService(command.parent!.parent!.opts());
-      
-      // Fetch all projects with their relationships
-      const result = await service.getProjects();
+    .action(handleCommand(async (...args: unknown[]) => {
+      const [, command] = args as [CommandOptions, Command];
+      const ctx = await createContext(command.parent!.parent!.opts());
+      const result = await listProjects(ctx.sdk);
       outputSuccess(result);
     }));
 }
