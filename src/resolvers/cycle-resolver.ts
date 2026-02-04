@@ -51,7 +51,7 @@ export async function resolveCycleId(
     const team = await cycle.team;
     nodes.push({
       id: cycle.id,
-      name: cycle.name,
+      name: cycle.name ?? "",
       number: cycle.number,
       startsAt: cycle.startsAt
         ? new Date(cycle.startsAt).toISOString()
