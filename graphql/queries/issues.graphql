@@ -170,7 +170,7 @@ query GetIssues($first: Int!, $orderBy: PaginationOrderBy) {
 # Uses the comprehensive fragment with comment data for detailed view.
 query GetIssueById($id: String!) {
   issue(id: $id) {
-    ...CompleteIssueFields
+    ...CompleteIssueWithCommentsFields
   }
 }
 
@@ -184,7 +184,7 @@ query GetIssueByIdentifier($teamKey: String!, $number: Float!) {
     first: 1
   ) {
     nodes {
-      ...CompleteIssueFields
+      ...CompleteIssueWithCommentsFields
     }
   }
 }
