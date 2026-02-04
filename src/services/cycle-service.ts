@@ -1,3 +1,4 @@
+import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
 
 export interface Cycle {
@@ -25,7 +26,7 @@ export async function listCycles(
   teamId?: string,
   activeOnly: boolean = false,
 ): Promise<Cycle[]> {
-  const filter: Record<string, unknown> = {};
+  const filter: LinearDocument.CycleFilter = {};
 
   if (teamId) {
     filter.team = { id: { eq: teamId } };

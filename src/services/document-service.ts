@@ -10,6 +10,7 @@ import {
   type GetDocumentQuery,
   ListDocumentsDocument,
   type ListDocumentsQuery,
+  type DocumentFilter,
   DocumentCreateDocument,
   type DocumentCreateMutation,
   type DocumentCreateInput,
@@ -73,7 +74,7 @@ export async function listDocuments(
   client: GraphQLClient,
   options?: {
     limit?: number;
-    filter?: Record<string, unknown>;
+    filter?: DocumentFilter;
   },
 ): Promise<DocumentListItem[]> {
   const result = await client.request<ListDocumentsQuery>(

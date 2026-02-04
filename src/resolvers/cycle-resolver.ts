@@ -1,3 +1,4 @@
+import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { isUuid } from "../common/identifier.js";
 import { notFoundError, multipleMatchesError } from "../common/errors.js";
@@ -22,7 +23,7 @@ export async function resolveCycleId(
 ): Promise<string> {
   if (isUuid(nameOrId)) return nameOrId;
 
-  const filter: Record<string, unknown> = {
+  const filter: LinearDocument.CycleFilter = {
     name: { eq: nameOrId },
   };
 

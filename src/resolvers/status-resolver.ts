@@ -1,3 +1,4 @@
+import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { isUuid } from "../common/identifier.js";
 
@@ -8,7 +9,7 @@ export async function resolveStatusId(
 ): Promise<string> {
   if (isUuid(nameOrId)) return nameOrId;
 
-  const filter: Record<string, unknown> = {
+  const filter: LinearDocument.WorkflowStateFilter = {
     name: { eqIgnoreCase: nameOrId },
   };
 

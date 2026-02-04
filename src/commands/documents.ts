@@ -16,6 +16,7 @@ import {
   createAttachment,
   listAttachments,
 } from "../services/attachment-service.js";
+import type { DocumentUpdateInput } from "../gql/graphql.js";
 
 /**
  * Options for document create command
@@ -209,7 +210,7 @@ export function setupDocumentsCommands(program: Command): void {
           const ctx = await createContext(rootOpts);
 
           // Build input with only provided fields
-          const input: Record<string, unknown> = {};
+          const input: DocumentUpdateInput = {};
           if (options.title) input.title = options.title;
           if (options.content) input.content = options.content;
           if (options.project) {
