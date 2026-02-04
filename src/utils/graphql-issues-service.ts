@@ -666,11 +666,12 @@ export class GraphQLIssuesService {
     searchArgs: QuerySearchIssuesArgs & { limit?: number }
   ): Promise<IssueFromSearch[]> {
     const limit = searchArgs.limit ?? 25;
+    const { term } = searchArgs;
 
     const result = await this.graphQLService.rawRequest<SearchIssuesQuery>(
       print(SearchIssuesDocument),
       {
-        ...searchArgs,
+        term,
         first: limit,
       }
     );
