@@ -149,10 +149,3 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
 
   return lines.join("\n");
 }
-
-/**
- * @deprecated Will be removed in Task 8 when main.ts is updated.
- */
-export function outputUsageInfo(_program: Command): void {
-  // Stub — replaced by formatOverview + formatDomainUsage
-}

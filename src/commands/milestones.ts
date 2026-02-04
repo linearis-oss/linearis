@@ -195,13 +195,13 @@ export function setupMilestonesCommands(program: Command): void {
             updateInput.sortOrder = parseFloat(options.sortOrder);
           }
 
-          const milestone = await updateMilestone(
+          const updated = await updateMilestone(
             ctx.gql,
             milestoneId,
             updateInput
           );
 
-          outputSuccess(milestone);
+          outputSuccess(updated);
         }
       )
     );
