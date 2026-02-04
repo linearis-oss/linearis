@@ -1,12 +1,23 @@
 import { Command } from "commander";
 import { createContext, type CommandOptions } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import { createComment } from "../services/comment-service.js";
 
 interface CreateCommentOptions extends CommandOptions {
   body?: string;
 }
+
+export const COMMENTS_META: DomainMeta = {
+  name: "comments",
+  summary: "discussion threads on issues",
+  context: "a comment is a text entry on an issue. comments support markdown.",
+  arguments: {
+    issue: "issue identifier (UUID or ABC-123)",
+  },
+  seeAlso: ["issues read <issue>"],
+};
 
 /**
  * Setup comments commands on the program
@@ -69,4 +80,11 @@ export function setupCommentsCommands(program: Command): void {
         },
       ),
     );
+
+  comments
+    .command("usage")
+    .description("show detailed usage for comments")
+    .action(() => {
+      console.log(formatDomainUsage(comments, COMMENTS_META));
+    });
 }

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import {
@@ -35,6 +36,23 @@ interface MilestoneUpdateOptions {
   targetDate?: string;
   sortOrder?: string;
 }
+
+export const MILESTONES_META: DomainMeta = {
+  name: "milestones",
+  summary: "progress checkpoints within projects",
+  context: [
+    "a milestone marks a phase or deadline within a project. milestones",
+    "can have target dates and contain issues assigned to them.",
+  ].join("\n"),
+  arguments: {
+    milestone: "milestone identifier (UUID or name)",
+    name: "string",
+  },
+  seeAlso: [
+    "issues create --project-milestone",
+    "issues update --project-milestone",
+  ],
+};
 
 export function setupMilestonesCommands(program: Command): void {
   const milestones = program
@@ -187,4 +205,11 @@ export function setupMilestonesCommands(program: Command): void {
         }
       )
     );
+
+  milestones
+    .command("usage")
+    .description("show detailed usage for milestones")
+    .action(() => {
+      console.log(formatDomainUsage(milestones, MILESTONES_META));
+    });
 }

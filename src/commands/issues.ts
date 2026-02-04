@@ -16,6 +16,7 @@ import {
   searchIssues,
 } from "../services/issue-service.js";
 import type { IssueCreateInput, IssueUpdateInput } from "../gql/graphql.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
 interface ListOptions {
   query?: string;
@@ -56,6 +57,23 @@ interface UpdateOptions {
   cycle?: string;
   clearCycle?: boolean;
 }
+
+export const ISSUES_META: DomainMeta = {
+  name: "issues",
+  summary: "work items with status, priority, assignee, labels",
+  context: [
+    "an issue belongs to exactly one team. it has a status (e.g. backlog,",
+    "todo, in progress, done — configurable per team), a priority (1-4),",
+    "and can be assigned to a user. issues can have labels, belong to a",
+    "project, be part of a cycle (sprint), and reference a project milestone.",
+    "parent-child relationships between issues are supported.",
+  ].join("\n"),
+  arguments: {
+    issue: "issue identifier (UUID or ABC-123)",
+    title: "string",
+  },
+  seeAlso: ["comments create <issue>", "documents list --issue <issue>"],
+};
 
 /**
  * Setup issues commands on the program
@@ -436,4 +454,11 @@ export function setupIssuesCommands(program: Command): void {
         },
       ),
     );
+
+  issues
+    .command("usage")
+    .description("show detailed usage for issues")
+    .action(() => {
+      console.log(formatDomainUsage(issues, ISSUES_META));
+    });
 }

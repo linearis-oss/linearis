@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { createContext, type CommandOptions } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { listUsers } from "../services/user-service.js";
 
 interface ListUsersOptions extends CommandOptions {
@@ -22,6 +23,17 @@ interface ListUsersOptions extends CommandOptions {
  * // Enables: linearis users list
  * ```
  */
+export const USERS_META: DomainMeta = {
+  name: "users",
+  summary: "workspace members and assignees",
+  context: [
+    "a user is a member of the Linear workspace. users can be assigned to",
+    "issues and belong to teams.",
+  ].join("\n"),
+  arguments: {},
+  seeAlso: [],
+};
+
 export function setupUsersCommands(program: Command): void {
   const users = program
     .command("users")
@@ -42,8 +54,8 @@ export function setupUsersCommands(program: Command): void {
    */
   users
     .command("list")
-    .description("List all users")
-    .option("--active", "Only show active users")
+    .description("list workspace members")
+    .option("--active", "only show active users")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListUsersOptions, Command];
@@ -52,4 +64,11 @@ export function setupUsersCommands(program: Command): void {
         outputSuccess(result);
       })
     );
+
+  users
+    .command("usage")
+    .description("show detailed usage for users")
+    .action(() => {
+      console.log(formatDomainUsage(users, USERS_META));
+    });
 }

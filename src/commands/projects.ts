@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { createContext, type CommandOptions } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { listProjects } from "../services/project-service.js";
 
 /**
@@ -19,6 +20,17 @@ import { listProjects } from "../services/project-service.js";
  * // Enables: linearis projects list [--limit <number>]
  * ```
  */
+export const PROJECTS_META: DomainMeta = {
+  name: "projects",
+  summary: "groups of issues toward a goal",
+  context: [
+    "a project collects related issues across teams. projects can have",
+    "milestones to track progress toward deadlines or phases.",
+  ].join("\n"),
+  arguments: {},
+  seeAlso: ["milestones list --project", "documents list --project"],
+};
+
 export function setupProjectsCommands(program: Command): void {
   const projects = program.command("projects")
     .description("Project operations");
@@ -37,10 +49,10 @@ export function setupProjectsCommands(program: Command): void {
    * Note: Linear SDK doesn't implement pagination, so all projects are shown.
    */
   projects.command("list")
-    .description("List projects")
+    .description("list projects")
     .option(
-      "-l, --limit <number>",
-      "limit results (not implemented by Linear SDK, showing all)",
+      "-l, --limit <n>",
+      "max results",
       "100",
     )
     .action(handleCommand(async (...args: unknown[]) => {
@@ -49,4 +61,11 @@ export function setupProjectsCommands(program: Command): void {
       const result = await listProjects(ctx.sdk);
       outputSuccess(result);
     }));
+
+  projects
+    .command("usage")
+    .description("show detailed usage for projects")
+    .action(() => {
+      console.log(formatDomainUsage(projects, PROJECTS_META));
+    });
 }

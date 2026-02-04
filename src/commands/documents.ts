@@ -17,6 +17,7 @@ import {
   listAttachments,
 } from "../services/attachment-service.js";
 import type { DocumentUpdateInput } from "../gql/graphql.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
 /**
  * Options for document create command
@@ -93,6 +94,19 @@ export function extractDocumentIdFromUrl(url: string): string | null {
     return null;
   }
 }
+
+export const DOCUMENTS_META: DomainMeta = {
+  name: "documents",
+  summary: "long-form markdown docs attached to projects or issues",
+  context: [
+    "a document is a markdown page. it can belong to a project and/or be",
+    "attached to an issue. documents support icons and colors.",
+  ].join("\n"),
+  arguments: {
+    document: "document identifier (UUID)",
+  },
+  seeAlso: ["issues read <issue>", "projects list"],
+};
 
 /**
  * Setup documents commands on the program
@@ -355,4 +369,11 @@ export function setupDocumentsCommands(program: Command): void {
         },
       ),
     );
+
+  documents
+    .command("usage")
+    .description("show detailed usage for documents")
+    .action(() => {
+      console.log(formatDomainUsage(documents, DOCUMENTS_META));
+    });
 }

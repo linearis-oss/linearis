@@ -9,6 +9,7 @@ import {
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { listCycles, getCycle, type Cycle } from "../services/cycle-service.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
 interface CycleListOptions extends CommandOptions {
   team?: string;
@@ -20,6 +21,19 @@ interface CycleReadOptions extends CommandOptions {
   team?: string;
   limit?: string;
 }
+
+export const CYCLES_META: DomainMeta = {
+  name: "cycles",
+  summary: "time-boxed iterations (sprints) per team",
+  context: [
+    "a cycle is a sprint belonging to one team. each team can have one",
+    "active cycle at a time. cycles contain issues and have start/end dates.",
+  ].join("\n"),
+  arguments: {
+    cycle: "cycle identifier (UUID or name)",
+  },
+  seeAlso: ["issues create --cycle", "issues update --cycle"],
+};
 
 export function setupCyclesCommands(program: Command): void {
   const cycles = program.command("cycles").description("Cycle operations");
@@ -113,4 +127,11 @@ export function setupCyclesCommands(program: Command): void {
         },
       ),
     );
+
+  cycles
+    .command("usage")
+    .description("show detailed usage for cycles")
+    .action(() => {
+      console.log(formatDomainUsage(cycles, CYCLES_META));
+    });
 }

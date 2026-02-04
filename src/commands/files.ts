@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getApiToken, type CommandOptions } from "../common/auth.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { FileService } from "../services/file-service.js";
 
 interface ErrorResponse {
@@ -8,6 +9,20 @@ interface ErrorResponse {
   error: string;
   statusCode?: number;
 }
+
+export const FILES_META: DomainMeta = {
+  name: "files",
+  summary: "upload/download file attachments",
+  context: [
+    "files are binary attachments stored in Linear's storage. upload returns",
+    "a URL that can be referenced in issue descriptions or comments.",
+  ].join("\n"),
+  arguments: {
+    url: "Linear storage URL",
+    file: "local file path",
+  },
+  seeAlso: [],
+};
 
 export function setupFilesCommands(program: Command): void {
   const files = program
@@ -109,4 +124,11 @@ export function setupFilesCommands(program: Command): void {
         },
       ),
     );
+
+  files
+    .command("usage")
+    .description("show detailed usage for files")
+    .action(() => {
+      console.log(formatDomainUsage(files, FILES_META));
+    });
 }
