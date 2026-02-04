@@ -9,7 +9,7 @@ Linearis is a CLI tool for Linear.app that compiles from TypeScript to JavaScrip
 Clone and install:
 
 ```bash
-git clone https://github.com/iamfj/linearis.git
+git clone https://github.com/czottmann/linearis.git
 cd linearis
 npm install
 ```
@@ -31,7 +31,7 @@ This creates the `linearis` command, pointing to `dist/main.js`.
 ### Direct Git Install
 
 ```bash
-npm install git+https://github.com/iamfj/linearis.git
+npm install git+https://github.com/czottmann/linearis.git
 ```
 
 This runs `postinstall` to generate GraphQL types. You still need to run `npm run build` separately to compile TypeScript.

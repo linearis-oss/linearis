@@ -210,9 +210,10 @@ export function setup*Commands(program: Command): void {
 **Import template**:
 ```typescript
 import { Command } from "commander";
-import { createContext, handleCommand, outputSuccess } from "../common/index.js";
-import { resolve*Id } from "../resolvers/index.js";
-import { service* } from "../services/*-service.js";
+import { createContext } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { resolve*Id } from "../resolvers/*-resolver.js";
+import { action* } from "../services/*-service.js";
 ```
 
 **Registration** (`src/main.ts`):
@@ -336,8 +337,9 @@ tests/unit/
 ```typescript
 // 1. Create src/commands/entity.ts
 import { Command } from "commander";
-import { createContext, handleCommand, outputSuccess } from "../common/index.js";
-import { resolveTeamId } from "../resolvers/index.js";
+import { createContext } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { createEntity } from "../services/entity-service.js";
 
 export function setupEntityCommands(program: Command): void {
@@ -709,7 +711,8 @@ export function setup*Commands(program: Command): void
 ```typescript
 // Command imports
 import { Command } from "commander";
-import { createContext, handleCommand, outputSuccess } from "../common/index.js";
+import { createContext } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
 import { resolve*Id } from "../resolvers/*-resolver.js";
 import { action* } from "../services/*-service.js";
 
