@@ -163,9 +163,9 @@ export class GraphQLIssuesService {
     );
 
     // Process resolution results
-    if (!isUuid(id)) {
+    if (!isUuid(input.id)) {
       if (!resolveResult.issues.nodes.length) {
-        throw new Error(`Issue with identifier "${id}" not found`);
+        throw new Error(`Issue with identifier "${input.id}" not found`);
       }
       resolvedIssueId = resolveResult.issues.nodes[0].id;
       currentIssueLabels = resolveResult.issues.nodes[0].labels.nodes.map(
