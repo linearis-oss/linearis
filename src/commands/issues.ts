@@ -18,10 +18,7 @@ import {
 import type { IssueCreateInput, IssueUpdateInput } from "../gql/graphql.js";
 
 interface ListOptions {
-  limit: string;
-}
-
-interface SearchOptions {
+  query?: string;
   team?: string;
   assignee?: string;
   project?: string;
@@ -50,7 +47,7 @@ interface UpdateOptions {
   assignee?: string;
   project?: string;
   labels?: string;
-  labelBy?: string;
+  labelMode?: string;
   clearLabels?: boolean;
   parentTicket?: string;
   clearParentTicket?: boolean;
@@ -94,43 +91,54 @@ export function setupIssuesCommands(program: Command): void {
    * Includes comments, assignees, projects, labels, and state information.
    */
   issues.command("list")
-    .description("List issues.")
-    .option("-l, --limit <number>", "limit results", "25")
+    .description("list issues with optional filters")
+    .option("--query <text>", "filter by text search")
+    .option("--team <team>", "filter by team (key, name, or UUID)")
+    .option("--assignee <user>", "filter by assignee (name or UUID)")
+    .option("--project <project>", "filter by project (name or UUID)")
+    .option("--status <status>", "filter by status (comma-separated names or UUIDs)")
+    .option("-l, --limit <n>", "max results", "50")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
           const [options, command] = args as [ListOptions, Command];
           const ctx = await createContext(command.parent!.parent!.opts());
-          const result = await listIssues(ctx.gql, parseInt(options.limit));
-          outputSuccess(result);
+
+          if (options.query) {
+            const result = await searchIssues(
+              ctx.gql,
+              options.query,
+              parseInt(options.limit),
+            );
+            outputSuccess(result);
+          } else {
+            const result = await listIssues(ctx.gql, parseInt(options.limit));
+            outputSuccess(result);
+          }
         },
       ),
     );
 
   /**
-   * Search issues
+   * Get issue details
    *
-   * Command: `linearis issues search <query> [options]`
+   * Command: `linearis issues read <issue>`
    *
-   * Searches issues with optional filtering by team, assignee, project,
-   * and workflow states. Uses optimized GraphQL queries.
+   * Retrieves complete issue details including all relationships and comments
+   * in a single optimized GraphQL query. Supports both UUID and TEAM-123 formats.
    */
-  issues.command("search <query>")
-    .description("Search issues.")
-    .option("--team <team>", "filter by team key, name, or ID")
-    .option("--assignee <assigneeId>", "filter by assignee ID")
-    .option("--project <project>", "filter by project name or ID")
-    .option("--status <status>", "filter by status (comma-separated)")
-    .option("-l, --limit <number>", "limit results", "10")
+  issues.command("read <issue>")
+    .description("get full issue details including description")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
     .action(
       handleCommand(
         async (...args: unknown[]) => {
-          const [query, options, command] = args as [string, SearchOptions, Command];
+          const [issue, , command] = args as [string, unknown, Command];
           const ctx = await createContext(command.parent!.parent!.opts());
-
-          // Note: Current implementation only supports basic search
-          // Team filtering is not yet implemented in searchIssues service
-          const result = await searchIssues(ctx.gql, query, parseInt(options.limit));
+          const result = await getIssue(ctx.gql, issue);
           outputSuccess(result);
         },
       ),
@@ -146,26 +154,26 @@ export function setupIssuesCommands(program: Command): void {
    * entity references (teams, projects, labels, etc.).
    */
   issues.command("create <title>")
-    .description("Create new issue.")
-    .option("-d, --description <desc>", "issue description")
-    .option("-a, --assignee <assigneeId>", "assign to user ID")
-    .option("-p, --priority <priority>", "priority level (1-4)")
-    .option("--project <project>", "add to project (name or ID)")
+    .description("create new issue")
+    .option("--description <text>", "issue body")
+    .option("--assignee <user>", "assign to user")
+    .option("--priority <1-4>", "1=urgent 2=high 3=medium 4=low")
+    .option("--project <project>", "add to project")
     .option(
       "--team <team>",
-      "team key, name, or ID (required if not specified)",
+      "target team (required)",
     )
-    .option("--labels <labels>", "labels (comma-separated names or IDs)")
+    .option("--labels <labels>", "comma-separated label names or UUIDs")
     .option(
-      "--project-milestone <milestone>",
-      "project milestone name or ID (requires --project)",
+      "--project-milestone <ms>",
+      "set milestone (requires --project)",
     )
     .option(
       "--cycle <cycle>",
-      "cycle name or ID (requires --team)",
+      "add to cycle (requires --team)",
     )
-    .option("--status <status>", "status name or ID")
-    .option("--parent-ticket <parentId>", "parent issue ID or identifier")
+    .option("--status <status>", "set status")
+    .option("--parent-ticket <issue>", "set parent issue")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
@@ -237,83 +245,54 @@ export function setupIssuesCommands(program: Command): void {
     );
 
   /**
-   * Get issue details
-   *
-   * Command: `linearis issues read <issueId>`
-   *
-   * Retrieves complete issue details including all relationships and comments
-   * in a single optimized GraphQL query. Supports both UUID and TEAM-123 formats.
-   */
-  issues.command("read <issueId>")
-    .description("Get issue details.")
-    .addHelpText(
-      "after",
-      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
-    )
-    .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [issueId, , command] = args as [string, unknown, Command];
-          const ctx = await createContext(command.parent!.parent!.opts());
-          const result = await getIssue(ctx.gql, issueId);
-          outputSuccess(result);
-        },
-      ),
-    );
-
-  /**
    * Update an issue
    *
-   * Command: `linearis issues update <issueId> [options]`
+   * Command: `linearis issues update <issue> [options]`
    *
    * Updates issue properties including title, description, state, priority,
    * assignee, project, labels, and parent relationship. Supports both
    * label adding and overwriting modes.
    */
-  issues.command("update <issueId>")
-    .description("Update an issue.")
+  issues.command("update <issue>")
+    .description("update an existing issue")
     .addHelpText(
       "after",
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
-    .option("-t, --title <title>", "new title")
-    .option("-d, --description <desc>", "new description")
-    .option("-s, --status <status>", "new status name or ID")
-    .option("-p, --priority <priority>", "new priority (1-4)")
-    .option("--assignee <assigneeId>", "new assignee ID")
-    .option("--project <project>", "new project (name or ID)")
-    .optionsGroup("Labels-related options:")
+    .option("--title <text>", "new title")
+    .option("--description <text>", "new description")
+    .option("--status <status>", "new status")
+    .option("--priority <1-4>", "new priority")
+    .option("--assignee <user>", "new assignee")
+    .option("--project <project>", "new project")
     .option(
       "--labels <labels>",
-      "labels to work with (comma-separated names or IDs)",
+      "labels to apply (comma-separated)",
     )
     .option(
-      "--label-by <mode>",
-      "how to apply labels: 'adding' (default) or 'overwriting'",
+      "--label-mode <mode>",
+      "add | overwrite",
     )
-    .option("--clear-labels", "remove all labels from issue")
-    .optionsGroup("Parent ticket-related options:")
-    .option("--parent-ticket <parentId>", "set parent issue ID or identifier")
-    .option("--clear-parent-ticket", "clear existing parent relationship")
-    .optionsGroup("Project milestone-related options:")
+    .option("--clear-labels", "remove all labels")
+    .option("--parent-ticket <issue>", "set parent issue")
+    .option("--clear-parent-ticket", "clear parent")
     .option(
-      "--project-milestone <milestone>",
-      "set project milestone (can use name or ID, will try to resolve within project context first)",
+      "--project-milestone <ms>",
+      "set project milestone",
     )
     .option(
       "--clear-project-milestone",
-      "clear existing project milestone assignment",
+      "clear project milestone",
     )
-    .optionsGroup("Cycle-related options:")
     .option(
       "--cycle <cycle>",
-      "set cycle (can use name or ID, will try to resolve within team context first)",
+      "set cycle",
     )
-    .option("--clear-cycle", "clear existing cycle assignment")
+    .option("--clear-cycle", "clear cycle")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
-          const [issueId, options, command] = args as [string, UpdateOptions, Command];
+          const [issue, options, command] = args as [string, UpdateOptions, Command];
           // Validate mutually exclusive flags
           if (options.parentTicket && options.clearParentTicket) {
             throw new Error(
@@ -333,9 +312,9 @@ export function setupIssuesCommands(program: Command): void {
             );
           }
 
-          if (options.labelBy && !options.labels) {
+          if (options.labelMode && !options.labels) {
             throw new Error(
-              "--label-by requires --labels to be specified",
+              "--label-mode requires --labels to be specified",
             );
           }
 
@@ -345,25 +324,25 @@ export function setupIssuesCommands(program: Command): void {
             );
           }
 
-          if (options.clearLabels && options.labelBy) {
+          if (options.clearLabels && options.labelMode) {
             throw new Error(
-              "--clear-labels cannot be used with --label-by",
+              "--clear-labels cannot be used with --label-mode",
             );
           }
 
           if (
-            options.labelBy &&
-            !["adding", "overwriting"].includes(options.labelBy)
+            options.labelMode &&
+            !["add", "overwrite"].includes(options.labelMode)
           ) {
             throw new Error(
-              "--label-by must be either 'adding' or 'overwriting'",
+              "--label-mode must be either 'add' or 'overwrite'",
             );
           }
 
           const ctx = await createContext(command.parent!.parent!.opts());
 
           // Resolve issue ID to UUID
-          const resolvedIssueId = await resolveIssueId(ctx.sdk, issueId);
+          const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
 
           // Build update input
           const input: IssueUpdateInput = {};
@@ -403,7 +382,7 @@ export function setupIssuesCommands(program: Command): void {
             const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
 
             // Handle label mode
-            if (options.labelBy === "adding") {
+            if (options.labelMode === "add") {
               // Get current labels and merge
               const issue = await getIssue(ctx.gql, resolvedIssueId);
               const currentLabels = "labels" in issue && issue.labels?.nodes
