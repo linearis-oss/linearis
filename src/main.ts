@@ -17,7 +17,7 @@
 import { program } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { setupCommentsCommands } from "./commands/comments.js";
-import { setupEmbedsCommands } from "./commands/embeds.js";
+import { setupFilesCommands } from "./commands/files.js";
 import { setupIssuesCommands } from "./commands/issues.js";
 import { setupLabelsCommands } from "./commands/labels.js";
 import { setupProjectsCommands } from "./commands/projects.js";
@@ -47,7 +47,7 @@ setupLabelsCommands(program);
 setupProjectsCommands(program);
 setupCyclesCommands(program);
 setupProjectMilestonesCommands(program);
-setupEmbedsCommands(program);
+setupFilesCommands(program);
 setupTeamsCommands(program);
 setupUsersCommands(program);
 setupDocumentsCommands(program);

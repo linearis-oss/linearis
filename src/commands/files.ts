@@ -9,46 +9,27 @@ interface ErrorResponse {
   statusCode?: number;
 }
 
-/**
- * Setup embeds commands on the program
- *
- * Registers `embeds` command group for uploading and downloading embedded files
- * from Linear's private cloud storage. Handles file operations with
- * authentication and error reporting.
- *
- * @param program - Commander.js program instance to register commands on
- *
- * @example
- * ```typescript
- * // In main.ts
- * setupEmbedsCommands(program);
- * // Enables:
- * //   linearis embeds upload <file>
- * //   linearis embeds download <url> [--output path] [--overwrite]
- * ```
- */
-export function setupEmbedsCommands(program: Command): void {
-  const embeds = program
-    .command("embeds")
+export function setupFilesCommands(program: Command): void {
+  const files = program
+    .command("files")
     .description("Upload and download files from Linear storage.");
 
-  // Show embeds help when no subcommand
-  embeds.action(() => {
-    embeds.help();
+  files.action(() => {
+    files.help();
   });
 
   /**
    * Download file from Linear storage
-   * 
-   * Command: `linearis embeds download <url> [--output <path>] [--overwrite]`
-   * 
+   *
+   * Command: `linearis files download <url> [--output <path>] [--overwrite]`
+   *
    * Downloads files from Linear's private cloud storage with automatic
    * authentication handling. Supports signed URLs and creates directories
    * as needed.
    */
-  embeds
+  files
     .command("download <url>")
-    .description("Download a file from Linear storage.")
+    .description("download a file from Linear storage")
     .option("--output <path>", "output file path")
     .option("--overwrite", "overwrite existing file", false)
     .action(
@@ -88,15 +69,15 @@ export function setupEmbedsCommands(program: Command): void {
   /**
    * Upload file to Linear storage
    *
-   * Command: `linearis embeds upload <file>`
+   * Command: `linearis files upload <file>`
    *
    * Uploads a local file to Linear's cloud storage using the fileUpload
    * GraphQL mutation. Returns the asset URL which can be used in markdown
    * for comments, descriptions, etc.
    */
-  embeds
+  files
     .command("upload <file>")
-    .description("Upload a file to Linear storage.")
+    .description("upload a file to Linear storage")
     .action(
       handleCommand(
         async (...args: unknown[]) => {
