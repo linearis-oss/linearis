@@ -1,216 +1,744 @@
 # AGENTS.md
 
-This file provides guidance to LLM agents when working with code in this repository.
+Agent instruction set for Linearis codebase.
 
-## Project Overview
+## Rule Hierarchy
 
-Linearis is a CLI tool for Linear.app that outputs structured JSON data, designed for LLM agents and users who prefer structured output. Written in TypeScript, built with Node.js using Commander.js for CLI structure and optimized GraphQL queries for Linear API integration.
+**P0 (Blocking)** - Violations fail CI/review
+**P1 (Required)** - Follow unless explicitly documented exception
+**P2 (Recommended)** - Follow for consistency
 
-**Design philosophy:** Minimize token usage for LLM agents while providing rich, structured data. The entire usage guide (`linearis usage`) comes in under 1000 tokens.
+## Core Constraints (P0)
 
-## Key Commands
+```yaml
+typescript:
+  no_any_types: REQUIRED
+  strict_mode: REQUIRED
+  explicit_return_types: REQUIRED
 
-### Development
+architecture:
+  layer_separation: STRICT
+  no_cross_layer_imports:
+    - resolvers MUST NOT import from services
+    - services MUST NOT import from resolvers
+    - commands MUST NOT import GraphQLClient directly
 
-- `npm start` - Run CLI in development mode using tsx (no compilation)
-- `npm run build` - Compile TypeScript to dist/ and make executable
-- `npm run clean` - Remove dist/ directory
-- `node dist/main.js` - Run compiled production version
-- `npm test` - Run test suite (unit + integration tests)
+  client_usage:
+    resolvers: LinearSdkClient ONLY
+    services: GraphQLClient ONLY
+    commands: Both via createContext()
 
-### Package Management
+id_resolution:
+  location: resolvers/ ONLY
+  no_duplication: STRICT
+  services_accept: UUIDs ONLY
 
-- Uses `npm` as the package manager
-- `npm install` - Install dependencies
-- `npm update` - Update dependencies
+testing:
+  mock_depth: ONE_LAYER
+  no_api_tokens: REQUIRED
+  structure_mirrors_src: REQUIRED
+```
 
-## Architecture
+## Project Context
 
-### Five-Layer Architecture
+**Type**: CLI tool for Linear.app
+**Output**: JSON only (except help text)
+**Design goal**: Minimal token usage, maximum structure
+**Architecture**: 5-layer separation (Client → Resolver → Service → Command → Common)
 
-The codebase uses a layered architecture that separates concerns and eliminates code duplication:
+## Layer Contracts
 
-1. **Client Layer** (`src/client/`) - GraphQL and SDK wrappers
-   - `graphql-client.ts` - Typed GraphQL client for direct queries
-   - `linear-client.ts` - Thin wrapper for Linear SDK access
-   - Takes `DocumentNode` types from codegen, returns typed results
-   - No business logic or ID resolution
+### Client Layer (`src/client/`)
 
-2. **Resolver Layer** (`src/resolvers/`) - Human-friendly ID → UUID resolution
-   - Pure functions: `resolveTeamId()`, `resolveProjectId()`, `resolveLabelId()`, etc.
-   - Converts human inputs (ABC-123, "Bug", "My Team") to UUIDs
-   - Uses SDK for lookups with smart fallbacks (key → name)
-   - Example: `resolveCycleId(client, "Sprint 1", "ENG")` → UUID with disambiguation
+**Files**: `graphql-client.ts`, `linear-client.ts`
 
-3. **Service Layer** (`src/services/`) - Business logic functions
-   - Pure, typed functions for CRUD operations
-   - Receives pre-resolved UUIDs, no ID resolution
-   - Uses GraphQL client for data operations
-   - Example: `createIssue(client, { teamId: "uuid", title: "..." })`
-   - Services: issue, document, attachment, milestone, cycle, team, user, project, label, comment, file
+```typescript
+// graphql-client.ts - Direct GraphQL execution
+class GraphQLClient {
+  request<TResult>(
+    document: DocumentNode,        // NOT string
+    variables?: Record<string, unknown>  // NOT any
+  ): Promise<TResult>
+}
 
-4. **Command Layer** (`src/commands/`) - CLI orchestration
-   - Thin command handlers that compose resolvers and services
-   - Pattern: create context → resolve IDs → call service → output result
-   - All commands use `handleCommand()` wrapper for error handling
-   - Current commands: issues, documents, comments, labels, projects, cycles, project-milestones, embeds, teams, users
+// linear-client.ts - SDK wrapper
+class LinearSdkClient {
+  readonly sdk: LinearClient
+}
+```
 
-5. **Common Layer** (`src/common/`) - Shared utilities
-   - `context.ts` - Creates clients (gql + sdk) from auth options
-   - `auth.ts` - Multi-source authentication (flag, env var, file)
-   - `output.ts` - JSON formatting (`outputSuccess`, `handleCommand`)
-   - `errors.ts` - Typed error factories (`notFoundError`, `multipleMatchesError`)
-   - `identifier.ts` - UUID/identifier utilities (`isUuid`, `parseIssueIdentifier`)
-   - `types.ts` - Type aliases derived from codegen types
-   - `embed-parser.ts` - Linear upload URL parsing
-   - `usage.ts` - CLI usage information
+**Rules**:
+- No business logic
+- No ID resolution
+- No `any` types
+- Variables must be `Record<string, unknown>`
 
-### Core Components
+### Resolver Layer (`src/resolvers/`)
 
-**Command Layer** (`src/commands/`)
+**Purpose**: Human ID → UUID conversion only
 
-- Each command file exports a `setup*Commands(program)` function
-- Commands registered in `src/main.ts` with Commander.js
-- All commands use `handleCommand()` wrapper for consistent error handling
-- Pattern: `const ctx = await createContext(opts)` → resolve IDs → call services
+**Contract**:
+```typescript
+export async function resolve*Id(
+  client: LinearSdkClient,  // MUST be LinearSdkClient
+  input: string
+): Promise<string>          // MUST return UUID string
+```
 
-**Query Definitions**
+**Standard implementation**:
+```typescript
+export async function resolveEntityId(
+  client: LinearSdkClient,
+  input: string
+): Promise<string> {
+  // 1. UUID passthrough
+  if (isUuid(input)) return input;
 
-- **GraphQL Files** (`graphql/queries/` and `graphql/mutations/`) - Raw GraphQL operation definitions with fragments
-- **Codegen Output** (`src/gql/graphql.ts`) - TypeScript types and `DocumentNode` exports
-- Query files organized by entity (issues, documents, attachments, project-milestones)
-- Run `npm run generate` to regenerate types from GraphQL schema
+  // 2. SDK lookup
+  const result = await client.sdk.entities({
+    filter: { /* lookup logic */ }
+  });
 
-**Type System**
+  // 3. Error if not found
+  if (!result.nodes[0]) {
+    throw notFoundError("Entity", input);
+  }
 
-- All types derived from GraphQL codegen (`src/gql/graphql.ts`)
-- Type aliases in `src/common/types.ts` for convenience
-- Strict TypeScript - no `any` types in new architecture
-- Ensures type safety across all layers
+  return result.nodes[0].id;
+}
+```
 
-### Authentication Flow
+**Supported resolvers**:
+```
+resolveTeamId(client, keyOrNameOrId): string
+resolveProjectId(client, nameOrId): string
+resolveLabelId(client, nameOrId): string
+resolveLabelIds(client, namesOrIds[]): string[]
+resolveCycleId(client, nameOrId, teamId?): string
+resolveStatusId(client, nameOrId, teamId): string
+resolveIssueId(client, identifier): string
+resolveMilestoneId(client, nameOrId, projectId?): string
+```
 
-Three authentication methods (checked in order):
+**Constraints**:
+- Use `LinearSdkClient` only (not `GraphQLClient`)
+- Return UUID strings only (not objects)
+- No CRUD operations
+- No data transformations
 
-1. `--api-token` command flag
-2. `LINEAR_API_TOKEN` environment variable
-3. Plain text file at `$HOME/.linear_api_token`
+### Service Layer (`src/services/`)
 
-Implemented in `src/common/auth.ts` via `getApiToken()` function.
+**Purpose**: Business logic and CRUD operations
 
-### Smart ID Resolution
+**Contract**:
+```typescript
+export async function action*(
+  client: GraphQLClient,  // MUST be GraphQLClient
+  params                  // Pre-resolved UUIDs only
+): Promise<ResultType>
+```
 
-Users can provide human-friendly identifiers that get automatically resolved in the resolver layer:
+**Standard implementation**:
+```typescript
+export async function createEntity(
+  client: GraphQLClient,
+  input: {
+    teamId: string;      // UUID - already resolved
+    name: string;
+    // ... other params
+  }
+): Promise<CreatedEntity> {
+  const result = await client.request<MutationType>(
+    MutationDocument,    // From codegen
+    { input }
+  );
+  return result.entityCreate.entity;
+}
+```
 
-- **Issue IDs**: `ABC-123` → UUID (parses team key + issue number)
-- **Project names**: `"Mobile App"` → project UUID
-- **Label names**: `"Bug", "Enhancement"` → label UUIDs
-- **Team identifiers**: `"ABC"` (key) or `"My Team"` (name) → team UUID
-- **Cycle names**: `"Sprint 2025-10"` → cycle UUID (with team disambiguation)
-- **Milestone names**: With optional project scoping for disambiguation
+**Services inventory**:
+```
+src/services/issue-service.ts
+src/services/document-service.ts
+src/services/attachment-service.ts
+src/services/milestone-service.ts
+src/services/cycle-service.ts
+src/services/team-service.ts
+src/services/user-service.ts
+src/services/project-service.ts
+src/services/label-service.ts
+src/services/comment-service.ts
+src/services/file-service.ts
+```
 
-All resolution happens in `src/resolvers/` via standalone `resolve*Id()` functions.
+**Constraints**:
+- Use `GraphQLClient` only (not `LinearSdkClient`)
+- Accept UUIDs only (no human-friendly IDs)
+- No ID resolution logic
+- Use codegen types (`DocumentNode`, typed results)
 
-### GraphQL Optimization Pattern
+### Command Layer (`src/commands/`)
 
-**Problem:** Linear SDK creates N+1 queries when fetching related entities.
+**Purpose**: CLI orchestration only
 
-**Solution:** Custom GraphQL queries with fragments fetch everything in one request.
+**Template**:
+```typescript
+export function setup*Commands(program: Command): void {
+  const entity = program.command("entity");
 
-Example - listing issues:
+  entity
+    .command("action <arg>")
+    .option("--team <id>", "Team identifier")
+    .action(handleCommand(async (arg, options, command) => {
+      // 1. Create context
+      const ctx = await createContext(command.parent!.parent!.opts());
 
-- SDK approach: 1 query for issues + 5 queries per issue (team, assignee, state, project, labels) = 1 + (5 × N) queries
-- GraphQL approach: 1 query with all relationships embedded = 1 query total
+      // 2. Resolve IDs (if needed)
+      const teamId = options.team
+        ? await resolveTeamId(ctx.sdk, options.team)
+        : undefined;
 
-See `graphql/queries/issues.graphql` for fragment definitions and query operations.
+      // 3. Call service
+      const result = await serviceAction(ctx.gql, { arg, teamId });
 
-### File Download Features
+      // 4. Output
+      outputSuccess(result);
+    }))
+}
+```
 
-The CLI can extract and download files uploaded to Linear's private cloud storage:
+**Import template**:
+```typescript
+import { Command } from "commander";
+import { createContext, handleCommand, outputSuccess } from "../common/index.js";
+import { resolve*Id } from "../resolvers/index.js";
+import { service* } from "../services/*-service.js";
+```
 
-- **Embed Extraction**: `issues read` command automatically parses markdown content for Linear upload URLs and includes them in the `embeds` array
-- **Signed URLs**: Uses Linear's `public-file-urls-expire-in` header to request 1-hour signed URLs that don't require Bearer token authentication
-- **File Downloads**: `embeds download <url>` command downloads files from signed URLs
-- **Expiration Tracking**: Each embed includes `expiresAt` timestamp (ISO 8601) indicating when the signed URL expires
-- **Smart Auth**: FileService automatically detects signed URLs and skips Bearer token authentication when signature is present
+**Registration** (`src/main.ts`):
+```typescript
+import { setup*Commands } from "./commands/*.js";
+// ...
+setup*Commands(program);
+```
 
-## Development Patterns
+**Constraints**:
+- Thin orchestration only (no business logic)
+- Always use `handleCommand()` wrapper
+- Always use `createContext()` for clients
+- Resolve all IDs before calling services
 
-### Adding a New Command
+### Common Layer (`src/common/`)
 
-1. Create command file in `src/commands/` (e.g., `milestones.ts`)
-2. Export `setup*Commands(program: Command)` function
-3. Import types: `createContext`, `handleCommand`, `outputSuccess` from `src/common/`
-4. Import resolvers from `src/resolvers/` (e.g., `resolveProjectId`, `resolveMilestoneId`)
-5. Import services from `src/services/` (e.g., `createMilestone`, `listMilestones`)
-6. Implement command pattern:
-   ```typescript
-   .action(
-     handleCommand(
-       async (...args: unknown[]) => {
-         const [options, command] = args as [OptionsType, Command];
-         const ctx = await createContext(command.parent!.parent!.opts());
+**Exports**:
+```typescript
+// context.ts
+interface CommandContext { gql: GraphQLClient; sdk: LinearSdkClient }
+function createContext(options): Promise<CommandContext>
 
-         // Resolve IDs if needed
-         const projectId = await resolveProjectId(ctx.sdk, options.project);
+// output.ts
+function outputSuccess(data: unknown): void
+function outputError(error: Error): void
+function handleCommand<T>(fn: (...args: T) => Promise<void>): Function
 
-         // Call service
-         const result = await createMilestone(ctx.gql, { projectId, ... });
+// identifier.ts
+function isUuid(value: string): boolean
+function parseIssueIdentifier(input: string): IssueIdentifier
 
-         outputSuccess(result);
-       }
-     )
-   )
-   ```
-7. Register in `src/main.ts` by importing and calling setup function
+// errors.ts
+function notFoundError(entity: string, id: string, context?: string): Error
+function multipleMatchesError(entity: string, id: string, matches: string[]): Error
 
-### Adding GraphQL Queries
+// types.ts - Codegen aliases
+type Issue = GetIssuesQuery["issues"]["nodes"][0]
+type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>
+```
 
-1. Define operations in `graphql/queries/<entity>.graphql` or `graphql/mutations/<entity>.graphql`
-2. Define reusable fragments in the same file or reference fragments from other files
-3. Run `npm run generate` to regenerate TypeScript types from GraphQL schema
-4. Import `DocumentNode` and types from `src/gql/graphql.ts`
-5. Create or update service in `src/services/` to use the new operation:
-   ```typescript
-   const result = await client.request<QueryType>(
-     QueryDocument,
-     { variables }
-   );
-   ```
-6. Test that all nested relationships are fetched in single query
+## Data Flow
 
-The GraphQL codegen workflow:
-- GraphQL operations are defined in `.graphql` files (human-readable, version-controlled)
-- `npm run generate` runs GraphQL codegen to generate TypeScript types in `src/gql/`
-- Services import `DocumentNode` and types directly from codegen
-- GraphQLClient accepts `DocumentNode` and returns typed results
+```
+CLI Input → Command → Resolver → Service → Output
+              ↓         ↓          ↓
+          createContext  SDK      GraphQL
+                       (UUID)    (data)
+```
 
-### Error Handling
+**Key rule**: ID resolution happens ONCE in resolvers.
 
-- All commands wrapped with `handleCommand()` which catches and formats errors
-- Service and resolver functions throw descriptive errors: `throw new Error("Team 'ABC' not found")`
-- Error factory functions in `src/common/errors.ts`: `notFoundError()`, `multipleMatchesError()`, etc.
-- GraphQL errors transformed in `GraphQLClient.request()`
+## Type System
 
-## Technical Requirements
+### GraphQL Codegen Workflow
 
-- Node.js >= 22.0.0
-- ES modules (type: "module" in package.json)
-- All CLI output must be JSON format (except help/usage text)
-- TypeScript with strict mode - no `any` types
+```
+1. Edit: graphql/{queries,mutations}/*.graphql
+2. Run: npm run generate
+3. Import: src/gql/graphql.ts (DocumentNode + types)
+4. Use: GraphQLClient.request<QueryType>(QueryDocument, vars)
+```
+
+### Codegen Import Pattern
+
+```typescript
+import {
+  GetEntityDocument,           // DocumentNode
+  type GetEntityQuery,         // Query result type
+  type GetEntityQueryVariables // Query variables type
+} from "../gql/graphql.js";
+
+const result = await client.request<GetEntityQuery>(
+  GetEntityDocument,
+  { id }  // Typed variables
+);
+```
+
+**Rules**:
+- Never edit `src/gql/graphql.ts` (generated)
+- Never use raw GraphQL strings
+- Always use `DocumentNode` exports
+- Always type `client.request<T>()`
+
+## Testing Strategy
+
+### Mock Pattern by Layer
+
+```typescript
+// Resolver test - Mock SDK
+const mockTeam = vi.fn().mockResolvedValue({ id: "uuid-123" });
+const client = { sdk: { team: mockTeam } } as unknown as LinearSdkClient;
+
+// Service test - Mock GraphQL
+const mockRequest = vi.fn().mockResolvedValue({ entity: { id: "123" } });
+const client = { request: mockRequest } as unknown as GraphQLClient;
+
+// Common test - No mocks (pure functions)
+```
+
+### Test File Structure
+
+```
+tests/unit/
+  resolvers/
+    team-resolver.test.ts
+    label-resolver.test.ts
+  services/
+    issue-service.test.ts
+    document-service.test.ts
+  common/
+    identifier.test.ts
+```
+
+**Coverage requirement**: Happy path + error case minimum.
+
+## Common Patterns
+
+### Pattern: Add New Command
+
+```typescript
+// 1. Create src/commands/entity.ts
+import { Command } from "commander";
+import { createContext, handleCommand, outputSuccess } from "../common/index.js";
+import { resolveTeamId } from "../resolvers/index.js";
+import { createEntity } from "../services/entity-service.js";
+
+export function setupEntityCommands(program: Command): void {
+  const entity = program.command("entity");
+
+  entity
+    .command("create <name>")
+    .option("--team <id>", "Team")
+    .action(handleCommand(async (name, options, command) => {
+      const ctx = await createContext(command.parent!.parent!.opts());
+      const teamId = options.team
+        ? await resolveTeamId(ctx.sdk, options.team)
+        : undefined;
+      const result = await createEntity(ctx.gql, { name, teamId });
+      outputSuccess(result);
+    }));
+}
+
+// 2. Register in src/main.ts
+import { setupEntityCommands } from "./commands/entity.js";
+setupEntityCommands(program);
+```
+
+### Pattern: Add GraphQL Operation
+
+```graphql
+# 1. Define in graphql/mutations/entity.graphql
+fragment EntityFields on Entity {
+  id
+  name
+  team { id name }
+}
+
+mutation CreateEntity($input: EntityCreateInput!) {
+  entityCreate(input: $input) {
+    entity { ...EntityFields }
+  }
+}
+```
+
+```bash
+# 2. Run codegen
+npm run generate
+```
+
+```typescript
+// 3. Use in service
+import { CreateEntityDocument, type CreateEntityMutation } from "../gql/graphql.js";
+
+export async function createEntity(
+  client: GraphQLClient,
+  input: { name: string; teamId: string }
+): Promise<Entity> {
+  const result = await client.request<CreateEntityMutation>(
+    CreateEntityDocument,
+    { input }
+  );
+  return result.entityCreate.entity;
+}
+```
+
+### Pattern: Add Resolver
+
+```typescript
+// src/resolvers/entity-resolver.ts
+import type { LinearSdkClient } from "../client/linear-client.js";
+import { isUuid } from "../common/identifier.js";
+import { notFoundError } from "../common/errors.js";
+
+export async function resolveEntityId(
+  client: LinearSdkClient,
+  nameOrId: string
+): Promise<string> {
+  if (isUuid(nameOrId)) return nameOrId;
+
+  const entities = await client.sdk.entities({
+    filter: { name: { eq: nameOrId } }
+  });
+
+  if (!entities.nodes[0]) {
+    throw notFoundError("Entity", nameOrId);
+  }
+
+  return entities.nodes[0].id;
+}
+```
+
+### Pattern: Add Service
+
+```typescript
+// src/services/entity-service.ts
+import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  GetEntitiesDocument,
+  type GetEntitiesQuery,
+  CreateEntityDocument,
+  type CreateEntityMutation
+} from "../gql/graphql.js";
+
+export async function listEntities(
+  client: GraphQLClient,
+  limit = 50
+): Promise<Entity[]> {
+  const result = await client.request<GetEntitiesQuery>(
+    GetEntitiesDocument,
+    { first: limit }
+  );
+  return result.entities.nodes;
+}
+
+export async function createEntity(
+  client: GraphQLClient,
+  input: { name: string; teamId: string }
+): Promise<Entity> {
+  const result = await client.request<CreateEntityMutation>(
+    CreateEntityDocument,
+    { input }
+  );
+  return result.entityCreate.entity;
+}
+```
+
+### Pattern: Error Handling
+
+```typescript
+// In resolvers/services - Throw descriptive errors
+throw notFoundError("Team", "ABC-123", "Check team key");
+throw multipleMatchesError("Cycle", "Sprint 1", ["id1", "id2"], "Specify team");
+
+// In commands - Use handleCommand wrapper (catches automatically)
+.action(handleCommand(async (...args) => {
+  // No try/catch needed
+}))
+```
+
+## Anti-Patterns (Violations)
+
+### ID Resolution in Service
+
+```typescript
+// WRONG - Service doing resolution
+export async function createIssue(
+  client: GraphQLClient,
+  teamName: string  // Human-friendly ID
+) {
+  const teamId = await resolveTeamId(...);  // Resolution in service
+}
+
+// CORRECT - Service receives UUID
+export async function createIssue(
+  client: GraphQLClient,
+  input: { teamId: string }  // Pre-resolved UUID
+) {
+  // ...
+}
+```
+
+### Wrong Client in Layer
+
+```typescript
+// WRONG - Resolver using GraphQL client
+export async function resolveTeamId(
+  client: GraphQLClient  // Wrong client type
+) {
+  const result = await client.request(...);
+}
+
+// CORRECT - Resolver using SDK client
+export async function resolveTeamId(
+  client: LinearSdkClient  // Correct client type
+) {
+  const team = await client.sdk.team(...);
+}
+```
+
+### Business Logic in Command
+
+```typescript
+// WRONG - Logic in command
+.action(handleCommand(async (title, options) => {
+  const ctx = await createContext(...);
+  const variables = { title, teamId: options.team };  // Complex logic
+  const result = await ctx.gql.request(..., variables);
+}))
+
+// CORRECT - Delegate to service
+.action(handleCommand(async (title, options) => {
+  const ctx = await createContext(...);
+  const teamId = await resolveTeamId(ctx.sdk, options.team);
+  const result = await createIssue(ctx.gql, { title, teamId });
+}))
+```
+
+### Using `any` Types
+
+```typescript
+// WRONG
+export async function getIssue(id: string): Promise<any> {
+  const result: any = await client.request(...);
+}
+
+// CORRECT
+export async function getIssue(
+  client: GraphQLClient,
+  id: string
+): Promise<IssueDetail> {
+  const result = await client.request<GetIssueByIdQuery>(...);
+}
+```
+
+## Decision Trees
+
+### Adding Functionality
+
+```
+Need GraphQL operation?
+  → Define in graphql/{queries,mutations}/*.graphql
+  → Run npm run generate
+  ↓
+Need ID resolution?
+  → Add resolve*Id() to src/resolvers/*-resolver.ts
+  → Use LinearSdkClient
+  → Return UUID string
+  ↓
+Need business logic?
+  → Add function to src/services/*-service.ts
+  → Use GraphQLClient
+  → Accept UUIDs only
+  ↓
+Need CLI interface?
+  → Add setup*Commands() to src/commands/*.ts
+  → Use createContext() + resolvers + services
+  → Register in src/main.ts
+  ↓
+Write tests
+  → tests/unit/{resolvers,services,common}/*.test.ts
+  → Mock one layer deep
+```
+
+### Troubleshooting
+
+```
+"Entity not found" but exists?
+  → Check resolver: try key/name/ID lookup order
+  → Verify correct SDK query filters
+
+N+1 query performance?
+  → Add GraphQL fragments
+  → Fetch relationships in single query
+
+TypeScript errors after GraphQL changes?
+  → Run: npm run generate
+
+Tests hitting real API?
+  → Check mocks: client.request or client.sdk.* mocked?
+
+"Multiple matches" error?
+  → Add disambiguation parameter (e.g., teamId for cycles)
+```
+
+## File Organization
+
+```
+src/
+  client/          # API wrappers
+  resolvers/       # ID resolution (SDK)
+  services/        # Business logic (GraphQL)
+  commands/        # CLI orchestration
+  common/          # Shared utilities
+  gql/             # Codegen output (DO NOT EDIT)
+
+graphql/
+  queries/         # GraphQL query definitions
+  mutations/       # GraphQL mutation definitions
+
+tests/
+  unit/
+    resolvers/     # Resolver tests (mock SDK)
+    services/      # Service tests (mock GraphQL)
+    common/        # Pure function tests (no mocks)
+```
+
+## Commands
+
+```bash
+# Development
+npm start              # Dev mode (tsx)
+npm run build          # Compile to dist/
+npm run clean          # Remove dist/
+npm test               # Run tests
+npm run generate       # Regenerate GraphQL types
+
+# Package
+npm install            # Install deps
+npm update             # Update deps
+```
+
+## Technical Constraints
+
+```yaml
+node: ">=22.0.0"
+module_system: ES_MODULES
+typescript:
+  strict: true
+  no_any: true
+output_format: JSON  # Except help/usage
+```
 
 ## Dependencies
 
-- `@linear/sdk` (^58.1.0) - Official Linear TypeScript SDK and GraphQL client
-- `commander` (^14.0.0) - CLI framework
-- `tsx` (^4.20.5) - TypeScript execution for development
+```json
+{
+  "@linear/sdk": "^58.1.0",
+  "commander": "^14.0.0",
+  "tsx": "^4.20.5"
+}
+```
 
-## Documentation
+## Quick Reference
 
-Comprehensive docs in `docs/`:
+### Layer-Client Matrix
 
-- `architecture.md` - Component organization, data flow, optimization patterns
-- `development.md` - Code patterns, TypeScript standards, common workflows
-- `build-system.md` - TypeScript compilation, automated builds
-- `testing.md` - Testing approach, manual validation, performance benchmarks
-- `files.md` - Complete file catalog
+| Layer | Client | Operations | Input | Output |
+|-------|--------|------------|-------|--------|
+| Resolver | `LinearSdkClient` | ID lookup | Name/key/ID | UUID |
+| Service | `GraphQLClient` | CRUD | UUIDs | Data |
+| Command | Both via `createContext()` | Orchestration | CLI args | JSON |
+
+### Function Signature Templates
+
+```typescript
+// Resolver
+export async function resolve*Id(
+  client: LinearSdkClient,
+  input: string
+): Promise<string>
+
+// Service - List
+export async function list*(
+  client: GraphQLClient,
+  limit?: number
+): Promise<Entity[]>
+
+// Service - Get
+export async function get*(
+  client: GraphQLClient,
+  id: string
+): Promise<EntityDetail>
+
+// Service - Create
+export async function create*(
+  client: GraphQLClient,
+  input: EntityCreateInput
+): Promise<CreatedEntity>
+
+// Service - Update
+export async function update*(
+  client: GraphQLClient,
+  id: string,
+  input: EntityUpdateInput
+): Promise<UpdatedEntity>
+
+// Command Setup
+export function setup*Commands(program: Command): void
+```
+
+### Import Templates
+
+```typescript
+// Command imports
+import { Command } from "commander";
+import { createContext, handleCommand, outputSuccess } from "../common/index.js";
+import { resolve*Id } from "../resolvers/*-resolver.js";
+import { action* } from "../services/*-service.js";
+
+// Service imports
+import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  DocumentName,
+  type QueryType
+} from "../gql/graphql.js";
+
+// Resolver imports
+import type { LinearSdkClient } from "../client/linear-client.js";
+import { isUuid } from "../common/identifier.js";
+import { notFoundError } from "../common/errors.js";
+```
+
+## Authentication
+
+Checked in order:
+1. `--api-token` flag
+2. `LINEAR_API_TOKEN` env var
+3. `~/.linear_api_token` file
+
+## Additional Documentation
+
+```
+docs/architecture.md          # Component organization
+docs/development.md           # Code patterns
+docs/build-system.md          # Compilation
+docs/testing.md               # Testing approach
+docs/files.md                 # File catalog
+```
