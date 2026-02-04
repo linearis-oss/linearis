@@ -57,11 +57,12 @@ The codebase uses a dual-service pattern optimized for performance:
 - `auth.ts` - Multi-source authentication (flag, env var, file)
 - `output.ts` - JSON formatting and error handling
 
-**Query Definitions** (`src/queries/`)
+**Query Definitions**
 
-- GraphQL query strings using fragments for reusability
-- `common.ts` contains shared fragments (COMPLETE_ISSUE_FRAGMENT, etc.)
-- Query files organized by entity (issues.ts, project-milestones.ts)
+- **GraphQL Files** (`graphql/queries/` and `graphql/mutations/`) - Raw GraphQL operation definitions with fragments
+- **Query Loaders** (`src/queries/`) - TypeScript modules that load and parse GraphQL files, extracting operations with their dependencies
+- Query files organized by entity (issues.ts, documents.ts, attachments.ts, project-milestones.ts)
+- Each loader reads the `.graphql` files and exports query/mutation strings for use with GraphQLService
 
 **Type System** (`src/utils/linear-types.d.ts`)
 
@@ -99,7 +100,7 @@ Example - listing issues:
 - SDK approach: 1 query for issues + 5 queries per issue (team, assignee, state, project, labels) = 1 + (5 × N) queries
 - GraphQL approach: 1 query with all relationships embedded = 1 query total
 
-See `src/queries/common.ts` for fragment definitions and `src/utils/graphql-issues-service.ts` for usage.
+See `graphql/queries/issues.graphql` for fragment definitions and query operations, and `src/utils/graphql-issues-service.ts` for usage.
 
 ### File Download Features
 
@@ -124,11 +125,18 @@ The CLI can extract and download files uploaded to Linear's private cloud storag
 
 ### Adding GraphQL Queries
 
-1. Define fragments in `src/queries/common.ts` if reusable
-2. Create query strings in `src/queries/<entity>.ts`
-3. Use fragments to ensure consistent data fetching
-4. Add corresponding method in `GraphQLIssuesService` or create new service
-5. Test that all nested relationships are fetched in single query
+1. Define operations in `graphql/queries/<entity>.graphql` or `graphql/mutations/<entity>.graphql`
+2. Define reusable fragments in the same file or reference fragments from other files
+3. Run `npm run generate` to regenerate TypeScript types from GraphQL schema
+4. The query loader in `src/queries/<entity>.ts` will automatically extract the new operation
+5. Add corresponding method in a GraphQL service (e.g., `GraphQLIssuesService`) or create new service
+6. Test that all nested relationships are fetched in single query
+
+The GraphQL codegen workflow:
+- GraphQL operations are defined in `.graphql` files (human-readable, version-controlled)
+- `npm run generate` runs GraphQL codegen to generate TypeScript types in `src/gql/`
+- Query loaders in `src/queries/` read the `.graphql` files at runtime and extract operations as strings
+- Services use the query strings with `GraphQLService.rawRequest()` for execution
 
 ### Error Handling
 
