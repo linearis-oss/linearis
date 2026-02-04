@@ -13,7 +13,7 @@
 import { print } from "graphql";
 import { access, mkdir, readFile, stat, writeFile } from "fs/promises";
 import { basename, dirname, extname } from "path";
-import { extractFilenameFromUrl, isLinearUploadUrl } from "../utils/embed-parser.js";
+import { extractFilenameFromUrl, isLinearUploadUrl } from "../common/embed-parser.js";
 import { FileUploadDocument } from "../gql/graphql.js";
 
 /**

@@ -26,7 +26,7 @@ import { setupProjectMilestonesCommands } from "./commands/project-milestones.js
 import { setupTeamsCommands } from "./commands/teams.js";
 import { setupUsersCommands } from "./commands/users.js";
 import { setupDocumentsCommands } from "./commands/documents.js";
-import { outputUsageInfo } from "./utils/usage.js";
+import { outputUsageInfo } from "./common/usage.js";
 
 // Setup main program
 program
