@@ -68,6 +68,6 @@
   },
   "graphql": {
     "schema": "https://api.linear.app/graphql",
-    "documents": "src/**/*.graphql"
+    "documents": "**/*.graphql"
   }
 }
