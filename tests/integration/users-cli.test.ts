@@ -62,9 +62,9 @@ describe("Users CLI Commands", () => {
       // Verify user has expected fields
       expect(user).toHaveProperty("id");
       expect(user).toHaveProperty("name");
-      expect(user).toHaveProperty("displayName");
       expect(user).toHaveProperty("email");
       expect(user).toHaveProperty("active");
+      // Note: displayName omitted in new architecture for token optimization
     });
 
     it.skipIf(!hasApiToken)("should filter active users only", async () => {

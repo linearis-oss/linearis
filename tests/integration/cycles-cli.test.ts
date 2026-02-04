@@ -67,26 +67,23 @@ describe("Cycles CLI Commands", () => {
         expect(cycle).toHaveProperty("id");
         expect(cycle).toHaveProperty("number");
         expect(cycle).toHaveProperty("isActive");
-        expect(cycle).toHaveProperty("team");
+        expect(cycle).toHaveProperty("name");
+        expect(cycle).toHaveProperty("startsAt");
+        expect(cycle).toHaveProperty("endsAt");
 
-        // Note: name field is optional - not all cycles have names
-
-        // Verify team structure
-        expect(cycle.team).toHaveProperty("id");
-        expect(cycle.team).toHaveProperty("key");
-        expect(cycle.team).toHaveProperty("name");
+        // Note: Team data is not included in list view for token optimization
       }
     });
 
     it.skipIf(!hasApiToken)("should filter by active cycles", async () => {
-      // First, get a team key
-      const { stdout: listOutput } = await execAsync(
-        `node ${CLI_PATH} cycles list`,
+      // First, get a team key from teams list
+      const { stdout: teamsOutput } = await execAsync(
+        `node ${CLI_PATH} teams list`,
       );
-      const allCycles = JSON.parse(listOutput);
+      const teams = JSON.parse(teamsOutput);
 
-      if (allCycles.length > 0 && allCycles[0].team) {
-        const teamKey = allCycles[0].team.key;
+      if (teams.length > 0) {
+        const teamKey = teams[0].key;
 
         // Now test active filter
         const { stdout } = await execAsync(
@@ -104,14 +101,14 @@ describe("Cycles CLI Commands", () => {
     it.skipIf(!hasApiToken)(
       "should work with --around-active flag",
       async () => {
-        // First, get a team key
-        const { stdout: listOutput } = await execAsync(
-          `node ${CLI_PATH} cycles list`,
+        // First, get a team key from teams list
+        const { stdout: teamsOutput } = await execAsync(
+          `node ${CLI_PATH} teams list`,
         );
-        const allCycles = JSON.parse(listOutput);
+        const teams = JSON.parse(teamsOutput);
 
-        if (allCycles.length > 0 && allCycles[0].team) {
-          const teamKey = allCycles[0].team.key;
+        if (teams.length > 0) {
+          const teamKey = teams[0].key;
 
           // Test around-active (may fail if no active cycle, which is ok)
           try {
@@ -175,18 +172,30 @@ describe("Cycles CLI Commands", () => {
     });
 
     it.skipIf(!hasApiToken)("should read cycle by name with team", async () => {
-      // First get a cycle name and team
+      // Get team key from teams list
+      const { stdout: teamsOutput } = await execAsync(
+        `node ${CLI_PATH} teams list`,
+      );
+      const teams = JSON.parse(teamsOutput);
+
+      if (teams.length === 0) {
+        console.log("Skipping: No teams found in workspace");
+        return;
+      }
+
+      const teamKey = teams[0].key;
+
+      // Get cycles for this team
       const { stdout: listOutput } = await execAsync(
-        `node ${CLI_PATH} cycles list`,
+        `node ${CLI_PATH} cycles list --team ${teamKey}`,
       );
       const cycles = JSON.parse(listOutput);
 
       // Find a cycle that has a name
       const cycleWithName = cycles.find((c: any) => c.name);
 
-      if (cycleWithName && cycleWithName.team) {
+      if (cycleWithName) {
         const cycleName = cycleWithName.name;
-        const teamKey = cycleWithName.team.key;
 
         const { stdout, stderr } = await execAsync(
           `node ${CLI_PATH} cycles read "${cycleName}" --team ${teamKey}`,
@@ -213,24 +222,58 @@ describe("Cycles CLI Commands", () => {
       ).rejects.toThrow(/--around-active requires --team/);
     });
 
-    it("should reject --around-active with non-numeric value", async () => {
-      if (!hasApiToken) return;
+    it.skipIf(!hasApiToken)(
+      "should reject --around-active with non-numeric value",
+      async () => {
+        // Get a real team key
+        const { stdout: teamsOutput } = await execAsync(
+          `node ${CLI_PATH} teams list`,
+        );
+        const teams = JSON.parse(teamsOutput);
 
-      await expect(
-        execAsync(
-          `node ${CLI_PATH} cycles list --around-active abc --team Engineering`,
-        ),
-      ).rejects.toThrow(/--around-active requires a non-negative integer/);
-    });
+        if (teams.length > 0) {
+          const teamKey = teams[0].key;
 
-    it("should reject --around-active with negative value", async () => {
-      if (!hasApiToken) return;
+          try {
+            await execAsync(
+              `node ${CLI_PATH} cycles list --around-active abc --team ${teamKey}`,
+            );
+            expect.fail("Should have thrown an error");
+          } catch (error: any) {
+            const output = JSON.parse(error.stdout || error.stderr);
+            expect(output.error).toContain(
+              "requires a non-negative integer",
+            );
+          }
+        }
+      },
+    );
 
-      await expect(
-        execAsync(
-          `node ${CLI_PATH} cycles list --around-active -5 --team Engineering`,
-        ),
-      ).rejects.toThrow(/--around-active requires a non-negative integer/);
-    });
+    it.skipIf(!hasApiToken)(
+      "should reject --around-active with negative value",
+      async () => {
+        // Get a real team key
+        const { stdout: teamsOutput } = await execAsync(
+          `node ${CLI_PATH} teams list`,
+        );
+        const teams = JSON.parse(teamsOutput);
+
+        if (teams.length > 0) {
+          const teamKey = teams[0].key;
+
+          try {
+            await execAsync(
+              `node ${CLI_PATH} cycles list --around-active -5 --team ${teamKey}`,
+            );
+            expect.fail("Should have thrown an error");
+          } catch (error: any) {
+            const output = JSON.parse(error.stdout || error.stderr);
+            expect(output.error).toContain(
+              "requires a non-negative integer",
+            );
+          }
+        }
+      },
+    );
   });
 });

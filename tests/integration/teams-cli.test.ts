@@ -63,8 +63,7 @@ describe("Teams CLI Commands", () => {
       expect(team).toHaveProperty("id");
       expect(team).toHaveProperty("key");
       expect(team).toHaveProperty("name");
-      // description is optional
-      expect(team).toHaveProperty("description");
+      // Note: description omitted in new architecture for token optimization
     });
 
     it.skipIf(!hasApiToken)("should return teams sorted by name", async () => {
