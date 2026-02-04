@@ -10,7 +10,8 @@
   "files": [
     "dist/",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "USAGE.md"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/main.js",
@@ -22,9 +23,11 @@
     "test:coverage": "vitest run --coverage",
     "test:commands": "tsx tests/command-coverage.ts",
     "generate": "graphql-codegen --config codegen.config.ts",
+    "generate:usage": "tsx src/main.ts usage --all > USAGE.md",
     "prestart": "npm run generate",
     "predev": "npm run generate",
     "postinstall": "npm run generate",
+    "prebuild": "npm run generate && npm run generate:usage",
     "prepublishOnly": "npm run build && npm run test && test -x dist/main.js"
   },
   "engines": {

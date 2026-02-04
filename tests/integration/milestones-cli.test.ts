@@ -5,10 +5,10 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 /**
- * Integration tests for project-milestones CLI command
+ * Integration tests for milestones CLI command
  *
  * These tests verify the command naming fix from PR #4:
- * - Command accessible via kebab-case (project-milestones)
+ * - Command accessible via kebab-case (milestones)
  * - Old camelCase (projectMilestones) fails appropriately
  * - Command functionality unchanged
  *
@@ -22,7 +22,7 @@ const execAsync = promisify(exec);
 const CLI_PATH = "./dist/main.js";
 const hasApiToken = !!process.env.LINEAR_API_TOKEN;
 
-describe("Project Milestones CLI Commands", () => {
+describe("Milestones CLI Commands", () => {
   beforeAll(async () => {
     if (!hasApiToken) {
       console.warn(
@@ -34,11 +34,11 @@ describe("Project Milestones CLI Commands", () => {
   describe("command naming", () => {
     it("should display help with kebab-case naming", async () => {
       const { stdout } = await execAsync(
-        `node ${CLI_PATH} project-milestones --help`,
+        `node ${CLI_PATH} milestones --help`,
       );
 
-      expect(stdout).toContain("Usage: linearis project-milestones");
-      expect(stdout).toContain("Project milestone operations");
+      expect(stdout).toContain("Usage: linearis milestones");
+      expect(stdout).toContain("Milestone operations");
       expect(stdout).toContain("list");
       expect(stdout).toContain("read");
       expect(stdout).toContain("create");
@@ -48,7 +48,7 @@ describe("Project Milestones CLI Commands", () => {
     it("should appear in main help with kebab-case", async () => {
       const { stdout } = await execAsync(`node ${CLI_PATH} --help`);
 
-      expect(stdout).toContain("project-milestones");
+      expect(stdout).toContain("milestones");
       expect(stdout).not.toContain("projectMilestones");
     });
 
@@ -69,10 +69,10 @@ describe("Project Milestones CLI Commands", () => {
     });
   });
 
-  describe("project-milestones list", () => {
+  describe("milestones list", () => {
     it.skipIf(!hasApiToken)("should require --project flag", async () => {
       try {
-        await execAsync(`node ${CLI_PATH} project-milestones list`);
+        await execAsync(`node ${CLI_PATH} milestones list`);
         expect.fail("Should have thrown an error");
       } catch (error: any) {
         expect(error.stderr).toContain("required option");
@@ -94,7 +94,7 @@ describe("Project Milestones CLI Commands", () => {
             const projectName = projects[0].name;
 
             const { stdout } = await execAsync(
-              `node ${CLI_PATH} project-milestones list --project "${projectName}"`,
+              `node ${CLI_PATH} milestones list --project "${projectName}"`,
             );
 
             const milestones = JSON.parse(stdout);
