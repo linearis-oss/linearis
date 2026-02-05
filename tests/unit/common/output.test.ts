@@ -54,6 +54,26 @@ describe("handleCommand", () => {
   });
 });
 
+describe("handleCommand with AuthenticationError", () => {
+  it("calls outputAuthError for AuthenticationError", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const handler = handleCommand(async () => {
+      throw new AuthenticationError("expired");
+    });
+
+    await handler();
+
+    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+    expect(output.error).toBe("AUTHENTICATION_REQUIRED");
+    expect(exitSpy).toHaveBeenCalledWith(42);
+
+    consoleSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
+
 describe("outputAuthError", () => {
   it("outputs structured JSON with AUTHENTICATION_REQUIRED", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

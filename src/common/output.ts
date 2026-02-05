@@ -1,4 +1,4 @@
-import { type AuthenticationError, AUTH_ERROR_CODE } from "./errors.js";
+import { AuthenticationError, AUTH_ERROR_CODE } from "./errors.js";
 
 /**
  * Outputs successful command result as formatted JSON.
@@ -44,6 +44,10 @@ export function handleCommand(
     try {
       await asyncFn(...args);
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        outputAuthError(error);
+        return;
+      }
       outputError(error instanceof Error ? error : new Error(String(error)));
     }
   };
