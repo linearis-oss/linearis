@@ -58,7 +58,7 @@ export function setupProjectsCommands(program: Command): void {
     .action(handleCommand(async (...args: unknown[]) => {
       const [, command] = args as [CommandOptions, Command];
       const ctx = await createContext(command.parent!.parent!.opts());
-      const result = await listProjects(ctx.sdk);
+      const result = await listProjects(ctx.gql);
       outputSuccess(result);
     }));
 

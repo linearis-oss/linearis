@@ -65,7 +65,7 @@ export function setupLabelsCommands(program: Command): void {
         : undefined;
 
       // Fetch labels with optional team filtering
-      const result = await listLabels(ctx.sdk, teamId);
+      const result = await listLabels(ctx.gql, teamId);
       outputSuccess(result);
     }));
 

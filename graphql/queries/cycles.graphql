@@ -6,9 +6,48 @@
 # with issues and teams.
 # ------------------------------------------------------------
 
+fragment CycleFields on Cycle {
+  id
+  number
+  name
+  startsAt
+  endsAt
+  isActive
+  isNext
+  isPrevious
+}
+
+fragment CycleWithIssuesFields on Cycle {
+  ...CycleFields
+  issues(first: $first) {
+    nodes {
+      id
+      identifier
+      title
+      state {
+        name
+      }
+    }
+  }
+}
+
+# List cycles with optional filtering
+query GetCycles($first: Int = 50, $filter: CycleFilter) {
+  cycles(first: $first, filter: $filter) {
+    nodes {
+      ...CycleFields
+    }
+  }
+}
+
+# Get cycle by ID with issues
+query GetCycleById($id: String!, $first: Int = 50) {
+  cycle(id: $id) {
+    ...CycleWithIssuesFields
+  }
+}
+
 # Find a cycle by name and team ID
-#
-# Fetches a cycle by its name and team ID.
 query FindCycleScoped($name: String!, $teamId: ID!) {
   cycles(
     filter: {
@@ -33,8 +72,6 @@ query FindCycleScoped($name: String!, $teamId: ID!) {
 }
 
 # Find a cycle by name
-#
-# Fetches a cycle by its name.
 query FindCycleGlobal($name: String!) {
   cycles(filter: { name: { eq: $name } }, first: 10) {
     nodes {

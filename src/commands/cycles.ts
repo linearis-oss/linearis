@@ -65,7 +65,7 @@ export function setupCyclesCommands(program: Command): void {
 
           // Fetch cycles
           const allCycles = await listCycles(
-            ctx.sdk,
+            ctx.gql,
             teamId,
             options.active || false,
           );
@@ -118,7 +118,7 @@ export function setupCyclesCommands(program: Command): void {
           );
 
           const cycleResult = await getCycle(
-            ctx.sdk,
+            ctx.gql,
             cycleId,
             parseInt(options.limit || "50"),
           );
