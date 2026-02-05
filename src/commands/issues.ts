@@ -20,10 +20,6 @@ import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
 interface ListOptions {
   query?: string;
-  team?: string;
-  assignee?: string;
-  project?: string;
-  status?: string;
   limit: string;
 }
 
@@ -111,10 +107,6 @@ export function setupIssuesCommands(program: Command): void {
   issues.command("list")
     .description("list issues with optional filters")
     .option("--query <text>", "filter by text search")
-    .option("--team <team>", "filter by team (key, name, or UUID)")
-    .option("--assignee <user>", "filter by assignee (name or UUID)")
-    .option("--project <project>", "filter by project (name or UUID)")
-    .option("--status <status>", "filter by status (comma-separated names or UUIDs)")
     .option("-l, --limit <n>", "max results", "50")
     .action(
       handleCommand(
