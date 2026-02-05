@@ -38,12 +38,8 @@ arguments:
   <title>  string
 
 list options:
-  --query <text>       filter by text search
-  --team <team>        filter by team (key, name, or UUID)
-  --assignee <user>    filter by assignee (name or UUID)
-  --project <project>  filter by project (name or UUID)
-  --status <status>    filter by status (comma-separated names or UUIDs)
-  --limit <n>          max results (default: 50)
+  --query <text>  filter by text search
+  --limit <n>     max results (default: 50)
 
 create options:
   --description <text>      issue body
