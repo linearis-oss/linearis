@@ -38,7 +38,7 @@ describe("Milestones CLI Commands", () => {
       );
 
       expect(stdout).toContain("Usage: linearis milestones");
-      expect(stdout).toContain("Milestone operations");
+      expect(stdout).toContain("Project milestone operations");
       expect(stdout).toContain("list");
       expect(stdout).toContain("read");
       expect(stdout).toContain("create");
