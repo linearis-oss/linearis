@@ -1,11 +1,22 @@
 # ------------------------------------------------------------
-# GraphQL queries and mutations for Linear cycles
+# GraphQL queries for Linear cycles
 #
-# Cycles are sprint/event containers within teams. They can be
-# queried by name (global or team-scoped), and are associated
-# with issues and teams.
+# Cycles are time-boxed iterations (sprints) belonging to teams.
+# Each team can have one active cycle at a time, plus past and future
+# cycles. Cycles are numbered sequentially per team (Cycle 1, 2, 3...)
+# and can have custom names.
+#
+# Key behavior:
+# - isActive, isNext, isPrevious are mutually exclusive flags
+# - Only one cycle per team can have isActive=true at any time
+# - Cycle.name is nullable - use "Cycle {number}" as fallback
+# - Issues can belong to exactly one cycle
 # ------------------------------------------------------------
 
+# Cycle fields fragment
+#
+# Defines the basic fields for a cycle entity. Number is sequential
+# per team, startsAt/endsAt are ISO 8601 timestamps.
 fragment CycleFields on Cycle {
   id
   number
@@ -17,6 +28,10 @@ fragment CycleFields on Cycle {
   isPrevious
 }
 
+# Cycle with issues fragment
+#
+# Extends CycleFields to include issues belonging to the cycle.
+# Issues are paginated - use $first variable to control limit.
 fragment CycleWithIssuesFields on Cycle {
   ...CycleFields
   issues(first: $first) {
@@ -32,6 +47,17 @@ fragment CycleWithIssuesFields on Cycle {
 }
 
 # List cycles with optional filtering
+#
+# Fetches a list of cycles with optional team and status filtering.
+# Without filters, returns cycles from all teams.
+#
+# Common filters:
+#   { team: { id: { eq: "uuid" } } } - cycles for specific team
+#   { isActive: { eq: true } } - only active cycles
+#
+# Variables:
+#   $first: Maximum number of cycles to return (default: 50)
+#   $filter: Optional CycleFilter for team/status filtering
 query GetCycles($first: Int = 50, $filter: CycleFilter) {
   cycles(first: $first, filter: $filter) {
     nodes {
@@ -40,14 +66,29 @@ query GetCycles($first: Int = 50, $filter: CycleFilter) {
   }
 }
 
-# Get cycle by ID with issues
+# Get cycle by ID with its issues
+#
+# Fetches a single cycle by UUID and includes its issues.
+# Use this for cycle detail views where issue list is needed.
+#
+# Variables:
+#   $id: Cycle UUID (String! not ID! due to Linear API quirk)
+#   $first: Maximum number of issues to return (default: 50)
 query GetCycleById($id: String!, $first: Int = 50) {
   cycle(id: $id) {
     ...CycleWithIssuesFields
   }
 }
 
-# Find a cycle by name and team ID
+# Find a cycle by name scoped to a team
+#
+# Resolves a cycle name to UUID within a specific team context.
+# Used when resolving human-friendly identifiers like "Sprint 1".
+# Returns up to 10 matches (typically only 1).
+#
+# Variables:
+#   $name: Cycle name to search for (case-sensitive)
+#   $teamId: Team UUID to scope the search
 query FindCycleScoped($name: String!, $teamId: ID!) {
   cycles(
     filter: {
@@ -71,7 +112,14 @@ query FindCycleScoped($name: String!, $teamId: ID!) {
   }
 }
 
-# Find a cycle by name
+# Find a cycle by name across all teams
+#
+# Resolves a cycle name to UUID globally (not team-scoped).
+# Used when team context is not available. May return multiple
+# matches if multiple teams have cycles with the same name.
+#
+# Variables:
+#   $name: Cycle name to search for (case-sensitive)
 query FindCycleGlobal($name: String!) {
   cycles(filter: { name: { eq: $name } }, first: 10) {
     nodes {

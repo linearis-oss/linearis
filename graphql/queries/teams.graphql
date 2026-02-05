@@ -1,11 +1,33 @@
-# Team query operations
+# ------------------------------------------------------------
+# GraphQL queries for Linear teams
+#
+# Teams are organizational units that own issues, cycles, and statuses.
+# Each team has a unique key (e.g., "ENG", "DESIGN") used for issue
+# identifiers (e.g., ENG-123). Teams serve as the primary scoping
+# mechanism for most Linear entities.
+#
+# Key behavior: Teams are workspace-level entities. All users see all
+# teams, but permission controls determine which teams users can
+# create issues in or modify.
+# ------------------------------------------------------------
 
+# Team fields fragment
+#
+# Defines the basic fields for a team entity. The key is used in
+# issue identifiers (TEAM-123), and the name is the display name.
 fragment TeamFields on Team {
   id
   key
   name
 }
 
+# List all teams in the workspace
+#
+# Fetches a list of all teams. Teams are typically limited in number
+# (most workspaces have < 50), so pagination is rarely needed.
+#
+# Variables:
+#   $first: Maximum number of teams to return (default: 50)
 query GetTeams($first: Int = 50) {
   teams(first: $first) {
     nodes {

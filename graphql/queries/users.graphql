@@ -1,5 +1,19 @@
-# User query operations
+# ------------------------------------------------------------
+# GraphQL queries for Linear users
+#
+# Users are workspace members who can be assigned to issues, own teams,
+# and create/modify Linear entities. Each user has a unique email and
+# can be active or inactive (deactivated users are retained for history).
+#
+# Key behavior: Inactive users are hidden from most UI surfaces but
+# remain accessible via API for historical data integrity. Use the
+# active filter to exclude deactivated users.
+# ------------------------------------------------------------
 
+# User fields fragment
+#
+# Defines the basic fields for a user entity. The active flag indicates
+# whether the user is currently active in the workspace.
 fragment UserFields on User {
   id
   name
@@ -7,6 +21,14 @@ fragment UserFields on User {
   active
 }
 
+# List users in the workspace
+#
+# Fetches a list of workspace members with optional filtering.
+# Common use case: filter by active: true to show only current members.
+#
+# Variables:
+#   $first: Maximum number of users to return (default: 50)
+#   $filter: Optional filter (e.g., { active: { eq: true } })
 query GetUsers($first: Int = 50, $filter: UserFilter) {
   users(first: $first, filter: $filter) {
     nodes {
