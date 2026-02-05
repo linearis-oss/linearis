@@ -16,6 +16,7 @@
 
 import { program, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
+import { setupAuthCommands, AUTH_META } from "./commands/auth.js";
 import { setupCommentsCommands, COMMENTS_META } from "./commands/comments.js";
 import { setupFilesCommands, FILES_META } from "./commands/files.js";
 import { setupIssuesCommands, ISSUES_META } from "./commands/issues.js";
@@ -45,6 +46,7 @@ program.action(() => {
 });
 
 // Setup all subcommand groups
+setupAuthCommands(program);
 setupIssuesCommands(program);
 setupCommentsCommands(program);
 setupLabelsCommands(program);
@@ -58,6 +60,7 @@ setupDocumentsCommands(program);
 
 // Collect all domain metadata (order matches overview display)
 const allMetas: DomainMeta[] = [
+  AUTH_META,
   ISSUES_META,
   COMMENTS_META,
   LABELS_META,
