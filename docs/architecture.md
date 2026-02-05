@@ -117,7 +117,7 @@ Shared utilities used across layers.
 - **identifier.ts** - `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`
 - **types.ts** - Type aliases from codegen (Issue, Document, Attachment, etc.)
 - **embed-parser.ts** - Linear upload URL parsing utilities
-- **usage.ts** - CLI usage information formatting
+- **usage.ts** - Token-optimized two-tier usage system (`formatOverview()`, `formatDomainUsage()`, `DomainMeta`)
 
 ## Component Map
 

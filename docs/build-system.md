@@ -35,6 +35,25 @@ The project uses [GraphQL Code Generator](https://the-guild.dev/graphql/codegen)
 
 > **Important:** Never edit files in `src/gql/` by hand. They are regenerated and any manual changes will be lost.
 
+## Usage Documentation Generation
+
+The project auto-generates token-optimized usage documentation for LLM agents.
+
+**How it works:**
+
+1. Each command file exports a `DomainMeta` object with domain name, summary, context, arguments, and cross-references.
+2. Running `npm run generate:usage` executes `linearis usage --all` and captures output to `USAGE.md`.
+3. The generated file contains two tiers: overview (~200 tokens) + per-domain detail (~300-500 tokens each).
+
+**When usage generation runs automatically:**
+
+- On `npm run build` (prebuild hook)
+- Before publishing (via prebuild in prepublishOnly chain)
+
+**Generated output:** `USAGE.md` -- Token-optimized usage documentation committed to the repository and shipped with the package. Typical agent cost: overview + 1 domain = ~500-700 tokens (vs ~3000+ for traditional help text).
+
+> **Important:** USAGE.md is auto-generated. Edit `DomainMeta` objects in command files instead. The file is regenerated on every build.
+
 ## Build Workflows
 
 ### Development
@@ -96,6 +115,8 @@ npm run test:commands   # Run command coverage analysis
 | `test:coverage` | `vitest run --coverage` | Run tests with coverage |
 | `test:commands` | `tsx tests/command-coverage.ts` | Check command test coverage |
 | `generate` | `graphql-codegen --config codegen.config.ts` | Generate TypeScript types from GraphQL |
+| `generate:usage` | `tsx src/main.ts usage --all > USAGE.md` | Generate token-optimized usage documentation |
+| `prebuild` | `npm run generate && npm run generate:usage` | Auto-run codegen and usage generation before build |
 | `prestart` | `npm run generate` | Auto-run codegen before `npm start` |
 | `postinstall` | `npm run generate` | Auto-run codegen after `npm install` |
 | `prepublishOnly` | `npm run build && npm run test && test -x dist/main.js` | Validate before publish |

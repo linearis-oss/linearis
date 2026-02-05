@@ -364,7 +364,7 @@ src/
     identifier.ts            # UUID validation and issue identifier parsing
     types.ts                 # Type aliases from codegen
     embed-parser.ts          # Embed extraction utilities
-    usage.ts                 # Usage info output
+    usage.ts                 # Two-tier usage system (DomainMeta, formatOverview, formatDomainUsage)
   gql/                       # GraphQL codegen output (DO NOT EDIT)
 graphql/
   queries/                   # GraphQL query definitions

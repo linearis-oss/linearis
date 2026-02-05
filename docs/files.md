@@ -67,7 +67,7 @@ Shared utilities used across all layers.
 - **identifier.ts** -- `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`.
 - **types.ts** -- Type aliases derived from codegen output (e.g., `Issue`, `IssueDetail`, `Document`).
 - **embed-parser.ts** -- `extractEmbeds()`, `isLinearUploadUrl()`, `extractFilenameFromUrl()` for parsing embedded files in markdown content.
-- **usage.ts** -- `outputUsageInfo()` for CLI usage display.
+- **usage.ts** -- Token-optimized two-tier usage system with `DomainMeta` interface, `formatOverview()` for tier 1 (all domains), and `formatDomainUsage()` for tier 2 (domain detail). Generates USAGE.md via build pipeline.
 
 ## Generated Types (`src/gql/`)
 
