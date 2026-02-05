@@ -8,7 +8,8 @@
 
 # Document fields fragment
 #
-# Defines the basic fields for a document entity.
+# Defines the basic fields for a document entity. The trashed field
+# indicates soft-deletion status (documents are not hard-deleted).
 fragment DocumentFields on Document {
   id
   title
@@ -19,6 +20,7 @@ fragment DocumentFields on Document {
   color
   createdAt
   updatedAt
+  trashed
 }
 
 # Get a single document by ID
