@@ -25,6 +25,8 @@ fragment UserFields on User {
 #
 # Fetches a list of workspace members with optional filtering.
 # Common use case: filter by active: true to show only current members.
+# Note: Results are sorted alphabetically by name in the service layer
+# to match Linear SDK behavior.
 #
 # Variables:
 #   $first: Maximum number of users to return (default: 50)

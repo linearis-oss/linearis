@@ -18,5 +18,6 @@ export async function listUsers(
     filter,
   });
 
-  return result.users.nodes;
+  // Sort by name to match Linear SDK behavior
+  return result.users.nodes.sort((a, b) => a.name.localeCompare(b.name));
 }
