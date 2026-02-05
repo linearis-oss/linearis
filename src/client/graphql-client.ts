@@ -1,5 +1,6 @@
 import { LinearClient } from "@linear/sdk";
 import { print, type DocumentNode } from "graphql";
+import { AuthenticationError, isAuthError } from "../common/errors.js";
 
 interface GraphQLErrorResponse {
   response?: {
@@ -63,8 +64,14 @@ export class GraphQLClient {
       return response.data as TResult;
     } catch (error: unknown) {
       const gqlError = error as GraphQLErrorResponse;
-      if (gqlError.response?.errors?.[0]) {
-        throw new Error(gqlError.response.errors[0].message || "GraphQL query failed");
+      const errorMessage = gqlError.response?.errors?.[0]?.message ?? "";
+
+      if (isAuthError(new Error(errorMessage))) {
+        throw new AuthenticationError(errorMessage || undefined);
+      }
+
+      if (errorMessage) {
+        throw new Error(errorMessage || "GraphQL query failed");
       }
       throw new Error(
         `GraphQL request failed: ${error instanceof Error ? error.message : String(error)}`,
