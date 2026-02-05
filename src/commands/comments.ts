@@ -71,7 +71,7 @@ export function setupCommentsCommands(program: Command): void {
           const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
 
           // Create comment using service
-          const result = await createComment(ctx.sdk, {
+          const result = await createComment(ctx.gql, {
             issueId: resolvedIssueId,
             body: options.body,
           });
