@@ -1,4 +1,5 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
+import { GetUsersDocument, type GetUsersQuery } from "../gql/graphql.js";
 
 export interface User {
   id: string;
@@ -8,16 +9,14 @@ export interface User {
 }
 
 export async function listUsers(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   activeOnly: boolean = false,
 ): Promise<User[]> {
   const filter = activeOnly ? { active: { eq: true } } : undefined;
-  const result = await client.sdk.users({ filter });
+  const result = await client.request<GetUsersQuery>(GetUsersDocument, {
+    first: 50,
+    filter,
+  });
 
-  return result.nodes.map((user) => ({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    active: user.active,
-  }));
+  return result.users.nodes;
 }

@@ -1,4 +1,5 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
+import { GetTeamsDocument, type GetTeamsQuery } from "../gql/graphql.js";
 
 export interface Team {
   id: string;
@@ -6,11 +7,9 @@ export interface Team {
   name: string;
 }
 
-export async function listTeams(client: LinearSdkClient): Promise<Team[]> {
-  const result = await client.sdk.teams();
-  return result.nodes.map((team) => ({
-    id: team.id,
-    key: team.key,
-    name: team.name,
-  }));
+export async function listTeams(client: GraphQLClient): Promise<Team[]> {
+  const result = await client.request<GetTeamsQuery>(GetTeamsDocument, {
+    first: 50,
+  });
+  return result.teams.nodes;
 }

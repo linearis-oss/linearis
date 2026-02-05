@@ -1,4 +1,5 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
+import { GetLabelsDocument, type GetLabelsQuery } from "../gql/graphql.js";
 
 export interface Label {
   id: string;
@@ -8,19 +9,20 @@ export interface Label {
 }
 
 export async function listLabels(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   teamId?: string,
 ): Promise<Label[]> {
-  const filter = teamId
-    ? { team: { id: { eq: teamId } } }
-    : undefined;
+  const filter = teamId ? { team: { id: { eq: teamId } } } : undefined;
 
-  const result = await client.sdk.issueLabels({ filter });
+  const result = await client.request<GetLabelsQuery>(GetLabelsDocument, {
+    first: 50,
+    filter,
+  });
 
-  return result.nodes.map((label) => ({
+  return result.issueLabels.nodes.map((label) => ({
     id: label.id,
     name: label.name,
     color: label.color,
-    description: label.description,
+    description: label.description ?? undefined,
   }));
 }

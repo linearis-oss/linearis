@@ -1,5 +1,11 @@
-import type { LinearDocument } from "@linear/sdk";
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  GetCyclesDocument,
+  type GetCyclesQuery,
+  GetCycleByIdDocument,
+  type GetCycleByIdQuery,
+  type CycleFilter,
+} from "../gql/graphql.js";
 
 export interface Cycle {
   id: string;
@@ -22,11 +28,11 @@ export interface CycleDetail extends Cycle {
 }
 
 export async function listCycles(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   teamId?: string,
   activeOnly: boolean = false,
 ): Promise<Cycle[]> {
-  const filter: LinearDocument.CycleFilter = {};
+  const filter: CycleFilter = {};
 
   if (teamId) {
     filter.team = { id: { eq: teamId } };
@@ -36,14 +42,17 @@ export async function listCycles(
     filter.isActive = { eq: true };
   }
 
-  const result = await client.sdk.cycles({ filter });
+  const result = await client.request<GetCyclesQuery>(GetCyclesDocument, {
+    first: 50,
+    filter,
+  });
 
-  return result.nodes.map((cycle) => ({
+  return result.cycles.nodes.map((cycle) => ({
     id: cycle.id,
     number: cycle.number,
     name: cycle.name ?? `Cycle ${cycle.number}`,
-    startsAt: new Date(cycle.startsAt).toISOString(),
-    endsAt: new Date(cycle.endsAt).toISOString(),
+    startsAt: cycle.startsAt,
+    endsAt: cycle.endsAt,
     isActive: cycle.isActive,
     isNext: cycle.isNext,
     isPrevious: cycle.isPrevious,
@@ -51,37 +60,35 @@ export async function listCycles(
 }
 
 export async function getCycle(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   cycleId: string,
   issuesLimit: number = 50,
 ): Promise<CycleDetail> {
-  const cycle = await client.sdk.cycle(cycleId);
+  const result = await client.request<GetCycleByIdQuery>(
+    GetCycleByIdDocument,
+    { id: cycleId, first: issuesLimit },
+  );
+
+  const cycle = result.cycle;
 
   if (!cycle) {
     throw new Error(`Cycle with ID "${cycleId}" not found`);
   }
 
-  const issues = await cycle.issues({ first: issuesLimit });
-
   return {
     id: cycle.id,
     number: cycle.number,
     name: cycle.name ?? `Cycle ${cycle.number}`,
-    startsAt: new Date(cycle.startsAt).toISOString(),
-    endsAt: new Date(cycle.endsAt).toISOString(),
+    startsAt: cycle.startsAt,
+    endsAt: cycle.endsAt,
     isActive: cycle.isActive,
     isNext: cycle.isNext,
     isPrevious: cycle.isPrevious,
-    issues: await Promise.all(
-      issues.nodes.map(async (issue) => {
-        const state = await issue.state;
-        return {
-          id: issue.id,
-          identifier: issue.identifier,
-          title: issue.title,
-          state: { name: state?.name ?? "Unknown" },
-        };
-      }),
-    ),
+    issues: cycle.issues.nodes.map((issue) => ({
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      state: { name: issue.state.name },
+    })),
   };
 }

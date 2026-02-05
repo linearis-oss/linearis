@@ -1,0 +1,16 @@
+# Comment mutation operations
+
+fragment CommentFields on Comment {
+  id
+  body
+  createdAt
+}
+
+mutation CreateComment($input: CommentCreateInput!) {
+  commentCreate(input: $input) {
+    success
+    comment {
+      ...CommentFields
+    }
+  }
+}

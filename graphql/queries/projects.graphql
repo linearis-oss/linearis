@@ -1,0 +1,18 @@
+# Project query operations
+
+fragment ProjectFields on Project {
+  id
+  name
+  description
+  state
+  targetDate
+  slugId
+}
+
+query GetProjects($first: Int = 50) {
+  projects(first: $first) {
+    nodes {
+      ...ProjectFields
+    }
+  }
+}

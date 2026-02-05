@@ -1,4 +1,9 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  CreateCommentDocument,
+  type CreateCommentMutation,
+  type CommentCreateInput,
+} from "../gql/graphql.js";
 
 export interface Comment {
   id: string;
@@ -6,26 +11,24 @@ export interface Comment {
   createdAt: string;
 }
 
-export interface CreateCommentInput {
-  issueId: string;
-  body: string;
-}
-
 export async function createComment(
-  client: LinearSdkClient,
-  input: CreateCommentInput,
+  client: GraphQLClient,
+  input: CommentCreateInput,
 ): Promise<Comment> {
-  const result = await client.sdk.createComment(input);
+  const result = await client.request<CreateCommentMutation>(
+    CreateCommentDocument,
+    { input },
+  );
 
-  if (!result.success || !result.comment) {
+  if (!result.commentCreate.success || !result.commentCreate.comment) {
     throw new Error("Failed to create comment");
   }
 
-  const comment = await result.comment;
+  const comment = result.commentCreate.comment;
 
   return {
     id: comment.id,
     body: comment.body,
-    createdAt: new Date(comment.createdAt).toISOString(),
+    createdAt: comment.createdAt,
   };
 }

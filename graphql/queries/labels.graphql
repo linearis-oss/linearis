@@ -1,0 +1,16 @@
+# Label query operations
+
+fragment LabelFields on IssueLabel {
+  id
+  name
+  color
+  description
+}
+
+query GetLabels($first: Int = 50, $filter: IssueLabelFilter) {
+  issueLabels(first: $first, filter: $filter) {
+    nodes {
+      ...LabelFields
+    }
+  }
+}

@@ -1,0 +1,15 @@
+# Team query operations
+
+fragment TeamFields on Team {
+  id
+  key
+  name
+}
+
+query GetTeams($first: Int = 50) {
+  teams(first: $first) {
+    nodes {
+      ...TeamFields
+    }
+  }
+}
