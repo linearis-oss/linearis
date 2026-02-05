@@ -99,7 +99,7 @@ describe("Cycles CLI Commands", () => {
     });
 
     it.skipIf(!hasApiToken)(
-      "should work with --around-active flag",
+      "should work with --window flag",
       async () => {
         // First, get a team key from teams list
         const { stdout: teamsOutput } = await execAsync(
@@ -110,10 +110,10 @@ describe("Cycles CLI Commands", () => {
         if (teams.length > 0) {
           const teamKey = teams[0].key;
 
-          // Test around-active (may fail if no active cycle, which is ok)
+          // Test window (may fail if no active cycle, which is ok)
           try {
             const { stdout, stderr } = await execAsync(
-              `node ${CLI_PATH} cycles list --around-active 3 --team ${teamKey}`,
+              `node ${CLI_PATH} cycles list --window 3 --team ${teamKey}`,
             );
 
             // Should not have complexity errors
@@ -132,12 +132,12 @@ describe("Cycles CLI Commands", () => {
       { timeout: 30000 },
     );
 
-    it("should require --team when using --around-active", async () => {
+    it("should require --team when using --window", async () => {
       try {
-        await execAsync(`node ${CLI_PATH} cycles list --around-active 3`);
+        await execAsync(`node ${CLI_PATH} cycles list --window 3`);
         expect.fail("Should have thrown an error");
       } catch (error: any) {
-        expect(error.stderr).toContain("--around-active requires --team");
+        expect(error.stderr).toContain("--window requires --team");
       }
     });
   });
@@ -214,16 +214,16 @@ describe("Cycles CLI Commands", () => {
   });
 
   describe("Cycles CLI - Error Cases", () => {
-    it("should reject --around-active without --team", async () => {
+    it("should reject --window without --team", async () => {
       if (!hasApiToken) return;
 
       await expect(
-        execAsync(`node ${CLI_PATH} cycles list --around-active 3`),
-      ).rejects.toThrow(/--around-active requires --team/);
+        execAsync(`node ${CLI_PATH} cycles list --window 3`),
+      ).rejects.toThrow(/--window requires --team/);
     });
 
     it.skipIf(!hasApiToken)(
-      "should reject --around-active with non-numeric value",
+      "should reject --window with non-numeric value",
       async () => {
         // Get a real team key
         const { stdout: teamsOutput } = await execAsync(
@@ -236,7 +236,7 @@ describe("Cycles CLI Commands", () => {
 
           try {
             await execAsync(
-              `node ${CLI_PATH} cycles list --around-active abc --team ${teamKey}`,
+              `node ${CLI_PATH} cycles list --window abc --team ${teamKey}`,
             );
             expect.fail("Should have thrown an error");
           } catch (error: any) {
@@ -250,7 +250,7 @@ describe("Cycles CLI Commands", () => {
     );
 
     it.skipIf(!hasApiToken)(
-      "should reject --around-active with negative value",
+      "should reject --window with negative value",
       async () => {
         // Get a real team key
         const { stdout: teamsOutput } = await execAsync(
@@ -263,7 +263,7 @@ describe("Cycles CLI Commands", () => {
 
           try {
             await execAsync(
-              `node ${CLI_PATH} cycles list --around-active -5 --team ${teamKey}`,
+              `node ${CLI_PATH} cycles list --window -5 --team ${teamKey}`,
             );
             expect.fail("Should have thrown an error");
           } catch (error: any) {
