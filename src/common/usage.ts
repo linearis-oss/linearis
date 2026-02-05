@@ -29,7 +29,7 @@ export function formatOverview(version: string, metas: DomainMeta[]): string {
     `linearis v${version} — CLI for Linear.app (project management / issue tracking)`,
   );
   lines.push(
-    "auth: --api-token <token> | LINEAR_API_TOKEN | ~/.linear_api_token",
+    "auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token",
   );
   lines.push("output: JSON");
   lines.push("ids: UUID or human-readable (team key, issue ABC-123, name)");
