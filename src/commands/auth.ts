@@ -3,6 +3,7 @@ import { exec } from "node:child_process";
 import { createInterface } from "node:readline";
 import { GraphQLClient } from "../client/graphql-client.js";
 import { GetViewerDocument, type GetViewerQuery } from "../gql/graphql.js";
+import { resolveApiToken, type CommandOptions, type TokenSource } from "../common/auth.js";
 import { saveToken, getStoredToken, clearToken } from "../common/token-storage.js";
 import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
@@ -176,34 +177,43 @@ export function setupAuthCommands(program: Command): void {
   auth
     .command("status")
     .description("check current authentication status")
-    .action(async () => {
-      try {
-        const token = getStoredToken();
-        if (!token) {
-          console.log(JSON.stringify({
-            authenticated: false,
-            message: "No stored token. Run 'linearis auth login' to authenticate.",
-          }, null, 2));
-          return;
-        }
+    .action(async (_options: Record<string, unknown>, command: Command) => {
+      const rootOpts = command.parent!.parent!.opts() as CommandOptions;
 
-        try {
-          const viewer = await validateToken(token);
-          console.log(JSON.stringify({
-            authenticated: true,
-            user: { id: viewer.id, name: viewer.name, email: viewer.email },
-          }, null, 2));
-        } catch {
-          console.log(JSON.stringify({
-            authenticated: false,
-            message: "Stored token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
-          }, null, 2));
-        }
-      } catch (error) {
-        console.error(
-          `Status check failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        process.exit(1);
+      const sourceLabels: Record<TokenSource, string> = {
+        flag: "--api-token flag",
+        env: "LINEAR_API_TOKEN env var",
+        stored: "~/.linearis/token",
+        legacy: "~/.linear_api_token (deprecated)",
+      };
+
+      let token: string;
+      let source: TokenSource;
+      try {
+        const resolved = await resolveApiToken(rootOpts);
+        token = resolved.token;
+        source = resolved.source;
+      } catch {
+        console.log(JSON.stringify({
+          authenticated: false,
+          message: "No API token found. Run 'linearis auth login' to authenticate.",
+        }, null, 2));
+        return;
+      }
+
+      try {
+        const viewer = await validateToken(token);
+        console.log(JSON.stringify({
+          authenticated: true,
+          source: sourceLabels[source],
+          user: { id: viewer.id, name: viewer.name, email: viewer.email },
+        }, null, 2));
+      } catch {
+        console.log(JSON.stringify({
+          authenticated: false,
+          source: sourceLabels[source],
+          message: "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
+        }, null, 2));
       }
     });
 

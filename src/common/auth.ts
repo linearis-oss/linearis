@@ -7,8 +7,15 @@ export interface CommandOptions {
   apiToken?: string;
 }
 
+export type TokenSource = "flag" | "env" | "stored" | "legacy";
+
+export interface ResolvedToken {
+  token: string;
+  source: TokenSource;
+}
+
 /**
- * Retrieves Linear API token from multiple sources.
+ * Retrieves Linear API token from multiple sources with source info.
  *
  * Checks sources in priority order:
  * 1. --api-token command flag
@@ -18,21 +25,21 @@ export interface CommandOptions {
  *
  * @throws Error if no token found in any source
  */
-export async function getApiToken(options: CommandOptions): Promise<string> {
+export async function resolveApiToken(options: CommandOptions): Promise<ResolvedToken> {
   // 1. CLI flag
   if (options.apiToken) {
-    return options.apiToken;
+    return { token: options.apiToken, source: "flag" };
   }
 
   // 2. Environment variable
   if (process.env.LINEAR_API_TOKEN) {
-    return process.env.LINEAR_API_TOKEN;
+    return { token: process.env.LINEAR_API_TOKEN, source: "env" };
   }
 
   // 3. Encrypted stored token (~/.linearis/token)
   const storedToken = getStoredToken();
   if (storedToken) {
-    return storedToken;
+    return { token: storedToken, source: "stored" };
   }
 
   // 4. Legacy plaintext file (~/.linear_api_token) — deprecated
@@ -41,10 +48,20 @@ export async function getApiToken(options: CommandOptions): Promise<string> {
     console.error(
       "Warning: ~/.linear_api_token is deprecated. Run 'linearis auth' to migrate.",
     );
-    return fs.readFileSync(legacyFile, "utf8").trim();
+    return { token: fs.readFileSync(legacyFile, "utf8").trim(), source: "legacy" };
   }
 
   throw new Error(
     "No API token found. Run 'linearis auth' to set up authentication.",
   );
+}
+
+/**
+ * Retrieves Linear API token from multiple sources.
+ *
+ * @throws Error if no token found in any source
+ */
+export async function getApiToken(options: CommandOptions): Promise<string> {
+  const { token } = await resolveApiToken(options);
+  return token;
 }
