@@ -212,33 +212,30 @@ npm start  # Development mode using tsx (no compilation needed)
 
 ## Authentication
 
-You can authenticate by passing in your API token via `--api-token` flag:
+The recommended way to authenticate is the interactive login command:
 
 ```bash
-linearis --api-token <token> issues list
+linearis auth login
 ```
 
-… OR by storing it in an environment variable `LINEAR_API_TOKEN`:
+This opens Linear in your browser, guides you through creating an API key, and stores the token encrypted in `~/.linearis/token`.
+
+Alternatively, you can provide a token directly:
 
 ```bash
+# Via CLI flag
+linearis --api-token <token> issues list
+
+# Via environment variable
 LINEAR_API_TOKEN=<token> linearis issues list
 ```
 
-… OR by storing it in `~/.linear_api_token` once, and then forgetting about it because the tool will check that file automatically:
+Token resolution order:
 
-```bash
-# Save token once:
-echo "<token>" > ~/.linear_api_token
-
-# Day-to-day, just use the tool
-linearis issues list
-```
-
-### Getting a Linear API key/token
-
-1. Log in to your Linear account
-1. Go to _Settings_ → _Security & Access_ → _Personal API keys_
-1. Create a new API key
+1. `--api-token` CLI flag
+2. `LINEAR_API_TOKEN` environment variable
+3. `~/.linearis/token` (encrypted, set up via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
 ## Example rule for your LLM agent
 
