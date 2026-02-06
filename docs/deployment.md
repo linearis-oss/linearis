@@ -50,15 +50,18 @@ The build script runs `tsc && chmod +x dist/main.js`. The clean script uses `rm 
 
 ## Authentication
 
+For interactive use (humans), run `linearis auth login` — it opens Linear in the browser and stores the token encrypted in `~/.linearis/token`.
+
 Linearis checks for an API token in this order:
 
 1. `--api-token` flag on the command line
 2. `LINEAR_API_TOKEN` environment variable
-3. `~/.linear_api_token` file
+3. `~/.linearis/token` (encrypted, set up via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
-For automated environments (CI, containers), set the environment variable. For interactive use, the flag or token file works well.
+For automated environments (CI, containers), set the environment variable.
 
-Authentication is handled in `src/common/auth.ts`.
+Authentication is handled in `src/common/auth.ts` and `src/common/token-storage.ts`.
 
 ## Platform Requirements
 

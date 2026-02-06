@@ -70,6 +70,7 @@ Pure, typed functions for CRUD operations. Receive pre-resolved UUIDs.
 
 Thin orchestration layer that composes resolvers and services.
 
+- **auth.ts** - Authentication commands (login, status, logout) — interactive, for humans
 - **issues.ts** - Issue commands (list, search, read, create, update)
 - **documents.ts** - Document commands with attachment operations
 - **project-milestones.ts** - Milestone commands
@@ -111,7 +112,7 @@ Thin orchestration layer that composes resolvers and services.
 Shared utilities used across layers.
 
 - **context.ts** - `createContext(options)` - Creates `{ gql, sdk }` from auth
-- **auth.ts** - `getApiToken(options)` - Multi-source authentication
+- **auth.ts** - `resolveApiToken(options)` - Multi-source authentication (flag, env, encrypted storage, legacy file)
 - **output.ts** - `outputSuccess(data)`, `outputError(error)`, `handleCommand(fn)`
 - **errors.ts** - `notFoundError()`, `multipleMatchesError()`, `invalidParameterError()`
 - **identifier.ts** - `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`
@@ -124,6 +125,7 @@ Shared utilities used across layers.
 ### Command Layer - CLI Interface
 
 - **src/main.ts** - Main program setup with Commander.js, command routing, and global options
+- **src/commands/auth.ts** - Authentication management (interactive, for humans)
 - **src/commands/issues.ts** - Issue management with resolvers and service composition
 - **src/commands/documents.ts** - Document operations with attachment support
 - **src/commands/project-milestones.ts** - Milestone CRUD operations
@@ -185,7 +187,8 @@ Shared utilities used across layers.
 **Common Layer**
 
 - src/common/context.ts - createContext factory
-- src/common/auth.ts - getApiToken with fallback sources
+- src/common/auth.ts - resolveApiToken with fallback sources (flag, env, encrypted storage, legacy file)
+- src/common/token-storage.ts - Encrypted token storage (saveToken, getStoredToken, clearToken)
 - src/common/output.ts - outputSuccess, outputError, handleCommand
 
 **Query Definitions**

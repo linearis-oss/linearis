@@ -278,16 +278,19 @@ outputError(error);    // { "error": "message" }
 
 ## Authentication
 
+For interactive setup, run `linearis auth login` — it opens Linear in the browser and stores the token encrypted in `~/.linearis/token`.
+
 The API token is resolved in this order:
 
 1. `--api-token <token>` command-line flag
 2. `LINEAR_API_TOKEN` environment variable
-3. `~/.linear_api_token` file
+3. `~/.linearis/token` (encrypted, set up via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
-For local development, the file method is the most convenient:
+For local development, the interactive login is the most convenient:
 
 ```bash
-echo "lin_api_YOUR_TOKEN" > ~/.linear_api_token
+linearis auth login
 ```
 
 ## Adding New Functionality
@@ -346,6 +349,7 @@ src/
     comment-service.ts
     file-service.ts
   commands/                  # CLI command definitions
+    auth.ts                  # Authentication (interactive, for humans)
     issues.ts
     documents.ts
     project-milestones.ts
@@ -358,7 +362,9 @@ src/
     embeds.ts
   common/                    # Shared utilities
     context.ts               # CommandContext and createContext()
-    auth.ts                  # API token resolution
+    auth.ts                  # API token resolution (flag, env, encrypted, legacy)
+    token-storage.ts         # Encrypted token storage
+    encryption.ts            # AES-256-CBC encryption
     output.ts                # JSON output and handleCommand()
     errors.ts                # Error factory functions
     identifier.ts            # UUID validation and issue identifier parsing
