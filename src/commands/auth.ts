@@ -11,7 +11,7 @@ const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security/api-key
 
 export const AUTH_META: DomainMeta = {
   name: "auth",
-  summary: "authenticate with Linear API",
+  summary: "authenticate with Linear API (interactive, for humans)",
   context: [
     "linearis requires a Linear API token for all operations.",
     "the auth command guides you through creating and storing a token.",
