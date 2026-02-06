@@ -40,9 +40,9 @@ program
   .version(pkg.version)
   .option("--api-token <token>", "Linear API token");
 
-// Default action - show help when no subcommand
+// Default action - show usage overview when no subcommand
 program.action(() => {
-  program.help();
+  console.log(formatOverview(pkg.version, allMetas));
 });
 
 // Setup all subcommand groups
