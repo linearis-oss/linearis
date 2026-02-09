@@ -176,6 +176,8 @@ export function setupAuthCommands(program: Command): void {
       }
     });
 
+  // Status bypasses createContext() — it needs token source information
+  // (flag/env/stored/legacy) which createContext() does not expose.
   auth
     .command("status")
     .description("check current authentication status")
