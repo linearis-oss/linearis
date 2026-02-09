@@ -297,35 +297,42 @@ export function setupIssuesCommands(program: Command): void {
           input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
         }
 
+        // Resolve relation target ID before issue creation to fail fast
+        const relationTargetId = options.blocks
+          ? await resolveIssueId(ctx.sdk, options.blocks)
+          : options.blockedBy
+            ? await resolveIssueId(ctx.sdk, options.blockedBy)
+            : options.relatesTo
+              ? await resolveIssueId(ctx.sdk, options.relatesTo)
+              : options.duplicateOf
+                ? await resolveIssueId(ctx.sdk, options.duplicateOf)
+                : undefined;
+
         const result = await createIssue(ctx.gql, input);
 
         // Create relation if a relation flag was provided
-        if (options.blocks) {
-          const targetId = await resolveIssueId(ctx.sdk, options.blocks);
+        if (options.blocks && relationTargetId) {
           await createIssueRelation(ctx.gql, {
             issueId: result.id,
-            relatedIssueId: targetId,
+            relatedIssueId: relationTargetId,
             type: IssueRelationType.Blocks,
           });
-        } else if (options.blockedBy) {
-          const targetId = await resolveIssueId(ctx.sdk, options.blockedBy);
+        } else if (options.blockedBy && relationTargetId) {
           await createIssueRelation(ctx.gql, {
-            issueId: targetId,
+            issueId: relationTargetId,
             relatedIssueId: result.id,
             type: IssueRelationType.Blocks,
           });
-        } else if (options.relatesTo) {
-          const targetId = await resolveIssueId(ctx.sdk, options.relatesTo);
+        } else if (options.relatesTo && relationTargetId) {
           await createIssueRelation(ctx.gql, {
             issueId: result.id,
-            relatedIssueId: targetId,
+            relatedIssueId: relationTargetId,
             type: IssueRelationType.Related,
           });
-        } else if (options.duplicateOf) {
-          const targetId = await resolveIssueId(ctx.sdk, options.duplicateOf);
+        } else if (options.duplicateOf && relationTargetId) {
           await createIssueRelation(ctx.gql, {
             issueId: result.id,
-            relatedIssueId: targetId,
+            relatedIssueId: relationTargetId,
             type: IssueRelationType.Duplicate,
           });
         }
