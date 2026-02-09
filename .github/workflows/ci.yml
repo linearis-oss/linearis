@@ -67,5 +67,8 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Biome check
+        run: npm run check:ci
+
       - name: TypeScript type check
         run: npx tsc --noEmit
