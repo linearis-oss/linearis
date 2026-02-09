@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { resolveApiToken, type CommandOptions, type TokenSource } from "../common/auth.js";
 import { createGraphQLClient } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
-import { saveToken, getStoredToken, clearToken } from "../common/token-storage.js";
+import { saveToken, clearToken } from "../common/token-storage.js";
 import type { Viewer } from "../common/types.js";
 import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { validateToken } from "../services/auth-service.js";
@@ -111,23 +111,32 @@ export function setupAuthCommands(program: Command): void {
     .command("login")
     .description("set up or refresh authentication")
     .option("--force", "reauthenticate even if already authenticated")
-    .action(async (options: { force?: boolean }) => {
+    .action(async (options: { force?: boolean }, command: Command) => {
       try {
-        // Check existing authentication
+        // Check existing authentication across all sources
         if (!options.force) {
-          const existingToken = getStoredToken();
-          if (existingToken) {
+          try {
+            const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+            const { token, source } = resolveApiToken(rootOpts);
             try {
-              const viewer = await validateApiToken(existingToken);
+              const viewer = await validateApiToken(token);
+              const sourceLabels: Record<TokenSource, string> = {
+                flag: "--api-token flag",
+                env: "LINEAR_API_TOKEN env var",
+                stored: "~/.linearis/token",
+                legacy: "~/.linear_api_token",
+              };
               console.error(
-                `Already authenticated as ${viewer.name} (${viewer.email}).`,
+                `Already authenticated as ${viewer.name} (${viewer.email}) via ${sourceLabels[source]}.`,
               );
               console.error("Run with --force to reauthenticate.");
               return;
             } catch {
               // Token is invalid, proceed with new auth
-              console.error("Stored token is invalid. Starting new authentication...");
+              console.error("Existing token is invalid. Starting new authentication...");
             }
+          } catch {
+            // No token found anywhere, proceed with login
           }
         }
 

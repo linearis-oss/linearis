@@ -14,7 +14,6 @@ vi.mock("node:readline", () => ({
 }));
 
 vi.mock("../../../src/common/token-storage.js", () => ({
-  getStoredToken: vi.fn(),
   saveToken: vi.fn(),
   clearToken: vi.fn(),
 }));
@@ -33,7 +32,7 @@ vi.mock("../../../src/common/auth.js", async (importOriginal) => {
 });
 
 import { setupAuthCommands } from "../../../src/commands/auth.js";
-import { getStoredToken, saveToken, clearToken } from "../../../src/common/token-storage.js";
+import { saveToken, clearToken } from "../../../src/common/token-storage.js";
 import { validateToken } from "../../../src/services/auth-service.js";
 import { resolveApiToken } from "../../../src/common/auth.js";
 
@@ -55,13 +54,15 @@ describe("auth login", () => {
     // Prevent process.exit from actually exiting
     exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    // Default: no stored token, stdin is not a TTY
-    vi.mocked(getStoredToken).mockReturnValue(null);
+    // Default: no token found, stdin is not a TTY
+    vi.mocked(resolveApiToken).mockImplementation(() => {
+      throw new Error("No API token found");
+    });
     Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
   });
 
   it("skips login when valid token already exists", async () => {
-    vi.mocked(getStoredToken).mockReturnValue("existing-token");
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "existing-token", source: "stored" });
     vi.mocked(validateToken).mockResolvedValue(mockViewer);
 
     const program = createProgram();
@@ -73,8 +74,21 @@ describe("auth login", () => {
     expect(saveToken).not.toHaveBeenCalled();
   });
 
+  it("skips login when valid token exists via env var", async () => {
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "env-token", source: "env" });
+    vi.mocked(validateToken).mockResolvedValue(mockViewer);
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "login"]);
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("via LINEAR_API_TOKEN env var"),
+    );
+    expect(saveToken).not.toHaveBeenCalled();
+  });
+
   it("proceeds with login when existing token is invalid", async () => {
-    vi.mocked(getStoredToken).mockReturnValue("bad-token");
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "bad-token", source: "stored" });
     vi.mocked(validateToken)
       .mockRejectedValueOnce(new Error("Authentication failed"))
       .mockResolvedValueOnce(mockViewer);
@@ -83,13 +97,13 @@ describe("auth login", () => {
     await program.parseAsync(["node", "test", "auth", "login"]);
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      "Stored token is invalid. Starting new authentication...",
+      "Existing token is invalid. Starting new authentication...",
     );
     expect(saveToken).toHaveBeenCalledWith("test-token");
   });
 
   it("bypasses existing token check with --force", async () => {
-    vi.mocked(getStoredToken).mockReturnValue("existing-token");
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "existing-token", source: "stored" });
     vi.mocked(validateToken).mockResolvedValue(mockViewer);
 
     const program = createProgram();
