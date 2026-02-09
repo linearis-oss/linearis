@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 
 const VERSION_PREFIX = "v1";
 const ALGORITHM = "aes-256-cbc";
@@ -16,9 +21,12 @@ export function encryptToken(token: string): string {
   const key = deriveKey();
   const iv = randomBytes(16);
   const cipher = createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(token, "utf8"),
+    cipher.final(),
+  ]);
   // Store as version:iv:ciphertext, all hex-encoded except version
-  return VERSION_PREFIX + ":" + iv.toString("hex") + ":" + encrypted.toString("hex");
+  return `${VERSION_PREFIX}:${iv.toString("hex")}:${encrypted.toString("hex")}`;
 }
 
 export function decryptToken(encrypted: string): string {
@@ -48,6 +56,9 @@ function decryptV1(ivHex: string, ciphertextHex: string): string {
   }
   const ciphertext = Buffer.from(ciphertextHex, "hex");
   const decipher = createDecipheriv(ALGORITHM, key, iv);
-  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  const decrypted = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]);
   return decrypted.toString("utf8");
 }

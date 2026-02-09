@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { encryptToken, decryptToken } from "./encryption.js";
+import { decryptToken, encryptToken } from "./encryption.js";
 
 const DIR_NAME = ".linearis";
 const TOKEN_FILE = "token";

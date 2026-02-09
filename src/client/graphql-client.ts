@@ -1,5 +1,5 @@
 import { LinearClient } from "@linear/sdk";
-import { print, type DocumentNode } from "graphql";
+import { type DocumentNode, print } from "graphql";
 import { AuthenticationError, isAuthError } from "../common/errors.js";
 
 interface GraphQLErrorResponse {
