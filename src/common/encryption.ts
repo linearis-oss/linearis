@@ -27,6 +27,9 @@ export function decryptToken(encrypted: string): string {
   }
   const key = deriveKey();
   const iv = Buffer.from(parts[0], "hex");
+  if (iv.length !== 16) {
+    throw new Error("Invalid encrypted token: corrupted IV");
+  }
   const ciphertext = Buffer.from(parts[1], "hex");
   const decipher = createDecipheriv(ALGORITHM, key, iv);
   const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);

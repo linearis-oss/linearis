@@ -32,4 +32,9 @@ describe("decryptToken", () => {
   it("throws on empty string", () => {
     expect(() => decryptToken("")).toThrow();
   });
+
+  it("throws on corrupted IV (wrong length)", () => {
+    // Valid format (hex:hex) but IV is only 4 bytes instead of 16
+    expect(() => decryptToken("aabbccdd:aabbccdd")).toThrow("corrupted IV");
+  });
 });
