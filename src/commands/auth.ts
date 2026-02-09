@@ -122,7 +122,7 @@ export function setupAuthCommands(program: Command): void {
         // Check existing authentication across all sources
         if (!options.force) {
           try {
-            const rootOpts = command.parent?.parent?.opts() as CommandOptions;
+            const rootOpts = command.parent!.parent!.opts() as CommandOptions;
             const { token, source } = resolveApiToken(rootOpts);
             try {
               const viewer = await validateApiToken(token);
@@ -212,7 +212,7 @@ export function setupAuthCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
-        const rootOpts = command.parent?.parent?.opts() as CommandOptions;
+        const rootOpts = command.parent!.parent!.opts() as CommandOptions;
 
         const sourceLabels: Record<TokenSource, string> = {
           flag: "--api-token flag",
@@ -260,7 +260,7 @@ export function setupAuthCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
-        const rootOpts = command.parent?.parent?.opts() as CommandOptions;
+        const rootOpts = command.parent!.parent!.opts() as CommandOptions;
 
         clearToken();
 

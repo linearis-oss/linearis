@@ -113,7 +113,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListOptions, Command];
-        const ctx = createContext(command.parent?.parent?.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
 
         if (options.query) {
           const result = await searchIssues(
@@ -147,7 +147,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent?.parent?.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
 
         if (isUuid(issue)) {
           const result = await getIssue(ctx.gql, issue);
@@ -193,7 +193,7 @@ export function setupIssuesCommands(program: Command): void {
           CreateOptions,
           Command,
         ];
-        const ctx = createContext(command.parent?.parent?.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
 
         // Resolve team ID (required)
         if (!options.team) {
@@ -342,7 +342,7 @@ export function setupIssuesCommands(program: Command): void {
           throw new Error("--label-mode must be either 'add' or 'overwrite'");
         }
 
-        const ctx = createContext(command.parent?.parent?.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
 
         // Resolve issue ID to UUID
         const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);

@@ -68,7 +68,7 @@ export function setupCommentsCommands(program: Command): void {
           CreateCommentOptions,
           Command,
         ];
-        const ctx = createContext(command.parent?.parent?.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
 
         // Validate required body flag
         if (!options.body) {

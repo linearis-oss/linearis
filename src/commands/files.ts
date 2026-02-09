@@ -55,7 +55,7 @@ export function setupFilesCommands(program: Command): void {
           Command,
         ];
         // Get API token from parent command options for authentication
-        const apiToken = getApiToken(command.parent?.parent?.opts());
+        const apiToken = getApiToken(command.parent!.parent!.opts());
 
         // Create file service and initiate download
         const fileService = new FileService(apiToken);
@@ -99,7 +99,7 @@ export function setupFilesCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [filePath, , command] = args as [string, CommandOptions, Command];
         // Get API token from parent command options for authentication
-        const apiToken = getApiToken(command.parent?.parent?.opts());
+        const apiToken = getApiToken(command.parent!.parent!.opts());
 
         // Create file service and initiate upload
         const fileService = new FileService(apiToken);

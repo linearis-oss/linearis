@@ -153,7 +153,7 @@ export function setupDocumentsCommands(program: Command): void {
           );
         }
 
-        const rootOpts = command.parent?.parent?.opts();
+        const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
         // Validate limit option
@@ -220,7 +220,7 @@ export function setupDocumentsCommands(program: Command): void {
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
       handleCommand(async (...args: unknown[]) => {
         const [document, , command] = args as [string, unknown, Command];
-        const rootOpts = command.parent?.parent?.opts();
+        const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
         const documentResult = await getDocument(ctx.gql, document);
@@ -246,7 +246,7 @@ export function setupDocumentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [DocumentCreateOptions, Command];
-        const rootOpts = command.parent?.parent?.opts();
+        const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
         // Resolve project ID if provided
@@ -317,7 +317,7 @@ export function setupDocumentsCommands(program: Command): void {
           DocumentUpdateOptions,
           Command,
         ];
-        const rootOpts = command.parent?.parent?.opts();
+        const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
         // Build input with only provided fields
@@ -349,7 +349,7 @@ export function setupDocumentsCommands(program: Command): void {
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
       handleCommand(async (...args: unknown[]) => {
         const [document, , command] = args as [string, unknown, Command];
-        const rootOpts = command.parent?.parent?.opts();
+        const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
         await deleteDocument(ctx.gql, document);

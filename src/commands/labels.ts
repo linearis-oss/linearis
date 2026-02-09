@@ -58,7 +58,7 @@ export function setupLabelsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListLabelsOptions, Command];
-        const ctx = createContext(command.parent?.parent?.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
 
         // Resolve team filter if provided
         const teamId = options.team
