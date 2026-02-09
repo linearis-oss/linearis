@@ -1,9 +1,6 @@
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * Checks if a string is a valid UUID.
- */
 export function isUuid(value: string): boolean {
   return UUID_REGEX.test(value);
 }
@@ -13,10 +10,7 @@ export interface IssueIdentifier {
   issueNumber: number;
 }
 
-/**
- * Parses an issue identifier (e.g., "ENG-123") into team key and issue number.
- * @throws Error if identifier format is invalid
- */
+/** @throws Error if identifier format is invalid */
 export function parseIssueIdentifier(identifier: string): IssueIdentifier {
   const parts = identifier.split("-");
 
@@ -36,9 +30,6 @@ export function parseIssueIdentifier(identifier: string): IssueIdentifier {
   return { teamKey, issueNumber };
 }
 
-/**
- * Attempts to parse an issue identifier, returning null on failure.
- */
 export function tryParseIssueIdentifier(
   identifier: string,
 ): IssueIdentifier | null {
