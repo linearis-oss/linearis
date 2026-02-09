@@ -157,8 +157,9 @@ export function setupAuthCommands(program: Command): void {
         let viewer: Viewer;
         try {
           viewer = await validateApiToken(token);
-        } catch {
-          console.error("Token rejected. Check it's correct and try again.");
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          console.error(`Token validation failed: ${detail}`);
           process.exit(1);
         }
 
