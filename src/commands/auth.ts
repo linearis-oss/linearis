@@ -3,9 +3,10 @@ import { exec } from "node:child_process";
 import { createInterface } from "node:readline";
 import { resolveApiToken, type CommandOptions, type TokenSource } from "../common/auth.js";
 import { createGraphQLClient } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
 import { saveToken, getStoredToken, clearToken } from "../common/token-storage.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import type { Viewer } from "../common/types.js";
+import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { validateToken } from "../services/auth-service.js";
 
 const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security/api-keys/new";
@@ -101,6 +102,8 @@ export function setupAuthCommands(program: Command): void {
     auth.help();
   });
 
+  // Login intentionally bypasses handleCommand() — it is interactive (raw stdin,
+  // stderr prompts, browser open) and needs its own error UX with process.exit.
   auth
     .command("login")
     .description("set up or refresh authentication")
@@ -176,7 +179,8 @@ export function setupAuthCommands(program: Command): void {
   auth
     .command("status")
     .description("check current authentication status")
-    .action(async (_options: Record<string, unknown>, command: Command) => {
+    .action(handleCommand(async (...args: unknown[]) => {
+      const [, command] = args as [unknown, Command];
       const rootOpts = command.parent!.parent!.opts() as CommandOptions;
 
       const sourceLabels: Record<TokenSource, string> = {
@@ -193,43 +197,36 @@ export function setupAuthCommands(program: Command): void {
         token = resolved.token;
         source = resolved.source;
       } catch {
-        console.log(JSON.stringify({
+        outputSuccess({
           authenticated: false,
           message: "No API token found. Run 'linearis auth login' to authenticate.",
-        }, null, 2));
+        });
         return;
       }
 
       try {
         const viewer = await validateApiToken(token);
-        console.log(JSON.stringify({
+        outputSuccess({
           authenticated: true,
           source: sourceLabels[source],
           user: { id: viewer.id, name: viewer.name, email: viewer.email },
-        }, null, 2));
+        });
       } catch {
-        console.log(JSON.stringify({
+        outputSuccess({
           authenticated: false,
           source: sourceLabels[source],
           message: "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
-        }, null, 2));
+        });
       }
-    });
+    }));
 
   auth
     .command("logout")
     .description("remove stored authentication token")
-    .action(async () => {
-      try {
-        clearToken();
-        console.error("Authentication token removed.");
-      } catch (error) {
-        console.error(
-          `Failed to remove token: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        process.exit(1);
-      }
-    });
+    .action(handleCommand(async () => {
+      clearToken();
+      outputSuccess({ message: "Authentication token removed." });
+    }));
 
   auth
     .command("usage")
