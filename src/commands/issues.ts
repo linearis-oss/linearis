@@ -82,7 +82,8 @@ export const ISSUES_META: DomainMeta = {
     "todo, in progress, done — configurable per team), a priority (1-4),",
     "and can be assigned to a user. issues can have labels, belong to a",
     "project, be part of a cycle (sprint), and reference a project milestone.",
-    "parent-child relationships between issues are supported.",
+    "parent-child relationships and issue relations (blocks, blocked-by,",
+    "relates-to, duplicate-of) are supported.",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
