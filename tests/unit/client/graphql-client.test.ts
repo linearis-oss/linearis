@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { AuthenticationError } from "../../../src/common/errors.js";
 
@@ -24,7 +24,7 @@ describe("GraphQLClient", () => {
     let mockRawRequest: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
-      const sdk = await import("@linear/sdk") as unknown as {
+      const sdk = (await import("@linear/sdk")) as unknown as {
         __mockRawRequest: ReturnType<typeof vi.fn>;
       };
       mockRawRequest = sdk.__mockRawRequest;
@@ -39,9 +39,13 @@ describe("GraphQLClient", () => {
       });
 
       const client = new GraphQLClient("bad-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<typeof client.request>[0];
+      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+        typeof client.request
+      >[0];
 
-      await expect(client.request(fakeDoc)).rejects.toThrow(AuthenticationError);
+      await expect(client.request(fakeDoc)).rejects.toThrow(
+        AuthenticationError,
+      );
     });
 
     it("throws AuthenticationError on 'Unauthorized' error message", async () => {
@@ -52,9 +56,13 @@ describe("GraphQLClient", () => {
       });
 
       const client = new GraphQLClient("bad-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<typeof client.request>[0];
+      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+        typeof client.request
+      >[0];
 
-      await expect(client.request(fakeDoc)).rejects.toThrow(AuthenticationError);
+      await expect(client.request(fakeDoc)).rejects.toThrow(
+        AuthenticationError,
+      );
     });
 
     it("throws regular Error on non-auth errors", async () => {
@@ -65,7 +73,9 @@ describe("GraphQLClient", () => {
       });
 
       const client = new GraphQLClient("good-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<typeof client.request>[0];
+      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+        typeof client.request
+      >[0];
 
       try {
         await client.request(fakeDoc);

@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import type { Command } from "commander";
 
 /**
  * Metadata for a CLI domain, used to generate token-optimized usage output.

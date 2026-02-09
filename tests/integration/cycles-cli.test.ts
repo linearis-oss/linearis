@@ -1,6 +1,6 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { exec } from "child_process";
-import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -138,7 +138,9 @@ describe("Cycles CLI Commands", () => {
         await execAsync(`node ${CLI_PATH} cycles list --window 3`);
         expect.fail("Should have thrown an error");
       } catch (error: unknown) {
-        expect((error as { stderr: string }).stderr).toContain("--window requires --team");
+        expect((error as { stderr: string }).stderr).toContain(
+          "--window requires --team",
+        );
       }
     });
   });
@@ -242,10 +244,10 @@ describe("Cycles CLI Commands", () => {
             expect.fail("Should have thrown an error");
           } catch (error: unknown) {
             const execError = error as { stdout?: string; stderr?: string };
-            const output = JSON.parse(execError.stdout || execError.stderr || "{}");
-            expect(output.error).toContain(
-              "requires a non-negative integer",
+            const output = JSON.parse(
+              execError.stdout || execError.stderr || "{}",
             );
+            expect(output.error).toContain("requires a non-negative integer");
           }
         }
       },
@@ -270,10 +272,10 @@ describe("Cycles CLI Commands", () => {
             expect.fail("Should have thrown an error");
           } catch (error: unknown) {
             const execError = error as { stdout?: string; stderr?: string };
-            const output = JSON.parse(execError.stdout || execError.stderr || "{}");
-            expect(output.error).toContain(
-              "requires a non-negative integer",
+            const output = JSON.parse(
+              execError.stdout || execError.stderr || "{}",
             );
+            expect(output.error).toContain("requires a non-negative integer");
           }
         }
       },

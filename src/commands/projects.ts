@@ -1,7 +1,7 @@
-import { Command } from "commander";
+import type { Command } from "commander";
 import { createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listProjects } from "../services/project-service.js";
 
 /**
@@ -32,7 +32,8 @@ export const PROJECTS_META: DomainMeta = {
 };
 
 export function setupProjectsCommands(program: Command): void {
-  const projects = program.command("projects")
+  const projects = program
+    .command("projects")
     .description("Project operations");
 
   // Show projects help when no subcommand
@@ -48,19 +49,18 @@ export function setupProjectsCommands(program: Command): void {
    * Lists all projects with their teams, leads, and progress information.
    * Note: Linear SDK doesn't implement pagination, so all projects are shown.
    */
-  projects.command("list")
+  projects
+    .command("list")
     .description("list projects")
-    .option(
-      "-l, --limit <n>",
-      "max results",
-      "100",
-    )
-    .action(handleCommand(async (...args: unknown[]) => {
-      const [options, command] = args as [{ limit: string }, Command];
-      const ctx = createContext(command.parent!.parent!.opts());
-      const result = await listProjects(ctx.gql, parseInt(options.limit));
-      outputSuccess(result);
-    }));
+    .option("-l, --limit <n>", "max results", "100")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [options, command] = args as [{ limit: string }, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const result = await listProjects(ctx.gql, parseInt(options.limit, 10));
+        outputSuccess(result);
+      }),
+    );
 
   projects
     .command("usage")

@@ -1,6 +1,10 @@
 // tests/unit/common/identifier.test.ts
-import { describe, it, expect } from "vitest";
-import { isUuid, parseIssueIdentifier, tryParseIssueIdentifier } from "../../../src/common/identifier.js";
+import { describe, expect, it } from "vitest";
+import {
+  isUuid,
+  parseIssueIdentifier,
+  tryParseIssueIdentifier,
+} from "../../../src/common/identifier.js";
 
 describe("isUuid", () => {
   it("returns true for valid UUID", () => {
@@ -23,17 +27,24 @@ describe("parseIssueIdentifier", () => {
   });
 
   it("throws on invalid format", () => {
-    expect(() => parseIssueIdentifier("invalid")).toThrow("Invalid issue identifier");
+    expect(() => parseIssueIdentifier("invalid")).toThrow(
+      "Invalid issue identifier",
+    );
   });
 
   it("throws on non-numeric issue number", () => {
-    expect(() => parseIssueIdentifier("ABC-XYZ")).toThrow("Invalid issue number");
+    expect(() => parseIssueIdentifier("ABC-XYZ")).toThrow(
+      "Invalid issue number",
+    );
   });
 });
 
 describe("tryParseIssueIdentifier", () => {
   it("returns parsed identifier for valid input", () => {
-    expect(tryParseIssueIdentifier("ABC-123")).toEqual({ teamKey: "ABC", issueNumber: 123 });
+    expect(tryParseIssueIdentifier("ABC-123")).toEqual({
+      teamKey: "ABC",
+      issueNumber: 123,
+    });
   });
 
   it("returns null for invalid input", () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { encryptToken, decryptToken } from "../../../src/common/encryption.js";
+import { describe, expect, it } from "vitest";
+import { decryptToken, encryptToken } from "../../../src/common/encryption.js";
 
 describe("encryptToken", () => {
   it("returns a string different from the input", () => {
@@ -54,6 +54,8 @@ describe("decryptToken", () => {
   it("throws on unsupported version prefix", () => {
     const encrypted = encryptToken("lin_api_test");
     const v99 = encrypted.replace(/^v1:/, "v99:");
-    expect(() => decryptToken(v99)).toThrow("Unsupported token encryption version: v99");
+    expect(() => decryptToken(v99)).toThrow(
+      "Unsupported token encryption version: v99",
+    );
   });
 });

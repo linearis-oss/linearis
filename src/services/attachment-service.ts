@@ -2,8 +2,8 @@ import type { GraphQLClient } from "../client/graphql-client.js";
 import type { Attachment, CreatedAttachment } from "../common/types.js";
 import {
   AttachmentCreateDocument,
-  type AttachmentCreateMutation,
   type AttachmentCreateInput,
+  type AttachmentCreateMutation,
   AttachmentDeleteDocument,
   type AttachmentDeleteMutation,
   ListAttachmentsDocument,

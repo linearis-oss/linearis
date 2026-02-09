@@ -1,7 +1,7 @@
-import { Command } from "commander";
-import { createContext, type CommandOptions } from "../common/context.js";
+import type { Command } from "commander";
+import { type CommandOptions, createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listUsers } from "../services/user-service.js";
 
 interface ListUsersOptions extends CommandOptions {
@@ -35,9 +35,7 @@ export const USERS_META: DomainMeta = {
 };
 
 export function setupUsersCommands(program: Command): void {
-  const users = program
-    .command("users")
-    .description("User operations");
+  const users = program.command("users").description("User operations");
 
   // Show users help when no subcommand
   users.action(() => {
@@ -62,7 +60,7 @@ export function setupUsersCommands(program: Command): void {
         const ctx = createContext(command.parent!.parent!.opts());
         const result = await listUsers(ctx.gql, options.active || false);
         outputSuccess(result);
-      })
+      }),
     );
 
   users

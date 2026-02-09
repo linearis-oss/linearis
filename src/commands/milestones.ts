@@ -1,16 +1,16 @@
-import { Command } from "commander";
+import type { Command } from "commander";
 import { createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
-import { resolveProjectId } from "../resolvers/project-resolver.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
+import type { ProjectMilestoneUpdateInput } from "../gql/graphql.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
+import { resolveProjectId } from "../resolvers/project-resolver.js";
 import {
-  listMilestones,
-  getMilestone,
   createMilestone,
+  getMilestone,
+  listMilestones,
   updateMilestone,
 } from "../services/milestone-service.js";
-import type { ProjectMilestoneUpdateInput } from "../gql/graphql.js";
 
 // Option interfaces for commands
 interface MilestoneListOptions {
@@ -68,23 +68,21 @@ export function setupMilestonesCommands(program: Command): void {
     .requiredOption("--project <project>", "target project (required)")
     .option("-l, --limit <n>", "max results", "50")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [options, command] = args as [MilestoneListOptions, Command];
-          const ctx = createContext(command.parent!.parent!.opts());
+      handleCommand(async (...args: unknown[]) => {
+        const [options, command] = args as [MilestoneListOptions, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
 
-          // Resolve project ID
-          const projectId = await resolveProjectId(ctx.sdk, options.project);
+        // Resolve project ID
+        const projectId = await resolveProjectId(ctx.sdk, options.project);
 
-          const milestones = await listMilestones(
-            ctx.gql,
-            projectId,
-            parseInt(options.limit || "50")
-          );
+        const milestones = await listMilestones(
+          ctx.gql,
+          projectId,
+          parseInt(options.limit || "50", 10),
+        );
 
-          outputSuccess(milestones);
-        }
-      )
+        outputSuccess(milestones);
+      }),
     );
 
   // Get milestone details with issues
@@ -94,31 +92,29 @@ export function setupMilestonesCommands(program: Command): void {
     .option("--project <project>", "scope name lookup to project")
     .option("--limit <n>", "max issues to fetch", "50")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [milestone, options, command] = args as [
-            string,
-            MilestoneReadOptions,
-            Command
-          ];
-          const ctx = createContext(command.parent!.parent!.opts());
+      handleCommand(async (...args: unknown[]) => {
+        const [milestone, options, command] = args as [
+          string,
+          MilestoneReadOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
 
-          const milestoneId = await resolveMilestoneId(
-            ctx.gql,
-            ctx.sdk,
-            milestone,
-            options.project
-          );
+        const milestoneId = await resolveMilestoneId(
+          ctx.gql,
+          ctx.sdk,
+          milestone,
+          options.project,
+        );
 
-          const milestoneResult = await getMilestone(
-            ctx.gql,
-            milestoneId,
-            parseInt(options.limit || "50")
-          );
+        const milestoneResult = await getMilestone(
+          ctx.gql,
+          milestoneId,
+          parseInt(options.limit || "50", 10),
+        );
 
-          outputSuccess(milestoneResult);
-        }
-      )
+        outputSuccess(milestoneResult);
+      }),
     );
 
   // Create a new milestone
@@ -129,28 +125,26 @@ export function setupMilestonesCommands(program: Command): void {
     .option("-d, --description <text>", "milestone description")
     .option("--target-date <date>", "target date in ISO format (YYYY-MM-DD)")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [name, options, command] = args as [
-            string,
-            MilestoneCreateOptions,
-            Command
-          ];
-          const ctx = createContext(command.parent!.parent!.opts());
+      handleCommand(async (...args: unknown[]) => {
+        const [name, options, command] = args as [
+          string,
+          MilestoneCreateOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
 
-          // Resolve project ID
-          const projectId = await resolveProjectId(ctx.sdk, options.project);
+        // Resolve project ID
+        const projectId = await resolveProjectId(ctx.sdk, options.project);
 
-          const milestone = await createMilestone(ctx.gql, {
-            projectId,
-            name,
-            description: options.description,
-            targetDate: options.targetDate,
-          });
+        const milestone = await createMilestone(ctx.gql, {
+          projectId,
+          name,
+          description: options.description,
+          targetDate: options.targetDate,
+        });
 
-          outputSuccess(milestone);
-        }
-      )
+        outputSuccess(milestone);
+      }),
     );
 
   // Update an existing milestone
@@ -162,48 +156,46 @@ export function setupMilestonesCommands(program: Command): void {
     .option("--description <text>", "new description")
     .option(
       "--target-date <date>",
-      "new target date in ISO format (YYYY-MM-DD)"
+      "new target date in ISO format (YYYY-MM-DD)",
     )
     .option("--sort-order <n>", "display order")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [milestone, options, command] = args as [
-            string,
-            MilestoneUpdateOptions,
-            Command
-          ];
-          const ctx = createContext(command.parent!.parent!.opts());
+      handleCommand(async (...args: unknown[]) => {
+        const [milestone, options, command] = args as [
+          string,
+          MilestoneUpdateOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
 
-          const milestoneId = await resolveMilestoneId(
-            ctx.gql,
-            ctx.sdk,
-            milestone,
-            options.project
-          );
+        const milestoneId = await resolveMilestoneId(
+          ctx.gql,
+          ctx.sdk,
+          milestone,
+          options.project,
+        );
 
-          // Build update input (only include provided fields)
-          const updateInput: ProjectMilestoneUpdateInput = {};
-          if (options.name !== undefined) updateInput.name = options.name;
-          if (options.description !== undefined) {
-            updateInput.description = options.description;
-          }
-          if (options.targetDate !== undefined) {
-            updateInput.targetDate = options.targetDate;
-          }
-          if (options.sortOrder !== undefined) {
-            updateInput.sortOrder = parseFloat(options.sortOrder);
-          }
-
-          const updated = await updateMilestone(
-            ctx.gql,
-            milestoneId,
-            updateInput
-          );
-
-          outputSuccess(updated);
+        // Build update input (only include provided fields)
+        const updateInput: ProjectMilestoneUpdateInput = {};
+        if (options.name !== undefined) updateInput.name = options.name;
+        if (options.description !== undefined) {
+          updateInput.description = options.description;
         }
-      )
+        if (options.targetDate !== undefined) {
+          updateInput.targetDate = options.targetDate;
+        }
+        if (options.sortOrder !== undefined) {
+          updateInput.sortOrder = parseFloat(options.sortOrder);
+        }
+
+        const updated = await updateMilestone(
+          ctx.gql,
+          milestoneId,
+          updateInput,
+        );
+
+        outputSuccess(updated);
+      }),
     );
 
   milestones

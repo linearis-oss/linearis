@@ -23,7 +23,7 @@ mutation DocumentCreate($input: DocumentCreateInput!) {
 # Updates an existing document and returns the updated document data.
 mutation DocumentUpdate($id: String!, $input: DocumentUpdateInput!) {
   documentUpdate(id: $id, input: $input) {
-    success,
+    success
     document {
       ...DocumentFields
     }

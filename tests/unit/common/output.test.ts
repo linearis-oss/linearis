@@ -1,13 +1,20 @@
 // tests/unit/common/output.test.ts
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { outputSuccess, outputError, handleCommand, outputAuthError } from "../../../src/common/output.js";
-import { AuthenticationError, AUTH_ERROR_CODE } from "../../../src/common/errors.js";
+import { describe, expect, it, vi } from "vitest";
+import { AuthenticationError } from "../../../src/common/errors.js";
+import {
+  handleCommand,
+  outputAuthError,
+  outputError,
+  outputSuccess,
+} from "../../../src/common/output.js";
 
 describe("outputSuccess", () => {
   it("writes JSON to stdout", () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     outputSuccess({ id: "123", title: "Test" });
-    expect(spy).toHaveBeenCalledWith(JSON.stringify({ id: "123", title: "Test" }, null, 2));
+    expect(spy).toHaveBeenCalledWith(
+      JSON.stringify({ id: "123", title: "Test" }, null, 2),
+    );
     spy.mockRestore();
   });
 });
@@ -15,7 +22,9 @@ describe("outputSuccess", () => {
 describe("outputError", () => {
   it("writes error JSON to stderr and exits", () => {
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
 
     outputError(new Error("something failed"));
 
@@ -40,7 +49,9 @@ describe("handleCommand", () => {
   it("catches errors and outputs them", async () => {
     const fn = vi.fn().mockRejectedValue(new Error("boom"));
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
 
     const wrapped = handleCommand(fn);
     await wrapped();
@@ -57,7 +68,9 @@ describe("handleCommand", () => {
 describe("handleCommand with AuthenticationError", () => {
   it("calls outputAuthError for AuthenticationError", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
 
     const handler = handleCommand(async () => {
       throw new AuthenticationError("expired");
@@ -77,7 +90,9 @@ describe("handleCommand with AuthenticationError", () => {
 describe("outputAuthError", () => {
   it("outputs structured JSON with AUTHENTICATION_REQUIRED", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
 
     const err = new AuthenticationError("Token expired");
     outputAuthError(err);

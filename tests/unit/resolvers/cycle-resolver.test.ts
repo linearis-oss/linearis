@@ -1,15 +1,29 @@
 // tests/unit/resolvers/cycle-resolver.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { resolveCycleId } from "../../../src/resolvers/cycle-resolver.js";
+import { describe, expect, it, vi } from "vitest";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { resolveCycleId } from "../../../src/resolvers/cycle-resolver.js";
 
-function mockSdkClient(cycleNodes: Array<{ id: string; name?: string; isActive?: boolean; isNext?: boolean; isPrevious?: boolean; number?: number; startsAt?: string }>) {
+function mockSdkClient(
+  cycleNodes: Array<{
+    id: string;
+    name?: string;
+    isActive?: boolean;
+    isNext?: boolean;
+    isPrevious?: boolean;
+    number?: number;
+    startsAt?: string;
+  }>,
+) {
   const teams = vi.fn().mockResolvedValue({ nodes: [{ id: "team-uuid" }] });
   const cycles = vi.fn().mockResolvedValue({ nodes: cycleNodes });
   // Mock cycle.team as a resolved property
   cycleNodes.forEach((node) => {
     Object.defineProperty(node, "team", {
-      value: Promise.resolve({ id: "team-uuid", key: "ENG", name: "Engineering" }),
+      value: Promise.resolve({
+        id: "team-uuid",
+        key: "ENG",
+        name: "Engineering",
+      }),
       enumerable: false,
     });
   });
@@ -19,7 +33,10 @@ function mockSdkClient(cycleNodes: Array<{ id: string; name?: string; isActive?:
 describe("resolveCycleId", () => {
   it("returns UUID as-is", async () => {
     const client = mockSdkClient([]);
-    const result = await resolveCycleId(client, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await resolveCycleId(
+      client,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 

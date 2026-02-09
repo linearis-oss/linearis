@@ -78,8 +78,7 @@ export function extractEmbeds(content: string): EmbedInfo[] {
   const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
 
   // Extract from image syntax
-  let match;
-  while ((match = imageRegex.exec(cleanedContent)) !== null) {
+  for (const match of cleanedContent.matchAll(imageRegex)) {
     const label = match[1] || "file";
     const url = match[2];
 
@@ -89,7 +88,7 @@ export function extractEmbeds(content: string): EmbedInfo[] {
   }
 
   // Extract from link syntax
-  while ((match = linkRegex.exec(cleanedContent)) !== null) {
+  for (const match of cleanedContent.matchAll(linkRegex)) {
     const label = match[1] || "file";
     const url = match[2];
 

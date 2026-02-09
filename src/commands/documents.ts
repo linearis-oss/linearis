@@ -1,23 +1,23 @@
-import { Command } from "commander";
+import type { Command } from "commander";
 import { createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
+import type { DocumentUpdateInput } from "../gql/graphql.js";
+import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
-import { resolveIssueId } from "../resolvers/issue-resolver.js";
-import {
-  getDocument,
-  createDocument,
-  updateDocument,
-  listDocuments,
-  listDocumentsBySlugIds,
-  deleteDocument,
-} from "../services/document-service.js";
 import {
   createAttachment,
   listAttachments,
 } from "../services/attachment-service.js";
-import type { DocumentUpdateInput } from "../gql/graphql.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
+import {
+  createDocument,
+  deleteDocument,
+  getDocument,
+  listDocuments,
+  listDocumentsBySlugIds,
+  updateDocument,
+} from "../services/document-service.js";
 
 /**
  * Options for document create command
@@ -138,71 +138,74 @@ export function setupDocumentsCommands(program: Command): void {
     .command("list")
     .description("list documents")
     .option("--project <project>", "filter by project name or ID")
-    .option("--issue <issue>", "filter by issue (shows documents attached to the issue)")
+    .option(
+      "--issue <issue>",
+      "filter by issue (shows documents attached to the issue)",
+    )
     .option("-l, --limit <n>", "max results", "50")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [options, command] = args as [DocumentListOptions, Command];
-          // Validate mutually exclusive options
-          if (options.project && options.issue) {
-            throw new Error(
-              "Cannot use --project and --issue together. Choose one filter.",
-            );
-          }
+      handleCommand(async (...args: unknown[]) => {
+        const [options, command] = args as [DocumentListOptions, Command];
+        // Validate mutually exclusive options
+        if (options.project && options.issue) {
+          throw new Error(
+            "Cannot use --project and --issue together. Choose one filter.",
+          );
+        }
 
-          const rootOpts = command.parent!.parent!.opts();
-          const ctx = createContext(rootOpts);
+        const rootOpts = command.parent!.parent!.opts();
+        const ctx = createContext(rootOpts);
 
-          // Validate limit option
-          const limit = parseInt(options.limit || "50", 10);
-          if (isNaN(limit) || limit < 1) {
-            throw new Error(
-              `Invalid limit "${options.limit}": must be a positive number`,
-            );
-          }
+        // Validate limit option
+        const limit = parseInt(options.limit || "50", 10);
+        if (Number.isNaN(limit) || limit < 1) {
+          throw new Error(
+            `Invalid limit "${options.limit}": must be a positive number`,
+          );
+        }
 
-          // Handle --issue filter: find documents via attachments
-          if (options.issue) {
-            const issueId = await resolveIssueId(ctx.sdk, options.issue);
-            const attachments = await listAttachments(ctx.gql, issueId);
+        // Handle --issue filter: find documents via attachments
+        if (options.issue) {
+          const issueId = await resolveIssueId(ctx.sdk, options.issue);
+          const attachments = await listAttachments(ctx.gql, issueId);
 
-            // Extract document slug IDs from Linear document URLs and deduplicate
-            const documentSlugIds = [
-              ...new Set(
-                attachments
-                  .map((att) => extractDocumentIdFromUrl(att.url))
-                  .filter((id): id is string => id !== null),
-              ),
-            ];
+          // Extract document slug IDs from Linear document URLs and deduplicate
+          const documentSlugIds = [
+            ...new Set(
+              attachments
+                .map((att) => extractDocumentIdFromUrl(att.url))
+                .filter((id): id is string => id !== null),
+            ),
+          ];
 
-            if (documentSlugIds.length === 0) {
-              outputSuccess([]);
-              return;
-            }
-
-            const documents = await listDocumentsBySlugIds(
-              ctx.gql,
-              documentSlugIds,
-            );
-            outputSuccess(documents);
+          if (documentSlugIds.length === 0) {
+            outputSuccess([]);
             return;
           }
 
-          // Handle --project filter or no filter
-          let projectId: string | undefined;
-          if (options.project) {
-            projectId = await resolveProjectId(ctx.sdk, options.project);
-          }
-
-          const documents = await listDocuments(ctx.gql, {
-            limit,
-            filter: projectId ? { project: { id: { eq: projectId } } } : undefined,
-          });
-
+          const documents = await listDocumentsBySlugIds(
+            ctx.gql,
+            documentSlugIds,
+          );
           outputSuccess(documents);
-        },
-      ),
+          return;
+        }
+
+        // Handle --project filter or no filter
+        let projectId: string | undefined;
+        if (options.project) {
+          projectId = await resolveProjectId(ctx.sdk, options.project);
+        }
+
+        const documents = await listDocuments(ctx.gql, {
+          limit,
+          filter: projectId
+            ? { project: { id: { eq: projectId } } }
+            : undefined,
+        });
+
+        outputSuccess(documents);
+      }),
     );
 
   /**
@@ -239,64 +242,59 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--team <team>", "team key or name")
     .option("--icon <icon>", "document icon")
     .option("--color <color>", "icon color")
-    .option(
-      "--issue <issue>",
-      "also attach document to issue (e.g., ABC-123)",
-    )
+    .option("--issue <issue>", "also attach document to issue (e.g., ABC-123)")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [options, command] = args as [DocumentCreateOptions, Command];
-          const rootOpts = command.parent!.parent!.opts();
-          const ctx = createContext(rootOpts);
+      handleCommand(async (...args: unknown[]) => {
+        const [options, command] = args as [DocumentCreateOptions, Command];
+        const rootOpts = command.parent!.parent!.opts();
+        const ctx = createContext(rootOpts);
 
-          // Resolve project ID if provided
-          let projectId: string | undefined;
-          if (options.project) {
-            projectId = await resolveProjectId(ctx.sdk, options.project);
+        // Resolve project ID if provided
+        let projectId: string | undefined;
+        if (options.project) {
+          projectId = await resolveProjectId(ctx.sdk, options.project);
+        }
+
+        // Resolve team ID if provided
+        let teamId: string | undefined;
+        if (options.team) {
+          teamId = await resolveTeamId(ctx.sdk, options.team);
+        }
+
+        // Create the document
+        const document = await createDocument(ctx.gql, {
+          title: options.title,
+          content: options.content,
+          projectId,
+          teamId,
+          icon: options.icon,
+          color: options.color,
+        });
+
+        // Optionally attach to issue
+        if (options.issue) {
+          const issueId = await resolveIssueId(ctx.sdk, options.issue);
+
+          try {
+            await createAttachment(ctx.gql, {
+              issueId,
+              url: document.url,
+              title: document.title,
+            });
+          } catch (attachError) {
+            // Document was created but attachment failed - provide actionable error
+            const errorMessage =
+              attachError instanceof Error
+                ? attachError.message
+                : String(attachError);
+            throw new Error(
+              `Document created (${document.id}) but failed to attach to issue "${options.issue}": ${errorMessage}.`,
+            );
           }
+        }
 
-          // Resolve team ID if provided
-          let teamId: string | undefined;
-          if (options.team) {
-            teamId = await resolveTeamId(ctx.sdk, options.team);
-          }
-
-          // Create the document
-          const document = await createDocument(ctx.gql, {
-            title: options.title,
-            content: options.content,
-            projectId,
-            teamId,
-            icon: options.icon,
-            color: options.color,
-          });
-
-          // Optionally attach to issue
-          if (options.issue) {
-            const issueId = await resolveIssueId(ctx.sdk, options.issue);
-
-            try {
-              await createAttachment(ctx.gql, {
-                issueId,
-                url: document.url,
-                title: document.title,
-              });
-            } catch (attachError) {
-              // Document was created but attachment failed - provide actionable error
-              const errorMessage =
-                attachError instanceof Error
-                  ? attachError.message
-                  : String(attachError);
-              throw new Error(
-                `Document created (${document.id}) but failed to attach to issue "${options.issue}": ${errorMessage}.`,
-              );
-            }
-          }
-
-          outputSuccess(document);
-        },
-      ),
+        outputSuccess(document);
+      }),
     );
 
   /**
@@ -313,37 +311,28 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--icon <icon>", "new icon")
     .option("--color <color>", "new icon color")
     .action(
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [document, options, command] = args as [
-            string,
-            DocumentUpdateOptions,
-            Command,
-          ];
-          const rootOpts = command.parent!.parent!.opts();
-          const ctx = createContext(rootOpts);
+      handleCommand(async (...args: unknown[]) => {
+        const [document, options, command] = args as [
+          string,
+          DocumentUpdateOptions,
+          Command,
+        ];
+        const rootOpts = command.parent!.parent!.opts();
+        const ctx = createContext(rootOpts);
 
-          // Build input with only provided fields
-          const input: DocumentUpdateInput = {};
-          if (options.title) input.title = options.title;
-          if (options.content) input.content = options.content;
-          if (options.project) {
-            input.projectId = await resolveProjectId(
-              ctx.sdk,
-              options.project,
-            );
-          }
-          if (options.icon) input.icon = options.icon;
-          if (options.color) input.color = options.color;
+        // Build input with only provided fields
+        const input: DocumentUpdateInput = {};
+        if (options.title) input.title = options.title;
+        if (options.content) input.content = options.content;
+        if (options.project) {
+          input.projectId = await resolveProjectId(ctx.sdk, options.project);
+        }
+        if (options.icon) input.icon = options.icon;
+        if (options.color) input.color = options.color;
 
-          const updatedDocument = await updateDocument(
-            ctx.gql,
-            document,
-            input,
-          );
-          outputSuccess(updatedDocument);
-        },
-      ),
+        const updatedDocument = await updateDocument(ctx.gql, document, input);
+        outputSuccess(updatedDocument);
+      }),
     );
 
   /**
@@ -358,16 +347,14 @@ export function setupDocumentsCommands(program: Command): void {
     .description("trash a document")
     .action(
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
-      handleCommand(
-        async (...args: unknown[]) => {
-          const [document, , command] = args as [string, unknown, Command];
-          const rootOpts = command.parent!.parent!.opts();
-          const ctx = createContext(rootOpts);
+      handleCommand(async (...args: unknown[]) => {
+        const [document, , command] = args as [string, unknown, Command];
+        const rootOpts = command.parent!.parent!.opts();
+        const ctx = createContext(rootOpts);
 
-          await deleteDocument(ctx.gql, document);
-          outputSuccess({ success: true, message: "Document moved to trash" });
-        },
-      ),
+        await deleteDocument(ctx.gql, document);
+        outputSuccess({ success: true, message: "Document moved to trash" });
+      }),
     );
 
   documents

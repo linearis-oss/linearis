@@ -1,4 +1,5 @@
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Checks if a string is a valid UUID.
@@ -26,9 +27,9 @@ export function parseIssueIdentifier(identifier: string): IssueIdentifier {
   }
 
   const teamKey = parts[0];
-  const issueNumber = parseInt(parts[1]);
+  const issueNumber = parseInt(parts[1], 10);
 
-  if (isNaN(issueNumber)) {
+  if (Number.isNaN(issueNumber)) {
     throw new Error(`Invalid issue number in identifier: "${identifier}"`);
   }
 
@@ -38,7 +39,9 @@ export function parseIssueIdentifier(identifier: string): IssueIdentifier {
 /**
  * Attempts to parse an issue identifier, returning null on failure.
  */
-export function tryParseIssueIdentifier(identifier: string): IssueIdentifier | null {
+export function tryParseIssueIdentifier(
+  identifier: string,
+): IssueIdentifier | null {
   try {
     return parseIssueIdentifier(identifier);
   } catch {

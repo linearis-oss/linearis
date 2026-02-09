@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
 import { Command } from "commander";
-import { formatOverview, formatDomainUsage, type DomainMeta } from "../../../src/common/usage.js";
+import { describe, expect, it } from "vitest";
+import {
+  type DomainMeta,
+  formatDomainUsage,
+  formatOverview,
+} from "../../../src/common/usage.js";
 
 describe("formatOverview", () => {
   it("formats overview with version, auth, and all domain summaries", () => {
@@ -25,12 +29,16 @@ describe("formatOverview", () => {
 
     expect(result).toContain("linearis v2025.12.3");
     expect(result).toContain("CLI for Linear.app");
-    expect(result).toContain("auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token");
+    expect(result).toContain(
+      "auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token",
+    );
     expect(result).toContain("output: JSON");
     expect(result).toContain("ids: UUID or human-readable");
     expect(result).toContain("domains:");
     expect(result).toContain("issues");
-    expect(result).toContain("work items with status, priority, assignee, labels");
+    expect(result).toContain(
+      "work items with status, priority, assignee, labels",
+    );
     expect(result).toContain("teams");
     expect(result).toContain("organizational units owning issues and cycles");
     expect(result).toContain("detail: linearis <domain> usage");
@@ -38,8 +46,20 @@ describe("formatOverview", () => {
 
   it("pads domain names for alignment", () => {
     const metas: DomainMeta[] = [
-      { name: "issues", summary: "short", context: "", arguments: {}, seeAlso: [] },
-      { name: "milestones", summary: "longer name", context: "", arguments: {}, seeAlso: [] },
+      {
+        name: "issues",
+        summary: "short",
+        context: "",
+        arguments: {},
+        seeAlso: [],
+      },
+      {
+        name: "milestones",
+        summary: "longer name",
+        context: "",
+        arguments: {},
+        seeAlso: [],
+      },
     ];
 
     const result = formatOverview("1.0.0", metas);
@@ -48,20 +68,23 @@ describe("formatOverview", () => {
     const milestonesLine = lines.find((l) => l.includes("milestones"));
 
     // Both summaries should start at the same column
-    expect(issuesLine!.indexOf("short")).toBe(milestonesLine!.indexOf("longer name"));
+    expect(issuesLine?.indexOf("short")).toBe(
+      milestonesLine?.indexOf("longer name"),
+    );
   });
 });
 
 describe("formatDomainUsage", () => {
   it("formats domain with commands, arguments, options, and see-also", () => {
     const domain = new Command("issues").description("Issue operations");
-    domain.command("list")
+    domain
+      .command("list")
       .description("list issues with optional filters")
       .option("--team <team>", "filter by team")
       .option("--limit <number>", "max results", "50");
-    domain.command("read <issue>")
-      .description("get full issue details");
-    domain.command("create <title>")
+    domain.command("read <issue>").description("get full issue details");
+    domain
+      .command("create <title>")
       .description("create new issue")
       .option("--team <team>", "target team");
     // usage subcommand should be excluded from output
@@ -70,7 +93,8 @@ describe("formatDomainUsage", () => {
     const meta: DomainMeta = {
       name: "issues",
       summary: "work items with status, priority, assignee, labels",
-      context: "an issue belongs to exactly one team.\nparent-child relationships are supported.",
+      context:
+        "an issue belongs to exactly one team.\nparent-child relationships are supported.",
       arguments: {
         issue: "issue identifier (UUID or ABC-123)",
         title: "string",
@@ -81,7 +105,9 @@ describe("formatDomainUsage", () => {
     const result = formatDomainUsage(domain, meta);
 
     // Header
-    expect(result).toContain("linearis issues — work items with status, priority, assignee, labels");
+    expect(result).toContain(
+      "linearis issues — work items with status, priority, assignee, labels",
+    );
     // Context
     expect(result).toContain("an issue belongs to exactly one team.");
     expect(result).toContain("parent-child relationships are supported.");
@@ -106,7 +132,9 @@ describe("formatDomainUsage", () => {
     // No "read options:" since read has no options
     expect(result).not.toContain("read options:");
     // See also
-    expect(result).toContain("see also: comments create <issue>, documents list --issue <issue>");
+    expect(result).toContain(
+      "see also: comments create <issue>, documents list --issue <issue>",
+    );
   });
 
   it("omits arguments and see-also sections when empty", () => {
@@ -132,7 +160,8 @@ describe("formatDomainUsage", () => {
 
   it("handles boolean flags correctly", () => {
     const domain = new Command("users").description("User operations");
-    domain.command("list")
+    domain
+      .command("list")
       .description("list users")
       .option("--active", "only show active users");
 
@@ -154,7 +183,8 @@ describe("formatDomainUsage", () => {
 
   it("strips short flags from option display", () => {
     const domain = new Command("test").description("Test");
-    domain.command("list")
+    domain
+      .command("list")
       .description("list items")
       .option("-l, --limit <number>", "max results", "25");
 
@@ -176,12 +206,13 @@ describe("formatDomainUsage", () => {
 
   it("shows [options] only when command has options but no arguments", () => {
     const domain = new Command("test").description("Test");
-    domain.command("list")
+    domain
+      .command("list")
       .description("with options only")
       .option("--team <team>", "filter");
-    domain.command("read <id>")
-      .description("with arg only");
-    domain.command("create <name>")
+    domain.command("read <id>").description("with arg only");
+    domain
+      .command("create <name>")
       .description("with arg and options")
       .option("--flag", "a flag");
 

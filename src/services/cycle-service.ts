@@ -1,10 +1,10 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import {
-  GetCyclesDocument,
-  type GetCyclesQuery,
+  type CycleFilter,
   GetCycleByIdDocument,
   type GetCycleByIdQuery,
-  type CycleFilter,
+  GetCyclesDocument,
+  type GetCyclesQuery,
 } from "../gql/graphql.js";
 
 export interface Cycle {
@@ -64,10 +64,10 @@ export async function getCycle(
   cycleId: string,
   issuesLimit: number = 50,
 ): Promise<CycleDetail> {
-  const result = await client.request<GetCycleByIdQuery>(
-    GetCycleByIdDocument,
-    { id: cycleId, first: issuesLimit },
-  );
+  const result = await client.request<GetCycleByIdQuery>(GetCycleByIdDocument, {
+    id: cycleId,
+    first: issuesLimit,
+  });
 
   const cycle = result.cycle;
 

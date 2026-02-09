@@ -1,27 +1,27 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type {
-  Issue,
-  IssueDetail,
-  IssueByIdentifier,
-  IssueSearchResult,
   CreatedIssue,
+  Issue,
+  IssueByIdentifier,
+  IssueDetail,
+  IssueSearchResult,
   UpdatedIssue,
 } from "../common/types.js";
 import {
-  GetIssuesDocument,
-  type GetIssuesQuery,
-  GetIssueByIdDocument,
-  type GetIssueByIdQuery,
-  GetIssueByIdentifierDocument,
-  type GetIssueByIdentifierQuery,
-  SearchIssuesDocument,
-  type SearchIssuesQuery,
   CreateIssueDocument,
   type CreateIssueMutation,
+  GetIssueByIdDocument,
+  GetIssueByIdentifierDocument,
+  type GetIssueByIdentifierQuery,
+  type GetIssueByIdQuery,
+  GetIssuesDocument,
+  type GetIssuesQuery,
   type IssueCreateInput,
+  type IssueUpdateInput,
+  SearchIssuesDocument,
+  type SearchIssuesQuery,
   UpdateIssueDocument,
   type UpdateIssueMutation,
-  type IssueUpdateInput,
 } from "../gql/graphql.js";
 
 export async function listIssues(
@@ -39,10 +39,9 @@ export async function getIssue(
   client: GraphQLClient,
   id: string,
 ): Promise<IssueDetail> {
-  const result = await client.request<GetIssueByIdQuery>(
-    GetIssueByIdDocument,
-    { id },
-  );
+  const result = await client.request<GetIssueByIdQuery>(GetIssueByIdDocument, {
+    id,
+  });
   if (!result.issue) {
     throw new Error(`Issue with ID "${id}" not found`);
   }
@@ -59,7 +58,9 @@ export async function getIssueByIdentifier(
     { teamKey, number: issueNumber },
   );
   if (!result.issues.nodes.length) {
-    throw new Error(`Issue with identifier "${teamKey}-${issueNumber}" not found`);
+    throw new Error(
+      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+    );
   }
   return result.issues.nodes[0];
 }
@@ -69,10 +70,10 @@ export async function searchIssues(
   term: string,
   limit: number = 25,
 ): Promise<IssueSearchResult[]> {
-  const result = await client.request<SearchIssuesQuery>(
-    SearchIssuesDocument,
-    { term, first: limit },
-  );
+  const result = await client.request<SearchIssuesQuery>(SearchIssuesDocument, {
+    term,
+    first: limit,
+  });
   return result.searchIssues?.nodes ?? [];
 }
 

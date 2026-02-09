@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 import { getStoredToken } from "./token-storage.js";
 
 export interface CommandOptions {
@@ -48,7 +48,10 @@ export function resolveApiToken(options: CommandOptions): ResolvedToken {
     console.error(
       "Warning: ~/.linear_api_token is deprecated. Run 'linearis auth' to migrate.",
     );
-    return { token: fs.readFileSync(legacyFile, "utf8").trim(), source: "legacy" };
+    return {
+      token: fs.readFileSync(legacyFile, "utf8").trim(),
+      source: "legacy",
+    };
   }
 
   throw new Error(

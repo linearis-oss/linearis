@@ -14,23 +14,29 @@
  * - Complete API coverage with optimized queries
  */
 
-import { program, Option } from "commander";
+import { Option, program } from "commander";
 import pkg from "../package.json" with { type: "json" };
-import { setupAuthCommands, AUTH_META } from "./commands/auth.js";
-import { setupCommentsCommands, COMMENTS_META } from "./commands/comments.js";
-import { setupFilesCommands, FILES_META } from "./commands/files.js";
-import { setupIssuesCommands, ISSUES_META } from "./commands/issues.js";
-import { setupLabelsCommands, LABELS_META } from "./commands/labels.js";
-import { setupProjectsCommands, PROJECTS_META } from "./commands/projects.js";
-import { setupCyclesCommands, CYCLES_META } from "./commands/cycles.js";
-import { setupMilestonesCommands, MILESTONES_META } from "./commands/milestones.js";
+import { AUTH_META, setupAuthCommands } from "./commands/auth.js";
+import { COMMENTS_META, setupCommentsCommands } from "./commands/comments.js";
+import { CYCLES_META, setupCyclesCommands } from "./commands/cycles.js";
+import {
+  DOCUMENTS_META,
+  setupDocumentsCommands,
+} from "./commands/documents.js";
+import { FILES_META, setupFilesCommands } from "./commands/files.js";
+import { ISSUES_META, setupIssuesCommands } from "./commands/issues.js";
+import { LABELS_META, setupLabelsCommands } from "./commands/labels.js";
+import {
+  MILESTONES_META,
+  setupMilestonesCommands,
+} from "./commands/milestones.js";
+import { PROJECTS_META, setupProjectsCommands } from "./commands/projects.js";
 import { setupTeamsCommands, TEAMS_META } from "./commands/teams.js";
 import { setupUsersCommands, USERS_META } from "./commands/users.js";
-import { setupDocumentsCommands, DOCUMENTS_META } from "./commands/documents.js";
 import {
-  formatOverview,
-  formatDomainUsage,
   type DomainMeta,
+  formatDomainUsage,
+  formatOverview,
 } from "./common/usage.js";
 
 // Setup main program

@@ -1,7 +1,7 @@
 // tests/unit/resolvers/project-resolver.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
+import { describe, expect, it, vi } from "vitest";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
 
 function mockSdkClient(nodes: Array<{ id: string }>) {
   return {
@@ -14,7 +14,10 @@ function mockSdkClient(nodes: Array<{ id: string }>) {
 describe("resolveProjectId", () => {
   it("returns UUID as-is", async () => {
     const client = mockSdkClient([]);
-    const result = await resolveProjectId(client, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await resolveProjectId(
+      client,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(client.sdk.projects).not.toHaveBeenCalled();
   });
@@ -27,6 +30,8 @@ describe("resolveProjectId", () => {
 
   it("throws when project not found", async () => {
     const client = mockSdkClient([]);
-    await expect(resolveProjectId(client, "Nonexistent")).rejects.toThrow('Project "Nonexistent" not found');
+    await expect(resolveProjectId(client, "Nonexistent")).rejects.toThrow(
+      'Project "Nonexistent" not found',
+    );
   });
 });

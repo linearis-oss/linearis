@@ -1,7 +1,7 @@
 // tests/unit/resolvers/status-resolver.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { resolveStatusId } from "../../../src/resolvers/status-resolver.js";
+import { describe, expect, it, vi } from "vitest";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { resolveStatusId } from "../../../src/resolvers/status-resolver.js";
 
 function mockSdkClient(nodes: Array<{ id: string }>) {
   return {
@@ -14,7 +14,10 @@ function mockSdkClient(nodes: Array<{ id: string }>) {
 describe("resolveStatusId", () => {
   it("returns UUID as-is", async () => {
     const client = mockSdkClient([]);
-    const result = await resolveStatusId(client, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await resolveStatusId(
+      client,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 
@@ -38,6 +41,8 @@ describe("resolveStatusId", () => {
 
   it("throws when status not found", async () => {
     const client = mockSdkClient([]);
-    await expect(resolveStatusId(client, "Nonexistent")).rejects.toThrow('Status "Nonexistent" not found');
+    await expect(resolveStatusId(client, "Nonexistent")).rejects.toThrow(
+      'Status "Nonexistent" not found',
+    );
   });
 });

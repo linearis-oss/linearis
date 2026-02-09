@@ -84,7 +84,6 @@ fragment CompleteIssueWithCommentsFields on Issue {
   }
 }
 
-
 # Complete issue search fragment with all relationships
 #
 # Combines all issue fragments into a comprehensive field selection.
@@ -165,7 +164,7 @@ query GetIssues($first: Int!, $orderBy: PaginationOrderBy) {
 }
 
 # Get single issue by UUID with comments and all relationships
-# 
+#
 # Fetches complete issue data including comments by direct UUID lookup.
 # Uses the comprehensive fragment with comment data for detailed view.
 query GetIssueById($id: String!) {
@@ -175,7 +174,7 @@ query GetIssueById($id: String!) {
 }
 
 # Get issue by identifier (team key + number)
-# 
+#
 # Fetches issue using TEAM-123 format. Resolves team key and
 # issue number to find the exact issue, returning complete data with comments.
 query GetIssueByIdentifier($teamKey: String!, $number: Float!) {
@@ -201,7 +200,7 @@ query GetIssueTeam($issueId: String!) {
 }
 
 # Search issues with text search and all relationships in single query
-# 
+#
 # Provides full-text search across Linear issues with complete
 # relationship data for each match.
 query SearchIssues($term: String!, $first: Int!) {
@@ -213,7 +212,7 @@ query SearchIssues($term: String!, $first: Int!) {
 }
 
 # Search issues with advanced filters and all relationships in single query
-# 
+#
 # Supports filtering by team, assignee, project, and states.
 # Used by the advanced search functionality with multiple criteria.
 query FilteredSearchIssues(
@@ -439,4 +438,3 @@ query BatchResolveForCreate(
 
   # Resolve cycles by name (team-scoped lookup is preferred but we also provide global fallback)
 }
-

@@ -1,7 +1,10 @@
 // tests/unit/resolvers/label-resolver.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { resolveLabelId, resolveLabelIds } from "../../../src/resolvers/label-resolver.js";
+import { describe, expect, it, vi } from "vitest";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import {
+  resolveLabelId,
+  resolveLabelIds,
+} from "../../../src/resolvers/label-resolver.js";
 
 function mockSdkClient(nodes: Array<{ id: string; name?: string }>) {
   return {
@@ -14,7 +17,10 @@ function mockSdkClient(nodes: Array<{ id: string; name?: string }>) {
 describe("resolveLabelId", () => {
   it("returns UUID as-is", async () => {
     const client = mockSdkClient([]);
-    const result = await resolveLabelId(client, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await resolveLabelId(
+      client,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 
@@ -26,7 +32,9 @@ describe("resolveLabelId", () => {
 
   it("throws when label not found", async () => {
     const client = mockSdkClient([]);
-    await expect(resolveLabelId(client, "Nonexistent")).rejects.toThrow('Label "Nonexistent" not found');
+    await expect(resolveLabelId(client, "Nonexistent")).rejects.toThrow(
+      'Label "Nonexistent" not found',
+    );
   });
 });
 
@@ -37,6 +45,9 @@ describe("resolveLabelIds", () => {
       "550e8400-e29b-41d4-a716-446655440000",
       "Bug",
     ]);
-    expect(result).toEqual(["550e8400-e29b-41d4-a716-446655440000", "label-uuid"]);
+    expect(result).toEqual([
+      "550e8400-e29b-41d4-a716-446655440000",
+      "label-uuid",
+    ]);
   });
 });

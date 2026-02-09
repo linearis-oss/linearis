@@ -1,7 +1,7 @@
 import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
-import { notFoundError, multipleMatchesError } from "../common/errors.js";
 import { resolveTeamId } from "./team-resolver.js";
 
 /**
@@ -60,9 +60,7 @@ export async function resolveCycleId(
       isActive: cycle.isActive,
       isNext: cycle.isNext,
       isPrevious: cycle.isPrevious,
-      team: team
-        ? { id: team.id, key: team.key, name: team.name }
-        : undefined,
+      team: team ? { id: team.id, key: team.key, name: team.name } : undefined,
     });
   }
 

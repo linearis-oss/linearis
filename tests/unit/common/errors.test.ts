@@ -1,13 +1,13 @@
 // tests/unit/common/errors.test.ts
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  notFoundError,
-  multipleMatchesError,
-  invalidParameterError,
-  requiresParameterError,
-  AuthenticationError,
-  isAuthError,
   AUTH_ERROR_CODE,
+  AuthenticationError,
+  invalidParameterError,
+  isAuthError,
+  multipleMatchesError,
+  notFoundError,
+  requiresParameterError,
 } from "../../../src/common/errors.js";
 
 describe("notFoundError", () => {
@@ -24,7 +24,12 @@ describe("notFoundError", () => {
 
 describe("multipleMatchesError", () => {
   it("creates error with matches and disambiguation hint", () => {
-    const err = multipleMatchesError("cycle", "Sprint", ["id-1", "id-2"], "use an ID");
+    const err = multipleMatchesError(
+      "cycle",
+      "Sprint",
+      ["id-1", "id-2"],
+      "use an ID",
+    );
     expect(err.message).toContain('Multiple cycles found matching "Sprint"');
     expect(err.message).toContain("id-1, id-2");
     expect(err.message).toContain("use an ID");
@@ -76,8 +81,12 @@ describe("isAuthError", () => {
   });
 
   it("returns false for errors that merely contain auth keywords", () => {
-    expect(isAuthError(new Error("Failed to update authentication settings"))).toBe(false);
-    expect(isAuthError(new Error("Unauthorized access to resource"))).toBe(false);
+    expect(
+      isAuthError(new Error("Failed to update authentication settings")),
+    ).toBe(false);
+    expect(isAuthError(new Error("Unauthorized access to resource"))).toBe(
+      false,
+    );
   });
 });
 

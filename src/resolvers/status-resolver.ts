@@ -1,7 +1,7 @@
 import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
-import { isUuid } from "../common/identifier.js";
 import { notFoundError } from "../common/errors.js";
+import { isUuid } from "../common/identifier.js";
 
 export async function resolveStatusId(
   client: LinearSdkClient,

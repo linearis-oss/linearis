@@ -1,7 +1,8 @@
 {
-    "recommendations": [
-        "graphql.vscode-graphql",
-        "graphql.vscode-graphql-syntax",
-        "editorconfig.editorconfig"
-    ]
+  "recommendations": [
+    "biomejs.biome",
+    "graphql.vscode-graphql",
+    "graphql.vscode-graphql-syntax",
+    "editorconfig.editorconfig"
+  ]
 }

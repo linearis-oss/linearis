@@ -1,6 +1,6 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { exec } from "child_process";
-import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -85,7 +85,9 @@ describe("Documents CLI Commands", () => {
           expect.fail("Should have thrown an error");
         } catch (error: unknown) {
           const execError = error as { stdout?: string; stderr?: string };
-          const output = JSON.parse(execError.stdout || execError.stderr || "{}");
+          const output = JSON.parse(
+            execError.stdout || execError.stderr || "{}",
+          );
           expect(output.error).toBeDefined();
         }
       },
@@ -99,7 +101,9 @@ describe("Documents CLI Commands", () => {
           expect.fail("Should have thrown an error");
         } catch (error: unknown) {
           const execError = error as { stdout?: string; stderr?: string };
-          const output = JSON.parse(execError.stdout || execError.stderr || "{}");
+          const output = JSON.parse(
+            execError.stdout || execError.stderr || "{}",
+          );
           expect(output.error).toContain("Invalid limit");
         }
       },
@@ -113,7 +117,9 @@ describe("Documents CLI Commands", () => {
           expect.fail("Should have thrown an error");
         } catch (error: unknown) {
           const execError = error as { stdout?: string; stderr?: string };
-          const output = JSON.parse(execError.stdout || execError.stderr || "{}");
+          const output = JSON.parse(
+            execError.stdout || execError.stderr || "{}",
+          );
           expect(output.error).toContain("Invalid limit");
         }
       },
