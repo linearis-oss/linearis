@@ -19,8 +19,8 @@ export interface CommandContext {
  * @param options - Command options containing API token
  * @returns Context with initialized clients
  */
-export async function createContext(options: CommandOptions): Promise<CommandContext> {
-  const token = await getApiToken(options);
+export function createContext(options: CommandOptions): CommandContext {
+  const token = getApiToken(options);
   return {
     gql: new GraphQLClient(token),
     sdk: new LinearSdkClient(token),

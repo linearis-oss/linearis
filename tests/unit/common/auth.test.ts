@@ -30,32 +30,32 @@ describe("getApiToken", () => {
     }
   });
 
-  it("returns --api-token flag when provided", async () => {
-    const token = await getApiToken({ apiToken: "flag-token" });
+  it("returns --api-token flag when provided", () => {
+    const token = getApiToken({ apiToken: "flag-token" });
     expect(token).toBe("flag-token");
   });
 
-  it("returns LINEAR_API_TOKEN env var as second priority", async () => {
+  it("returns LINEAR_API_TOKEN env var as second priority", () => {
     process.env.LINEAR_API_TOKEN = "env-token";
-    const token = await getApiToken({});
+    const token = getApiToken({});
     expect(token).toBe("env-token");
   });
 
-  it("returns decrypted stored token as third priority", async () => {
+  it("returns decrypted stored token as third priority", () => {
     vi.mocked(getStoredToken).mockReturnValue("stored-token");
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
-    const token = await getApiToken({});
+    const token = getApiToken({});
     expect(token).toBe("stored-token");
   });
 
-  it("reads legacy ~/.linear_api_token as fourth priority with deprecation warning", async () => {
+  it("reads legacy ~/.linear_api_token as fourth priority with deprecation warning", () => {
     vi.mocked(getStoredToken).mockReturnValue(null);
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue("legacy-token\n");
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const token = await getApiToken({});
+    const token = getApiToken({});
     expect(token).toBe("legacy-token");
     expect(stderrSpy).toHaveBeenCalledWith(
       expect.stringContaining("deprecated"),
@@ -64,10 +64,10 @@ describe("getApiToken", () => {
     stderrSpy.mockRestore();
   });
 
-  it("throws when no token found anywhere", async () => {
+  it("throws when no token found anywhere", () => {
     vi.mocked(getStoredToken).mockReturnValue(null);
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
-    await expect(getApiToken({})).rejects.toThrow("No API token found");
+    expect(() => getApiToken({})).toThrow("No API token found");
   });
 });

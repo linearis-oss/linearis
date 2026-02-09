@@ -196,7 +196,7 @@ export function setupAuthCommands(program: Command): void {
       let token: string;
       let source: TokenSource;
       try {
-        const resolved = await resolveApiToken(rootOpts);
+        const resolved = resolveApiToken(rootOpts);
         token = resolved.token;
         source = resolved.source;
       } catch {

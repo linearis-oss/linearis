@@ -25,7 +25,7 @@ export interface ResolvedToken {
  *
  * @throws Error if no token found in any source
  */
-export async function resolveApiToken(options: CommandOptions): Promise<ResolvedToken> {
+export function resolveApiToken(options: CommandOptions): ResolvedToken {
   // 1. CLI flag
   if (options.apiToken) {
     return { token: options.apiToken, source: "flag" };
@@ -61,7 +61,7 @@ export async function resolveApiToken(options: CommandOptions): Promise<Resolved
  *
  * @throws Error if no token found in any source
  */
-export async function getApiToken(options: CommandOptions): Promise<string> {
-  const { token } = await resolveApiToken(options);
+export function getApiToken(options: CommandOptions): string {
+  const { token } = resolveApiToken(options);
   return token;
 }
