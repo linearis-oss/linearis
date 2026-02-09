@@ -1,6 +1,3 @@
-/**
- * Creates a not found error with consistent formatting.
- */
 export function notFoundError(
   entityType: string,
   identifier: string,
@@ -10,9 +7,6 @@ export function notFoundError(
   return new Error(`${entityType} "${identifier}"${contextStr} not found`);
 }
 
-/**
- * Creates an error for ambiguous identifier matches.
- */
 export function multipleMatchesError(
   entityType: string,
   identifier: string,
@@ -27,9 +21,6 @@ export function multipleMatchesError(
   );
 }
 
-/**
- * Creates an error for invalid parameter values.
- */
 export function invalidParameterError(
   parameter: string,
   reason: string,
@@ -37,9 +28,6 @@ export function invalidParameterError(
   return new Error(`Invalid ${parameter}: ${reason}`);
 }
 
-/**
- * Creates an error when a flag requires another flag to be specified.
- */
 export function requiresParameterError(
   flag: string,
   requiredFlag: string,

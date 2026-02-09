@@ -14,17 +14,7 @@ export interface ResolvedToken {
   source: TokenSource;
 }
 
-/**
- * Retrieves Linear API token from multiple sources with source info.
- *
- * Checks sources in priority order:
- * 1. --api-token command flag
- * 2. LINEAR_API_TOKEN environment variable
- * 3. ~/.linearis/token (encrypted)
- * 4. ~/.linear_api_token (legacy, deprecated)
- *
- * @throws Error if no token found in any source
- */
+/** @throws Error if no token found in any source */
 export function resolveApiToken(options: CommandOptions): ResolvedToken {
   // 1. CLI flag
   if (options.apiToken) {
@@ -59,11 +49,6 @@ export function resolveApiToken(options: CommandOptions): ResolvedToken {
   );
 }
 
-/**
- * Retrieves Linear API token from multiple sources.
- *
- * @throws Error if no token found in any source
- */
 export function getApiToken(options: CommandOptions): string {
   const { token } = resolveApiToken(options);
   return token;

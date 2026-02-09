@@ -1,28 +1,13 @@
 import type { Command } from "commander";
 
-/**
- * Metadata for a CLI domain, used to generate token-optimized usage output.
- */
 export interface DomainMeta {
-  /** Domain command name (e.g. "issues") */
   name: string;
-  /** One-line summary shown in overview (e.g. "work items with status, priority, assignee, labels") */
   summary: string;
-  /** Multi-line context explaining the domain's data model for LLM agents */
   context: string;
-  /** Argument descriptions keyed by argument name without brackets (e.g. { issue: "issue identifier (UUID or ABC-123)" }) */
   arguments: Record<string, string>;
-  /** Cross-references to related commands (e.g. ["comments create <issue>"]) */
   seeAlso: string[];
 }
 
-/**
- * Format tier 1 overview: all domains with one-line summaries.
- *
- * @param version - CLI version string
- * @param metas - Domain metadata array
- * @returns Formatted plain text overview
- */
 export function formatOverview(version: string, metas: DomainMeta[]): string {
   const lines: string[] = [];
   lines.push(
@@ -43,20 +28,12 @@ export function formatOverview(version: string, metas: DomainMeta[]): string {
   return lines.join("\n");
 }
 
-/**
- * Extract long flag with value placeholder from Commander.js option flags string.
- * Strips short flag prefix (e.g. "-l, --limit <number>" → "--limit <number>").
- */
 function extractLongFlag(flags: string): string {
   const parts = flags.split(",").map((s) => s.trim());
   const longPart = parts.find((p) => p.startsWith("--"));
   return longPart || flags;
 }
 
-/**
- * Build command signature string from Commander.js command.
- * Shows arguments if present, otherwise [options] if options exist.
- */
 function formatCommandSignature(cmd: Command): string {
   const args = cmd.registeredArguments;
   const parts: string[] = [cmd.name()];
@@ -72,28 +49,14 @@ function formatCommandSignature(cmd: Command): string {
   return parts.join(" ");
 }
 
-/**
- * Format tier 2 domain usage: full command reference for one domain.
- *
- * Introspects Commander.js command tree for commands and options.
- * Uses DomainMeta for context, argument descriptions, and cross-references.
- *
- * @param command - Commander.js command for this domain
- * @param meta - Domain metadata
- * @returns Formatted plain text domain usage
- */
 export function formatDomainUsage(command: Command, meta: DomainMeta): string {
   const lines: string[] = [];
 
-  // Header
   lines.push(`linearis ${meta.name} — ${meta.summary}`);
   lines.push("");
-
-  // Context
   lines.push(meta.context);
   lines.push("");
 
-  // Commands (exclude "usage" subcommand)
   const subcommands = command.commands.filter((c) => c.name() !== "usage");
   lines.push("commands:");
 
@@ -106,7 +69,6 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
     lines.push(`  ${sig.padEnd(maxSigLen + 2)}${desc}`);
   }
 
-  // Arguments
   const argEntries = Object.entries(meta.arguments);
   if (argEntries.length > 0) {
     lines.push("");
@@ -119,7 +81,6 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
     }
   }
 
-  // Options per subcommand
   for (const cmd of subcommands) {
     const opts = cmd.options.filter((o) => !o.hidden);
     if (opts.length === 0) continue;
@@ -141,7 +102,6 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
     }
   }
 
-  // See also
   if (meta.seeAlso.length > 0) {
     lines.push("");
     lines.push(`see also: ${meta.seeAlso.join(", ")}`);

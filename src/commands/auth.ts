@@ -16,6 +16,13 @@ import { validateToken } from "../services/auth-service.js";
 const LINEAR_API_KEY_URL =
   "https://linear.app/settings/account/security/api-keys/new";
 
+const SOURCE_LABELS: Record<TokenSource, string> = {
+  flag: "--api-token flag",
+  env: "LINEAR_API_TOKEN env var",
+  stored: "~/.linearis/token",
+  legacy: "~/.linear_api_token (deprecated)",
+};
+
 export const AUTH_META: DomainMeta = {
   name: "auth",
   summary: "authenticate with Linear API (interactive, for humans)",
@@ -106,34 +113,23 @@ export function setupAuthCommands(program: Command): void {
     .command("auth")
     .description("Authenticate with Linear API");
 
-  // Show auth help when no subcommand
-  auth.action(() => {
-    auth.help();
-  });
+  auth.action(() => auth.help());
 
-  // Login intentionally bypasses handleCommand() — it is interactive (raw stdin,
-  // stderr prompts, browser open) and needs its own error UX with process.exit.
+  // Login bypasses handleCommand() — interactive UX with raw stdin and process.exit
   auth
     .command("login")
     .description("set up or refresh authentication")
     .option("--force", "reauthenticate even if already authenticated")
     .action(async (options: { force?: boolean }, command: Command) => {
       try {
-        // Check existing authentication across all sources
         if (!options.force) {
           try {
             const rootOpts = command.parent!.parent!.opts() as CommandOptions;
             const { token, source } = resolveApiToken(rootOpts);
             try {
               const viewer = await validateApiToken(token);
-              const sourceLabels: Record<TokenSource, string> = {
-                flag: "--api-token flag",
-                env: "LINEAR_API_TOKEN env var",
-                stored: "~/.linearis/token",
-                legacy: "~/.linear_api_token",
-              };
               console.error(
-                `Already authenticated as ${viewer.name} (${viewer.email}) via ${sourceLabels[source]}.`,
+                `Already authenticated as ${viewer.name} (${viewer.email}) via ${SOURCE_LABELS[source]}.`,
               );
               console.error("Run with --force to reauthenticate.");
               return;
@@ -148,7 +144,6 @@ export function setupAuthCommands(program: Command): void {
           }
         }
 
-        // Guide user
         console.error("");
         console.error("To authenticate, create a new Linear API key:");
         console.error("");
@@ -166,7 +161,6 @@ export function setupAuthCommands(program: Command): void {
 
         openBrowser(LINEAR_API_KEY_URL);
 
-        // Prompt for token
         const token = await promptToken();
 
         if (!token) {
@@ -175,7 +169,6 @@ export function setupAuthCommands(program: Command): void {
           return;
         }
 
-        // Validate token
         console.error("Validating token...");
         let viewer: Viewer;
         try {
@@ -187,7 +180,6 @@ export function setupAuthCommands(program: Command): void {
           return;
         }
 
-        // Store token
         saveToken(token);
 
         console.error("");
@@ -204,8 +196,6 @@ export function setupAuthCommands(program: Command): void {
       }
     });
 
-  // Status bypasses createContext() — it needs token source information
-  // (flag/env/stored/legacy) which createContext() does not expose.
   auth
     .command("status")
     .description("check current authentication status")
@@ -213,13 +203,6 @@ export function setupAuthCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
         const rootOpts = command.parent!.parent!.opts() as CommandOptions;
-
-        const sourceLabels: Record<TokenSource, string> = {
-          flag: "--api-token flag",
-          env: "LINEAR_API_TOKEN env var",
-          stored: "~/.linearis/token",
-          legacy: "~/.linear_api_token (deprecated)",
-        };
 
         let token: string;
         let source: TokenSource;
@@ -240,13 +223,13 @@ export function setupAuthCommands(program: Command): void {
           const viewer = await validateApiToken(token);
           outputSuccess({
             authenticated: true,
-            source: sourceLabels[source],
+            source: SOURCE_LABELS[source],
             user: { id: viewer.id, name: viewer.name, email: viewer.email },
           });
         } catch {
           outputSuccess({
             authenticated: false,
-            source: sourceLabels[source],
+            source: SOURCE_LABELS[source],
             message:
               "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
           });
@@ -267,15 +250,9 @@ export function setupAuthCommands(program: Command): void {
         // Warn if a token is still active from another source
         try {
           const { source } = resolveApiToken(rootOpts);
-          const sourceLabels: Record<TokenSource, string> = {
-            flag: "--api-token flag",
-            env: "LINEAR_API_TOKEN env var",
-            stored: "~/.linearis/token",
-            legacy: "~/.linear_api_token (deprecated)",
-          };
           outputSuccess({
             message: "Authentication token removed.",
-            warning: `A token is still active via ${sourceLabels[source]}.`,
+            warning: `A token is still active via ${SOURCE_LABELS[source]}.`,
           });
         } catch {
           outputSuccess({ message: "Authentication token removed." });
