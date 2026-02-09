@@ -1,6 +1,6 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
-import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 import { notFoundError } from "../common/errors.js";
+import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 
 /**
  * Resolves issue identifier to UUID.

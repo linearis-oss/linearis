@@ -1,14 +1,14 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
-import { notFoundError, multipleMatchesError } from "../common/errors.js";
-import { resolveProjectId } from "./project-resolver.js";
 import {
-  FindProjectMilestoneScopedDocument,
-  type FindProjectMilestoneScopedQuery,
   FindProjectMilestoneGlobalDocument,
   type FindProjectMilestoneGlobalQuery,
+  FindProjectMilestoneScopedDocument,
+  type FindProjectMilestoneScopedQuery,
 } from "../gql/graphql.js";
+import { resolveProjectId } from "./project-resolver.js";
 
 /**
  * Resolves milestone identifier to UUID.
@@ -37,7 +37,11 @@ export async function resolveMilestoneId(
 ): Promise<string> {
   if (isUuid(nameOrId)) return nameOrId;
 
-  type MilestoneNode = { id: string; name: string; project?: { name: string } | null };
+  type MilestoneNode = {
+    id: string;
+    name: string;
+    project?: { name: string } | null;
+  };
   let nodes: MilestoneNode[] = [];
 
   if (projectNameOrId) {
@@ -51,10 +55,11 @@ export async function resolveMilestoneId(
 
   // Fall back to global search if no project scope or not found
   if (nodes.length === 0) {
-    const globalResult = await gqlClient.request<FindProjectMilestoneGlobalQuery>(
-      FindProjectMilestoneGlobalDocument,
-      { name: nameOrId },
-    );
+    const globalResult =
+      await gqlClient.request<FindProjectMilestoneGlobalQuery>(
+        FindProjectMilestoneGlobalDocument,
+        { name: nameOrId },
+      );
     nodes = (globalResult.projectMilestones?.nodes as MilestoneNode[]) || [];
   }
 
