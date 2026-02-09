@@ -16,6 +16,12 @@ import {
  * Accepts UUID or milestone name. When multiple milestones match a name,
  * use projectNameOrId to scope the search to a specific project.
  *
+ * ARCHITECTURAL EXCEPTION: This resolver uses GraphQLClient in addition to
+ * LinearSdkClient because the Linear SDK does not expose milestone lookup
+ * by name. The GraphQL client is needed for the FindProjectMilestoneScoped
+ * and FindProjectMilestoneGlobal queries. This is a documented deviation
+ * from the standard resolver contract (resolvers normally use SDK only).
+ *
  * @param gqlClient - GraphQL client for querying milestones
  * @param sdkClient - SDK client for project resolution
  * @param nameOrId - Milestone name or UUID

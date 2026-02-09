@@ -71,7 +71,7 @@ export class GraphQLClient {
       }
 
       if (errorMessage) {
-        throw new Error(errorMessage || "GraphQL query failed");
+        throw new Error(errorMessage);
       }
       throw new Error(
         `GraphQL request failed: ${error instanceof Error ? error.message : String(error)}`,

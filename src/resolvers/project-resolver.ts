@@ -1,5 +1,6 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { isUuid } from "../common/identifier.js";
+import { notFoundError } from "../common/errors.js";
 
 export async function resolveProjectId(
   client: LinearSdkClient,
@@ -13,7 +14,7 @@ export async function resolveProjectId(
   });
 
   if (result.nodes.length === 0) {
-    throw new Error(`Project "${nameOrId}" not found`);
+    throw notFoundError("Project", nameOrId);
   }
 
   return result.nodes[0].id;

@@ -1,5 +1,6 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { isUuid } from "../common/identifier.js";
+import { notFoundError } from "../common/errors.js";
 
 export async function resolveTeamId(
   client: LinearSdkClient,
@@ -21,5 +22,5 @@ export async function resolveTeamId(
   });
   if (byName.nodes.length > 0) return byName.nodes[0].id;
 
-  throw new Error(`Team "${keyOrNameOrId}" not found`);
+  throw notFoundError("Team", keyOrNameOrId);
 }

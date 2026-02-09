@@ -18,6 +18,8 @@ export function ensureTokenDir(): void {
   const dir = getTokenDir();
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  } else {
+    fs.chmodSync(dir, 0o700);
   }
 }
 
@@ -34,8 +36,12 @@ export function getStoredToken(): string | null {
   if (!fs.existsSync(tokenPath)) {
     return null;
   }
-  const encrypted = fs.readFileSync(tokenPath, "utf8").trim();
-  return decryptToken(encrypted);
+  try {
+    const encrypted = fs.readFileSync(tokenPath, "utf8").trim();
+    return decryptToken(encrypted);
+  } catch {
+    return null;
+  }
 }
 
 export function clearToken(): void {

@@ -83,8 +83,9 @@ describe("Documents CLI Commands", () => {
             `node ${CLI_PATH} documents read nonexistent-uuid-12345`,
           );
           expect.fail("Should have thrown an error");
-        } catch (error: any) {
-          const output = JSON.parse(error.stdout || error.stderr);
+        } catch (error: unknown) {
+          const execError = error as { stdout?: string; stderr?: string };
+          const output = JSON.parse(execError.stdout || execError.stderr || "{}");
           expect(output.error).toBeDefined();
         }
       },
@@ -96,8 +97,9 @@ describe("Documents CLI Commands", () => {
         try {
           await execAsync(`node ${CLI_PATH} documents list --limit abc`);
           expect.fail("Should have thrown an error");
-        } catch (error: any) {
-          const output = JSON.parse(error.stdout || error.stderr);
+        } catch (error: unknown) {
+          const execError = error as { stdout?: string; stderr?: string };
+          const output = JSON.parse(execError.stdout || execError.stderr || "{}");
           expect(output.error).toContain("Invalid limit");
         }
       },
@@ -109,8 +111,9 @@ describe("Documents CLI Commands", () => {
         try {
           await execAsync(`node ${CLI_PATH} documents list --limit -5`);
           expect.fail("Should have thrown an error");
-        } catch (error: any) {
-          const output = JSON.parse(error.stdout || error.stderr);
+        } catch (error: unknown) {
+          const execError = error as { stdout?: string; stderr?: string };
+          const output = JSON.parse(execError.stdout || execError.stderr || "{}");
           expect(output.error).toContain("Invalid limit");
         }
       },

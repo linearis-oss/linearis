@@ -1,6 +1,7 @@
 import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { isUuid } from "../common/identifier.js";
+import { notFoundError } from "../common/errors.js";
 
 export async function resolveStatusId(
   client: LinearSdkClient,
@@ -23,8 +24,8 @@ export async function resolveStatusId(
   });
 
   if (result.nodes.length === 0) {
-    const context = teamId ? ` for team ${teamId}` : "";
-    throw new Error(`Status "${nameOrId}"${context} not found`);
+    const context = teamId ? `for team ${teamId}` : undefined;
+    throw notFoundError("Status", nameOrId, context);
   }
 
   return result.nodes[0].id;

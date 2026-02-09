@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { createContext, type CommandOptions } from "../common/context.js";
+import { createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 import { listProjects } from "../services/project-service.js";
@@ -56,9 +56,9 @@ export function setupProjectsCommands(program: Command): void {
       "100",
     )
     .action(handleCommand(async (...args: unknown[]) => {
-      const [, command] = args as [CommandOptions, Command];
+      const [options, command] = args as [{ limit: string }, Command];
       const ctx = await createContext(command.parent!.parent!.opts());
-      const result = await listProjects(ctx.gql);
+      const result = await listProjects(ctx.gql, parseInt(options.limit));
       outputSuccess(result);
     }));
 

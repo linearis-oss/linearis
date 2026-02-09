@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
-import path from "node:path";
 
 // Mock fs and os modules
 vi.mock("node:fs");
@@ -52,12 +51,17 @@ describe("ensureTokenDir", () => {
     );
   });
 
-  it("does nothing if directory exists", () => {
+  it("fixes permissions if directory exists", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.chmodSync).mockReturnValue(undefined);
 
     ensureTokenDir();
 
     expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(fs.chmodSync).toHaveBeenCalledWith(
+      "/home/testuser/.linearis",
+      0o700
+    );
   });
 });
 
@@ -104,6 +108,19 @@ describe("getStoredToken", () => {
 
   it("returns null when file does not exist", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    const token = getStoredToken();
+    expect(token).toBeNull();
+  });
+
+  it("returns null when token file is corrupted", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue("corrupted-data");
+
+    const { decryptToken } = await import("../../../src/common/encryption.js");
+    vi.mocked(decryptToken).mockImplementation(() => {
+      throw new Error("Invalid encrypted token format");
+    });
 
     const token = getStoredToken();
     expect(token).toBeNull();

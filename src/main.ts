@@ -40,6 +40,21 @@ program
   .version(pkg.version)
   .option("--api-token <token>", "Linear API token");
 
+// Collect all domain metadata (order matches overview display)
+const allMetas: DomainMeta[] = [
+  AUTH_META,
+  ISSUES_META,
+  COMMENTS_META,
+  LABELS_META,
+  PROJECTS_META,
+  CYCLES_META,
+  MILESTONES_META,
+  DOCUMENTS_META,
+  FILES_META,
+  TEAMS_META,
+  USERS_META,
+];
+
 // Default action - show usage overview when no subcommand
 program.action(() => {
   console.log(formatOverview(pkg.version, allMetas));
@@ -57,21 +72,6 @@ setupFilesCommands(program);
 setupTeamsCommands(program);
 setupUsersCommands(program);
 setupDocumentsCommands(program);
-
-// Collect all domain metadata (order matches overview display)
-const allMetas: DomainMeta[] = [
-  AUTH_META,
-  ISSUES_META,
-  COMMENTS_META,
-  LABELS_META,
-  PROJECTS_META,
-  CYCLES_META,
-  MILESTONES_META,
-  DOCUMENTS_META,
-  FILES_META,
-  TEAMS_META,
-  USERS_META,
-];
 
 // Add usage command with hidden --all flag for static file generation
 program

@@ -11,10 +11,12 @@ import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
   listIssues,
   getIssue,
+  getIssueByIdentifier,
   createIssue,
   updateIssue,
   searchIssues,
 } from "../services/issue-service.js";
+import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 import type { IssueCreateInput, IssueUpdateInput } from "../gql/graphql.js";
 import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
@@ -148,8 +150,15 @@ export function setupIssuesCommands(program: Command): void {
         async (...args: unknown[]) => {
           const [issue, , command] = args as [string, unknown, Command];
           const ctx = await createContext(command.parent!.parent!.opts());
-          const result = await getIssue(ctx.gql, issue);
-          outputSuccess(result);
+
+          if (isUuid(issue)) {
+            const result = await getIssue(ctx.gql, issue);
+            outputSuccess(result);
+          } else {
+            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+            const result = await getIssueByIdentifier(ctx.gql, teamKey, issueNumber);
+            outputSuccess(result);
+          }
         },
       ),
     );
@@ -354,6 +363,13 @@ export function setupIssuesCommands(program: Command): void {
           // Resolve issue ID to UUID
           const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
 
+          // Fetch issue context once if needed for resolution
+          const needsContext = options.status || options.projectMilestone ||
+            options.cycle || (options.labels && options.labelMode === "add");
+          const issueContext = needsContext
+            ? await getIssue(ctx.gql, resolvedIssueId)
+            : undefined;
+
           // Build update input
           const input: IssueUpdateInput = {};
 
@@ -366,9 +382,8 @@ export function setupIssuesCommands(program: Command): void {
           }
 
           if (options.status) {
-            // Get the issue to find its team for status resolution
-            const issue = await getIssue(ctx.gql, resolvedIssueId);
-            const teamId = "team" in issue && issue.team ? issue.team.id : undefined;
+            const teamId = issueContext && "team" in issueContext && issueContext.team
+              ? issueContext.team.id : undefined;
             input.stateId = await resolveStatusId(ctx.sdk, options.status, teamId);
           }
 
@@ -393,10 +408,8 @@ export function setupIssuesCommands(program: Command): void {
 
             // Handle label mode
             if (options.labelMode === "add") {
-              // Get current labels and merge
-              const issue = await getIssue(ctx.gql, resolvedIssueId);
-              const currentLabels = "labels" in issue && issue.labels?.nodes
-                ? issue.labels.nodes.map((l) => l.id)
+              const currentLabels = issueContext && "labels" in issueContext && issueContext.labels?.nodes
+                ? issueContext.labels.nodes.map((l) => l.id)
                 : [];
               input.labelIds = [...new Set([...currentLabels, ...labelIds])];
             } else {
@@ -416,10 +429,8 @@ export function setupIssuesCommands(program: Command): void {
           if (options.clearProjectMilestone) {
             input.projectMilestoneId = null;
           } else if (options.projectMilestone) {
-            // Get project context if possible
-            const issue = await getIssue(ctx.gql, resolvedIssueId);
-            const projectName = "project" in issue && issue.project?.name
-              ? issue.project.name
+            const projectName = issueContext && "project" in issueContext && issueContext.project?.name
+              ? issueContext.project.name
               : undefined;
             input.projectMilestoneId = await resolveMilestoneId(
               ctx.gql,
@@ -433,10 +444,8 @@ export function setupIssuesCommands(program: Command): void {
           if (options.clearCycle) {
             input.cycleId = null;
           } else if (options.cycle) {
-            // Get team context if possible
-            const issue = await getIssue(ctx.gql, resolvedIssueId);
-            const teamKey = "team" in issue && issue.team?.key
-              ? issue.team.key
+            const teamKey = issueContext && "team" in issueContext && issueContext.team?.key
+              ? issueContext.team.key
               : undefined;
             input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
           }

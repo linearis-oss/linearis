@@ -67,9 +67,14 @@ describe("GraphQLClient", () => {
       const client = new GraphQLClient("good-token");
       const fakeDoc = { kind: "Document", definitions: [] } as Parameters<typeof client.request>[0];
 
-      const promise = client.request(fakeDoc);
-      await expect(promise).rejects.toThrow("Entity not found");
-      await expect(promise).rejects.not.toBeInstanceOf(AuthenticationError);
+      try {
+        await client.request(fakeDoc);
+        expect.fail("Should have thrown");
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toBeInstanceOf(AuthenticationError);
+        expect((error as Error).message).toBe("Entity not found");
+      }
     });
   });
 });

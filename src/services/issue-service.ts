@@ -7,7 +7,6 @@ import type {
   CreatedIssue,
   UpdatedIssue,
 } from "../common/types.js";
-import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 import {
   GetIssuesDocument,
   type GetIssuesQuery,
@@ -39,25 +38,28 @@ export async function listIssues(
 export async function getIssue(
   client: GraphQLClient,
   id: string,
-): Promise<IssueDetail | IssueByIdentifier> {
-  if (isUuid(id)) {
-    const result = await client.request<GetIssueByIdQuery>(
-      GetIssueByIdDocument,
-      { id },
-    );
-    if (!result.issue) {
-      throw new Error(`Issue with ID "${id}" not found`);
-    }
-    return result.issue;
+): Promise<IssueDetail> {
+  const result = await client.request<GetIssueByIdQuery>(
+    GetIssueByIdDocument,
+    { id },
+  );
+  if (!result.issue) {
+    throw new Error(`Issue with ID "${id}" not found`);
   }
+  return result.issue;
+}
 
-  const { teamKey, issueNumber } = parseIssueIdentifier(id);
+export async function getIssueByIdentifier(
+  client: GraphQLClient,
+  teamKey: string,
+  issueNumber: number,
+): Promise<IssueByIdentifier> {
   const result = await client.request<GetIssueByIdentifierQuery>(
     GetIssueByIdentifierDocument,
     { teamKey, number: issueNumber },
   );
   if (!result.issues.nodes.length) {
-    throw new Error(`Issue with identifier "${id}" not found`);
+    throw new Error(`Issue with identifier "${teamKey}-${issueNumber}" not found`);
   }
   return result.issues.nodes[0];
 }

@@ -7,6 +7,12 @@ import { resolveApiToken, type CommandOptions, type TokenSource } from "../commo
 import { saveToken, getStoredToken, clearToken } from "../common/token-storage.js";
 import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
 
+// ARCHITECTURAL EXCEPTION: The auth command intentionally deviates from
+// standard command patterns (no handleCommand wrapper, direct GraphQLClient
+// construction) because it bootstraps authentication before a context can
+// exist. The login flow is interactive (writes to stderr, reads from stdin),
+// which is fundamentally different from data commands that output JSON.
+
 const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security/api-keys/new";
 
 export const AUTH_META: DomainMeta = {
@@ -221,8 +227,15 @@ export function setupAuthCommands(program: Command): void {
     .command("logout")
     .description("remove stored authentication token")
     .action(async () => {
-      clearToken();
-      console.error("Authentication token removed.");
+      try {
+        clearToken();
+        console.error("Authentication token removed.");
+      } catch (error) {
+        console.error(
+          `Failed to remove token: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        process.exit(1);
+      }
     });
 
   auth
