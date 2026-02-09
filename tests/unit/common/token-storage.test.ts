@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs and os modules
 vi.mock("node:fs");
@@ -9,16 +9,18 @@ vi.mock("node:os");
 // Mock encryption module
 vi.mock("../../../src/common/encryption.js", () => ({
   encryptToken: vi.fn((token: string) => `encrypted:${token}`),
-  decryptToken: vi.fn((encrypted: string) => encrypted.replace("encrypted:", "")),
+  decryptToken: vi.fn((encrypted: string) =>
+    encrypted.replace("encrypted:", ""),
+  ),
 }));
 
 import { decryptToken } from "../../../src/common/encryption.js";
 import {
-  ensureTokenDir,
-  saveToken,
-  getStoredToken,
   clearToken,
+  ensureTokenDir,
+  getStoredToken,
   getTokenDir,
+  saveToken,
 } from "../../../src/common/token-storage.js";
 
 beforeEach(() => {
@@ -46,10 +48,10 @@ describe("ensureTokenDir", () => {
 
     ensureTokenDir();
 
-    expect(fs.mkdirSync).toHaveBeenCalledWith(
-      "/home/testuser/.linearis",
-      { recursive: true, mode: 0o700 }
-    );
+    expect(fs.mkdirSync).toHaveBeenCalledWith("/home/testuser/.linearis", {
+      recursive: true,
+      mode: 0o700,
+    });
   });
 
   it("fixes permissions if directory exists", () => {
@@ -61,7 +63,7 @@ describe("ensureTokenDir", () => {
     expect(fs.mkdirSync).not.toHaveBeenCalled();
     expect(fs.chmodSync).toHaveBeenCalledWith(
       "/home/testuser/.linearis",
-      0o700
+      0o700,
     );
   });
 });
@@ -80,7 +82,7 @@ describe("saveToken", () => {
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       "/home/testuser/.linearis/token",
       "encrypted:my-api-token",
-      "utf8"
+      "utf8",
     );
   });
 
@@ -89,7 +91,7 @@ describe("saveToken", () => {
 
     expect(fs.chmodSync).toHaveBeenCalledWith(
       "/home/testuser/.linearis/token",
-      0o600
+      0o600,
     );
   });
 });
@@ -138,7 +140,7 @@ describe("clearToken", () => {
     clearToken();
 
     expect(fs.unlinkSync).toHaveBeenCalledWith(
-      "/home/testuser/.linearis/token"
+      "/home/testuser/.linearis/token",
     );
   });
 

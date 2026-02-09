@@ -1,7 +1,7 @@
 // tests/unit/resolvers/issue-resolver.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
+import { describe, expect, it, vi } from "vitest";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
 
 function mockSdkClient(nodes: Array<{ id: string }>) {
   return {
@@ -14,7 +14,10 @@ function mockSdkClient(nodes: Array<{ id: string }>) {
 describe("resolveIssueId", () => {
   it("returns UUID as-is", async () => {
     const client = mockSdkClient([]);
-    const result = await resolveIssueId(client, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await resolveIssueId(
+      client,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 
@@ -26,6 +29,8 @@ describe("resolveIssueId", () => {
 
   it("throws when issue not found", async () => {
     const client = mockSdkClient([]);
-    await expect(resolveIssueId(client, "ENG-999")).rejects.toThrow('Issue "ENG-999" not found');
+    await expect(resolveIssueId(client, "ENG-999")).rejects.toThrow(
+      'Issue "ENG-999" not found',
+    );
   });
 });

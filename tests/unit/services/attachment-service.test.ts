@@ -1,14 +1,16 @@
 // tests/unit/services/attachment-service.test.ts
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   createAttachment,
   deleteAttachment,
   listAttachments,
 } from "../../../src/services/attachment-service.js";
-import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 
 function mockGqlClient(response: Record<string, unknown>) {
-  return { request: vi.fn().mockResolvedValue(response) } as unknown as GraphQLClient;
+  return {
+    request: vi.fn().mockResolvedValue(response),
+  } as unknown as GraphQLClient;
 }
 
 describe("createAttachment", () => {
@@ -16,7 +18,11 @@ describe("createAttachment", () => {
     const client = mockGqlClient({
       attachmentCreate: {
         success: true,
-        attachment: { id: "att-1", title: "Test.pdf", url: "https://example.com/test.pdf" },
+        attachment: {
+          id: "att-1",
+          title: "Test.pdf",
+          url: "https://example.com/test.pdf",
+        },
       },
     });
     const result = await createAttachment(client, {
@@ -50,7 +56,9 @@ describe("deleteAttachment", () => {
 
   it("throws when delete fails", async () => {
     const client = mockGqlClient({ attachmentDelete: { success: false } });
-    await expect(deleteAttachment(client, "att-1")).rejects.toThrow("Failed to delete attachment");
+    await expect(deleteAttachment(client, "att-1")).rejects.toThrow(
+      "Failed to delete attachment",
+    );
   });
 });
 
@@ -80,6 +88,8 @@ describe("listAttachments", () => {
 
   it("throws when issue not found", async () => {
     const client = mockGqlClient({ issue: null });
-    await expect(listAttachments(client, "missing")).rejects.toThrow("not found");
+    await expect(listAttachments(client, "missing")).rejects.toThrow(
+      "not found",
+    );
   });
 });

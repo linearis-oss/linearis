@@ -1,7 +1,12 @@
 // tests/unit/services/issue-service.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { listIssues, getIssue, getIssueByIdentifier, searchIssues } from "../../../src/services/issue-service.js";
+import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import {
+  getIssue,
+  getIssueByIdentifier,
+  listIssues,
+  searchIssues,
+} from "../../../src/services/issue-service.js";
 
 function mockGqlClient(response: Record<string, unknown>) {
   return {
@@ -31,13 +36,18 @@ describe("getIssue", () => {
     const client = mockGqlClient({
       issue: { id: "550e8400-e29b-41d4-a716-446655440000", title: "Found" },
     });
-    const result = await getIssue(client, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await getIssue(
+      client,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result.id).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 
   it("throws when issue not found by UUID", async () => {
     const client = mockGqlClient({ issue: null });
-    await expect(getIssue(client, "550e8400-e29b-41d4-a716-446655440000")).rejects.toThrow("not found");
+    await expect(
+      getIssue(client, "550e8400-e29b-41d4-a716-446655440000"),
+    ).rejects.toThrow("not found");
   });
 });
 
@@ -52,7 +62,9 @@ describe("getIssueByIdentifier", () => {
 
   it("throws when issue not found by identifier", async () => {
     const client = mockGqlClient({ issues: { nodes: [] } });
-    await expect(getIssueByIdentifier(client, "ENG", 999)).rejects.toThrow("not found");
+    await expect(getIssueByIdentifier(client, "ENG", 999)).rejects.toThrow(
+      "not found",
+    );
   });
 });
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Command } from "commander";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock all external dependencies before importing the module under test
 vi.mock("node:child_process", () => ({
@@ -27,16 +27,21 @@ vi.mock("../../../src/common/context.js", () => ({
 }));
 
 vi.mock("../../../src/common/auth.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../src/common/auth.js")>();
+  const actual =
+    await importOriginal<typeof import("../../../src/common/auth.js")>();
   return { ...actual, resolveApiToken: vi.fn() };
 });
 
 import { setupAuthCommands } from "../../../src/commands/auth.js";
-import { saveToken, clearToken } from "../../../src/common/token-storage.js";
-import { validateToken } from "../../../src/services/auth-service.js";
 import { resolveApiToken } from "../../../src/common/auth.js";
+import { clearToken, saveToken } from "../../../src/common/token-storage.js";
+import { validateToken } from "../../../src/services/auth-service.js";
 
-const mockViewer = { id: "user-1", name: "Test User", email: "test@example.com" };
+const mockViewer = {
+  id: "user-1",
+  name: "Test User",
+  email: "test@example.com",
+};
 
 function createProgram(): Command {
   const program = new Command();
@@ -52,17 +57,25 @@ describe("auth login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Prevent process.exit from actually exiting
-    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
     stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     // Default: no token found, stdin is not a TTY
     vi.mocked(resolveApiToken).mockImplementation(() => {
       throw new Error("No API token found");
     });
-    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
   });
 
   it("skips login when valid token already exists", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "existing-token", source: "stored" });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "existing-token",
+      source: "stored",
+    });
     vi.mocked(validateToken).mockResolvedValue(mockViewer);
 
     const program = createProgram();
@@ -75,7 +88,10 @@ describe("auth login", () => {
   });
 
   it("skips login when valid token exists via env var", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "env-token", source: "env" });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "env-token",
+      source: "env",
+    });
     vi.mocked(validateToken).mockResolvedValue(mockViewer);
 
     const program = createProgram();
@@ -88,7 +104,10 @@ describe("auth login", () => {
   });
 
   it("proceeds with login when existing token is invalid", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "bad-token", source: "stored" });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "bad-token",
+      source: "stored",
+    });
     vi.mocked(validateToken)
       .mockRejectedValueOnce(new Error("Authentication failed"))
       .mockResolvedValueOnce(mockViewer);
@@ -103,7 +122,10 @@ describe("auth login", () => {
   });
 
   it("bypasses existing token check with --force", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "existing-token", source: "stored" });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "existing-token",
+      source: "stored",
+    });
     vi.mocked(validateToken).mockResolvedValue(mockViewer);
 
     const program = createProgram();
@@ -153,7 +175,10 @@ describe("auth status", () => {
   });
 
   it("reports authenticated with user info when token is valid", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "valid-token", source: "stored" });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "valid-token",
+      source: "stored",
+    });
     vi.mocked(validateToken).mockResolvedValue(mockViewer);
 
     const program = createProgram();
@@ -183,8 +208,13 @@ describe("auth status", () => {
   });
 
   it("reports unauthenticated when token is invalid", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "bad-token", source: "env" });
-    vi.mocked(validateToken).mockRejectedValue(new Error("Authentication failed"));
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "bad-token",
+      source: "env",
+    });
+    vi.mocked(validateToken).mockRejectedValue(
+      new Error("Authentication failed"),
+    );
 
     const program = createProgram();
     await program.parseAsync(["node", "test", "auth", "status"]);
@@ -193,7 +223,8 @@ describe("auth status", () => {
     expect(output).toEqual({
       authenticated: false,
       source: "LINEAR_API_TOKEN env var",
-      message: "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
+      message:
+        "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
     });
   });
 
@@ -246,7 +277,10 @@ describe("auth logout", () => {
   });
 
   it("warns when token is still active via env var after logout", async () => {
-    vi.mocked(resolveApiToken).mockReturnValue({ token: "env-token", source: "env" });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "env-token",
+      source: "env",
+    });
 
     const program = createProgram();
     await program.parseAsync(["node", "test", "auth", "logout"]);

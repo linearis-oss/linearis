@@ -1,14 +1,14 @@
 // tests/unit/resolvers/milestone-resolver.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { resolveMilestoneId } from "../../../src/resolvers/milestone-resolver.js";
+import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { resolveMilestoneId } from "../../../src/resolvers/milestone-resolver.js";
 
-function mockGqlClient(
-  ...responses: Array<Record<string, unknown>>
-) {
+function mockGqlClient(...responses: Array<Record<string, unknown>>) {
   const request = vi.fn();
-  responses.forEach((r) => request.mockResolvedValueOnce(r));
+  for (const r of responses) {
+    request.mockResolvedValueOnce(r);
+  }
   return { request } as unknown as GraphQLClient;
 }
 
@@ -24,7 +24,11 @@ describe("resolveMilestoneId", () => {
   it("returns UUID as-is", async () => {
     const gql = mockGqlClient();
     const sdk = mockSdkClient();
-    const result = await resolveMilestoneId(gql, sdk, "550e8400-e29b-41d4-a716-446655440000");
+    const result = await resolveMilestoneId(
+      gql,
+      sdk,
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 
