@@ -67,6 +67,26 @@ fragment CompleteIssueFields on Issue {
       title
     }
   }
+  relations {
+    nodes {
+      id
+      type
+      relatedIssue {
+        id
+        identifier
+      }
+    }
+  }
+  inverseRelations {
+    nodes {
+      id
+      type
+      issue {
+        id
+        identifier
+      }
+    }
+  }
 }
 
 # Complete issue fragment with all relationships and comments
@@ -142,6 +162,26 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
       id
       identifier
       title
+    }
+  }
+  relations {
+    nodes {
+      id
+      type
+      relatedIssue {
+        id
+        identifier
+      }
+    }
+  }
+  inverseRelations {
+    nodes {
+      id
+      type
+      issue {
+        id
+        identifier
+      }
     }
   }
 }
