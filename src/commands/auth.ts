@@ -183,7 +183,7 @@ export function setupAuthCommands(program: Command): void {
     .command("status")
     .description("check current authentication status")
     .action(handleCommand(async (...args: unknown[]) => {
-      const [, command] = args as [unknown, Command];
+      const [, command] = args as [CommandOptions, Command];
       const rootOpts = command.parent!.parent!.opts() as CommandOptions;
 
       const sourceLabels: Record<TokenSource, string> = {
