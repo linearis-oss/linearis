@@ -90,6 +90,14 @@ describe("findIssueRelation", () => {
     expect(result).toBe("rel-2");
   });
 
+  it("throws when issue is not found", async () => {
+    const client = mockGqlClient({ issue: null });
+
+    await expect(
+      findIssueRelation(client, "non-existent-id", "target-id"),
+    ).rejects.toThrow("not found");
+  });
+
   it("throws when no relation found", async () => {
     const client = mockGqlClient({
       issue: {
