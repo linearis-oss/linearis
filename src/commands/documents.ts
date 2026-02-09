@@ -152,7 +152,7 @@ export function setupDocumentsCommands(program: Command): void {
           }
 
           const rootOpts = command.parent!.parent!.opts();
-          const ctx = await createContext(rootOpts);
+          const ctx = createContext(rootOpts);
 
           // Validate limit option
           const limit = parseInt(options.limit || "50", 10);
@@ -218,7 +218,7 @@ export function setupDocumentsCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [document, , command] = args as [string, unknown, Command];
         const rootOpts = command.parent!.parent!.opts();
-        const ctx = await createContext(rootOpts);
+        const ctx = createContext(rootOpts);
 
         const documentResult = await getDocument(ctx.gql, document);
         outputSuccess(documentResult);
@@ -248,7 +248,7 @@ export function setupDocumentsCommands(program: Command): void {
         async (...args: unknown[]) => {
           const [options, command] = args as [DocumentCreateOptions, Command];
           const rootOpts = command.parent!.parent!.opts();
-          const ctx = await createContext(rootOpts);
+          const ctx = createContext(rootOpts);
 
           // Resolve project ID if provided
           let projectId: string | undefined;
@@ -321,7 +321,7 @@ export function setupDocumentsCommands(program: Command): void {
             Command,
           ];
           const rootOpts = command.parent!.parent!.opts();
-          const ctx = await createContext(rootOpts);
+          const ctx = createContext(rootOpts);
 
           // Build input with only provided fields
           const input: DocumentUpdateInput = {};
@@ -362,7 +362,7 @@ export function setupDocumentsCommands(program: Command): void {
         async (...args: unknown[]) => {
           const [document, , command] = args as [string, unknown, Command];
           const rootOpts = command.parent!.parent!.opts();
-          const ctx = await createContext(rootOpts);
+          const ctx = createContext(rootOpts);
 
           await deleteDocument(ctx.gql, document);
           outputSuccess({ success: true, message: "Document moved to trash" });

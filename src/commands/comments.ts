@@ -60,7 +60,7 @@ export function setupCommentsCommands(program: Command): void {
       handleCommand(
         async (...args: unknown[]) => {
           const [issue, options, command] = args as [string, CreateCommentOptions, Command];
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           // Validate required body flag
           if (!options.body) {

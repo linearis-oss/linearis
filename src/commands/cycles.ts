@@ -56,7 +56,7 @@ export function setupCyclesCommands(program: Command): void {
             throw requiresParameterError("--window", "--team");
           }
 
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           // Resolve team filter if provided
           const teamId = options.team
@@ -109,7 +109,7 @@ export function setupCyclesCommands(program: Command): void {
       handleCommand(
         async (...args: unknown[]) => {
           const [cycle, options, command] = args as [string, CycleReadOptions, Command];
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           const cycleId = await resolveCycleId(
             ctx.sdk,

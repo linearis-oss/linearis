@@ -71,7 +71,7 @@ export function setupMilestonesCommands(program: Command): void {
       handleCommand(
         async (...args: unknown[]) => {
           const [options, command] = args as [MilestoneListOptions, Command];
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           // Resolve project ID
           const projectId = await resolveProjectId(ctx.sdk, options.project);
@@ -101,7 +101,7 @@ export function setupMilestonesCommands(program: Command): void {
             MilestoneReadOptions,
             Command
           ];
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           const milestoneId = await resolveMilestoneId(
             ctx.gql,
@@ -136,7 +136,7 @@ export function setupMilestonesCommands(program: Command): void {
             MilestoneCreateOptions,
             Command
           ];
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           // Resolve project ID
           const projectId = await resolveProjectId(ctx.sdk, options.project);
@@ -173,7 +173,7 @@ export function setupMilestonesCommands(program: Command): void {
             MilestoneUpdateOptions,
             Command
           ];
-          const ctx = await createContext(command.parent!.parent!.opts());
+          const ctx = createContext(command.parent!.parent!.opts());
 
           const milestoneId = await resolveMilestoneId(
             ctx.gql,
