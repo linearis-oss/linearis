@@ -241,9 +241,28 @@ export function setupAuthCommands(program: Command): void {
   auth
     .command("logout")
     .description("remove stored authentication token")
-    .action(handleCommand(async () => {
+    .action(handleCommand(async (...args: unknown[]) => {
+      const [, command] = args as [CommandOptions, Command];
+      const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+
       clearToken();
-      outputSuccess({ message: "Authentication token removed." });
+
+      // Warn if a token is still active from another source
+      try {
+        const { source } = resolveApiToken(rootOpts);
+        const sourceLabels: Record<TokenSource, string> = {
+          flag: "--api-token flag",
+          env: "LINEAR_API_TOKEN env var",
+          stored: "~/.linearis/token",
+          legacy: "~/.linear_api_token (deprecated)",
+        };
+        outputSuccess({
+          message: "Authentication token removed.",
+          warning: `A token is still active via ${sourceLabels[source]}.`,
+        });
+      } catch {
+        outputSuccess({ message: "Authentication token removed." });
+      }
     }));
 
   auth

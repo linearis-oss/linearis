@@ -233,11 +233,29 @@ describe("auth logout", () => {
   });
 
   it("clears token and outputs success message", async () => {
+    vi.mocked(resolveApiToken).mockImplementation(() => {
+      throw new Error("No API token found");
+    });
+
     const program = createProgram();
     await program.parseAsync(["node", "test", "auth", "logout"]);
 
     expect(clearToken).toHaveBeenCalled();
     const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
     expect(output).toEqual({ message: "Authentication token removed." });
+  });
+
+  it("warns when token is still active via env var after logout", async () => {
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "env-token", source: "env" });
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "logout"]);
+
+    expect(clearToken).toHaveBeenCalled();
+    const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(output).toEqual({
+      message: "Authentication token removed.",
+      warning: "A token is still active via LINEAR_API_TOKEN env var.",
+    });
   });
 });
