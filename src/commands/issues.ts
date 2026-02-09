@@ -101,6 +101,19 @@ interface RelationFlags {
   removeRelation?: string;
 }
 
+function validateRelationFlags(flags: RelationFlags): void {
+  const active = [
+    flags.blocks,
+    flags.blockedBy,
+    flags.relatesTo,
+    flags.duplicateOf,
+    flags.removeRelation,
+  ].filter(Boolean);
+  if (active.length > 1) {
+    throw new Error("Only one relation flag can be used at a time");
+  }
+}
+
 async function resolveRelationTarget(
   ctx: CommandContext,
   flags: RelationFlags,
@@ -276,16 +289,7 @@ export function setupIssuesCommands(program: Command): void {
         ];
         const ctx = createContext(command.parent!.parent!.opts());
 
-        // Validate mutually exclusive relation flags
-        const relationFlags = [
-          options.blocks,
-          options.blockedBy,
-          options.relatesTo,
-          options.duplicateOf,
-        ].filter(Boolean);
-        if (relationFlags.length > 1) {
-          throw new Error("Only one relation flag can be used at a time");
-        }
+        validateRelationFlags(options);
 
         // Resolve team ID (required)
         if (!options.team) {
@@ -447,17 +451,7 @@ export function setupIssuesCommands(program: Command): void {
           throw new Error("--label-mode must be either 'add' or 'overwrite'");
         }
 
-        // Validate mutually exclusive relation flags
-        const relationFlags = [
-          options.blocks,
-          options.blockedBy,
-          options.relatesTo,
-          options.duplicateOf,
-          options.removeRelation,
-        ].filter(Boolean);
-        if (relationFlags.length > 1) {
-          throw new Error("Only one relation flag can be used at a time");
-        }
+        validateRelationFlags(options);
 
         const ctx = createContext(command.parent!.parent!.opts());
 
