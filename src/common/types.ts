@@ -1,6 +1,7 @@
 import type {
   AttachmentCreateMutation,
   CreateIssueMutation,
+  CreateIssueRelationMutation,
   CreateProjectMilestoneMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
@@ -29,6 +30,10 @@ export type CreatedIssue = NonNullable<
 export type UpdatedIssue = NonNullable<
   UpdateIssueMutation["issueUpdate"]["issue"]
 >;
+
+// Issue relation types
+export type CreatedIssueRelation =
+  CreateIssueRelationMutation["issueRelationCreate"]["issueRelation"];
 
 // Document types
 export type Document = NonNullable<GetDocumentQuery["document"]>;

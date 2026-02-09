@@ -44,7 +44,8 @@ an issue belongs to exactly one team. it has a status (e.g. backlog,
 todo, in progress, done — configurable per team), a priority (1-4),
 and can be assigned to a user. issues can have labels, belong to a
 project, be part of a cycle (sprint), and reference a project milestone.
-parent-child relationships between issues are supported.
+parent-child relationships and issue relations (blocks, blocked-by,
+relates-to, duplicate-of) are supported.
 
 commands:
   list [options]  list issues with optional filters
@@ -71,6 +72,10 @@ create options:
   --cycle <cycle>           add to cycle (requires --team)
   --status <status>         set status
   --parent-ticket <issue>   set parent issue
+  --blocks <issue>          this issue blocks <issue>
+  --blocked-by <issue>      this issue is blocked by <issue>
+  --relates-to <issue>      this issue relates to <issue>
+  --duplicate-of <issue>    this issue duplicates <issue>
 
 update options:
   --title <text>             new title
@@ -88,6 +93,11 @@ update options:
   --clear-project-milestone  clear project milestone
   --cycle <cycle>            set cycle
   --clear-cycle              clear cycle
+  --blocks <issue>           add blocks relation
+  --blocked-by <issue>       add blocked-by relation
+  --relates-to <issue>       add relates-to relation
+  --duplicate-of <issue>     add duplicate relation
+  --remove-relation <issue>  remove relation with <issue>
 
 see also: comments create <issue>, documents list --issue <issue>
 
