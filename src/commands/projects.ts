@@ -4,22 +4,6 @@ import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listProjects } from "../services/project-service.js";
 
-/**
- * Setup projects commands on the program
- *
- * Registers `projects` command group for Linear project management.
- * Provides listing functionality with comprehensive project information
- * including teams, progress, and leadership details.
- *
- * @param program - Commander.js program instance to register commands on
- *
- * @example
- * ```typescript
- * // In main.ts
- * setupProjectsCommands(program);
- * // Enables: linearis projects list [--limit <number>]
- * ```
- */
 export const PROJECTS_META: DomainMeta = {
   name: "projects",
   summary: "groups of issues toward a goal",
@@ -36,19 +20,8 @@ export function setupProjectsCommands(program: Command): void {
     .command("projects")
     .description("Project operations");
 
-  // Show projects help when no subcommand
-  projects.action(() => {
-    projects.help();
-  });
+  projects.action(() => projects.help());
 
-  /**
-   * List projects
-   *
-   * Command: `linearis projects list [--limit <number>]`
-   *
-   * Lists all projects with their teams, leads, and progress information.
-   * Note: Linear SDK doesn't implement pagination, so all projects are shown.
-   */
   projects
     .command("list")
     .description("list projects")

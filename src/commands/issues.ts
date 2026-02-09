@@ -163,38 +163,11 @@ async function applyRelation(
   }
 }
 
-/**
- * Setup issues commands on the program
- *
- * Registers the `issues` command group with comprehensive issue management
- * operations including create, read, list, search, and update functionality.
- * Uses optimized GraphQL queries for efficient data retrieval.
- *
- * @param program - Commander.js program instance to register commands on
- *
- * @example
- * ```typescript
- * // In main.ts
- * setupIssuesCommands(program);
- * // Enables: linearis issues list|read|search|create|update ...
- * ```
- */
 export function setupIssuesCommands(program: Command): void {
   const issues = program.command("issues").description("Issue operations");
 
-  // Show issues help when no subcommand
-  issues.action(() => {
-    issues.help();
-  });
+  issues.action(() => issues.help());
 
-  /**
-   * List issues
-   *
-   * Command: `linearis issues list [--limit <number>]`
-   *
-   * Lists issues with all relationships in a single optimized GraphQL query.
-   * Includes comments, assignees, projects, labels, and state information.
-   */
   issues
     .command("list")
     .description("list issues with optional filters")
@@ -219,14 +192,6 @@ export function setupIssuesCommands(program: Command): void {
       }),
     );
 
-  /**
-   * Get issue details
-   *
-   * Command: `linearis issues read <issue>`
-   *
-   * Retrieves complete issue details including all relationships and comments
-   * in a single optimized GraphQL query. Supports both UUID and TEAM-123 formats.
-   */
   issues
     .command("read <issue>")
     .description("get full issue details including description")
@@ -254,15 +219,6 @@ export function setupIssuesCommands(program: Command): void {
       }),
     );
 
-  /**
-   * Create new issue
-   *
-   * Command: `linearis issues create <title> [options]`
-   *
-   * Creates a new issue with optional description, assignee, priority,
-   * project, labels, and milestone. Uses smart ID resolution for all
-   * entity references (teams, projects, labels, etc.).
-   */
   issues
     .command("create <title>")
     .description("create new issue")
@@ -291,19 +247,16 @@ export function setupIssuesCommands(program: Command): void {
 
         validateRelationFlags(options);
 
-        // Resolve team ID (required)
         if (!options.team) {
           throw new Error("--team is required");
         }
         const teamId = await resolveTeamId(ctx.sdk, options.team);
 
-        // Build input object
         const input: IssueCreateInput = {
           title,
           teamId,
         };
 
-        // Resolve optional IDs
         if (options.description) {
           input.description = options.description;
         }
@@ -359,7 +312,6 @@ export function setupIssuesCommands(program: Command): void {
           input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
         }
 
-        // Resolve relation target before issue creation to fail fast
         const relationTargetId = await resolveRelationTarget(ctx, options);
 
         const result = await createIssue(ctx.gql, input);
@@ -372,15 +324,6 @@ export function setupIssuesCommands(program: Command): void {
       }),
     );
 
-  /**
-   * Update an issue
-   *
-   * Command: `linearis issues update <issue> [options]`
-   *
-   * Updates issue properties including title, description, state, priority,
-   * assignee, project, labels, and parent relationship. Supports both
-   * label adding and overwriting modes.
-   */
   issues
     .command("update <issue>")
     .description("update an existing issue")
@@ -415,7 +358,6 @@ export function setupIssuesCommands(program: Command): void {
           UpdateOptions,
           Command,
         ];
-        // Validate mutually exclusive flags
         if (options.parentTicket && options.clearParentTicket) {
           throw new Error(
             "Cannot use --parent-ticket and --clear-parent-ticket together",
@@ -455,10 +397,8 @@ export function setupIssuesCommands(program: Command): void {
 
         const ctx = createContext(command.parent!.parent!.opts());
 
-        // Resolve issue ID to UUID
         const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
 
-        // Fetch issue context once if needed for resolution
         const needsContext =
           options.status ||
           options.projectMilestone ||
@@ -468,7 +408,6 @@ export function setupIssuesCommands(program: Command): void {
           ? await getIssue(ctx.gql, resolvedIssueId)
           : undefined;
 
-        // Build update input
         const input: IssueUpdateInput = {};
 
         if (options.title) {
@@ -503,14 +442,12 @@ export function setupIssuesCommands(program: Command): void {
           input.projectId = await resolveProjectId(ctx.sdk, options.project);
         }
 
-        // Handle labels
         if (options.clearLabels) {
           input.labelIds = [];
         } else if (options.labels) {
           const labelNames = options.labels.split(",").map((l) => l.trim());
           const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
 
-          // Handle label mode
           if (options.labelMode === "add") {
             const currentLabels =
               issueContext &&
@@ -520,19 +457,16 @@ export function setupIssuesCommands(program: Command): void {
                 : [];
             input.labelIds = [...new Set([...currentLabels, ...labelIds])];
           } else {
-            // Overwriting mode (default)
             input.labelIds = labelIds;
           }
         }
 
-        // Handle parent
         if (options.clearParentTicket) {
           input.parentId = null;
         } else if (options.parentTicket) {
           input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
         }
 
-        // Handle milestone
         if (options.clearProjectMilestone) {
           input.projectMilestoneId = null;
         } else if (options.projectMilestone) {
@@ -550,7 +484,6 @@ export function setupIssuesCommands(program: Command): void {
           );
         }
 
-        // Handle cycle
         if (options.clearCycle) {
           input.cycleId = null;
         } else if (options.cycle) {
@@ -561,7 +494,6 @@ export function setupIssuesCommands(program: Command): void {
           input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
         }
 
-        // Resolve relation target before update to fail fast
         const relationTargetId = await resolveRelationTarget(ctx, options);
 
         const result = await updateIssue(ctx.gql, resolvedIssueId, input);
