@@ -15,7 +15,11 @@ import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveStatusId } from "../resolvers/status-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
-import { createIssueRelation } from "../services/issue-relation-service.js";
+import {
+  createIssueRelation,
+  deleteIssueRelation,
+  findIssueRelation,
+} from "../services/issue-relation-service.js";
 import {
   createIssue,
   getIssue,
@@ -63,6 +67,11 @@ interface UpdateOptions {
   clearProjectMilestone?: boolean;
   cycle?: string;
   clearCycle?: boolean;
+  blocks?: string;
+  blockedBy?: string;
+  relatesTo?: string;
+  duplicateOf?: string;
+  removeRelation?: string;
 }
 
 export const ISSUES_META: DomainMeta = {
@@ -355,6 +364,11 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
+    .option("--blocks <issue>", "add blocks relation")
+    .option("--blocked-by <issue>", "add blocked-by relation")
+    .option("--relates-to <issue>", "add relates-to relation")
+    .option("--duplicate-of <issue>", "add duplicate relation")
+    .option("--remove-relation <issue>", "remove relation with <issue>")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, options, command] = args as [
@@ -396,6 +410,18 @@ export function setupIssuesCommands(program: Command): void {
           !["add", "overwrite"].includes(options.labelMode)
         ) {
           throw new Error("--label-mode must be either 'add' or 'overwrite'");
+        }
+
+        // Validate mutually exclusive relation flags
+        const relationFlags = [
+          options.blocks,
+          options.blockedBy,
+          options.relatesTo,
+          options.duplicateOf,
+          options.removeRelation,
+        ].filter(Boolean);
+        if (relationFlags.length > 1) {
+          throw new Error("Only one relation flag can be used at a time");
         }
 
         const ctx = createContext(command.parent!.parent!.opts());
@@ -507,6 +533,49 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         const result = await updateIssue(ctx.gql, resolvedIssueId, input);
+
+        // Handle relation flags
+        if (options.blocks) {
+          const targetId = await resolveIssueId(ctx.sdk, options.blocks);
+          await createIssueRelation(ctx.gql, {
+            issueId: resolvedIssueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Blocks,
+          });
+        } else if (options.blockedBy) {
+          const targetId = await resolveIssueId(ctx.sdk, options.blockedBy);
+          await createIssueRelation(ctx.gql, {
+            issueId: targetId,
+            relatedIssueId: resolvedIssueId,
+            type: IssueRelationType.Blocks,
+          });
+        } else if (options.relatesTo) {
+          const targetId = await resolveIssueId(ctx.sdk, options.relatesTo);
+          await createIssueRelation(ctx.gql, {
+            issueId: resolvedIssueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Related,
+          });
+        } else if (options.duplicateOf) {
+          const targetId = await resolveIssueId(ctx.sdk, options.duplicateOf);
+          await createIssueRelation(ctx.gql, {
+            issueId: resolvedIssueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Duplicate,
+          });
+        } else if (options.removeRelation) {
+          const targetId = await resolveIssueId(
+            ctx.sdk,
+            options.removeRelation,
+          );
+          const relationId = await findIssueRelation(
+            ctx.gql,
+            resolvedIssueId,
+            targetId,
+          );
+          await deleteIssueRelation(ctx.gql, relationId);
+        }
+
         outputSuccess(result);
       }),
     );
