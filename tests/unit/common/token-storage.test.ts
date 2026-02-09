@@ -12,6 +12,7 @@ vi.mock("../../../src/common/encryption.js", () => ({
   decryptToken: vi.fn((encrypted: string) => encrypted.replace("encrypted:", "")),
 }));
 
+import { decryptToken } from "../../../src/common/encryption.js";
 import {
   ensureTokenDir,
   saveToken,
@@ -113,12 +114,10 @@ describe("getStoredToken", () => {
     expect(token).toBeNull();
   });
 
-  it("returns null when token file is corrupted", async () => {
+  it("returns null when token file is corrupted", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue("corrupted-data");
-
-    const { decryptToken } = await import("../../../src/common/encryption.js");
-    vi.mocked(decryptToken).mockImplementation(() => {
+    vi.mocked(decryptToken).mockImplementationOnce(() => {
       throw new Error("Invalid encrypted token format");
     });
 
