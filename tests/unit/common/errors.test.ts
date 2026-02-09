@@ -63,16 +63,21 @@ describe("isAuthError", () => {
     expect(isAuthError(new AuthenticationError())).toBe(true);
   });
 
-  it("returns true for error with 'authentication' in message", () => {
+  it("returns true for exact 'Authentication required' message", () => {
     expect(isAuthError(new Error("Authentication required"))).toBe(true);
   });
 
-  it("returns true for error with 'unauthorized' in message", () => {
-    expect(isAuthError(new Error("Unauthorized access"))).toBe(true);
+  it("returns true for exact 'Unauthorized' message", () => {
+    expect(isAuthError(new Error("Unauthorized"))).toBe(true);
   });
 
   it("returns false for unrelated errors", () => {
     expect(isAuthError(new Error("Team not found"))).toBe(false);
+  });
+
+  it("returns false for errors that merely contain auth keywords", () => {
+    expect(isAuthError(new Error("Failed to update authentication settings"))).toBe(false);
+    expect(isAuthError(new Error("Unauthorized access to resource"))).toBe(false);
   });
 });
 

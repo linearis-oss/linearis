@@ -59,11 +59,16 @@ export class AuthenticationError extends Error {
   }
 }
 
+const AUTH_ERROR_PATTERNS: ReadonlyArray<string> = [
+  "authentication required",
+  "unauthorized",
+];
+
 export function isAuthError(error: unknown): boolean {
   if (error instanceof AuthenticationError) return true;
   if (error instanceof Error) {
-    const msg = error.message.toLowerCase();
-    return msg.includes("authentication") || msg.includes("unauthorized");
+    const msg = error.message.toLowerCase().trim();
+    return AUTH_ERROR_PATTERNS.some((pattern) => msg === pattern);
   }
   return false;
 }
