@@ -27,9 +27,15 @@ vi.mock("../../../src/common/context.js", () => ({
   createGraphQLClient: vi.fn(() => ({})),
 }));
 
+vi.mock("../../../src/common/auth.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/common/auth.js")>();
+  return { ...actual, resolveApiToken: vi.fn() };
+});
+
 import { setupAuthCommands } from "../../../src/commands/auth.js";
-import { getStoredToken, saveToken } from "../../../src/common/token-storage.js";
+import { getStoredToken, saveToken, clearToken } from "../../../src/common/token-storage.js";
 import { validateToken } from "../../../src/services/auth-service.js";
+import { resolveApiToken } from "../../../src/common/auth.js";
 
 const mockViewer = { id: "user-1", name: "Test User", email: "test@example.com" };
 
@@ -120,5 +126,104 @@ describe("auth login", () => {
       "No token provided. Authentication cancelled.",
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("auth status", () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("reports authenticated with user info when token is valid", async () => {
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "valid-token", source: "stored" });
+    vi.mocked(validateToken).mockResolvedValue(mockViewer);
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "status"]);
+
+    const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(output).toEqual({
+      authenticated: true,
+      source: "~/.linearis/token",
+      user: { id: "user-1", name: "Test User", email: "test@example.com" },
+    });
+  });
+
+  it("reports unauthenticated when no token is found", async () => {
+    vi.mocked(resolveApiToken).mockImplementation(() => {
+      throw new Error("No API token found");
+    });
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "status"]);
+
+    const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(output).toEqual({
+      authenticated: false,
+      message: "No API token found. Run 'linearis auth login' to authenticate.",
+    });
+  });
+
+  it("reports unauthenticated when token is invalid", async () => {
+    vi.mocked(resolveApiToken).mockReturnValue({ token: "bad-token", source: "env" });
+    vi.mocked(validateToken).mockRejectedValue(new Error("Authentication failed"));
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "status"]);
+
+    const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(output).toEqual({
+      authenticated: false,
+      source: "LINEAR_API_TOKEN env var",
+      message: "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
+    });
+  });
+
+  it("maps all token sources to human-readable labels", async () => {
+    vi.mocked(validateToken).mockResolvedValue(mockViewer);
+
+    const sourceLabels: Record<string, string> = {
+      flag: "--api-token flag",
+      env: "LINEAR_API_TOKEN env var",
+      stored: "~/.linearis/token",
+      legacy: "~/.linear_api_token (deprecated)",
+    };
+
+    for (const [source, label] of Object.entries(sourceLabels)) {
+      vi.mocked(resolveApiToken).mockReturnValue({
+        token: "t",
+        source: source as "flag" | "env" | "stored" | "legacy",
+      });
+      stdoutSpy.mockClear();
+
+      const program = createProgram();
+      await program.parseAsync(["node", "test", "auth", "status"]);
+
+      const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(output.source).toBe(label);
+    }
+  });
+});
+
+describe("auth logout", () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("clears token and outputs success message", async () => {
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "logout"]);
+
+    expect(clearToken).toHaveBeenCalled();
+    const output = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(output).toEqual({ message: "Authentication token removed." });
   });
 });
