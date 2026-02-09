@@ -2,6 +2,17 @@
 
 Agent instruction set for Linearis codebase.
 
+## Package Manager
+
+Use **npm**: `npm install`, `npm start`, `npm test`, `npm run build`
+
+## Commit Attribution
+
+AI commits MUST include:
+```
+Co-Authored-By: <agent model name> <noreply@anthropic.com>
+```
+
 ## Rule Hierarchy
 
 **P0 (Blocking)** - Violations fail CI/review
