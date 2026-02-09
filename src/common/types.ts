@@ -15,6 +15,7 @@ import type {
   ListProjectMilestonesQuery,
   CreateProjectMilestoneMutation,
   UpdateProjectMilestoneMutation,
+  GetViewerQuery,
 } from "../gql/graphql.js";
 
 // Issue types
@@ -40,3 +41,6 @@ export type MilestoneDetail = NonNullable<GetProjectMilestoneByIdQuery["projectM
 export type MilestoneListItem = ListProjectMilestonesQuery["project"]["projectMilestones"]["nodes"][0];
 export type CreatedMilestone = NonNullable<CreateProjectMilestoneMutation["projectMilestoneCreate"]["projectMilestone"]>;
 export type UpdatedMilestone = NonNullable<UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]>;
+
+// Viewer types
+export type Viewer = GetViewerQuery["viewer"];
