@@ -150,6 +150,7 @@ export function setupAuthCommands(program: Command): void {
         if (!token) {
           console.error("No token provided. Authentication cancelled.");
           process.exit(1);
+          return;
         }
 
         // Validate token
@@ -161,6 +162,7 @@ export function setupAuthCommands(program: Command): void {
           const detail = error instanceof Error ? error.message : String(error);
           console.error(`Token validation failed: ${detail}`);
           process.exit(1);
+          return;
         }
 
         // Store token
@@ -174,6 +176,7 @@ export function setupAuthCommands(program: Command): void {
           `Authentication failed: ${error instanceof Error ? error.message : String(error)}`,
         );
         process.exit(1);
+        return;
       }
     });
 
