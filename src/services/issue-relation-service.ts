@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
+import type { CreatedIssueRelation } from "../common/types.js";
 import {
   CreateIssueRelationDocument,
   type CreateIssueRelationMutation,
@@ -9,9 +10,6 @@ import {
   type GetIssueRelationsQuery,
   type IssueRelationType,
 } from "../gql/graphql.js";
-
-type CreatedIssueRelation =
-  CreateIssueRelationMutation["issueRelationCreate"]["issueRelation"];
 
 export async function createIssueRelation(
   client: GraphQLClient,
