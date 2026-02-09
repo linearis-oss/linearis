@@ -1,15 +1,20 @@
-import { Command } from "commander";
 import { exec } from "node:child_process";
 import { createInterface } from "node:readline";
-import { resolveApiToken, type CommandOptions, type TokenSource } from "../common/auth.js";
+import type { Command } from "commander";
+import {
+  type CommandOptions,
+  resolveApiToken,
+  type TokenSource,
+} from "../common/auth.js";
 import { createGraphQLClient } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
-import { saveToken, clearToken } from "../common/token-storage.js";
+import { clearToken, saveToken } from "../common/token-storage.js";
 import type { Viewer } from "../common/types.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { validateToken } from "../services/auth-service.js";
 
-const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security/api-keys/new";
+const LINEAR_API_KEY_URL =
+  "https://linear.app/settings/account/security/api-keys/new";
 
 export const AUTH_META: DomainMeta = {
   name: "auth",
@@ -26,11 +31,12 @@ export const AUTH_META: DomainMeta = {
 };
 
 function openBrowser(url: string): void {
-  const cmd = process.platform === "darwin"
-    ? `open "${url}"`
-    : process.platform === "win32"
-      ? `start "" "${url}"`
-      : `xdg-open "${url}"`;
+  const cmd =
+    process.platform === "darwin"
+      ? `open "${url}"`
+      : process.platform === "win32"
+        ? `start "" "${url}"`
+        : `xdg-open "${url}"`;
 
   exec(cmd, () => {
     // Browser open failed — URL is already printed, user can open manually
@@ -116,7 +122,7 @@ export function setupAuthCommands(program: Command): void {
         // Check existing authentication across all sources
         if (!options.force) {
           try {
-            const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+            const rootOpts = command.parent?.parent?.opts() as CommandOptions;
             const { token, source } = resolveApiToken(rootOpts);
             try {
               const viewer = await validateApiToken(token);
@@ -133,7 +139,9 @@ export function setupAuthCommands(program: Command): void {
               return;
             } catch {
               // Token is invalid, proceed with new auth
-              console.error("Existing token is invalid. Starting new authentication...");
+              console.error(
+                "Existing token is invalid. Starting new authentication...",
+              );
             }
           } catch {
             // No token found anywhere, proceed with login
@@ -144,7 +152,9 @@ export function setupAuthCommands(program: Command): void {
         console.error("");
         console.error("To authenticate, create a new Linear API key:");
         console.error("");
-        console.error("  1. Open the link below (or it will open automatically)");
+        console.error(
+          "  1. Open the link below (or it will open automatically)",
+        );
         console.error("  2. Set key name to: linearis-cli");
         console.error("  3. Keep 'Full access' selected (default)");
         console.error("  4. Keep 'All teams' selected (default)");
@@ -181,7 +191,9 @@ export function setupAuthCommands(program: Command): void {
         saveToken(token);
 
         console.error("");
-        console.error(`Authentication successful. Logged in as ${viewer.name} (${viewer.email}).`);
+        console.error(
+          `Authentication successful. Logged in as ${viewer.name} (${viewer.email}).`,
+        );
         console.error("Token encrypted and stored in ~/.linearis/token");
       } catch (error) {
         console.error(
@@ -197,73 +209,79 @@ export function setupAuthCommands(program: Command): void {
   auth
     .command("status")
     .description("check current authentication status")
-    .action(handleCommand(async (...args: unknown[]) => {
-      const [, command] = args as [CommandOptions, Command];
-      const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [, command] = args as [CommandOptions, Command];
+        const rootOpts = command.parent?.parent?.opts() as CommandOptions;
 
-      const sourceLabels: Record<TokenSource, string> = {
-        flag: "--api-token flag",
-        env: "LINEAR_API_TOKEN env var",
-        stored: "~/.linearis/token",
-        legacy: "~/.linear_api_token (deprecated)",
-      };
-
-      let token: string;
-      let source: TokenSource;
-      try {
-        const resolved = resolveApiToken(rootOpts);
-        token = resolved.token;
-        source = resolved.source;
-      } catch {
-        outputSuccess({
-          authenticated: false,
-          message: "No API token found. Run 'linearis auth login' to authenticate.",
-        });
-        return;
-      }
-
-      try {
-        const viewer = await validateApiToken(token);
-        outputSuccess({
-          authenticated: true,
-          source: sourceLabels[source],
-          user: { id: viewer.id, name: viewer.name, email: viewer.email },
-        });
-      } catch {
-        outputSuccess({
-          authenticated: false,
-          source: sourceLabels[source],
-          message: "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
-        });
-      }
-    }));
-
-  auth
-    .command("logout")
-    .description("remove stored authentication token")
-    .action(handleCommand(async (...args: unknown[]) => {
-      const [, command] = args as [CommandOptions, Command];
-      const rootOpts = command.parent!.parent!.opts() as CommandOptions;
-
-      clearToken();
-
-      // Warn if a token is still active from another source
-      try {
-        const { source } = resolveApiToken(rootOpts);
         const sourceLabels: Record<TokenSource, string> = {
           flag: "--api-token flag",
           env: "LINEAR_API_TOKEN env var",
           stored: "~/.linearis/token",
           legacy: "~/.linear_api_token (deprecated)",
         };
-        outputSuccess({
-          message: "Authentication token removed.",
-          warning: `A token is still active via ${sourceLabels[source]}.`,
-        });
-      } catch {
-        outputSuccess({ message: "Authentication token removed." });
-      }
-    }));
+
+        let token: string;
+        let source: TokenSource;
+        try {
+          const resolved = resolveApiToken(rootOpts);
+          token = resolved.token;
+          source = resolved.source;
+        } catch {
+          outputSuccess({
+            authenticated: false,
+            message:
+              "No API token found. Run 'linearis auth login' to authenticate.",
+          });
+          return;
+        }
+
+        try {
+          const viewer = await validateApiToken(token);
+          outputSuccess({
+            authenticated: true,
+            source: sourceLabels[source],
+            user: { id: viewer.id, name: viewer.name, email: viewer.email },
+          });
+        } catch {
+          outputSuccess({
+            authenticated: false,
+            source: sourceLabels[source],
+            message:
+              "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
+          });
+        }
+      }),
+    );
+
+  auth
+    .command("logout")
+    .description("remove stored authentication token")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [, command] = args as [CommandOptions, Command];
+        const rootOpts = command.parent?.parent?.opts() as CommandOptions;
+
+        clearToken();
+
+        // Warn if a token is still active from another source
+        try {
+          const { source } = resolveApiToken(rootOpts);
+          const sourceLabels: Record<TokenSource, string> = {
+            flag: "--api-token flag",
+            env: "LINEAR_API_TOKEN env var",
+            stored: "~/.linearis/token",
+            legacy: "~/.linear_api_token (deprecated)",
+          };
+          outputSuccess({
+            message: "Authentication token removed.",
+            warning: `A token is still active via ${sourceLabels[source]}.`,
+          });
+        } catch {
+          outputSuccess({ message: "Authentication token removed." });
+        }
+      }),
+    );
 
   auth
     .command("usage")

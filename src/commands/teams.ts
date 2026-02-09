@@ -1,7 +1,7 @@
-import { Command } from "commander";
-import { createContext, type CommandOptions } from "../common/context.js";
+import type { Command } from "commander";
+import { type CommandOptions, createContext } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
-import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listTeams } from "../services/team-service.js";
 
 /**
@@ -31,9 +31,7 @@ export const TEAMS_META: DomainMeta = {
 };
 
 export function setupTeamsCommands(program: Command): void {
-  const teams = program
-    .command("teams")
-    .description("Team operations");
+  const teams = program.command("teams").description("Team operations");
 
   // Show teams help when no subcommand
   teams.action(() => {
@@ -53,10 +51,10 @@ export function setupTeamsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(command.parent?.parent?.opts());
         const result = await listTeams(ctx.gql);
         outputSuccess(result);
-      })
+      }),
     );
 
   teams
