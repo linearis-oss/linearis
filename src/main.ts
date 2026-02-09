@@ -1,19 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Linearis CLI - A command-line tool for Linear.app with structured JSON output
- *
- * This tool provides optimized GraphQL operations for Linear API interactions,
- * smart ID resolution (UUID and TEAM-123 formats), and comprehensive
- * entity management capabilities.
- *
- * Key features:
- * - Single-query GraphQL operations with batch resolving
- * - Human-friendly ID resolution (TEAM-123 → UUID)
- * - Structured JSON output for LLM consumption
- * - Complete API coverage with optimized queries
- */
-
 import { Option, program } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { AUTH_META, setupAuthCommands } from "./commands/auth.js";
@@ -39,14 +25,12 @@ import {
   formatOverview,
 } from "./common/usage.js";
 
-// Setup main program
 program
   .name("linearis")
   .description("CLI for Linear.app with JSON output")
   .version(pkg.version)
   .option("--api-token <token>", "Linear API token");
 
-// Collect all domain metadata (order matches overview display)
 const allMetas: DomainMeta[] = [
   AUTH_META,
   ISSUES_META,
@@ -61,12 +45,8 @@ const allMetas: DomainMeta[] = [
   USERS_META,
 ];
 
-// Default action - show usage overview when no subcommand
-program.action(() => {
-  console.log(formatOverview(pkg.version, allMetas));
-});
+program.action(() => console.log(formatOverview(pkg.version, allMetas)));
 
-// Setup all subcommand groups
 setupAuthCommands(program);
 setupIssuesCommands(program);
 setupCommentsCommands(program);
@@ -79,7 +59,6 @@ setupTeamsCommands(program);
 setupUsersCommands(program);
 setupDocumentsCommands(program);
 
-// Add usage command with hidden --all flag for static file generation
 program
   .command("usage")
   .description("show overview of all domains")
@@ -101,5 +80,4 @@ program
     }
   });
 
-// Parse command line arguments
 program.parse();
