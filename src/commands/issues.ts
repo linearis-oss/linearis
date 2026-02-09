@@ -3,7 +3,11 @@ import { createContext } from "../common/context.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { IssueCreateInput, IssueUpdateInput } from "../gql/graphql.js";
+import {
+  type IssueCreateInput,
+  IssueRelationType,
+  type IssueUpdateInput,
+} from "../gql/graphql.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import { resolveLabelIds } from "../resolvers/label-resolver.js";
@@ -11,6 +15,7 @@ import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveStatusId } from "../resolvers/status-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { createIssueRelation } from "../services/issue-relation-service.js";
 import {
   createIssue,
   getIssue,
@@ -36,6 +41,10 @@ interface CreateOptions {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  blocks?: string;
+  blockedBy?: string;
+  relatesTo?: string;
+  duplicateOf?: string;
 }
 
 interface UpdateOptions {
@@ -186,6 +195,10 @@ export function setupIssuesCommands(program: Command): void {
     .option("--cycle <cycle>", "add to cycle (requires --team)")
     .option("--status <status>", "set status")
     .option("--parent-ticket <issue>", "set parent issue")
+    .option("--blocks <issue>", "this issue blocks <issue>")
+    .option("--blocked-by <issue>", "this issue is blocked by <issue>")
+    .option("--relates-to <issue>", "this issue relates to <issue>")
+    .option("--duplicate-of <issue>", "this issue duplicates <issue>")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [title, options, command] = args as [
@@ -194,6 +207,17 @@ export function setupIssuesCommands(program: Command): void {
           Command,
         ];
         const ctx = createContext(command.parent!.parent!.opts());
+
+        // Validate mutually exclusive relation flags
+        const relationFlags = [
+          options.blocks,
+          options.blockedBy,
+          options.relatesTo,
+          options.duplicateOf,
+        ].filter(Boolean);
+        if (relationFlags.length > 1) {
+          throw new Error("Only one relation flag can be used at a time");
+        }
 
         // Resolve team ID (required)
         if (!options.team) {
@@ -264,6 +288,38 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         const result = await createIssue(ctx.gql, input);
+
+        // Create relation if a relation flag was provided
+        if (options.blocks) {
+          const targetId = await resolveIssueId(ctx.sdk, options.blocks);
+          await createIssueRelation(ctx.gql, {
+            issueId: result.id,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Blocks,
+          });
+        } else if (options.blockedBy) {
+          const targetId = await resolveIssueId(ctx.sdk, options.blockedBy);
+          await createIssueRelation(ctx.gql, {
+            issueId: targetId,
+            relatedIssueId: result.id,
+            type: IssueRelationType.Blocks,
+          });
+        } else if (options.relatesTo) {
+          const targetId = await resolveIssueId(ctx.sdk, options.relatesTo);
+          await createIssueRelation(ctx.gql, {
+            issueId: result.id,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Related,
+          });
+        } else if (options.duplicateOf) {
+          const targetId = await resolveIssueId(ctx.sdk, options.duplicateOf);
+          await createIssueRelation(ctx.gql, {
+            issueId: result.id,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Duplicate,
+          });
+        }
+
         outputSuccess(result);
       }),
     );
