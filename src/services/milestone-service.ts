@@ -1,16 +1,21 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { MilestoneDetail, MilestoneListItem, CreatedMilestone, UpdatedMilestone } from "../common/types.js";
+import type {
+  CreatedMilestone,
+  MilestoneDetail,
+  MilestoneListItem,
+  UpdatedMilestone,
+} from "../common/types.js";
 import {
-  ListProjectMilestonesDocument,
-  type ListProjectMilestonesQuery,
-  GetProjectMilestoneByIdDocument,
-  type GetProjectMilestoneByIdQuery,
   CreateProjectMilestoneDocument,
   type CreateProjectMilestoneMutation,
+  GetProjectMilestoneByIdDocument,
+  type GetProjectMilestoneByIdQuery,
+  ListProjectMilestonesDocument,
+  type ListProjectMilestonesQuery,
   type ProjectMilestoneCreateInput,
+  type ProjectMilestoneUpdateInput,
   UpdateProjectMilestoneDocument,
   type UpdateProjectMilestoneMutation,
-  type ProjectMilestoneUpdateInput,
 } from "../gql/graphql.js";
 
 export async function listMilestones(
@@ -52,7 +57,10 @@ export async function createMilestone(
     { input },
   );
 
-  if (!result.projectMilestoneCreate.success || !result.projectMilestoneCreate.projectMilestone) {
+  if (
+    !result.projectMilestoneCreate.success ||
+    !result.projectMilestoneCreate.projectMilestone
+  ) {
     throw new Error("Failed to create milestone");
   }
 
@@ -69,7 +77,10 @@ export async function updateMilestone(
     { id, input },
   );
 
-  if (!result.projectMilestoneUpdate.success || !result.projectMilestoneUpdate.projectMilestone) {
+  if (
+    !result.projectMilestoneUpdate.success ||
+    !result.projectMilestoneUpdate.projectMilestone
+  ) {
     throw new Error("Failed to update milestone");
   }
 

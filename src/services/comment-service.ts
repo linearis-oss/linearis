@@ -1,8 +1,8 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import {
+  type CommentCreateInput,
   CreateCommentDocument,
   type CreateCommentMutation,
-  type CommentCreateInput,
 } from "../gql/graphql.js";
 
 export interface Comment {

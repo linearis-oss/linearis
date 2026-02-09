@@ -1,34 +1,33 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type {
+  CreatedDocument,
   Document,
   DocumentListItem,
-  CreatedDocument,
   UpdatedDocument,
 } from "../common/types.js";
 import {
+  DocumentCreateDocument,
+  type DocumentCreateInput,
+  type DocumentCreateMutation,
+  DocumentDeleteDocument,
+  type DocumentDeleteMutation,
+  type DocumentFilter,
+  DocumentUpdateDocument,
+  type DocumentUpdateInput,
+  type DocumentUpdateMutation,
   GetDocumentDocument,
   type GetDocumentQuery,
   ListDocumentsDocument,
   type ListDocumentsQuery,
-  type DocumentFilter,
-  DocumentCreateDocument,
-  type DocumentCreateMutation,
-  type DocumentCreateInput,
-  DocumentUpdateDocument,
-  type DocumentUpdateMutation,
-  type DocumentUpdateInput,
-  DocumentDeleteDocument,
-  type DocumentDeleteMutation,
 } from "../gql/graphql.js";
 
 export async function getDocument(
   client: GraphQLClient,
   id: string,
 ): Promise<Document> {
-  const result = await client.request<GetDocumentQuery>(
-    GetDocumentDocument,
-    { id },
-  );
+  const result = await client.request<GetDocumentQuery>(GetDocumentDocument, {
+    id,
+  });
 
   if (!result.document) {
     throw new Error(`Document with ID "${id}" not found`);

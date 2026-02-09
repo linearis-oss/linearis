@@ -10,10 +10,13 @@
  * - Comprehensive error handling and status reporting
  */
 
+import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, extname } from "node:path";
 import { print } from "graphql";
-import { access, mkdir, readFile, stat, writeFile } from "fs/promises";
-import { basename, dirname, extname } from "path";
-import { extractFilenameFromUrl, isLinearUploadUrl } from "../common/embed-parser.js";
+import {
+  extractFilenameFromUrl,
+  isLinearUploadUrl,
+} from "../common/embed-parser.js";
 import { FileUploadDocument } from "../gql/graphql.js";
 
 /**
@@ -171,8 +174,7 @@ export class FileService {
         await access(outputPath);
         return {
           success: false,
-          error:
-            `File already exists: ${outputPath}. Use --overwrite to replace.`,
+          error: `File already exists: ${outputPath}. Use --overwrite to replace.`,
         };
       } catch {
         // File doesn't exist, we can proceed
@@ -283,9 +285,9 @@ export class FileService {
       const actualMB = fileSize / (1024 * 1024);
       return {
         success: false,
-        error: `File too large: ${
-          actualMB.toFixed(1)
-        }MB exceeds limit of ${maxMB}MB`,
+        error: `File too large: ${actualMB.toFixed(
+          1,
+        )}MB exceeds limit of ${maxMB}MB`,
       };
     }
 
