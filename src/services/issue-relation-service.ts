@@ -16,7 +16,7 @@ export async function createIssueRelation(
   input: {
     issueId: string;
     relatedIssueId: string;
-    type: IssueRelationType | string;
+    type: IssueRelationType;
   },
 ): Promise<CreatedIssueRelation> {
   const result = await client.request<CreateIssueRelationMutation>(

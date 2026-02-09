@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { IssueRelationType } from "../../../src/gql/graphql.js";
 import {
   createIssueRelation,
   deleteIssueRelation,
@@ -16,7 +17,7 @@ describe("createIssueRelation", () => {
   it("creates a relation and returns it", async () => {
     const relation = {
       id: "rel-1",
-      type: "blocks",
+      type: IssueRelationType.Blocks,
       relatedIssue: { id: "issue-2", identifier: "ENG-2" },
     };
     const client = mockGqlClient({
@@ -26,7 +27,7 @@ describe("createIssueRelation", () => {
     const result = await createIssueRelation(client, {
       issueId: "issue-1",
       relatedIssueId: "issue-2",
-      type: "blocks",
+      type: IssueRelationType.Blocks,
     });
 
     expect(result).toEqual(relation);
@@ -42,7 +43,7 @@ describe("createIssueRelation", () => {
       createIssueRelation(client, {
         issueId: "issue-1",
         relatedIssueId: "issue-2",
-        type: "blocks",
+        type: IssueRelationType.Blocks,
       }),
     ).rejects.toThrow("Failed to create issue relation");
   });
@@ -56,7 +57,7 @@ describe("findIssueRelation", () => {
           nodes: [
             {
               id: "rel-1",
-              type: "blocks",
+              type: IssueRelationType.Blocks,
               relatedIssue: { id: "target-id", identifier: "ENG-2" },
             },
           ],
@@ -77,7 +78,7 @@ describe("findIssueRelation", () => {
           nodes: [
             {
               id: "rel-2",
-              type: "blocks",
+              type: IssueRelationType.Blocks,
               issue: { id: "target-id", identifier: "ENG-1" },
             },
           ],
