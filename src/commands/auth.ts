@@ -64,6 +64,9 @@ function promptToken(): Promise<string> {
         } else if (char === "\u0003") {
           // Ctrl+C
           process.stdin.setRawMode?.(false);
+          process.stdin.pause();
+          process.stdin.removeListener("data", onData);
+          process.stderr.write("\n");
           rl.close();
           reject(new Error("Cancelled"));
         } else if (char === "\u007F" || char === "\b") {
