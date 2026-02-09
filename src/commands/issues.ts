@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
@@ -91,6 +92,63 @@ export const ISSUES_META: DomainMeta = {
   },
   seeAlso: ["comments create <issue>", "documents list --issue <issue>"],
 };
+
+interface RelationFlags {
+  blocks?: string;
+  blockedBy?: string;
+  relatesTo?: string;
+  duplicateOf?: string;
+  removeRelation?: string;
+}
+
+async function resolveRelationTarget(
+  ctx: CommandContext,
+  flags: RelationFlags,
+): Promise<string | undefined> {
+  const target =
+    flags.blocks ??
+    flags.blockedBy ??
+    flags.relatesTo ??
+    flags.duplicateOf ??
+    flags.removeRelation;
+  return target ? resolveIssueId(ctx.sdk, target) : undefined;
+}
+
+async function applyRelation(
+  ctx: CommandContext,
+  issueId: string,
+  targetId: string,
+  flags: RelationFlags,
+): Promise<void> {
+  if (flags.blocks) {
+    await createIssueRelation(ctx.gql, {
+      issueId,
+      relatedIssueId: targetId,
+      type: IssueRelationType.Blocks,
+    });
+  } else if (flags.blockedBy) {
+    await createIssueRelation(ctx.gql, {
+      issueId: targetId,
+      relatedIssueId: issueId,
+      type: IssueRelationType.Blocks,
+    });
+  } else if (flags.relatesTo) {
+    await createIssueRelation(ctx.gql, {
+      issueId,
+      relatedIssueId: targetId,
+      type: IssueRelationType.Related,
+    });
+  } else if (flags.duplicateOf) {
+    await createIssueRelation(ctx.gql, {
+      issueId,
+      relatedIssueId: targetId,
+      type: IssueRelationType.Duplicate,
+    });
+  } else if (flags.removeRelation) {
+    const relationId = await findIssueRelation(ctx.gql, issueId, targetId);
+    await deleteIssueRelation(ctx.gql, relationId);
+  }
+}
 
 /**
  * Setup issues commands on the program
@@ -297,44 +355,13 @@ export function setupIssuesCommands(program: Command): void {
           input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
         }
 
-        // Resolve relation target ID before issue creation to fail fast
-        const relationTargetId = options.blocks
-          ? await resolveIssueId(ctx.sdk, options.blocks)
-          : options.blockedBy
-            ? await resolveIssueId(ctx.sdk, options.blockedBy)
-            : options.relatesTo
-              ? await resolveIssueId(ctx.sdk, options.relatesTo)
-              : options.duplicateOf
-                ? await resolveIssueId(ctx.sdk, options.duplicateOf)
-                : undefined;
+        // Resolve relation target before issue creation to fail fast
+        const relationTargetId = await resolveRelationTarget(ctx, options);
 
         const result = await createIssue(ctx.gql, input);
 
-        // Create relation if a relation flag was provided
-        if (options.blocks && relationTargetId) {
-          await createIssueRelation(ctx.gql, {
-            issueId: result.id,
-            relatedIssueId: relationTargetId,
-            type: IssueRelationType.Blocks,
-          });
-        } else if (options.blockedBy && relationTargetId) {
-          await createIssueRelation(ctx.gql, {
-            issueId: relationTargetId,
-            relatedIssueId: result.id,
-            type: IssueRelationType.Blocks,
-          });
-        } else if (options.relatesTo && relationTargetId) {
-          await createIssueRelation(ctx.gql, {
-            issueId: result.id,
-            relatedIssueId: relationTargetId,
-            type: IssueRelationType.Related,
-          });
-        } else if (options.duplicateOf && relationTargetId) {
-          await createIssueRelation(ctx.gql, {
-            issueId: result.id,
-            relatedIssueId: relationTargetId,
-            type: IssueRelationType.Duplicate,
-          });
+        if (relationTargetId) {
+          await applyRelation(ctx, result.id, relationTargetId, options);
         }
 
         outputSuccess(result);
@@ -540,48 +567,13 @@ export function setupIssuesCommands(program: Command): void {
           input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
         }
 
+        // Resolve relation target before update to fail fast
+        const relationTargetId = await resolveRelationTarget(ctx, options);
+
         const result = await updateIssue(ctx.gql, resolvedIssueId, input);
 
-        // Handle relation flags
-        if (options.blocks) {
-          const targetId = await resolveIssueId(ctx.sdk, options.blocks);
-          await createIssueRelation(ctx.gql, {
-            issueId: resolvedIssueId,
-            relatedIssueId: targetId,
-            type: IssueRelationType.Blocks,
-          });
-        } else if (options.blockedBy) {
-          const targetId = await resolveIssueId(ctx.sdk, options.blockedBy);
-          await createIssueRelation(ctx.gql, {
-            issueId: targetId,
-            relatedIssueId: resolvedIssueId,
-            type: IssueRelationType.Blocks,
-          });
-        } else if (options.relatesTo) {
-          const targetId = await resolveIssueId(ctx.sdk, options.relatesTo);
-          await createIssueRelation(ctx.gql, {
-            issueId: resolvedIssueId,
-            relatedIssueId: targetId,
-            type: IssueRelationType.Related,
-          });
-        } else if (options.duplicateOf) {
-          const targetId = await resolveIssueId(ctx.sdk, options.duplicateOf);
-          await createIssueRelation(ctx.gql, {
-            issueId: resolvedIssueId,
-            relatedIssueId: targetId,
-            type: IssueRelationType.Duplicate,
-          });
-        } else if (options.removeRelation) {
-          const targetId = await resolveIssueId(
-            ctx.sdk,
-            options.removeRelation,
-          );
-          const relationId = await findIssueRelation(
-            ctx.gql,
-            resolvedIssueId,
-            targetId,
-          );
-          await deleteIssueRelation(ctx.gql, relationId);
+        if (relationTargetId) {
+          await applyRelation(ctx, resolvedIssueId, relationTargetId, options);
         }
 
         outputSuccess(result);
