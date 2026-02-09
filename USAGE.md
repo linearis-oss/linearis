@@ -1,9 +1,10 @@
 linearis v2025.12.3 — CLI for Linear.app (project management / issue tracking)
-auth: --api-token <token> | LINEAR_API_TOKEN | ~/.linear_api_token
+auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token
 output: JSON
 ids: UUID or human-readable (team key, issue ABC-123, name)
 
 domains:
+  auth          authenticate with Linear API (interactive, for humans)
   issues        work items with status, priority, assignee, labels
   comments      discussion threads on issues
   labels        categorization tags, workspace-wide or team-scoped
@@ -16,6 +17,24 @@ domains:
   users         workspace members and assignees
 
 detail: linearis <domain> usage
+
+---
+
+linearis auth — authenticate with Linear API (interactive, for humans)
+
+linearis requires a Linear API token for all operations.
+the auth command guides you through creating and storing a token.
+tokens are encrypted and stored in ~/.linearis/token.
+token resolution order: --api-token flag, LINEAR_API_TOKEN env,
+~/.linearis/token (encrypted), ~/.linear_api_token (deprecated).
+
+commands:
+  login [options]  set up or refresh authentication
+  status           check current authentication status
+  logout           remove stored authentication token
+
+login options:
+  --force  reauthenticate even if already authenticated
 
 ---
 

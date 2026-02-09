@@ -1,6 +1,7 @@
 // tests/unit/common/output.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { outputSuccess, outputError, handleCommand } from "../../../src/common/output.js";
+import { outputSuccess, outputError, handleCommand, outputAuthError } from "../../../src/common/output.js";
+import { AuthenticationError, AUTH_ERROR_CODE } from "../../../src/common/errors.js";
 
 describe("outputSuccess", () => {
   it("writes JSON to stdout", () => {
@@ -49,6 +50,48 @@ describe("handleCommand", () => {
     );
 
     stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
+
+describe("handleCommand with AuthenticationError", () => {
+  it("calls outputAuthError for AuthenticationError", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const handler = handleCommand(async () => {
+      throw new AuthenticationError("expired");
+    });
+
+    await handler();
+
+    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+    expect(output.error).toBe("AUTHENTICATION_REQUIRED");
+    expect(exitSpy).toHaveBeenCalledWith(42);
+
+    consoleSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
+
+describe("outputAuthError", () => {
+  it("outputs structured JSON with AUTHENTICATION_REQUIRED", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const err = new AuthenticationError("Token expired");
+    outputAuthError(err);
+
+    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+    expect(output.error).toBe("AUTHENTICATION_REQUIRED");
+    expect(output.message).toBe("Linear API authentication failed.");
+    expect(output.details).toBe("Token expired");
+    expect(output.action).toBe("USER_ACTION_REQUIRED");
+    expect(output.instruction).toContain("linearis auth");
+    expect(output.exit_code).toBe(42);
+    expect(exitSpy).toHaveBeenCalledWith(42);
+
+    consoleSpy.mockRestore();
     exitSpy.mockRestore();
   });
 });

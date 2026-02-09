@@ -1,0 +1,11 @@
+# Viewer query for token validation
+#
+# Returns the authenticated user's basic info.
+# Used by `linearis auth` to validate tokens.
+query GetViewer {
+  viewer {
+    id
+    name
+    email
+  }
+}

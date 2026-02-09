@@ -1,3 +1,5 @@
+import { AuthenticationError, AUTH_ERROR_CODE } from "./errors.js";
+
 /**
  * Outputs successful command result as formatted JSON.
  */
@@ -14,6 +16,21 @@ export function outputError(error: Error): void {
 }
 
 /**
+ * Outputs authentication error as structured JSON and exits with auth error code.
+ */
+export function outputAuthError(error: AuthenticationError): void {
+  console.error(JSON.stringify({
+    error: "AUTHENTICATION_REQUIRED",
+    message: error.message,
+    details: error.details,
+    action: "USER_ACTION_REQUIRED",
+    instruction: "Run 'linearis auth' to set up or refresh your authentication token.",
+    exit_code: AUTH_ERROR_CODE,
+  }, null, 2));
+  process.exit(AUTH_ERROR_CODE);
+}
+
+/**
  * Wraps command handler with error handling.
  *
  * Catches errors from async command handlers and outputs them
@@ -27,6 +44,10 @@ export function handleCommand(
     try {
       await asyncFn(...args);
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        outputAuthError(error);
+        return;
+      }
       outputError(error instanceof Error ? error : new Error(String(error)));
     }
   };

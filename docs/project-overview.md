@@ -42,11 +42,14 @@ Commands receive user input, resolve any identifiers to UUIDs through the resolv
 
 ## Authentication
 
-Authentication is resolved in the following order:
+Interactive setup (for humans): `linearis auth login` — opens Linear in the browser and stores the token encrypted in `~/.linearis/token`.
+
+Token resolution order:
 
 1. `--api-token` CLI flag
 2. `LINEAR_API_TOKEN` environment variable
-3. `~/.linear_api_token` file
+3. `~/.linearis/token` (encrypted, set up via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
 ## Build and Development
 

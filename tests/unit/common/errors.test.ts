@@ -5,6 +5,9 @@ import {
   multipleMatchesError,
   invalidParameterError,
   requiresParameterError,
+  AuthenticationError,
+  isAuthError,
+  AUTH_ERROR_CODE,
 } from "../../../src/common/errors.js";
 
 describe("notFoundError", () => {
@@ -39,5 +42,47 @@ describe("requiresParameterError", () => {
   it("creates error with flag dependency", () => {
     const err = requiresParameterError("--around-active", "--team");
     expect(err.message).toBe("--around-active requires --team to be specified");
+  });
+});
+
+describe("AuthenticationError", () => {
+  it("creates error with default message", () => {
+    const err = new AuthenticationError();
+    expect(err.message).toBe("Linear API authentication failed.");
+    expect(err.name).toBe("AuthenticationError");
+  });
+
+  it("creates error with custom details", () => {
+    const err = new AuthenticationError("Token expired");
+    expect(err.details).toBe("Token expired");
+  });
+});
+
+describe("isAuthError", () => {
+  it("returns true for AuthenticationError", () => {
+    expect(isAuthError(new AuthenticationError())).toBe(true);
+  });
+
+  it("returns true for exact 'Authentication required' message", () => {
+    expect(isAuthError(new Error("Authentication required"))).toBe(true);
+  });
+
+  it("returns true for exact 'Unauthorized' message", () => {
+    expect(isAuthError(new Error("Unauthorized"))).toBe(true);
+  });
+
+  it("returns false for unrelated errors", () => {
+    expect(isAuthError(new Error("Team not found"))).toBe(false);
+  });
+
+  it("returns false for errors that merely contain auth keywords", () => {
+    expect(isAuthError(new Error("Failed to update authentication settings"))).toBe(false);
+    expect(isAuthError(new Error("Unauthorized access to resource"))).toBe(false);
+  });
+});
+
+describe("AUTH_ERROR_CODE", () => {
+  it("is 42", () => {
+    expect(AUTH_ERROR_CODE).toBe(42);
   });
 });

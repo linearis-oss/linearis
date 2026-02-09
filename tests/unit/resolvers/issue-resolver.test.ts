@@ -26,6 +26,6 @@ describe("resolveIssueId", () => {
 
   it("throws when issue not found", async () => {
     const client = mockSdkClient([]);
-    await expect(resolveIssueId(client, "ENG-999")).rejects.toThrow('Issue with identifier "ENG-999" not found');
+    await expect(resolveIssueId(client, "ENG-999")).rejects.toThrow('Issue "ENG-999" not found');
   });
 });

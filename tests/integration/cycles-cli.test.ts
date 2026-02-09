@@ -92,7 +92,7 @@ describe("Cycles CLI Commands", () => {
         const activeCycles = JSON.parse(stdout);
 
         // All returned cycles should be active
-        activeCycles.forEach((cycle: any) => {
+        activeCycles.forEach((cycle: { isActive: boolean }) => {
           expect(cycle.isActive).toBe(true);
         });
       }
@@ -121,9 +121,10 @@ describe("Cycles CLI Commands", () => {
 
             const cycles = JSON.parse(stdout);
             expect(Array.isArray(cycles)).toBe(true);
-          } catch (error: any) {
+          } catch (error: unknown) {
             // It's ok if there's no active cycle
-            if (!error.stderr?.includes("No active cycle")) {
+            const execError = error as { stderr?: string };
+            if (!execError.stderr?.includes("No active cycle")) {
               throw error;
             }
           }
@@ -136,8 +137,8 @@ describe("Cycles CLI Commands", () => {
       try {
         await execAsync(`node ${CLI_PATH} cycles list --window 3`);
         expect.fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.stderr).toContain("--window requires --team");
+      } catch (error: unknown) {
+        expect((error as { stderr: string }).stderr).toContain("--window requires --team");
       }
     });
   });
@@ -192,7 +193,7 @@ describe("Cycles CLI Commands", () => {
       const cycles = JSON.parse(listOutput);
 
       // Find a cycle that has a name
-      const cycleWithName = cycles.find((c: any) => c.name);
+      const cycleWithName = cycles.find((c: { name?: string }) => c.name);
 
       if (cycleWithName) {
         const cycleName = cycleWithName.name;
@@ -239,8 +240,9 @@ describe("Cycles CLI Commands", () => {
               `node ${CLI_PATH} cycles list --window abc --team ${teamKey}`,
             );
             expect.fail("Should have thrown an error");
-          } catch (error: any) {
-            const output = JSON.parse(error.stdout || error.stderr);
+          } catch (error: unknown) {
+            const execError = error as { stdout?: string; stderr?: string };
+            const output = JSON.parse(execError.stdout || execError.stderr || "{}");
             expect(output.error).toContain(
               "requires a non-negative integer",
             );
@@ -266,8 +268,9 @@ describe("Cycles CLI Commands", () => {
               `node ${CLI_PATH} cycles list --window -5 --team ${teamKey}`,
             );
             expect.fail("Should have thrown an error");
-          } catch (error: any) {
-            const output = JSON.parse(error.stdout || error.stderr);
+          } catch (error: unknown) {
+            const execError = error as { stdout?: string; stderr?: string };
+            const output = JSON.parse(execError.stdout || execError.stderr || "{}");
             expect(output.error).toContain(
               "requires a non-negative integer",
             );

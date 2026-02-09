@@ -12,9 +12,10 @@ export interface Project {
 
 export async function listProjects(
   client: GraphQLClient,
+  limit: number = 50,
 ): Promise<Project[]> {
   const result = await client.request<GetProjectsQuery>(GetProjectsDocument, {
-    first: 50,
+    first: limit,
   });
 
   return result.projects.nodes.map((project) => ({

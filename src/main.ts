@@ -16,6 +16,7 @@
 
 import { program, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
+import { setupAuthCommands, AUTH_META } from "./commands/auth.js";
 import { setupCommentsCommands, COMMENTS_META } from "./commands/comments.js";
 import { setupFilesCommands, FILES_META } from "./commands/files.js";
 import { setupIssuesCommands, ISSUES_META } from "./commands/issues.js";
@@ -39,25 +40,9 @@ program
   .version(pkg.version)
   .option("--api-token <token>", "Linear API token");
 
-// Default action - show help when no subcommand
-program.action(() => {
-  program.help();
-});
-
-// Setup all subcommand groups
-setupIssuesCommands(program);
-setupCommentsCommands(program);
-setupLabelsCommands(program);
-setupProjectsCommands(program);
-setupCyclesCommands(program);
-setupMilestonesCommands(program);
-setupFilesCommands(program);
-setupTeamsCommands(program);
-setupUsersCommands(program);
-setupDocumentsCommands(program);
-
 // Collect all domain metadata (order matches overview display)
 const allMetas: DomainMeta[] = [
+  AUTH_META,
   ISSUES_META,
   COMMENTS_META,
   LABELS_META,
@@ -69,6 +54,24 @@ const allMetas: DomainMeta[] = [
   TEAMS_META,
   USERS_META,
 ];
+
+// Default action - show usage overview when no subcommand
+program.action(() => {
+  console.log(formatOverview(pkg.version, allMetas));
+});
+
+// Setup all subcommand groups
+setupAuthCommands(program);
+setupIssuesCommands(program);
+setupCommentsCommands(program);
+setupLabelsCommands(program);
+setupProjectsCommands(program);
+setupCyclesCommands(program);
+setupMilestonesCommands(program);
+setupFilesCommands(program);
+setupTeamsCommands(program);
+setupUsersCommands(program);
+setupDocumentsCommands(program);
 
 // Add usage command with hidden --all flag for static file generation
 program

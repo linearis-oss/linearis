@@ -62,9 +62,10 @@ describe("Milestones CLI Commands", () => {
           (e) => e,
         );
         expect(stdout).toContain("Usage: linearis");
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Expected to fail - old command name not recognized
-        expect(error.stderr || error.message).toBeTruthy();
+        const execError = error as { stderr?: string; message?: string };
+        expect(execError.stderr || execError.message).toBeTruthy();
       }
     });
   });
@@ -74,9 +75,10 @@ describe("Milestones CLI Commands", () => {
       try {
         await execAsync(`node ${CLI_PATH} milestones list`);
         expect.fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.stderr).toContain("required option");
-        expect(error.stderr).toContain("--project");
+      } catch (error: unknown) {
+        const execError = error as { stderr: string };
+        expect(execError.stderr).toContain("required option");
+        expect(execError.stderr).toContain("--project");
       }
     });
 
@@ -100,11 +102,12 @@ describe("Milestones CLI Commands", () => {
             const milestones = JSON.parse(stdout);
             expect(Array.isArray(milestones)).toBe(true);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Skip test if network issues or no projects
+          const execError = error as { stderr?: string };
           if (
-            error.stderr?.includes("Fetch failed") ||
-            error.stderr?.includes("not found")
+            execError.stderr?.includes("Fetch failed") ||
+            execError.stderr?.includes("not found")
           ) {
             console.log("Skipping: Network issues or no projects available");
           } else {

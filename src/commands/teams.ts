@@ -53,7 +53,7 @@ export function setupTeamsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
-        const ctx = await createContext(command.parent!.parent!.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
         const result = await listTeams(ctx.gql);
         outputSuccess(result);
       })

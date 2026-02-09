@@ -1,5 +1,6 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
+import { notFoundError } from "../common/errors.js";
 
 /**
  * Resolves issue identifier to UUID.
@@ -28,7 +29,7 @@ export async function resolveIssueId(
   });
 
   if (issues.nodes.length === 0) {
-    throw new Error(`Issue with identifier "${issueIdOrIdentifier}" not found`);
+    throw notFoundError("Issue", issueIdOrIdentifier);
   }
 
   return issues.nodes[0].id;

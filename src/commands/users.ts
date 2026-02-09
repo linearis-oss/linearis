@@ -59,7 +59,7 @@ export function setupUsersCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListUsersOptions, Command];
-        const ctx = await createContext(command.parent!.parent!.opts());
+        const ctx = createContext(command.parent!.parent!.opts());
         const result = await listUsers(ctx.gql, options.active || false);
         outputSuccess(result);
       })

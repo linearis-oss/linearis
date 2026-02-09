@@ -25,7 +25,7 @@ describe("formatOverview", () => {
 
     expect(result).toContain("linearis v2025.12.3");
     expect(result).toContain("CLI for Linear.app");
-    expect(result).toContain("auth: --api-token <token> | LINEAR_API_TOKEN | ~/.linear_api_token");
+    expect(result).toContain("auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token");
     expect(result).toContain("output: JSON");
     expect(result).toContain("ids: UUID or human-readable");
     expect(result).toContain("domains:");

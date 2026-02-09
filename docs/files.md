@@ -45,6 +45,7 @@ Business logic and CRUD operations. Services use `GraphQLClient` exclusively and
 
 CLI orchestration. Each file registers a command group via a `setup*Commands(program)` function. Commands use `createContext()` to obtain both clients, call resolvers for ID conversion, then delegate to services.
 
+- **auth.ts** -- `auth login`, `auth status`, `auth logout` — interactive authentication (for humans)
 - **issues.ts** -- `issue list`, `issue search`, `issue read`, `issue create`, `issue update`
 - **documents.ts** -- Document commands with attachment support
 - **project-milestones.ts** -- Milestone CRUD commands
@@ -61,7 +62,9 @@ CLI orchestration. Each file registers a command group via a `setup*Commands(pro
 Shared utilities used across all layers.
 
 - **context.ts** -- `CommandContext` interface and `createContext()` factory that produces both `GraphQLClient` and `LinearSdkClient`.
-- **auth.ts** -- `getApiToken()` with multi-source lookup: `--api-token` flag, `LINEAR_API_TOKEN` env var, `~/.linear_api_token` file.
+- **auth.ts** -- `resolveApiToken()` with multi-source lookup: `--api-token` flag, `LINEAR_API_TOKEN` env var, `~/.linearis/token` (encrypted), `~/.linear_api_token` (deprecated).
+- **token-storage.ts** -- `saveToken()`, `getStoredToken()`, `clearToken()` for encrypted token storage in `~/.linearis/token`.
+- **encryption.ts** -- AES-256-CBC encryption for token storage.
 - **output.ts** -- `outputSuccess()`, `outputError()`, and `handleCommand()` wrapper for consistent JSON output and error handling.
 - **errors.ts** -- `notFoundError()`, `multipleMatchesError()`, `invalidParameterError()`, `requiresParameterError()`.
 - **identifier.ts** -- `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`.

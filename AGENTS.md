@@ -887,10 +887,13 @@ import { notFoundError } from "../common/errors.js";
 
 ## Authentication
 
+Interactive setup (for humans): `linearis auth login`
+
 Checked in order:
 1. `--api-token` flag
 2. `LINEAR_API_TOKEN` env var
-3. `~/.linear_api_token` file
+3. `~/.linearis/token` (encrypted, via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
 ## Additional Documentation
 

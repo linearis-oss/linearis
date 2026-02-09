@@ -52,7 +52,7 @@ export function setupFilesCommands(program: Command): void {
         async (...args: unknown[]) => {
           const [url, options, command] = args as [string, CommandOptions & { output?: string; overwrite?: boolean }, Command];
           // Get API token from parent command options for authentication
-          const apiToken = await getApiToken(command.parent!.parent!.opts());
+          const apiToken = getApiToken(command.parent!.parent!.opts());
 
           // Create file service and initiate download
           const fileService = new FileService(apiToken);
@@ -98,7 +98,7 @@ export function setupFilesCommands(program: Command): void {
         async (...args: unknown[]) => {
           const [filePath, , command] = args as [string, CommandOptions, Command];
           // Get API token from parent command options for authentication
-          const apiToken = await getApiToken(command.parent!.parent!.opts());
+          const apiToken = getApiToken(command.parent!.parent!.opts());
 
           // Create file service and initiate upload
           const fileService = new FileService(apiToken);
