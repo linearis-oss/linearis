@@ -15,6 +15,11 @@ describe("encryptToken", () => {
     const b = encryptToken(token);
     expect(a).not.toBe(b);
   });
+
+  it("includes v1 version prefix", () => {
+    const encrypted = encryptToken("lin_api_abc123def456");
+    expect(encrypted).toMatch(/^v1:/);
+  });
 });
 
 describe("decryptToken", () => {
@@ -23,6 +28,14 @@ describe("decryptToken", () => {
     const encrypted = encryptToken(token);
     const decrypted = decryptToken(encrypted);
     expect(decrypted).toBe(token);
+  });
+
+  it("decrypts legacy unversioned format (iv:ciphertext)", () => {
+    // Encrypt with current function, then strip the v1: prefix to simulate legacy
+    const token = "lin_api_legacy_test";
+    const encrypted = encryptToken(token);
+    const legacy = encrypted.replace(/^v1:/, "");
+    expect(decryptToken(legacy)).toBe(token);
   });
 
   it("throws on malformed input", () => {
@@ -34,7 +47,13 @@ describe("decryptToken", () => {
   });
 
   it("throws on corrupted IV (wrong length)", () => {
-    // Valid format (hex:hex) but IV is only 4 bytes instead of 16
+    // Valid legacy format (hex:hex) but IV is only 4 bytes instead of 16
     expect(() => decryptToken("aabbccdd:aabbccdd")).toThrow("corrupted IV");
+  });
+
+  it("throws on unsupported version prefix", () => {
+    const encrypted = encryptToken("lin_api_test");
+    const v99 = encrypted.replace(/^v1:/, "v99:");
+    expect(() => decryptToken(v99)).toThrow("Unsupported token encryption version: v99");
   });
 });
