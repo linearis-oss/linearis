@@ -26,3 +26,13 @@ export async function createContext(options: CommandOptions): Promise<CommandCon
     sdk: new LinearSdkClient(token),
   };
 }
+
+/**
+ * Creates a GraphQL client from a raw token.
+ *
+ * Used by the auth command to validate tokens before they are stored.
+ * Other commands should use createContext() instead.
+ */
+export function createGraphQLClient(token: string): GraphQLClient {
+  return new GraphQLClient(token);
+}

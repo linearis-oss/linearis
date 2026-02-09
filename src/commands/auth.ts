@@ -1,17 +1,11 @@
 import { Command } from "commander";
 import { exec } from "node:child_process";
 import { createInterface } from "node:readline";
-import { GraphQLClient } from "../client/graphql-client.js";
-import { GetViewerDocument, type GetViewerQuery } from "../gql/graphql.js";
 import { resolveApiToken, type CommandOptions, type TokenSource } from "../common/auth.js";
+import { createGraphQLClient } from "../common/context.js";
 import { saveToken, getStoredToken, clearToken } from "../common/token-storage.js";
 import { formatDomainUsage, type DomainMeta } from "../common/usage.js";
-
-// ARCHITECTURAL EXCEPTION: The auth command intentionally deviates from
-// standard command patterns (no handleCommand wrapper, direct GraphQLClient
-// construction) because it bootstraps authentication before a context can
-// exist. The login flow is interactive (writes to stderr, reads from stdin),
-// which is fundamentally different from data commands that output JSON.
+import { validateToken, type Viewer } from "../services/auth-service.js";
 
 const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security/api-keys/new";
 
@@ -92,10 +86,8 @@ function promptToken(): Promise<string> {
   });
 }
 
-async function validateToken(token: string): Promise<{ id: string; name: string; email: string }> {
-  const client = new GraphQLClient(token);
-  const result = await client.request<GetViewerQuery>(GetViewerDocument);
-  return result.viewer;
+function validateApiToken(token: string): Promise<Viewer> {
+  return validateToken(createGraphQLClient(token));
 }
 
 export function setupAuthCommands(program: Command): void {
@@ -119,7 +111,7 @@ export function setupAuthCommands(program: Command): void {
           const existingToken = getStoredToken();
           if (existingToken) {
             try {
-              const viewer = await validateToken(existingToken);
+              const viewer = await validateApiToken(existingToken);
               console.error(
                 `Already authenticated as ${viewer.name} (${viewer.email}).`,
               );
@@ -158,9 +150,9 @@ export function setupAuthCommands(program: Command): void {
 
         // Validate token
         console.error("Validating token...");
-        let viewer: { id: string; name: string; email: string };
+        let viewer: Viewer;
         try {
-          viewer = await validateToken(token);
+          viewer = await validateApiToken(token);
         } catch {
           console.error("Token rejected. Check it's correct and try again.");
           process.exit(1);
@@ -208,7 +200,7 @@ export function setupAuthCommands(program: Command): void {
       }
 
       try {
-        const viewer = await validateToken(token);
+        const viewer = await validateApiToken(token);
         console.log(JSON.stringify({
           authenticated: true,
           source: sourceLabels[source],
