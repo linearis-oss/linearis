@@ -21,6 +21,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:commands": "tsx tests/command-coverage.ts",
+    "prepare": "npm_config_global=false npm install --ignore-scripts && tsc && chmod +x dist/main.js",
     "prepublishOnly": "npm run build && npm run test && test -x dist/main.js"
   },
   "engines": {
