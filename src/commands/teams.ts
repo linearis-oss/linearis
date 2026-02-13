@@ -1,50 +1,41 @@
-import { Command } from "commander";
-import { createLinearService } from "../utils/linear-service.js";
-import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
+import type { Command } from "commander";
+import { type CommandOptions, createContext } from "../common/context.js";
+import { handleCommand, outputSuccess } from "../common/output.js";
+import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
+import { listTeams } from "../services/team-service.js";
 
-/**
- * Setup teams commands on the program
- *
- * Registers `teams` command group for listing Linear teams.
- * Provides team information including key, name, and description.
- *
- * @param program - Commander.js program instance to register commands on
- *
- * @example
- * ```typescript
- * // In main.ts
- * setupTeamsCommands(program);
- * // Enables: linearis teams list
- * ```
- */
+export const TEAMS_META: DomainMeta = {
+  name: "teams",
+  summary: "organizational units owning issues and cycles",
+  context: [
+    "a team is a group of users that owns issues, cycles, statuses, and",
+    "labels. teams are identified by a short key (e.g. ENG), name, or UUID.",
+  ].join("\n"),
+  arguments: {},
+  seeAlso: [],
+};
+
 export function setupTeamsCommands(program: Command): void {
-  const teams = program
-    .command("teams")
-    .description("Team operations");
+  const teams = program.command("teams").description("Team operations");
 
-  // Show teams help when no subcommand
-  teams.action(() => {
-    teams.help();
-  });
+  teams.action(() => teams.help());
 
-  /**
-   * List all teams
-   *
-   * Command: `linearis teams list`
-   *
-   * Lists all teams in the workspace with their key, name, and description.
-   */
   teams
     .command("list")
-    .description("List all teams")
+    .description("list all teams")
     .action(
-      handleAsyncCommand(async (options: any, command: Command) => {
-        // Initialize Linear service for team operations
-        const service = await createLinearService(command.parent!.parent!.opts());
-
-        // Fetch all teams from the workspace
-        const result = await service.getTeams();
+      handleCommand(async (...args: unknown[]) => {
+        const [, command] = args as [CommandOptions, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const result = await listTeams(ctx.gql);
         outputSuccess(result);
-      })
+      }),
     );
+
+  teams
+    .command("usage")
+    .description("show detailed usage for teams")
+    .action(() => {
+      console.log(formatDomainUsage(teams, TEAMS_META));
+    });
 }

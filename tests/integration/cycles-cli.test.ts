@@ -1,6 +1,6 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { exec } from "child_process";
-import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -67,26 +67,23 @@ describe("Cycles CLI Commands", () => {
         expect(cycle).toHaveProperty("id");
         expect(cycle).toHaveProperty("number");
         expect(cycle).toHaveProperty("isActive");
-        expect(cycle).toHaveProperty("team");
+        expect(cycle).toHaveProperty("name");
+        expect(cycle).toHaveProperty("startsAt");
+        expect(cycle).toHaveProperty("endsAt");
 
-        // Note: name field is optional - not all cycles have names
-
-        // Verify team structure
-        expect(cycle.team).toHaveProperty("id");
-        expect(cycle.team).toHaveProperty("key");
-        expect(cycle.team).toHaveProperty("name");
+        // Note: Team data is not included in list view for token optimization
       }
     });
 
     it.skipIf(!hasApiToken)("should filter by active cycles", async () => {
-      // First, get a team key
-      const { stdout: listOutput } = await execAsync(
-        `node ${CLI_PATH} cycles list`,
+      // First, get a team key from teams list
+      const { stdout: teamsOutput } = await execAsync(
+        `node ${CLI_PATH} teams list`,
       );
-      const allCycles = JSON.parse(listOutput);
+      const teams = JSON.parse(teamsOutput);
 
-      if (allCycles.length > 0 && allCycles[0].team) {
-        const teamKey = allCycles[0].team.key;
+      if (teams.length > 0) {
+        const teamKey = teams[0].key;
 
         // Now test active filter
         const { stdout } = await execAsync(
@@ -95,28 +92,28 @@ describe("Cycles CLI Commands", () => {
         const activeCycles = JSON.parse(stdout);
 
         // All returned cycles should be active
-        activeCycles.forEach((cycle: any) => {
+        activeCycles.forEach((cycle: { isActive: boolean }) => {
           expect(cycle.isActive).toBe(true);
         });
       }
     });
 
     it.skipIf(!hasApiToken)(
-      "should work with --around-active flag",
+      "should work with --window flag",
       async () => {
-        // First, get a team key
-        const { stdout: listOutput } = await execAsync(
-          `node ${CLI_PATH} cycles list`,
+        // First, get a team key from teams list
+        const { stdout: teamsOutput } = await execAsync(
+          `node ${CLI_PATH} teams list`,
         );
-        const allCycles = JSON.parse(listOutput);
+        const teams = JSON.parse(teamsOutput);
 
-        if (allCycles.length > 0 && allCycles[0].team) {
-          const teamKey = allCycles[0].team.key;
+        if (teams.length > 0) {
+          const teamKey = teams[0].key;
 
-          // Test around-active (may fail if no active cycle, which is ok)
+          // Test window (may fail if no active cycle, which is ok)
           try {
             const { stdout, stderr } = await execAsync(
-              `node ${CLI_PATH} cycles list --around-active 3 --team ${teamKey}`,
+              `node ${CLI_PATH} cycles list --window 3 --team ${teamKey}`,
             );
 
             // Should not have complexity errors
@@ -124,9 +121,10 @@ describe("Cycles CLI Commands", () => {
 
             const cycles = JSON.parse(stdout);
             expect(Array.isArray(cycles)).toBe(true);
-          } catch (error: any) {
+          } catch (error: unknown) {
             // It's ok if there's no active cycle
-            if (!error.stderr?.includes("No active cycle")) {
+            const execError = error as { stderr?: string };
+            if (!execError.stderr?.includes("No active cycle")) {
               throw error;
             }
           }
@@ -135,12 +133,14 @@ describe("Cycles CLI Commands", () => {
       { timeout: 30000 },
     );
 
-    it("should require --team when using --around-active", async () => {
+    it("should require --team when using --window", async () => {
       try {
-        await execAsync(`node ${CLI_PATH} cycles list --around-active 3`);
+        await execAsync(`node ${CLI_PATH} cycles list --window 3`);
         expect.fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.stderr).toContain("--around-active requires --team");
+      } catch (error: unknown) {
+        expect((error as { stderr: string }).stderr).toContain(
+          "--window requires --team",
+        );
       }
     });
   });
@@ -175,18 +175,30 @@ describe("Cycles CLI Commands", () => {
     });
 
     it.skipIf(!hasApiToken)("should read cycle by name with team", async () => {
-      // First get a cycle name and team
+      // Get team key from teams list
+      const { stdout: teamsOutput } = await execAsync(
+        `node ${CLI_PATH} teams list`,
+      );
+      const teams = JSON.parse(teamsOutput);
+
+      if (teams.length === 0) {
+        console.log("Skipping: No teams found in workspace");
+        return;
+      }
+
+      const teamKey = teams[0].key;
+
+      // Get cycles for this team
       const { stdout: listOutput } = await execAsync(
-        `node ${CLI_PATH} cycles list`,
+        `node ${CLI_PATH} cycles list --team ${teamKey}`,
       );
       const cycles = JSON.parse(listOutput);
 
       // Find a cycle that has a name
-      const cycleWithName = cycles.find((c: any) => c.name);
+      const cycleWithName = cycles.find((c: { name?: string }) => c.name);
 
-      if (cycleWithName && cycleWithName.team) {
+      if (cycleWithName) {
         const cycleName = cycleWithName.name;
-        const teamKey = cycleWithName.team.key;
 
         const { stdout, stderr } = await execAsync(
           `node ${CLI_PATH} cycles read "${cycleName}" --team ${teamKey}`,
@@ -205,32 +217,68 @@ describe("Cycles CLI Commands", () => {
   });
 
   describe("Cycles CLI - Error Cases", () => {
-    it("should reject --around-active without --team", async () => {
+    it("should reject --window without --team", async () => {
       if (!hasApiToken) return;
 
       await expect(
-        execAsync(`node ${CLI_PATH} cycles list --around-active 3`),
-      ).rejects.toThrow(/--around-active requires --team/);
+        execAsync(`node ${CLI_PATH} cycles list --window 3`),
+      ).rejects.toThrow(/--window requires --team/);
     });
 
-    it("should reject --around-active with non-numeric value", async () => {
-      if (!hasApiToken) return;
+    it.skipIf(!hasApiToken)(
+      "should reject --window with non-numeric value",
+      async () => {
+        // Get a real team key
+        const { stdout: teamsOutput } = await execAsync(
+          `node ${CLI_PATH} teams list`,
+        );
+        const teams = JSON.parse(teamsOutput);
 
-      await expect(
-        execAsync(
-          `node ${CLI_PATH} cycles list --around-active abc --team Engineering`,
-        ),
-      ).rejects.toThrow(/--around-active requires a non-negative integer/);
-    });
+        if (teams.length > 0) {
+          const teamKey = teams[0].key;
 
-    it("should reject --around-active with negative value", async () => {
-      if (!hasApiToken) return;
+          try {
+            await execAsync(
+              `node ${CLI_PATH} cycles list --window abc --team ${teamKey}`,
+            );
+            expect.fail("Should have thrown an error");
+          } catch (error: unknown) {
+            const execError = error as { stdout?: string; stderr?: string };
+            const output = JSON.parse(
+              execError.stdout || execError.stderr || "{}",
+            );
+            expect(output.error).toContain("requires a non-negative integer");
+          }
+        }
+      },
+    );
 
-      await expect(
-        execAsync(
-          `node ${CLI_PATH} cycles list --around-active -5 --team Engineering`,
-        ),
-      ).rejects.toThrow(/--around-active requires a non-negative integer/);
-    });
+    it.skipIf(!hasApiToken)(
+      "should reject --window with negative value",
+      async () => {
+        // Get a real team key
+        const { stdout: teamsOutput } = await execAsync(
+          `node ${CLI_PATH} teams list`,
+        );
+        const teams = JSON.parse(teamsOutput);
+
+        if (teams.length > 0) {
+          const teamKey = teams[0].key;
+
+          try {
+            await execAsync(
+              `node ${CLI_PATH} cycles list --window -5 --team ${teamKey}`,
+            );
+            expect.fail("Should have thrown an error");
+          } catch (error: unknown) {
+            const execError = error as { stdout?: string; stderr?: string };
+            const output = JSON.parse(
+              execError.stdout || execError.stderr || "{}",
+            );
+            expect(output.error).toContain("requires a non-negative integer");
+          }
+        }
+      },
+    );
   });
 });

@@ -1,163 +1,145 @@
-<!-- Generated: 2025-01-09T12:34:56+00:00 -->
+# File Catalog
 
-# Files Catalog
+A reference of every file in the Linearis codebase, organized by architectural layer.
 
-Linearis project follows a clean, modular structure with TypeScript source files organized by function. The codebase separates concerns into command handlers, optimized GraphQL service layers, and type definitions, making it easy to locate functionality and understand system relationships.
+## Entry Point
 
-All source files use modern ES modules with TypeScript for type safety. The project maintains clear boundaries between CLI interface logic, GraphQL operations, SDK fallback operations, and data access patterns. Configuration and documentation files provide comprehensive project context and development guidance.
+- **src/main.ts** -- CLI setup with Commander.js. Registers all command groups and parses global options.
 
-## Core Source Files
+## Client Layer (`src/client/`)
 
-### Main Application Logic
+Thin wrappers around the Linear API. No business logic.
 
-**src/main.ts** - CLI entry point and program setup with Commander.js framework **src/commands/issues.ts** - Complete issue management commands (list, search, create, read, update) with enhanced label and parent relationship management **src/commands/projects.ts** - Project operations commands (list, read) with simplified interface **src/commands/comments.ts** - Comment operations (create) with lightweight issue ID resolution **src/commands/teams.ts** - Team operations (list) with workspace team discovery **src/commands/users.ts** - User operations (list) with active user filtering **src/commands/embeds.ts** - File download command for Linear uploaded files with signed URL support
+- **graphql-client.ts** -- `GraphQLClient` class with a typed `request<TResult>(document: DocumentNode, variables?: Record<string, unknown>)` method for direct GraphQL execution.
+- **linear-client.ts** -- `LinearSdkClient` wrapper exposing a readonly `sdk: LinearClient` property for SDK-based lookups.
 
-### Service Layer
+## Resolver Layer (`src/resolvers/`)
 
-**src/utils/graphql-service.ts** - GraphQL client wrapper with raw query execution and batch operation support **src/utils/graphql-issues-service.ts**
+Each resolver converts a human-friendly identifier (name, key, or slug) into a UUID. Resolvers use `LinearSdkClient` exclusively.
 
-- Optimized GraphQL operations for issues with single-query strategy and batch ID resolution **src/utils/linear-service.ts** - Legacy SDK-based Linear API integration with smart ID resolution and fallback operations **src/utils/auth.ts** - Multi-source authentication handling (API token flag, environment variable, token file) **src/utils/output.ts** - JSON response formatting and standardized error handling with async command wrapping **src/utils/embed-parser.ts** - Markdown parsing for Linear upload URL extraction with embed info and expiration tracking **src/utils/file-service.ts** - Authenticated file download service with signed URL support and smart authentication detection
+- **team-resolver.ts** -- `resolveTeamId(client, keyOrNameOrId)`
+- **project-resolver.ts** -- `resolveProjectId(client, nameOrId)`
+- **label-resolver.ts** -- `resolveLabelId(client, nameOrId)`, `resolveLabelIds(client, namesOrIds)`
+- **cycle-resolver.ts** -- `resolveCycleId(client, nameOrId, teamFilter?)`
+- **status-resolver.ts** -- `resolveStatusId(client, nameOrId, teamId?)`
+- **issue-resolver.ts** -- `resolveIssueId(client, issueIdOrIdentifier)`
+- **milestone-resolver.ts** -- `resolveMilestoneId(gqlClient, sdkClient, nameOrId, projectNameOrId?)`
 
-### Type System
+## Service Layer (`src/services/`)
 
-**src/utils/linear-types.d.ts** - Complete TypeScript interfaces for Linear entities (LinearIssue, LinearProject) and operation parameters (CreateIssueArgs, UpdateIssueArgs, SearchIssuesArgs) **src/utils/uuid.ts** - UUID validation utilities for smart ID resolution
+Business logic and CRUD operations. Services use `GraphQLClient` exclusively and accept pre-resolved UUIDs.
 
-### Query Definitions
+- **issue-service.ts** -- `listIssues`, `getIssue`, `searchIssues`, `createIssue`, `updateIssue`
+- **document-service.ts** -- `getDocument`, `createDocument`, `updateDocument`, `listDocuments`, `deleteDocument`
+- **attachment-service.ts** -- `createAttachment`, `deleteAttachment`, `listAttachments`
+- **milestone-service.ts** -- `listMilestones`, `getMilestone`, `createMilestone`, `updateMilestone`
+- **cycle-service.ts** -- `listCycles`, `getCycle`
+- **team-service.ts** -- `listTeams`
+- **user-service.ts** -- `listUsers`
+- **project-service.ts** -- `listProjects`
+- **label-service.ts** -- `listLabels`
+- **comment-service.ts** -- `createComment`
+- **file-service.ts** -- File upload and download operations for Linear uploads
 
-**src/queries/common.ts** - Reusable GraphQL fragments for consistent data fetching across operations **src/queries/issues.ts** - Optimized GraphQL queries and mutations for issue operations (get, create, update, search) **src/queries/index.ts** - Query exports and organization
+## Command Layer (`src/commands/`)
 
-## Configuration Files
+CLI orchestration. Each file registers a command group via a `setup*Commands(program)` function. Commands use `createContext()` to obtain both clients, call resolvers for ID conversion, then delegate to services.
 
-### Package Management
+- **auth.ts** -- `auth login`, `auth status`, `auth logout` — interactive authentication (for humans)
+- **issues.ts** -- `issue list`, `issue search`, `issue read`, `issue create`, `issue update`
+- **documents.ts** -- Document commands with attachment support
+- **project-milestones.ts** -- Milestone CRUD commands
+- **cycles.ts** -- Cycle listing and detail reading
+- **teams.ts** -- Team listing
+- **users.ts** -- User listing
+- **projects.ts** -- Project listing
+- **labels.ts** -- Label listing
+- **comments.ts** -- Comment creation
+- **embeds.ts** -- File download from Linear upload URLs
 
-**package.json** - Project configuration with dependencies (@linear/sdk, commander, tsx), scripts, and Node.js >= 22.0.0 requirement **package-lock.json** - Dependency lock file ensuring reproducible builds with exact versions **mise.toml** - Development environment configuration with Node.js 22 and Deno 2.2.8 tool versions
+## Common Layer (`src/common/`)
 
-### Documentation and Specifications
+Shared utilities used across all layers.
 
-**README.md** - User-facing documentation with installation instructions, usage examples, and performance benchmarks **CLAUDE.md** - AI-specific project instructions, architecture overview, and development guidelines for LLM agents **PERFORMANCE.md** - Detailed performance optimization analysis with before/after benchmarks and optimization techniques
+- **context.ts** -- `CommandContext` interface and `createContext()` factory that produces both `GraphQLClient` and `LinearSdkClient`.
+- **auth.ts** -- `resolveApiToken()` with multi-source lookup: `--api-token` flag, `LINEAR_API_TOKEN` env var, `~/.linearis/token` (encrypted), `~/.linear_api_token` (deprecated).
+- **token-storage.ts** -- `saveToken()`, `getStoredToken()`, `clearToken()` for encrypted token storage in `~/.linearis/token`.
+- **encryption.ts** -- AES-256-CBC encryption for token storage.
+- **output.ts** -- `outputSuccess()`, `outputError()`, and `handleCommand()` wrapper for consistent JSON output and error handling.
+- **errors.ts** -- `notFoundError()`, `multipleMatchesError()`, `invalidParameterError()`, `requiresParameterError()`.
+- **identifier.ts** -- `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`.
+- **types.ts** -- Type aliases derived from codegen output (e.g., `Issue`, `IssueDetail`, `Document`).
+- **embed-parser.ts** -- `extractEmbeds()`, `isLinearUploadUrl()`, `extractFilenameFromUrl()` for parsing embedded files in markdown content.
+- **usage.ts** -- Token-optimized two-tier usage system with `DomainMeta` interface, `formatOverview()` for tier 1 (all domains), and `formatDomainUsage()` for tier 2 (domain detail). Generates USAGE.md via build pipeline.
 
-## Platform Implementation
+## Generated Types (`src/gql/`)
 
-### Command Interface Layer
+Auto-generated by GraphQL Code Generator. **Do not edit these files manually.**
 
-**src/main.ts (lines 3-25)** - Sets up Commander.js with global options and subcommand registration
+- **graphql.ts** -- All generated TypeScript types and `DocumentNode` exports.
+- **gql.ts** -- Generated helper functions.
+- **fragment-masking.ts** -- Fragment masking support.
+- **index.ts** -- Barrel export.
 
-- Global `--api-token` option handling
-- Default help action when no subcommand provided
-- Modular command setup via imported functions
+## GraphQL Definitions (`graphql/`)
 
-**src/commands/*.ts** - Command-specific implementations with consistent patterns:
+Source `.graphql` files that feed into code generation.
 
-- Parameter validation and smart ID resolution
-- Service layer integration via createLinearService
-- Standardized error handling and JSON output
+### Queries
 
-### GraphQL Service Layer
+- `queries/issues.graphql`
+- `queries/documents.graphql`
+- `queries/attachments.graphql`
+- `queries/cycles.graphql`
+- `queries/project-milestones.graphql`
 
-**src/utils/graphql-issues-service.ts** - Optimized GraphQL issue operations:
+### Mutations
 
-- Lines 32-46: Single-query issue listing (reduces N+1 queries to 1 query)
-- Lines 52-100: Issue retrieval by ID with comprehensive data fetching
-- Lines 109-245: Enhanced issue updates with batch resolution and label modes
-- Lines 253-390: Optimized issue creation with batch ID resolution
-- Lines 398-536: Advanced search with filtering and GraphQL optimization
+- `mutations/issues.graphql`
+- `mutations/documents.graphql`
+- `mutations/attachments.graphql`
+- `mutations/files.graphql`
+- `mutations/project-milestones.graphql`
 
-**src/utils/graphql-service.ts** - GraphQL client wrapper:
+## Tests (`tests/`)
 
-- Lines 8-32: Raw GraphQL query execution with error handling
-- Lines 37-44: Batch query operations for parallel execution
+Unit tests mirror the source structure. Resolver tests mock the SDK client; service tests mock the GraphQL client; common tests require no mocks.
 
-### Legacy API Integration Layer
+```
+tests/unit/
+  resolvers/   # e.g., team-resolver.test.ts
+  services/    # e.g., issue-service.test.ts
+  common/      # e.g., identifier.test.ts
+```
 
-**src/utils/linear-service.ts** - SDK-based Linear API service (fallback operations):
+## Configuration
 
-- Lines 193-290: Smart issue ID resolution supporting both UUIDs and human-readable identifiers
-- Lines 354-393: Project operations with relationship fetching
-- Lines 398-473: Smart ID resolution methods for projects, labels, and teams
+- **package.json** -- Project metadata, dependencies, and scripts. Requires Node.js >= 22.
+- **package-lock.json** -- Dependency lock file.
+- **tsconfig.json** -- TypeScript settings (ES2023 target, strict mode, ES modules).
+- **codegen.config.ts** -- GraphQL Code Generator configuration.
+- **vitest.config.ts** -- Test runner configuration.
+- **mise.toml** -- Development tool versions (Node.js 22).
 
-**docs/Linear-API@current.graphql** - Linear GraphQL API schema, downloaded from https://studio.apollographql.com/public/Linear-API/variant/current/schema/sdl?selectedSchema=%23%40%21api%21%40%23
+## Documentation (`docs/`)
 
-## Build System
+- **architecture.md** -- Architecture overview and layer contracts
+- **build-system.md** -- Build and compilation details
+- **deployment.md** -- Deployment guide
+- **development.md** -- Development patterns and workflows
+- **files.md** -- This file
+- **performance.md** -- Performance considerations
+- **project-overview.md** -- High-level project summary
+- **testing.md** -- Testing approach and conventions
+- **Linear-API@current.graphql** -- Linear GraphQL API schema reference
 
-### Execution Environment
+## Data Flow
 
-**Development Execution** - TypeScript execution via tsx:
+```
+CLI Input --> Command --> Resolver --> Service --> JSON Output
+                |            |            |
+           createContext()   SDK       GraphQL
+                          (name->UUID)  (CRUD)
+```
 
-- tsx handles TypeScript compilation at runtime for development
-- ES modules support via package.json "type": "module"
-- All imports use .js extensions for ES module compatibility
-
-**Production Build** - Compiled JavaScript execution:
-
-- `npm run build` creates executable dist/main.js (chmod +x automatically applied)
-- Significantly faster execution than tsx for production use
-- Clean build process removes previous dist/ directory
-
-**Development Scripts** - package.json scripts section:
-
-- `npm start` executes tsx src/main.ts for development
-- `npm run build` compiles to executable dist/main.js
-- `npm run clean` removes compiled dist/ directory
-- `npm test` runs the test suite
-
-### Dependencies Structure
-
-**Production Dependencies** (package.json lines 18-22):
-
-- @linear/sdk ^58.1.0 - Official Linear GraphQL API client (used for GraphQL client and fallback operations)
-- commander ^14.0.0 - CLI framework for command structure
-
-**Development Dependencies** (package.json lines 23-26):
-
-- @types/node ^22.0.0 - Node.js type definitions
-- tsx ^4.20.5 - TypeScript execution engine for development
-- typescript ^5.0.0 - TypeScript compiler and language support
-
-## Reference
-
-### File Relationships and Dependencies
-
-**Modern Command Flow**: src/main.ts → src/commands/*.ts → src/utils/graphql-issues-service.ts → src/utils/graphql-service.ts → @linear/sdk GraphQL client
-
-**Legacy Command Flow**: src/main.ts → src/commands/*.ts → src/utils/linear-service.ts → @linear/sdk
-
-**Embeds Command Flow**: src/main.ts → src/commands/embeds.ts → src/utils/file-service.ts → Linear uploads.linear.app
-
-**Embed Extraction Flow**: GraphQL response → src/utils/graphql-issues-service.ts → src/utils/embed-parser.ts → embeds array in JSON output
-
-**Authentication Flow**: Command options → src/utils/auth.ts → service layer
-
-**Response Flow**: GraphQL/Service results → src/utils/output.ts → JSON console output
-
-**Query Organization**: src/queries/issues.ts → src/queries/common.ts fragments → GraphQL execution
-
-### Key Entry Points for Development
-
-**Adding Commands** - Start with src/commands/ files, follow existing patterns\
-**GraphQL Integration** - Add queries to src/queries/ and extend src/utils/graphql-issues-service.ts\
-**Legacy API Integration** - Extend src/utils/linear-service.ts methods for fallback operations\
-**Authentication** - Modify src/utils/auth.ts for new authentication methods\
-**Type Definitions** - Update src/utils/linear-types.d.ts for new data structures
-
-### File Size and Complexity
-
-Most files are focused and maintainable:
-
-- src/main.ts: 25 lines - Minimal CLI setup
-- src/utils/auth.ts: 39 lines - Simple authentication logic
-- src/utils/output.ts: 34 lines - Utility functions only
-- src/commands/embeds.ts: 58 lines - File download command
-- src/utils/graphql-service.ts: 62 lines - GraphQL client wrapper
-- src/utils/embed-parser.ts: 86 lines - Markdown embed extraction
-- src/utils/file-service.ts: 111 lines - File download with auth
-- src/commands/issues.ts: 211 lines - Comprehensive but focused
-- src/commands/comments.ts: 46 lines - Simple comment operations
-- src/queries/issues.ts: 301 lines - GraphQL queries and mutations
-- src/utils/graphql-issues-service.ts: 604 lines - Optimized GraphQL operations
-- src/utils/linear-service.ts: 485 lines - Legacy SDK operations (could be reduced as GraphQL operations replace them)
-
-### Naming Conventions
-
-**Files**: Kebab-case for multi-word names (linear-service.ts, graphql-issues-service.ts, linear-types.d.ts)\
-**Directories**: Lowercase single words (commands, utils, queries)\
-**Exports**: PascalCase classes (LinearService, GraphQLIssuesService), camelCase functions (createLinearService, createGraphQLService)
+Resolvers convert human-friendly identifiers to UUIDs exactly once. Services operate solely on UUIDs. Commands tie the pieces together.

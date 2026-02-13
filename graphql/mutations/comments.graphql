@@ -1,0 +1,41 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear issue comments
+#
+# Comments are discussion threads on issues. Each comment has a body
+# (markdown-formatted text), author, and timestamp. Comments cannot
+# be nested - all comments on an issue are at the same level.
+#
+# Key behavior: Comment body supports full markdown including code
+# blocks, links, and mentions (@user). Comments cannot be edited via
+# API - only created and deleted. Use commentUpdate mutation if it
+# becomes available.
+# ------------------------------------------------------------
+
+# Comment fields fragment
+#
+# Defines the basic fields for a comment entity. Body is markdown,
+# createdAt is ISO 8601 timestamp.
+fragment CommentFields on Comment {
+  id
+  body
+  createdAt
+}
+
+# Create a comment on an issue
+#
+# Creates a new comment on the specified issue. The comment body
+# supports markdown formatting including mentions and code blocks.
+#
+# Input fields (CommentCreateInput):
+#   issueId: UUID of the issue to comment on (required)
+#   body: Comment text in markdown format (required)
+#
+# Returns: success flag and the created comment with its fields
+mutation CreateComment($input: CommentCreateInput!) {
+  commentCreate(input: $input) {
+    success
+    comment {
+      ...CommentFields
+    }
+  }
+}

@@ -2,57 +2,73 @@ name: CI
 
 on:
   push:
-    branches: [main, pr-*]
+    branches: 
+      - main
   pull_request:
-    branches: [main]
+    types: 
+      - opened
+      - synchronize
+      - ready_for_review
+      - reopened
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Test on Node ${{ matrix.node-version }}
+    name: Unit tests on node v${{ matrix.node-version }}
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [22.x]
+        node-version: [22]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup node v${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install deps
         run: npm ci
 
       - name: Build project
         run: npm run build
 
-      - name: Run tests
+      - name: Run unit tests
         run: npm test
 
   lint:
-    name: Lint and Type Check
+    strategy:
+      matrix:
+        node-version: [22]
+
+    name: Code checks on node v${{ matrix.node-version }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup node v${{ matrix.node-version }}
+        uses: actions/setup-node@v6
         with:
-          node-version: 22.x
+          node-version: ${{ matrix.node-version }}
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install deps
         run: npm ci
 
-      - name: TypeScript type check
+      - name: Build project
         run: npm run build
 
-      - name: Check for TypeScript errors
+      - name: Biome check
+        run: npm run check:ci
+
+      - name: TypeScript type check
         run: npx tsc --noEmit

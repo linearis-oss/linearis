@@ -1,6 +1,6 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { exec } from "child_process";
-import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -38,9 +38,7 @@ describe("Teams CLI Commands", () => {
 
   describe("teams list", () => {
     it.skipIf(!hasApiToken)("should list teams without error", async () => {
-      const { stdout, stderr } = await execAsync(
-        `node ${CLI_PATH} teams list`,
-      );
+      const { stdout, stderr } = await execAsync(`node ${CLI_PATH} teams list`);
 
       // Should not have errors
       expect(stderr).not.toContain("error");
@@ -63,8 +61,7 @@ describe("Teams CLI Commands", () => {
       expect(team).toHaveProperty("id");
       expect(team).toHaveProperty("key");
       expect(team).toHaveProperty("name");
-      // description is optional
-      expect(team).toHaveProperty("description");
+      // Note: description omitted in new architecture for token optimization
     });
 
     it.skipIf(!hasApiToken)("should return teams sorted by name", async () => {

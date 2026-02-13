@@ -1,149 +1,189 @@
-<!-- Generated: 2025-08-31T18:51:03+02:00 -->
-
 # Build System
 
-Linearis uses a TypeScript compilation-based build system optimized for both development productivity and production performance. The project features automatic builds during installation, and cross-platform clean scripts.
+Linearis uses TypeScript compilation for production builds, GraphQL code generation for type-safe API access, and Vitest for testing. Development runs directly via tsx without a compilation step.
 
-The build system leverages TypeScript's compiler for production builds while maintaining tsx for development convenience. All builds output to the dist/ directory with automated preparation during npm install, ensuring consistent deployment across platforms.
+## Prerequisites
+
+- **Node.js >= 22.0.0** -- required for ES module support and modern language features
+- **mise** (optional) -- manages tool versions via `mise.toml`; run `mise install` to set up Node.js 22 and Deno 2.2.8 automatically
+
+## Getting Started
+
+```bash
+npm install       # Install dependencies and run GraphQL codegen (postinstall hook)
+npm start         # Run in development mode (regenerates types, then executes via tsx)
+```
+
+After `npm install`, the project is ready for development. The `postinstall` hook runs GraphQL codegen automatically, so `src/gql/graphql.ts` is always up to date.
+
+## GraphQL Code Generation
+
+The project uses [GraphQL Code Generator](https://the-guild.dev/graphql/codegen) to produce TypeScript types and typed document nodes from `.graphql` files.
+
+**How it works:**
+
+1. GraphQL queries and mutations are defined in `graphql/**/*.graphql`.
+2. Running `npm run generate` introspects the Linear API schema and generates typed output into `src/gql/`.
+3. Services import the generated `DocumentNode` constants and result types from `src/gql/graphql.ts`.
+
+**When codegen runs automatically:**
+
+- On `npm install` (postinstall hook)
+- On `npm start` (prestart hook)
+
+**Configuration:** `codegen.config.ts` -- uses the `client` preset with fragment masking disabled, pointing at the Linear API schema.
+
+> **Important:** Never edit files in `src/gql/` by hand. They are regenerated and any manual changes will be lost.
+
+## Usage Documentation Generation
+
+The project auto-generates token-optimized usage documentation for LLM agents.
+
+**How it works:**
+
+1. Each command file exports a `DomainMeta` object with domain name, summary, context, arguments, and cross-references.
+2. Running `npm run generate:usage` executes `linearis usage --all` and captures output to `USAGE.md`.
+3. The generated file contains two tiers: overview (~200 tokens) + per-domain detail (~300-500 tokens each).
+
+**When usage generation runs automatically:**
+
+- On `npm run build` (prebuild hook)
+- Before publishing (via prebuild in prepublishOnly chain)
+
+**Generated output:** `USAGE.md` -- Token-optimized usage documentation committed to the repository and shipped with the package. Typical agent cost: overview + 1 domain = ~500-700 tokens (vs ~3000+ for traditional help text).
+
+> **Important:** USAGE.md is auto-generated. Edit `DomainMeta` objects in command files instead. The file is regenerated on every build.
 
 ## Build Workflows
 
-### Production Build Process
-
-**TypeScript Compilation** - tsconfig.json (lines 7-8) outputs to dist/:
+### Development
 
 ```bash
-npm run build
-# Executes: tsc (compiles src/ → dist/)
+npm start <command>     # Runs codegen, then executes src/main.ts via tsx
 ```
 
-**Automated Build During Install** - package.json (line 13):
+tsx provides on-the-fly TypeScript execution without a separate compilation step. Startup is slower than compiled output (~0.64s vs ~0.15s) but avoids the build cycle during development.
+
+### Production Build
 
 ```bash
-npm install  # Automatically runs prepare script
-# Executes: npm run clean && npm run build
+npm run build           # Compiles TypeScript to dist/ and marks dist/main.js as executable
 ```
 
-**Cross-Platform Clean** - package.json (line 12):
-
-```bash
-npm run clean
-# Executes: node -e "require('fs').rmSync('dist', {recursive: true, force: true})"
-```
-
-### Development Execution
-
-**Development Command** - package.json (line 14):
-
-```bash
-npm start <command>
-# Executes: tsx src/main.ts <command>
-```
-
-**Production Execution** - package.json (lines 5, 8):
+The compiled binary entry point is `dist/main.js`:
 
 ```bash
 node dist/main.js <command>
 ```
 
-### Package Management Workflows
-
-**Installation with Build**:
+### Clean
 
 ```bash
-npm install  # Install dependencies and automatically build
-npm update   # Update to latest versions within constraints
+npm run clean           # rm -rf dist/
 ```
 
-**Dependency Management**
-
-- **Runtime dependencies** - package.json (lines 24-27) - @linear/sdk, commander
-- **Development dependencies** - package.json (lines 28-32) - @types/node, tsx, typescript
-
-### Development Environment Setup
-
-**Environment Tool Configuration** - mise.toml (lines 1-3)
+### Publishing
 
 ```bash
-mise install    # Install Node.js 22 and Deno 2.2.8
-mise use         # Activate configured tool versions
+npm publish             # Triggers prepublishOnly: build, test, and verify dist/main.js is executable
 ```
 
-## Platform Setup
+## Testing
 
-### Node.js Requirements
-
-**Version Constraint** - package.json (lines 11-13)
-
-- Node.js >= 22.0.0 required for ES modules and modern features
-- TypeScript 5.0.0 for latest language features
-
-### TypeScript Configuration
-
-**Build Configuration** - tsconfig.json (lines 2-16):
-
-- Target: ES2023 with modern Node.js features
-- Module: ESNext with ES modules output
-- Output: dist/ directory with declaration files
-- Optimization: Remove comments, no source maps for production
-
-**Module System** - package.json (line 6):
-
-- ES modules enabled with "type": "module"
-- Binary points to compiled dist/main.js (line 8)
-- All imports use .js extensions for ES module compatibility
-
-### Package Manager Lock
-
-**Reproducible Builds** - package-lock.json
-
-- Exact dependency versions locked for consistent installations
-
-## Reference
-
-### Build Targets and Commands
-
-| Command           | File Reference       | Purpose                                   |
-| ----------------- | -------------------- | ----------------------------------------- |
-| `npm run build`   | package.json line 11 | Compile TypeScript to JavaScript (tsc)    |
-| `npm run clean`   | package.json line 12 | Remove dist/ directory (cross-platform)   |
-| `npm run prepare` | package.json line 13 | Auto-build during install (clean + build) |
-| `npm start`       | package.json line 14 | Development execution with tsx            |
-| `npm test`        | package.json line 15 | Run test suite                            |
-
-### Configuration Files
-
-- **package.json** - Main project configuration with dependencies, scripts, and binary setup
-- **tsconfig.json** - TypeScript compilation configuration targeting ES2023
-- **package-lock.json** - Dependency lock file for reproducible builds
-- **mise.toml** - Development environment tool versions
-
-### Troubleshooting Build Issues
-
-**Build Failures** - TypeScript compilation errors:
+Linearis uses [Vitest](https://vitest.dev) for unit and integration tests. Test files live in `tests/` and follow the pattern `tests/**/*.test.ts`.
 
 ```bash
-# Clean and rebuild
-npm run clean
-npm run build
+npm test                # Run all tests once
+npm run test:watch      # Run tests in watch mode
+npm run test:ui         # Open the Vitest browser UI
+npm run test:coverage   # Run tests with V8 coverage reporting
+npm run test:commands   # Run command coverage analysis
 ```
 
-**Performance Comparison** - Execution timing:
+**Configuration:** `vitest.config.ts` -- uses the Node environment with V8 coverage. Coverage reports are generated in text, JSON, and HTML formats. Source files in `src/` are included; declaration files, `src/main.ts`, and `dist/` are excluded from coverage.
 
-- Compiled JavaScript: ~0.15s startup (production)
-- tsx TypeScript: ~0.64s startup (development only)
+## Scripts Reference
 
-**Import Resolution** - All imports in TypeScript files use .js extensions:
+| Script | Command | Purpose |
+|---|---|---|
+| `build` | `tsc && chmod +x dist/main.js` | Compile TypeScript and make entry point executable |
+| `clean` | `rm -rf dist/` | Remove compiled output |
+| `start` | `tsx src/main.ts` | Run in development mode |
+| `test` | `vitest run` | Run test suite once |
+| `test:watch` | `vitest` | Run tests in watch mode |
+| `test:ui` | `vitest --ui` | Open Vitest browser UI |
+| `test:coverage` | `vitest run --coverage` | Run tests with coverage |
+| `test:commands` | `tsx tests/command-coverage.ts` | Check command test coverage |
+| `generate` | `graphql-codegen --config codegen.config.ts` | Generate TypeScript types from GraphQL |
+| `generate:usage` | `tsx src/main.ts usage --all > USAGE.md` | Generate token-optimized usage documentation |
+| `prebuild` | `npm run generate && npm run generate:usage` | Auto-run codegen and usage generation before build |
+| `prestart` | `npm run generate` | Auto-run codegen before `npm start` |
+| `postinstall` | `npm run generate` | Auto-run codegen after `npm install` |
+| `prepublishOnly` | `npm run build && npm run test && test -x dist/main.js` | Validate before publish |
 
-- src/main.ts imports use .js extensions for ES modules compatibility
-- TypeScript compiler resolves .js → .ts during compilation
+## Configuration Files
 
-**Missing dist/ Directory**:
+| File | Purpose |
+|---|---|
+| `package.json` | Project metadata, scripts, and dependencies |
+| `tsconfig.json` | TypeScript compiler options (ES2022 target, ESNext modules, strict mode, output to `dist/`) |
+| `codegen.config.ts` | GraphQL Code Generator configuration (Linear API schema, client preset) |
+| `vitest.config.ts` | Vitest test runner and coverage settings |
+| `mise.toml` | Development tool versions (Node.js 22, Deno 2.2.8) |
 
-- Run `npm run prepare` to build after fresh clone
-- dist/ directory auto-created during npm install
+## Dependencies
 
-**Node.js Version Issues**
+### Runtime
 
-- Verify Node.js >= 22.0.0 with `node --version`
-- Use mise or nvm to manage Node.js versions
+| Package | Version | Purpose |
+|---|---|---|
+| `@linear/sdk` | ^58.1.0 | Linear API SDK for ID resolution |
+| `commander` | ^14.0.0 | CLI argument parsing |
+
+### Development
+
+| Package | Version | Purpose |
+|---|---|---|
+| `@graphql-codegen/cli` | ^6.1.1 | GraphQL code generation CLI |
+| `@graphql-codegen/client-preset` | ^5.2.2 | Typed document node generation |
+| `@graphql-codegen/introspection` | 5.0.0 | Schema introspection plugin |
+| `@graphql-codegen/schema-ast` | ^5.0.0 | Schema AST generation |
+| `@types/node` | ^22.0.0 | Node.js type definitions |
+| `@vitest/coverage-v8` | ^2.1.8 | V8-based code coverage |
+| `@vitest/ui` | ^2.1.8 | Browser-based test UI |
+| `tsx` | ^4.20.5 | TypeScript execution for development |
+| `typescript` | ^5.0.0 | TypeScript compiler |
+| `vitest` | ^2.1.8 | Test runner |
+
+## TypeScript Configuration
+
+Key `tsconfig.json` settings:
+
+- **Target:** ES2022
+- **Module system:** ESNext with Node module resolution
+- **Strict mode:** Enabled
+- **Output directory:** `dist/`
+- **Source maps:** Disabled (production builds only)
+- **Comments:** Stripped from output
+- **Excluded from compilation:** `node_modules`, `dist`, `tests`, test files, `vitest.config.ts`
+
+All imports use `.js` extensions for ES module compatibility. TypeScript resolves `.js` to `.ts` during compilation.
+
+## Troubleshooting
+
+**TypeScript errors after changing GraphQL files:**
+Run `npm run generate` to regenerate types, then rebuild.
+
+**Missing `src/gql/graphql.ts`:**
+Run `npm run generate` or `npm install` (the postinstall hook handles this).
+
+**Build failures:**
+```bash
+npm run clean && npm run generate && npm run build
+```
+
+**Node.js version issues:**
+Verify you are running Node.js >= 22 with `node --version`. Use mise (`mise install`) or nvm to manage versions.
+
+**Missing `dist/` directory:**
+Run `npm run build`. The `dist/` directory is not checked into version control.

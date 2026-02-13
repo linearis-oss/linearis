@@ -1,34 +1,30 @@
-<!-- Generated: 2025-01-09T12:34:56+00:00 -->
-
 # Performance Optimizations
 
 This document details the performance optimizations implemented in the Linear CLI tool.
 
-## Performance Problems Identified
+## The N+1 Query Problem
 
-### Original N+1 Query Problem
+The initial implementation used the Linear SDK's lazy-loading model, which suffered from a classic N+1 query problem:
 
-The initial implementation suffered from a classic N+1 query problem:
+1. **1 query** to fetch the issues list
+2. **N additional queries** per issue for related data:
+   - 1 query for state
+   - 1 query for team
+   - 1 query for assignee
+   - 1 query for project
+   - 1 query for labels
 
-1. **Single query** to fetch issues list
-2. **N additional queries** for each issue's related data:
-   - 1 query for state information
-   - 1 query for team information
-   - 1 query for assignee information
-   - 1 query for project information
-   - 1 query for labels information
+For 10 issues, this resulted in 1 + (10 x 5) = **51 API calls**, taking 10+ seconds.
 
-**Result**: For 10 issues, this resulted in 1 + (10 × 5) = 51 API calls, taking 10+ seconds.
+## Solution: Direct GraphQL with Typed Codegen
 
-## Solutions Implemented
+All data-fetching operations now use single, comprehensive GraphQL queries executed through `GraphQLClient.request<T>()`. Query definitions live in `.graphql` files and are processed by codegen into typed `DocumentNode` exports and result types.
 
-### 1. GraphQL Single-Query Strategy
-
-**Before** (Multiple API calls):
+### Before: SDK Lazy Loading (Slow)
 
 ```typescript
-// Multiple sequential API calls - SLOW
-const issues = await this.client.issues({ first: 10 });
+// N+1 pattern -- each property access triggers a separate API call
+const issues = await client.sdk.issues({ first: 10 });
 for (const issue of issues.nodes) {
   const state = await issue.state;
   const team = await issue.team;
@@ -38,153 +34,138 @@ for (const issue of issues.nodes) {
 }
 ```
 
-**After** (Single GraphQL query):
+### After: Single GraphQL Query (Fast)
 
 ```typescript
-// Single comprehensive GraphQL query - FAST
-const result = await this.graphQLService.rawRequest(GET_ISSUES_QUERY, {
+// One query fetches issues with all relationships included
+const result = await client.request<GetIssuesQuery>(GetIssuesDocument, {
   first: limit,
   orderBy: "updatedAt",
 });
-// All relationships included in single response
+// result.issues.nodes already contains state, team, assignee, project, labels
 ```
 
-### 2. GraphQL Batch Resolution
+### Batch ID Resolution
 
-**Before** (Sequential ID resolution):
+Operations that need to resolve multiple human-friendly identifiers (team keys, project names, label names) into UUIDs do so in a single batch query rather than issuing separate lookups.
 
-```typescript
-// Resolve team name → ID
-const team = await this.resolveTeamByName(teamName);
-// Resolve project name → ID  
-const project = await this.resolveProjectByName(projectName);
-// Resolve label names → IDs
-const labels = await Promise.all(labelNames.map(name => this.resolveLabelByName(name)));
-// Then create issue
-const issue = await this.createIssue({...});
-```
-
-**After** (Batch GraphQL resolution):
+**Before** (sequential resolution):
 
 ```typescript
-// Single query resolves ALL IDs at once
-const resolveResult = await this.graphQLService.rawRequest(
-  BATCH_RESOLVE_FOR_CREATE_QUERY,
-  { teamName, projectName, labelNames },
+const team = await resolveTeamByName(teamName);       // 1 API call
+const project = await resolveProjectByName(projName);  // 1 API call
+const labels = await Promise.all(                      // N API calls
+  labelNames.map(name => resolveLabelByName(name))
 );
-// Then create with resolved IDs
+const issue = await createIssue({ ... });              // 1 API call
 ```
 
-This reduces issue creation from **7+ API calls to 2 API calls**.
+**After** (batch resolution in a single query):
 
-### 3. Optimized Query Fragments
+```typescript
+const resolved = await client.request<BatchResolveForCreateQuery>(
+  BatchResolveForCreateDocument,
+  { teamKey, projectName, labelNames },
+);
+// All IDs resolved -- proceed with creation
+const issue = await createIssue(client, { ...resolvedInput });
+```
 
-**Comprehensive Data Fetching** (src/queries/common.ts):
+This reduces issue creation from 7+ API calls down to 2.
+
+## Fragment Reuse
+
+GraphQL fragments defined in `graphql/queries/*.graphql` ensure consistent, complete data fetching across operations. For example, `CompleteIssueFields` is shared by list, read, and search queries:
 
 ```graphql
-fragment CompleteIssue on Issue {
-  id identifier title description priority estimate
+# graphql/queries/issues.graphql
+
+fragment CompleteIssueFields on Issue {
+  id
+  identifier
+  title
+  description
+  priority
+  estimate
+  createdAt
+  updatedAt
   state { id name }
   assignee { id name }
   team { id key name }
   project { id name }
   labels { nodes { id name } }
-  createdAt updatedAt
+  cycle { id name number }
+  parent { id identifier title }
+  children { nodes { id identifier title } }
+}
+
+query GetIssues($first: Int!, $orderBy: PaginationOrderBy) {
+  issues(first: $first, orderBy: $orderBy, ...) {
+    nodes { ...CompleteIssueFields }
+  }
 }
 ```
 
-All issue operations use shared fragments to ensure consistent, complete data fetching without redundant queries.
+All services import typed `DocumentNode` and result types from codegen output, so queries are never written as raw strings.
 
-## Performance Results
+## Benchmarks
 
-### Benchmarks
+All benchmarks performed against the real Linear API:
 
-All tests performed with real Linear API:
+| Operation         | Before (SDK) | After (GraphQL) | Improvement     |
+| ----------------- | ------------ | --------------- | --------------- |
+| Single issue read | ~10+ seconds | ~0.9-1.1 seconds | 90%+ faster |
+| List 10 issues    | ~30+ seconds | ~0.9 seconds     | 95%+ faster |
+| Create issue      | ~2-3 seconds | ~1.1 seconds     | 50%+ faster |
+| Search issues     | ~15+ seconds | ~1.0 seconds     | 93%+ faster |
 
-| Operation         | Before       | After            | Improvement     |
-| ----------------- | ------------ | ---------------- | --------------- |
-| Single issue read | ~10+ seconds | ~0.9-1.1 seconds | **90%+ faster** |
-| List 10 issues    | ~30+ seconds | ~0.9 seconds     | **95%+ faster** |
-| Create issue      | ~2-3 seconds | ~1.1 seconds     | **50%+ faster** |
-| Search issues     | ~15+ seconds | ~1.0 seconds     | **93%+ faster** |
-
-### Test Commands Used
+### Test Commands
 
 ```bash
-# Single issue read
 time npm start issues read ABC-123
-
-# List issues  
 time npm start issues list -l 10
-
-# Create issue
 time npm start issues create --title "Test" --team ABC
-
-# Search issues
 time npm start issues search "test" --team ABC
 ```
 
-### Real-World Performance
-
-Example output from `time npm start issues list -l 1`:
+### Example Timing
 
 ```
 npm start issues list -l 1 < /dev/null  0.62s user 0.08s system 77% cpu 0.904 total
 ```
 
-**Total time: 0.904 seconds** (including npm overhead and Node.js startup)
+Total wall time: 0.904 seconds (including npm overhead and Node.js startup).
 
-## Technical Implementation Details
+## Code Locations
 
-### Code Locations
+- `src/client/graphql-client.ts` -- GraphQL client wrapper with typed `request<T>()` method
+- `src/services/issue-service.ts` -- Issue CRUD and search operations
+- `src/services/` -- Other domain services (documents, attachments, cycles, etc.)
+- `graphql/queries/*.graphql` -- Query and fragment definitions
+- `graphql/mutations/*.graphql` -- Mutation definitions
+- `src/gql/graphql.ts` -- Codegen output (generated, do not edit)
+- `src/commands/issues.ts` -- CLI command orchestration
 
-The GraphQL optimizations are implemented in:
+## Key Principles
 
-- **src/utils/graphql-service.ts** - GraphQL client wrapper with batch operations
-- **src/utils/graphql-issues-service.ts** - Single-query issue operations (lines 32-536)
-- **src/queries/issues.ts** - Optimized GraphQL queries and fragments
-- **src/queries/common.ts** - Reusable query fragments for consistent data fetching
-- **src/commands/issues.ts** - Enhanced commands using GraphQL service
+1. **Single GraphQL queries** -- Replace N+1 SDK patterns with comprehensive queries that fetch all relationships in one round trip.
+2. **Batch ID resolution** -- Resolve multiple identifiers in a single query before performing mutations.
+3. **Fragment reuse** -- Shared `.graphql` fragments keep field selections consistent and reduce duplication.
+4. **Typed operations** -- All queries use codegen `DocumentNode` exports and typed results (`client.request<GetIssuesQuery>(GetIssuesDocument, ...)`), catching schema mismatches at compile time.
 
-### Key Performance Patterns
-
-1. **Single GraphQL Queries**: Replace N+1 patterns with comprehensive single queries
-2. **Batch ID Resolution**: Resolve multiple identifiers in single operations
-3. **Fragment Reuse**: Use consistent GraphQL fragments across operations
-4. **Smart Caching**: Leverage GraphQL response structure for efficient data handling
-5. **Lightweight Operations**: Use minimal queries for simple operations like comment creation
-
-## Monitoring Performance
-
-To monitor performance in production:
+## Monitoring
 
 ```bash
-# Add timing to any command
+# Time any command
 time linearis <command>
 
-# Example: Monitor issue listing performance
+# Examples
 time linearis issues list -l 25
-
-# Example: Monitor search performance  
 time linearis issues search "bug" --team ABC
 ```
 
-## Future Optimizations
+## Future Considerations
 
-Potential areas for further improvement:
-
-1. **Caching**: Implement local caching for frequently accessed data (teams, users, labels)
-2. **Connection Pooling**: Optimize HTTP connections to Linear's GraphQL API
-3. **Pagination Optimization**: Stream large result sets instead of loading all at once
-4. **Background Prefetching**: Pre-load common data in background
-
-## Impact
-
-The performance optimizations provide:
-
-- **90%+ reduction** in API response times
-- **Better user experience** with sub-second response times
-- **Reduced API load** on Linear's servers
-- **More efficient** resource utilization
-
-These improvements make the CLI suitable for real-time use and integration into automated workflows.
+- **Local caching** for frequently accessed reference data (teams, users, labels)
+- **Pagination streaming** for large result sets
+- **Connection pooling** for HTTP connections to the Linear API

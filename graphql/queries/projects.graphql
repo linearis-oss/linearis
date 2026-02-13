@@ -1,0 +1,41 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear projects
+#
+# Projects group related issues across teams toward a common goal.
+# Each project has a state (planned, started, paused, completed,
+# canceled), optional target date, and can contain milestones.
+# Projects are workspace-level and can span multiple teams.
+#
+# Key behavior: Project slugId is a URL-friendly identifier used
+# in Linear's web UI. The state field is a string enum, not a
+# relationship to a State entity.
+# ------------------------------------------------------------
+
+# Project fields fragment
+#
+# Defines the basic fields for a project entity. State is one of:
+# planned, started, paused, completed, canceled. TargetDate is nullable.
+fragment ProjectFields on Project {
+  id
+  name
+  description
+  state
+  targetDate
+  slugId
+}
+
+# List all projects in the workspace
+#
+# Fetches a list of projects across all teams. Projects are typically
+# limited in number (active projects < 50 is common), so pagination
+# is rarely needed.
+#
+# Variables:
+#   $first: Maximum number of projects to return (default: 50)
+query GetProjects($first: Int = 50) {
+  projects(first: $first) {
+    nodes {
+      ...ProjectFields
+    }
+  }
+}

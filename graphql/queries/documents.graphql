@@ -1,0 +1,44 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear documents
+#
+# Documents are standalone entities that can be associated with projects,
+# initiatives, or teams. To link a document to an issue, use the
+# attachments API (see attachments.graphql).
+# ------------------------------------------------------------
+
+# Document fields fragment
+#
+# Defines the basic fields for a document entity. The trashed field
+# indicates soft-deletion status (documents are not hard-deleted).
+fragment DocumentFields on Document {
+  id
+  title
+  content
+  slugId
+  url
+  icon
+  color
+  createdAt
+  updatedAt
+  trashed
+}
+
+# Get a single document by ID
+#
+# Fetches a document by its unique identifier.
+query GetDocument($id: String!) {
+  document(id: $id) {
+    ...DocumentFields
+  }
+}
+
+# List documents with optional filtering
+#
+# Fetches a list of documents with optional filtering criteria.
+query ListDocuments($first: Int!, $filter: DocumentFilter) {
+  documents(first: $first, filter: $filter) {
+    nodes {
+      ...DocumentFields
+    }
+  }
+}

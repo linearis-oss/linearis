@@ -1,6 +1,6 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { exec } from "child_process";
-import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -38,9 +38,7 @@ describe("Users CLI Commands", () => {
 
   describe("users list", () => {
     it.skipIf(!hasApiToken)("should list users without error", async () => {
-      const { stdout, stderr } = await execAsync(
-        `node ${CLI_PATH} users list`,
-      );
+      const { stdout, stderr } = await execAsync(`node ${CLI_PATH} users list`);
 
       // Should not have errors
       expect(stderr).not.toContain("error");
@@ -62,9 +60,9 @@ describe("Users CLI Commands", () => {
       // Verify user has expected fields
       expect(user).toHaveProperty("id");
       expect(user).toHaveProperty("name");
-      expect(user).toHaveProperty("displayName");
       expect(user).toHaveProperty("email");
       expect(user).toHaveProperty("active");
+      // Note: displayName omitted in new architecture for token optimization
     });
 
     it.skipIf(!hasApiToken)("should filter active users only", async () => {

@@ -1,56 +1,70 @@
-<!-- Generated: 2025-01-09T12:34:56+00:00 -->
-
 # Project Overview
 
-Linearis is a high-performance Command Line Interface (CLI) tool for Linear.app that outputs structured JSON data. It's specifically designed for LLM agents and users who prefer structured output over web interfaces. Built with TypeScript and Node.js, the tool provides complete Linear API coverage with smart ID resolution and optimized performance.
+Linearis is a command-line interface for [Linear.app](https://linear.app) that outputs structured JSON. It is built for automation, scripting, and integration with other tools, including LLM agents.
 
-The CLI eliminates common performance bottlenecks found in API integrations, achieving 90%+ speed improvements over parallel direct Linear SDK calls through optimized GraphQL batch operations and single-query strategies. All commands return JSON-formatted responses, making it ideal for automation, scripting, and integration with other tools.
+All commands return JSON-formatted responses. Human-friendly identifiers (such as team keys like `ENG` or issue identifiers like `ENG-42`) are automatically resolved to internal UUIDs before any API call is made.
 
-The tool supports comprehensive issue management (create, read, update, list, search), project operations, comment handling, and enhanced label management with intelligent conversion between user-friendly identifiers (like ABC-123) and internal UUIDs.
+## Architecture
 
-## Key Files
+The codebase follows a five-layer architecture. Each layer has a specific responsibility and a strict client contract.
 
-### Main Entry Points
+| Layer | Directory | Responsibility | Client |
+|-------|-----------|---------------|--------|
+| Client | `src/client/` | Low-level API wrappers | -- |
+| Resolver | `src/resolvers/` | Human ID to UUID conversion | LinearSdkClient |
+| Service | `src/services/` | Business logic and CRUD operations | GraphQLClient |
+| Command | `src/commands/` | CLI orchestration via Commander.js | Both (via `createContext()`) |
+| Common | `src/common/` | Shared utilities, types, error handling | -- |
 
-- **src/main.ts** - CLI entry point with Commander.js setup and command routing
-- **package.json** - Project configuration with Node.js >= 22.0.0 requirement
+Data flows in one direction:
 
-### Core Configuration Files
+```
+CLI Input -> Command -> Resolver -> Service -> JSON Output
+```
 
-- **CLAUDE.md** - AI-specific project instructions and development guidelines
-- **README.md** - User-facing documentation with usage examples and setup instructions
+Commands receive user input, resolve any identifiers to UUIDs through the resolver layer, then delegate to services for the actual API operations. Services never perform ID resolution, and resolvers never perform data mutations.
 
 ## Technology Stack
 
-### Core Technologies with File Examples
+- **TypeScript** with strict mode enabled and no `any` types
+- **Node.js** >= 22.0.0, ES modules throughout
+- **Commander.js** v14.0.0 for CLI structure
+- **Linear SDK** v58.1.0 for the SDK client used in resolvers
+- **GraphQL Codegen** for type-safe query and mutation documents
+- **Vitest** for unit testing
+- **tsx** for development execution
 
-- **TypeScript** - Full type safety implementation (all .ts files in src/)
-- **Node.js >= 22.0.0** - Modern runtime with ES modules support (package.json engines field)
-- **Commander.js v14.0.0** - CLI framework used in src/main.ts for command structure
-- **Linear SDK v58.1.0** - GraphQL API integration with optimized service layer in src/utils/graphql-service.ts and src/utils/linear-service.ts
-- **tsx v4.20.5** - TypeScript execution engine for development (package.json scripts.start)
+## Key Entry Points
 
-### Package Management
+- `src/main.ts` -- CLI entry point, registers all commands
+- `src/common/context.ts` -- `createContext()` factory that provides both clients
+- `src/common/auth.ts` -- authentication resolution
 
-- **npm** - Package manager
-- **package-lock.json** - Lock file ensuring reproducible builds
+## Authentication
 
-## Platform Support
+Interactive setup (for humans): `linearis auth login` — opens Linear in the browser and stores the token encrypted in `~/.linearis/token`.
 
-### Development Environment Requirements
+Token resolution order:
 
-- **Node.js >= 22.0.0** - Required runtime version specified in package.json engines
-- **mise.toml** - Development environment tool configuration with Node.js 22 and Deno 2.2.8
-- **TypeScript 5.0.0** - Type system and compilation support (devDependencies)
+1. `--api-token` CLI flag
+2. `LINEAR_API_TOKEN` environment variable
+3. `~/.linearis/token` (encrypted, set up via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
-### Operating System Support
+## Build and Development
 
-- **Cross-platform compatibility** - Node.js application runs on Windows, macOS, and Linux
-- **Authentication file support** - `$HOME/.linear_api_token` works across all platforms
+| Command | Description |
+|---------|-------------|
+| `npm start` | Run in development mode via tsx |
+| `npm run build` | Compile to `dist/` |
+| `npm test` | Run the test suite |
+| `npm run generate` | Regenerate GraphQL types from `.graphql` files |
 
-### Build and Execution
+The compiled binary is `dist/main.js`.
 
-- **Direct execution** - `npm start <command>` for development (package.json scripts)
-- **Production build** - `npm run build` creates executable dist/main.js with optimized performance
-- **TypeScript compilation** - `npx tsx src/main.ts <command>` for manual execution
-- **ES modules** - Modern module system enabled via package.json type: "module"
+## Package Information
+
+- **Name:** linearis
+- **License:** MIT
+- **Node.js:** >= 22.0.0
+- **Module system:** ES modules

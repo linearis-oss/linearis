@@ -1,169 +1,110 @@
-<!-- Generated: 2025-08-31T18:51:03+02:00 -->
-
 # Deployment
 
-Linearis deploys as a compiled Node.js application with automatic builds during installation. Distribution supports npm packages, git-based installation, and standalone executables with automated TypeScript compilation ensuring consistency across platforms.
+Linearis is a CLI tool for Linear.app that compiles from TypeScript to JavaScript during installation. It runs on Node.js 22+ and outputs JSON for all commands.
 
-The deployment strategy leverages npm's prepare script for automatic builds, compiled JavaScript for production performance, and cross-platform clean scripts for reliable distribution. All installations automatically compile TypeScript to optimized JavaScript in the dist/ directory.
+## Installation
 
-## Package Types
+### From Git
 
-### Git-Based Installation
+Clone and install:
 
-**Direct Repository Install with Auto-Build** - Primary deployment method:
+```bash
+git clone https://github.com/czottmann/linearis.git
+cd linearis
+npm install
+```
+
+`npm install` handles the full setup automatically:
+
+- `postinstall` runs `npm run generate` (GraphQL codegen)
+- `prepare` is not used; build manually with `npm run build`
+
+After building, link the CLI globally:
+
+```bash
+npm run build
+npm link
+```
+
+This creates the `linearis` command, pointing to `dist/main.js`.
+
+### Direct Git Install
 
 ```bash
 npm install git+https://github.com/czottmann/linearis.git
-# Automatically runs prepare script: clean + build
-# Creates dist/ with compiled JavaScript
 ```
 
-**Development Clone** - For local development:
+This runs `postinstall` to generate GraphQL types. You still need to run `npm run build` separately to compile TypeScript.
 
-```bash
-git clone <repository>
-cd linearis
-npm install  # Auto-builds via prepare script
-```
+## Build Scripts
 
-**Global CLI Access** - package.json (lines 5, 8):
+| Command            | Description                                |
+| ------------------ | ------------------------------------------ |
+| `npm run generate` | Generate GraphQL types from schema         |
+| `npm run build`    | Compile TypeScript and make entry executable |
+| `npm run clean`    | Remove `dist/` directory (`rm -rf dist/`)  |
+| `npm run start`    | Run in development mode via tsx             |
+| `npm test`         | Run test suite                             |
 
-```bash
-npm link  # Creates global 'linear' command
-# Uses main: "dist/main.js" and bin: "dist/main.js"
-```
+The build script runs `tsc && chmod +x dist/main.js`. The clean script uses `rm -rf dist/`.
 
-### Package Distribution Options
+## Authentication
 
-**NPM Package** - package.json configured for npm publishing:
+For interactive use (humans), run `linearis auth login` — it opens Linear in the browser and stores the token encrypted in `~/.linearis/token`.
 
-- Name: "linearis" (line 2)
-- Version: "1.0.0" (line 3)
-- Author: "Carlo Zottmann <carlo@zottmann.dev>" (line 15)
-- License: "MIT" (line 16)
+Linearis checks for an API token in this order:
 
-**Standalone Executable** - Using compiled JavaScript:
+1. `--api-token` flag on the command line
+2. `LINEAR_API_TOKEN` environment variable
+3. `~/.linearis/token` (encrypted, set up via `linearis auth login`)
+4. `~/.linear_api_token` (deprecated)
 
-```bash
-# Create standalone binary from compiled output
-npx pkg dist/main.js --targets node22-linux-x64,node22-macos-x64,node22-win-x64
-```
+For automated environments (CI, containers), set the environment variable.
 
-## Platform Deployment
+Authentication is handled in `src/common/auth.ts` and `src/common/token-storage.ts`.
 
-### Cross-Platform Compatibility
+## Platform Requirements
 
-**Node.js Runtime** - package.json (lines 11-13):
+- Node.js >= 22.0.0
+- ES modules support (package uses `"type": "module"`)
+- Works on Linux, macOS, and Windows
+- The token file path resolves via `os.homedir()`, so it works across platforms (`$HOME` on Unix, `%USERPROFILE%` on Windows)
 
-- Requires Node.js >= 22.0.0 on all platforms
-- ES modules support ensures modern JavaScript compatibility
+## Container Deployment
 
-**File System Dependencies**:
-
-- Authentication file: `$HOME/.linear_api_token` (src/utils/auth.ts line 30)
-- Works on Windows (`%USERPROFILE%`), macOS/Linux (`$HOME`)
-
-### Environment Setup
-
-**Development Environment** - mise.toml configuration:
-
-```bash
-# Install development tools
-mise install  # Installs Node.js 22 and Deno 2.2.8
-```
-
-**Production Environment**:
-
-```bash
-# Minimal production setup
-node --version  # Verify >= 22.0.0
-npm --version   # Verify npm available
-```
-
-### Container Deployment
-
-**Docker Option** - Optimized Dockerfile with build:
+Example Dockerfile:
 
 ```dockerfile
 FROM node:22-alpine
 WORKDIR /app
-COPY package.json package-lock.json tsconfig.json ./
+COPY package.json package-lock.json tsconfig.json codegen.config.ts ./
 COPY src/ ./src/
-RUN npm install  # Auto-builds via prepare script
+COPY graphql/ ./graphql/
+RUN npm install
 ENTRYPOINT ["node", "dist/main.js"]
 ```
 
-## Reference
+`npm install` triggers `postinstall` (which runs `npm run generate`). The `graphql/` directory is required because codegen reads the query and mutation definitions from it. Run `npm run build` separately to compile TypeScript.
 
-### Deployment Scripts and Commands
+Pass the API token as an environment variable:
 
-**Installation Commands**:
+```bash
+docker build -t linearis .
+docker run -e LINEAR_API_TOKEN=lin_api_... linearis issue list
+```
 
-| Command             | Purpose                          | File Reference         |
-| ------------------- | -------------------------------- | ---------------------- |
-| `npm install`       | Install + auto-build via prepare | package.json scripts   |
-| `npm run build`     | Manual TypeScript compilation    | package.json line 11   |
-| `npm link`          | Global CLI access (compiled)     | package.json bin field |
-| `node dist/main.js` | Direct production execution      | Compiled output        |
+## Troubleshooting
 
-### Distribution Formats
+**Missing `dist/` directory** -- Run `npm run build` to compile TypeScript.
 
-**Current Format** - Compiled distribution:
+**GraphQL type errors after schema changes** -- Run `npm run generate` to regenerate types.
 
-- TypeScript source files in src/ directory
-- Automated compilation to dist/ during install
-- Production execution via `node dist/main.js`
+**Node.js version mismatch** -- Verify you have Node.js 22.0.0 or later with `node --version`.
 
-**Distribution Methods**:
+**Command not found after `npm link`** -- Make sure `npm run build` completed successfully and `dist/main.js` exists.
 
-- Git install with auto-build: `npm install git+https://...`
+**Authentication failures** -- Confirm your Linear API token is valid and provided through one of the three supported methods.
 
-### Configuration Files for Deployment
+## Version
 
-**Runtime Configuration**:
-
-- **package.json** - Dependencies, scripts, binary configuration, and prepare script
-- **tsconfig.json** - TypeScript compilation settings for production build
-- **package-lock.json** - Exact dependency versions for reproducible builds
-- **dist/main.js** - Compiled entry point for production execution
-
-**Environment Configuration**:
-
-- **mise.toml** - Development environment tools (not needed for production)
-- **LINEAR_API_TOKEN** - Environment variable for authentication
-- **~/.linear_api_token** - File-based authentication option
-
-### Authentication in Deployment
-
-**Production Authentication** - src/utils/auth.ts (lines 18-38):
-
-1. **Container/CI**: Use `LINEAR_API_TOKEN` environment variable
-2. **Server**: Place token in `/home/user/.linear_api_token` file
-3. **Desktop**: Use `--api-token` flag for interactive use
-
-### Performance Considerations
-
-**Runtime Performance** - Compilation benchmarks:
-
-- Compiled JavaScript startup: ~0.15s
-- Development tsx startup: ~0.64s (development only)
-- Production runtime: Sub-second for most operations
-- Memory usage: Minimal Node.js footprint
-
-**Deployment Size**:
-
-- Source code: ~50KB TypeScript files
-- Compiled output: ~40KB JavaScript files in dist/
-- Dependencies: ~10-20MB node_modules (runtime only)
-- Full installation: ~25MB including dev dependencies
-
-### Troubleshooting Deployment
-
-**Common Issues**:
-
-- Missing dist/ directory: Run `npm install` to trigger prepare script
-- Build failures: Check TypeScript compilation with `npm run build`
-- Node.js version incompatibility: Verify >= 22.0.0 requirement
-- Binary not found: Ensure package.json bin points to `dist/main.js`
-- Authentication failures: Verify Linear API token is valid and has required permissions
-- Performance issues: Use compiled `node dist/main.js` instead of `tsx src/main.ts`
+Current version: 2025.12.3 (defined in `package.json`).

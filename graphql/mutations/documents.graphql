@@ -1,0 +1,40 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear documents
+#
+# Documents are standalone entities that can be associated with projects,
+# initiatives, or teams. To link a document to an issue, use the
+# attachments API (see attachments.graphql).
+# ------------------------------------------------------------
+
+# Create a new document mutation
+#
+# Creates a new document and returns the created document data.
+mutation DocumentCreate($input: DocumentCreateInput!) {
+  documentCreate(input: $input) {
+    success
+    document {
+      ...DocumentFields
+    }
+  }
+}
+
+# Update an existing document mutation
+#
+# Updates an existing document and returns the updated document data.
+mutation DocumentUpdate($id: String!, $input: DocumentUpdateInput!) {
+  documentUpdate(id: $id, input: $input) {
+    success
+    document {
+      ...DocumentFields
+    }
+  }
+}
+
+# Delete a document mutation
+#
+# Deletes a document and returns success status.
+mutation DocumentDelete($id: String!) {
+  documentDelete(id: $id) {
+    success
+  }
+}

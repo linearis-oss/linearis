@@ -1,0 +1,58 @@
+# ------------------------------------------------------------
+# GraphQL operations for issue relation management
+# ------------------------------------------------------------
+
+# Fragment for relation fields used in issue output
+fragment IssueRelationFields on IssueRelation {
+  id
+  type
+  relatedIssue {
+    id
+    identifier
+  }
+}
+
+# Fragment for inverse relation fields used in issue output
+fragment InverseIssueRelationFields on IssueRelation {
+  id
+  type
+  issue {
+    id
+    identifier
+  }
+}
+
+# Create a relation between two issues
+mutation CreateIssueRelation($input: IssueRelationCreateInput!) {
+  issueRelationCreate(input: $input) {
+    success
+    issueRelation {
+      ...IssueRelationFields
+    }
+  }
+}
+
+# Delete a relation by ID
+mutation DeleteIssueRelation($id: String!) {
+  issueRelationDelete(id: $id) {
+    success
+    entityId
+  }
+}
+
+# Find relations between a specific issue and another issue
+# Used by --remove-relation to locate the relation ID before deletion
+query GetIssueRelations($issueId: String!) {
+  issue(id: $issueId) {
+    relations {
+      nodes {
+        ...IssueRelationFields
+      }
+    }
+    inverseRelations {
+      nodes {
+        ...InverseIssueRelationFields
+      }
+    }
+  }
+}

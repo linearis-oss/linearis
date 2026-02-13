@@ -1,0 +1,40 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear issue labels
+#
+# Labels categorize and tag issues for organization and filtering.
+# Labels can be workspace-wide (visible to all teams) or scoped to
+# a specific team. Each label has a color (hex code) and optional
+# description.
+#
+# Key behavior: Label names are unique within their scope (workspace
+# or team). When filtering by team, only labels scoped to that team
+# plus workspace-wide labels are returned.
+# ------------------------------------------------------------
+
+# Label fields fragment
+#
+# Defines the basic fields for a label entity. Color is a hex code
+# (e.g., "#ff0000"), and description is optional.
+fragment LabelFields on IssueLabel {
+  id
+  name
+  color
+  description
+}
+
+# List labels in the workspace
+#
+# Fetches a list of issue labels with optional team filtering.
+# Without a filter, returns all workspace-wide labels and team-scoped
+# labels across all teams.
+#
+# Variables:
+#   $first: Maximum number of labels to return (default: 50)
+#   $filter: Optional filter (e.g., { team: { id: { eq: "team-uuid" } } })
+query GetLabels($first: Int = 50, $filter: IssueLabelFilter) {
+  issueLabels(first: $first, filter: $filter) {
+    nodes {
+      ...LabelFields
+    }
+  }
+}
