@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { DocumentUpdateInput } from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
@@ -112,12 +112,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
-        const limit = parseInt(options.limit || "50", 10);
-        if (Number.isNaN(limit) || limit < 1) {
-          throw new Error(
-            `Invalid limit "${options.limit}": must be a positive number`,
-          );
-        }
+        const limit = parseLimit(options.limit || "50");
 
         if (options.issue) {
           const issueId = await resolveIssueId(ctx.sdk, options.issue);

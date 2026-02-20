@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { ProjectMilestoneUpdateInput } from "../gql/graphql.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
@@ -78,7 +78,7 @@ export function setupMilestonesCommands(program: Command): void {
         const projectId = await resolveProjectId(ctx.sdk, options.project);
 
         const milestones = await listMilestones(ctx.gql, projectId, {
-          limit: parseInt(options.limit || "50", 10),
+          limit: parseLimit(options.limit || "50"),
           after: options.after,
         });
 
@@ -111,7 +111,7 @@ export function setupMilestonesCommands(program: Command): void {
         const milestoneResult = await getMilestone(
           ctx.gql,
           milestoneId,
-          parseInt(options.limit || "50", 10),
+          parseLimit(options.limit || "50"),
         );
 
         outputSuccess(milestoneResult);

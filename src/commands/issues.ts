@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
   type IssueCreateInput,
@@ -182,7 +182,7 @@ export function setupIssuesCommands(program: Command): void {
         const ctx = createContext(command.parent!.parent!.opts());
 
         const paginationOptions = {
-          limit: parseInt(options.limit, 10),
+          limit: parseLimit(options.limit),
           after: options.after,
         };
 

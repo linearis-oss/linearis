@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listTeams } from "../services/team-service.js";
 
@@ -33,7 +33,7 @@ export function setupTeamsCommands(program: Command): void {
         ];
         const ctx = createContext(command.parent!.parent!.opts());
         const result = await listTeams(ctx.gql, {
-          limit: parseInt(options.limit, 10),
+          limit: parseLimit(options.limit),
           after: options.after,
         });
         outputSuccess(result);

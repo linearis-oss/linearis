@@ -6,6 +6,7 @@ import {
   outputAuthError,
   outputError,
   outputSuccess,
+  parseLimit,
 } from "../../../src/common/output.js";
 
 describe("outputSuccess", () => {
@@ -84,6 +85,28 @@ describe("handleCommand with AuthenticationError", () => {
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();
+  });
+});
+
+describe("parseLimit", () => {
+  it("parses valid integer string", () => {
+    expect(parseLimit("50")).toBe(50);
+  });
+
+  it("parses single digit", () => {
+    expect(parseLimit("1")).toBe(1);
+  });
+
+  it("throws on non-numeric string", () => {
+    expect(() => parseLimit("foo")).toThrow();
+  });
+
+  it("throws on zero", () => {
+    expect(() => parseLimit("0")).toThrow();
+  });
+
+  it("throws on negative number", () => {
+    expect(() => parseLimit("-1")).toThrow();
   });
 });
 

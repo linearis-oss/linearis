@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { type CommandOptions, createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { listLabels } from "../services/label-service.js";
@@ -43,7 +43,7 @@ export function setupLabelsCommands(program: Command): void {
           : undefined;
 
         const result = await listLabels(ctx.gql, teamId, {
-          limit: parseInt(options.limit, 10),
+          limit: parseLimit(options.limit),
           after: options.after,
         });
         outputSuccess(result);

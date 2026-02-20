@@ -5,7 +5,7 @@ import {
   notFoundError,
   requiresParameterError,
 } from "../common/errors.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
@@ -75,7 +75,7 @@ export function setupCyclesCommands(program: Command): void {
           ctx.gql,
           teamId,
           options.active || false,
-          { limit: parseInt(options.limit, 10), after: options.after },
+          { limit: parseLimit(options.limit), after: options.after },
         );
 
         if (options.window) {
@@ -130,7 +130,7 @@ export function setupCyclesCommands(program: Command): void {
         const cycleResult = await getCycle(
           ctx.gql,
           cycleId,
-          parseInt(options.limit || "50", 10),
+          parseLimit(options.limit || "50"),
         );
 
         outputSuccess(cycleResult);

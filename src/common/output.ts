@@ -1,4 +1,8 @@
-import { AUTH_ERROR_CODE, AuthenticationError } from "./errors.js";
+import {
+  AUTH_ERROR_CODE,
+  AuthenticationError,
+  invalidParameterError,
+} from "./errors.js";
 
 export function outputSuccess(data: unknown): void {
   console.log(JSON.stringify(data, null, 2));
@@ -26,6 +30,14 @@ export function outputAuthError(error: AuthenticationError): void {
     ),
   );
   process.exit(AUTH_ERROR_CODE);
+}
+
+export function parseLimit(value: string): number {
+  const limit = parseInt(value, 10);
+  if (Number.isNaN(limit) || limit < 1) {
+    throw invalidParameterError("--limit", "must be a positive integer");
+  }
+  return limit;
 }
 
 export function handleCommand(
