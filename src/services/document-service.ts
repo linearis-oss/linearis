@@ -3,6 +3,7 @@ import type {
   CreatedDocument,
   Document,
   DocumentListItem,
+  PaginatedResult,
   UpdatedDocument,
 } from "../common/types.js";
 import {
@@ -73,18 +74,23 @@ export async function listDocuments(
   client: GraphQLClient,
   options?: {
     limit?: number;
+    after?: string;
     filter?: DocumentFilter;
   },
-): Promise<DocumentListItem[]> {
+): Promise<PaginatedResult<DocumentListItem>> {
   const result = await client.request<ListDocumentsQuery>(
     ListDocumentsDocument,
     {
       first: options?.limit ?? 25,
+      after: options?.after,
       filter: options?.filter,
     },
   );
 
-  return result.documents?.nodes ?? [];
+  return {
+    nodes: result.documents?.nodes ?? [],
+    pageInfo: result.documents.pageInfo,
+  };
 }
 
 export async function listDocumentsBySlugIds(

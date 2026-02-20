@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import { GetLabelsDocument, type GetLabelsQuery } from "../gql/graphql.js";
 
 export interface Label {
@@ -11,18 +12,24 @@ export interface Label {
 export async function listLabels(
   client: GraphQLClient,
   teamId?: string,
-): Promise<Label[]> {
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<Label>> {
+  const { limit = 50, after } = options;
   const filter = teamId ? { team: { id: { eq: teamId } } } : undefined;
 
   const result = await client.request<GetLabelsQuery>(GetLabelsDocument, {
-    first: 50,
+    first: limit,
+    after,
     filter,
   });
 
-  return result.issueLabels.nodes.map((label) => ({
-    id: label.id,
-    name: label.name,
-    color: label.color,
-    description: label.description ?? undefined,
-  }));
+  return {
+    nodes: result.issueLabels.nodes.map((label) => ({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      description: label.description ?? undefined,
+    })),
+    pageInfo: result.issueLabels.pageInfo,
+  };
 }

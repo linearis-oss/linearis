@@ -3,6 +3,8 @@ import type {
   CreatedMilestone,
   MilestoneDetail,
   MilestoneListItem,
+  PaginatedResult,
+  PaginationOptions,
   UpdatedMilestone,
 } from "../common/types.js";
 import {
@@ -21,14 +23,18 @@ import {
 export async function listMilestones(
   client: GraphQLClient,
   projectId: string,
-  limit: number = 50,
-): Promise<MilestoneListItem[]> {
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<MilestoneListItem>> {
+  const { limit = 50, after } = options;
   const result = await client.request<ListProjectMilestonesQuery>(
     ListProjectMilestonesDocument,
-    { projectId, first: limit },
+    { projectId, first: limit, after },
   );
 
-  return result.project?.projectMilestones?.nodes ?? [];
+  return {
+    nodes: result.project?.projectMilestones?.nodes ?? [],
+    pageInfo: result.project.projectMilestones.pageInfo,
+  };
 }
 
 export async function getMilestone(

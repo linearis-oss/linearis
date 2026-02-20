@@ -22,7 +22,7 @@ import type {
 // Pagination types
 export interface PageInfo {
   hasNextPage: boolean;
-  endCursor: string | null;
+  endCursor?: string | null;
 }
 
 export interface PaginatedResult<T> {
