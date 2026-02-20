@@ -20,10 +20,7 @@ import type {
 } from "../gql/graphql.js";
 
 // Pagination types
-export interface PageInfo {
-  hasNextPage: boolean;
-  endCursor?: string | null;
-}
+export type PageInfo = GetIssuesQuery["issues"]["pageInfo"];
 
 export interface PaginatedResult<T> {
   nodes: T[];
