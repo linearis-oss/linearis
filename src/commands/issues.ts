@@ -16,6 +16,7 @@ import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveStatusId } from "../resolvers/status-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { resolveUserId } from "../resolvers/user-resolver.js";
 import {
   createIssueRelation,
   deleteIssueRelation,
@@ -262,7 +263,7 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.assignee) {
-          input.assigneeId = options.assignee;
+          input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
         }
 
         if (options.priority) {
@@ -435,7 +436,7 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.assignee) {
-          input.assigneeId = options.assignee;
+          input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
         }
 
         if (options.project) {
