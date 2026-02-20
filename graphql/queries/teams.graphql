@@ -28,10 +28,14 @@ fragment TeamFields on Team {
 #
 # Variables:
 #   $first: Maximum number of teams to return (default: 50)
-query GetTeams($first: Int = 50) {
-  teams(first: $first) {
+query GetTeams($first: Int = 50, $after: String) {
+  teams(first: $first, after: $after) {
     nodes {
       ...TeamFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

@@ -1,12 +1,14 @@
 import type { Command } from "commander";
 import { type CommandOptions, createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { listLabels } from "../services/label-service.js";
 
 interface ListLabelsOptions extends CommandOptions {
   team?: string;
+  limit: string;
+  after?: string;
 }
 
 export const LABELS_META: DomainMeta = {
@@ -29,6 +31,8 @@ export function setupLabelsCommands(program: Command): void {
     .command("list")
     .description("list available labels")
     .option("--team <team>", "filter by team (key, name, or UUID)")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListLabelsOptions, Command];
@@ -38,7 +42,10 @@ export function setupLabelsCommands(program: Command): void {
           ? await resolveTeamId(ctx.sdk, options.team)
           : undefined;
 
-        const result = await listLabels(ctx.gql, teamId);
+        const result = await listLabels(ctx.gql, teamId, {
+          limit: parseLimit(options.limit),
+          after: options.after,
+        });
         outputSuccess(result);
       }),
     );

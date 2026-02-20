@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { DocumentUpdateInput } from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
@@ -41,6 +41,7 @@ interface DocumentListOptions {
   project?: string;
   issue?: string;
   limit?: string;
+  after?: string;
 }
 
 /** Extracts slug ID from a Linear document URL (e.g. /workspace/document/title-slug-abc123 -> abc123). */
@@ -98,6 +99,7 @@ export function setupDocumentsCommands(program: Command): void {
       "filter by issue (shows documents attached to the issue)",
     )
     .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [DocumentListOptions, Command];
@@ -110,12 +112,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
-        const limit = parseInt(options.limit || "50", 10);
-        if (Number.isNaN(limit) || limit < 1) {
-          throw new Error(
-            `Invalid limit "${options.limit}": must be a positive number`,
-          );
-        }
+        const limit = parseLimit(options.limit || "50");
 
         if (options.issue) {
           const issueId = await resolveIssueId(ctx.sdk, options.issue);
@@ -130,7 +127,10 @@ export function setupDocumentsCommands(program: Command): void {
           ];
 
           if (documentSlugIds.length === 0) {
-            outputSuccess([]);
+            outputSuccess({
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            });
             return;
           }
 
@@ -138,7 +138,10 @@ export function setupDocumentsCommands(program: Command): void {
             ctx.gql,
             documentSlugIds,
           );
-          outputSuccess(documents);
+          outputSuccess({
+            nodes: documents,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          });
           return;
         }
 
@@ -149,6 +152,7 @@ export function setupDocumentsCommands(program: Command): void {
 
         const documents = await listDocuments(ctx.gql, {
           limit,
+          after: options.after,
           filter: projectId
             ? { project: { id: { eq: projectId } } }
             : undefined,

@@ -31,10 +31,14 @@ fragment LabelFields on IssueLabel {
 # Variables:
 #   $first: Maximum number of labels to return (default: 50)
 #   $filter: Optional filter (e.g., { team: { id: { eq: "team-uuid" } } })
-query GetLabels($first: Int = 50, $filter: IssueLabelFilter) {
-  issueLabels(first: $first, filter: $filter) {
+query GetLabels($first: Int = 50, $after: String, $filter: IssueLabelFilter) {
+  issueLabels(first: $first, after: $after, filter: $filter) {
     nodes {
       ...LabelFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

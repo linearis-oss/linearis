@@ -32,10 +32,14 @@ fragment ProjectFields on Project {
 #
 # Variables:
 #   $first: Maximum number of projects to return (default: 50)
-query GetProjects($first: Int = 50) {
-  projects(first: $first) {
+query GetProjects($first: Int = 50, $after: String) {
+  projects(first: $first, after: $after) {
     nodes {
       ...ProjectFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

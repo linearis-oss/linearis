@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listProjects } from "../services/project-service.js";
 
@@ -26,11 +26,18 @@ export function setupProjectsCommands(program: Command): void {
     .command("list")
     .description("list projects")
     .option("-l, --limit <n>", "max results", "100")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [{ limit: string }, Command];
+        const [options, command] = args as [
+          { limit: string; after?: string },
+          Command,
+        ];
         const ctx = createContext(command.parent!.parent!.opts());
-        const result = await listProjects(ctx.gql, parseInt(options.limit, 10));
+        const result = await listProjects(ctx.gql, {
+          limit: parseLimit(options.limit),
+          after: options.after,
+        });
         outputSuccess(result);
       }),
     );

@@ -58,10 +58,14 @@ fragment CycleWithIssuesFields on Cycle {
 # Variables:
 #   $first: Maximum number of cycles to return (default: 50)
 #   $filter: Optional CycleFilter for team/status filtering
-query GetCycles($first: Int = 50, $filter: CycleFilter) {
-  cycles(first: $first, filter: $filter) {
+query GetCycles($first: Int = 50, $after: String, $filter: CycleFilter) {
+  cycles(first: $first, after: $after, filter: $filter) {
     nodes {
       ...CycleFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

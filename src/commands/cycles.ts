@@ -5,7 +5,7 @@ import {
   notFoundError,
   requiresParameterError,
 } from "../common/errors.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
@@ -15,6 +15,8 @@ interface CycleListOptions extends CommandOptions {
   team?: string;
   active?: boolean;
   window?: string;
+  limit: string;
+  after?: string;
 }
 
 interface CycleReadOptions extends CommandOptions {
@@ -46,11 +48,19 @@ export function setupCyclesCommands(program: Command): void {
     .option("--team <team>", "filter by team (key, name, or UUID)")
     .option("--active", "only show active cycles")
     .option("--window <n>", "active cycle +/- n neighbors (requires --team)")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [CycleListOptions, Command];
         if (options.window && !options.team) {
           throw requiresParameterError("--window", "--team");
+        }
+        if (options.window && options.after) {
+          throw invalidParameterError(
+            "--after",
+            "cannot be used with --window",
+          );
         }
 
         const ctx = createContext(command.parent!.parent!.opts());
@@ -61,10 +71,11 @@ export function setupCyclesCommands(program: Command): void {
           : undefined;
 
         // Fetch cycles
-        const allCycles = await listCycles(
+        const result = await listCycles(
           ctx.gql,
           teamId,
           options.active || false,
+          { limit: parseLimit(options.limit), after: options.after },
         );
 
         if (options.window) {
@@ -76,7 +87,7 @@ export function setupCyclesCommands(program: Command): void {
             );
           }
 
-          const activeCycle = allCycles.find((c: Cycle) => c.isActive);
+          const activeCycle = result.nodes.find((c: Cycle) => c.isActive);
           if (!activeCycle) {
             throw notFoundError("Active cycle", options.team ?? "", "for team");
           }
@@ -85,15 +96,18 @@ export function setupCyclesCommands(program: Command): void {
           const min = activeNumber - n;
           const max = activeNumber + n;
 
-          const filtered = allCycles
+          const filteredNodes = result.nodes
             .filter((c: Cycle) => c.number >= min && c.number <= max)
             .sort((a: Cycle, b: Cycle) => a.number - b.number);
 
-          outputSuccess(filtered);
+          outputSuccess({
+            nodes: filteredNodes,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          });
           return;
         }
 
-        outputSuccess(allCycles);
+        outputSuccess(result);
       }),
     );
 
@@ -116,7 +130,7 @@ export function setupCyclesCommands(program: Command): void {
         const cycleResult = await getCycle(
           ctx.gql,
           cycleId,
-          parseInt(options.limit || "50", 10),
+          parseLimit(options.limit || "50"),
         );
 
         outputSuccess(cycleResult);

@@ -8,11 +8,11 @@
 # List project milestones in a project
 #
 # Fetches a list of project milestones for a given project.
-query ListProjectMilestones($projectId: String!, $first: Int!) {
+query ListProjectMilestones($projectId: String!, $first: Int!, $after: String) {
   project(id: $projectId) {
     id
     name
-    projectMilestones(first: $first) {
+    projectMilestones(first: $first, after: $after) {
       nodes {
         id
         name
@@ -21,6 +21,10 @@ query ListProjectMilestones($projectId: String!, $first: Int!) {
         sortOrder
         createdAt
         updatedAt
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }

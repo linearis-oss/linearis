@@ -1,6 +1,6 @@
 import type { Command } from "commander";
-import { type CommandOptions, createContext } from "../common/context.js";
-import { handleCommand, outputSuccess } from "../common/output.js";
+import { createContext } from "../common/context.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listTeams } from "../services/team-service.js";
 
@@ -23,11 +23,19 @@ export function setupTeamsCommands(program: Command): void {
   teams
     .command("list")
     .description("list all teams")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [, command] = args as [CommandOptions, Command];
+        const [options, command] = args as [
+          { limit: string; after?: string },
+          Command,
+        ];
         const ctx = createContext(command.parent!.parent!.opts());
-        const result = await listTeams(ctx.gql);
+        const result = await listTeams(ctx.gql, {
+          limit: parseLimit(options.limit),
+          after: options.after,
+        });
         outputSuccess(result);
       }),
     );

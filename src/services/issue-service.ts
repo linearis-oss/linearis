@@ -5,6 +5,8 @@ import type {
   IssueByIdentifier,
   IssueDetail,
   IssueSearchResult,
+  PaginatedResult,
+  PaginationOptions,
   UpdatedIssue,
 } from "../common/types.js";
 import {
@@ -26,13 +28,18 @@ import {
 
 export async function listIssues(
   client: GraphQLClient,
-  limit: number = 25,
-): Promise<Issue[]> {
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<Issue>> {
+  const { limit = 25, after } = options;
   const result = await client.request<GetIssuesQuery>(GetIssuesDocument, {
     first: limit,
+    after,
     orderBy: "updatedAt",
   });
-  return result.issues?.nodes ?? [];
+  return {
+    nodes: result.issues?.nodes ?? [],
+    pageInfo: result.issues.pageInfo,
+  };
 }
 
 export async function getIssue(
@@ -68,13 +75,18 @@ export async function getIssueByIdentifier(
 export async function searchIssues(
   client: GraphQLClient,
   term: string,
-  limit: number = 25,
-): Promise<IssueSearchResult[]> {
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<IssueSearchResult>> {
+  const { limit = 25, after } = options;
   const result = await client.request<SearchIssuesQuery>(SearchIssuesDocument, {
     term,
     first: limit,
+    after,
   });
-  return result.searchIssues?.nodes ?? [];
+  return {
+    nodes: result.searchIssues?.nodes ?? [],
+    pageInfo: result.searchIssues.pageInfo,
+  };
 }
 
 export async function createIssue(
