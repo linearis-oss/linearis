@@ -76,16 +76,58 @@ describe("updateDocument", () => {
 describe("listDocuments", () => {
   it("returns documents list", async () => {
     const client = mockGqlClient({
-      documents: { nodes: [{ id: "1" }, { id: "2" }] },
+      documents: {
+        nodes: [{ id: "1" }, { id: "2" }],
+        pageInfo: { hasNextPage: false, endCursor: "cursor2" },
+      },
     });
     const result = await listDocuments(client);
-    expect(result).toHaveLength(2);
+    expect(result.nodes).toHaveLength(2);
+    expect(result.pageInfo).toEqual({
+      hasNextPage: false,
+      endCursor: "cursor2",
+    });
   });
 
-  it("returns empty array when no documents", async () => {
-    const client = mockGqlClient({ documents: { nodes: [] } });
+  it("returns empty result when no documents", async () => {
+    const client = mockGqlClient({
+      documents: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
     const result = await listDocuments(client);
-    expect(result).toEqual([]);
+    expect(result.nodes).toEqual([]);
+    expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: null });
+  });
+
+  it("passes after cursor to GraphQL request", async () => {
+    const client = mockGqlClient({
+      documents: {
+        nodes: [{ id: "3" }],
+        pageInfo: { hasNextPage: false, endCursor: "cursor3" },
+      },
+    });
+    await listDocuments(client, { limit: 10, after: "cursor2" });
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 10,
+      after: "cursor2",
+      filter: undefined,
+    });
+  });
+
+  it("returns pageInfo with hasNextPage true", async () => {
+    const client = mockGqlClient({
+      documents: {
+        nodes: [{ id: "1" }],
+        pageInfo: { hasNextPage: true, endCursor: "nextCursor" },
+      },
+    });
+    const result = await listDocuments(client, { limit: 1 });
+    expect(result.pageInfo).toEqual({
+      hasNextPage: true,
+      endCursor: "nextCursor",
+    });
   });
 });
 
