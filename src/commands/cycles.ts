@@ -94,7 +94,10 @@ export function setupCyclesCommands(program: Command): void {
             .filter((c: Cycle) => c.number >= min && c.number <= max)
             .sort((a: Cycle, b: Cycle) => a.number - b.number);
 
-          outputSuccess({ nodes: filteredNodes, pageInfo: result.pageInfo });
+          outputSuccess({
+            nodes: filteredNodes,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          });
           return;
         }
 
