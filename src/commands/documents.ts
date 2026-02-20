@@ -132,7 +132,10 @@ export function setupDocumentsCommands(program: Command): void {
           ];
 
           if (documentSlugIds.length === 0) {
-            outputSuccess([]);
+            outputSuccess({
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            });
             return;
           }
 
@@ -140,7 +143,10 @@ export function setupDocumentsCommands(program: Command): void {
             ctx.gql,
             documentSlugIds,
           );
-          outputSuccess(documents);
+          outputSuccess({
+            nodes: documents,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          });
           return;
         }
 

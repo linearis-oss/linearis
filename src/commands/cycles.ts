@@ -56,6 +56,12 @@ export function setupCyclesCommands(program: Command): void {
         if (options.window && !options.team) {
           throw requiresParameterError("--window", "--team");
         }
+        if (options.window && options.after) {
+          throw invalidParameterError(
+            "--after",
+            "cannot be used with --window",
+          );
+        }
 
         const ctx = createContext(command.parent!.parent!.opts());
 
