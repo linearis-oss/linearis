@@ -89,7 +89,10 @@ export async function listDocuments(
 
   return {
     nodes: result.documents?.nodes ?? [],
-    pageInfo: result.documents.pageInfo,
+    pageInfo: result.documents?.pageInfo ?? {
+      hasNextPage: false,
+      endCursor: null,
+    },
   };
 }
 

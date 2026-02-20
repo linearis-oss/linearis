@@ -33,7 +33,10 @@ export async function listMilestones(
 
   return {
     nodes: result.project?.projectMilestones?.nodes ?? [],
-    pageInfo: result.project.projectMilestones.pageInfo,
+    pageInfo: result.project?.projectMilestones?.pageInfo ?? {
+      hasNextPage: false,
+      endCursor: null,
+    },
   };
 }
 
