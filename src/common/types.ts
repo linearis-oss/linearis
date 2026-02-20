@@ -19,6 +19,22 @@ import type {
   UpdateProjectMilestoneMutation,
 } from "../gql/graphql.js";
 
+// Pagination types
+export interface PageInfo {
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+
+export interface PaginatedResult<T> {
+  nodes: T[];
+  pageInfo: PageInfo;
+}
+
+export interface PaginationOptions {
+  limit?: number;
+  after?: string;
+}
+
 // Issue types
 export type Issue = GetIssuesQuery["issues"]["nodes"][0];
 export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;

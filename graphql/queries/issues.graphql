@@ -191,14 +191,19 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
 # Fetches paginated issues excluding completed ones,
 # ordered by most recently updated. Includes all relationships
 # for comprehensive issue data.
-query GetIssues($first: Int!, $orderBy: PaginationOrderBy) {
+query GetIssues($first: Int!, $after: String, $orderBy: PaginationOrderBy) {
   issues(
     first: $first
+    after: $after
     orderBy: $orderBy
     filter: { state: { type: { neq: "completed" } } }
   ) {
     nodes {
       ...CompleteIssueFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -243,10 +248,19 @@ query GetIssueTeam($issueId: String!) {
 #
 # Provides full-text search across Linear issues with complete
 # relationship data for each match.
-query SearchIssues($term: String!, $first: Int!) {
-  searchIssues(term: $term, first: $first, includeArchived: false) {
+query SearchIssues($term: String!, $first: Int!, $after: String) {
+  searchIssues(
+    term: $term
+    first: $first
+    after: $after
+    includeArchived: false
+  ) {
     nodes {
       ...CompleteIssueSearchFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -257,17 +271,23 @@ query SearchIssues($term: String!, $first: Int!) {
 # Used by the advanced search functionality with multiple criteria.
 query FilteredSearchIssues(
   $first: Int!
+  $after: String
   $filter: IssueFilter
   $orderBy: PaginationOrderBy
 ) {
   issues(
     first: $first
+    after: $after
     filter: $filter
     orderBy: $orderBy
     includeArchived: false
   ) {
     nodes {
       ...CompleteIssueFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

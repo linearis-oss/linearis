@@ -35,10 +35,14 @@ query GetDocument($id: String!) {
 # List documents with optional filtering
 #
 # Fetches a list of documents with optional filtering criteria.
-query ListDocuments($first: Int!, $filter: DocumentFilter) {
-  documents(first: $first, filter: $filter) {
+query ListDocuments($first: Int!, $after: String, $filter: DocumentFilter) {
+  documents(first: $first, after: $after, filter: $filter) {
     nodes {
       ...DocumentFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
