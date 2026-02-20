@@ -34,6 +34,7 @@ import {
 interface ListOptions {
   query?: string;
   limit: string;
+  after?: string;
 }
 
 interface CreateOptions {
@@ -174,20 +175,26 @@ export function setupIssuesCommands(program: Command): void {
     .description("list issues with optional filters")
     .option("--query <text>", "filter by text search")
     .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListOptions, Command];
         const ctx = createContext(command.parent!.parent!.opts());
 
+        const paginationOptions = {
+          limit: parseInt(options.limit, 10),
+          after: options.after,
+        };
+
         if (options.query) {
           const result = await searchIssues(
             ctx.gql,
             options.query,
-            parseInt(options.limit, 10),
+            paginationOptions,
           );
           outputSuccess(result);
         } else {
-          const result = await listIssues(ctx.gql, parseInt(options.limit, 10));
+          const result = await listIssues(ctx.gql, paginationOptions);
           outputSuccess(result);
         }
       }),

@@ -41,6 +41,7 @@ interface DocumentListOptions {
   project?: string;
   issue?: string;
   limit?: string;
+  after?: string;
 }
 
 /** Extracts slug ID from a Linear document URL (e.g. /workspace/document/title-slug-abc123 -> abc123). */
@@ -98,6 +99,7 @@ export function setupDocumentsCommands(program: Command): void {
       "filter by issue (shows documents attached to the issue)",
     )
     .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [DocumentListOptions, Command];
@@ -149,6 +151,7 @@ export function setupDocumentsCommands(program: Command): void {
 
         const documents = await listDocuments(ctx.gql, {
           limit,
+          after: options.after,
           filter: projectId
             ? { project: { id: { eq: projectId } } }
             : undefined,

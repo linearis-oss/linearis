@@ -15,6 +15,8 @@ interface CycleListOptions extends CommandOptions {
   team?: string;
   active?: boolean;
   window?: string;
+  limit: string;
+  after?: string;
 }
 
 interface CycleReadOptions extends CommandOptions {
@@ -46,6 +48,8 @@ export function setupCyclesCommands(program: Command): void {
     .option("--team <team>", "filter by team (key, name, or UUID)")
     .option("--active", "only show active cycles")
     .option("--window <n>", "active cycle +/- n neighbors (requires --team)")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [CycleListOptions, Command];
@@ -61,10 +65,11 @@ export function setupCyclesCommands(program: Command): void {
           : undefined;
 
         // Fetch cycles
-        const allCycles = await listCycles(
+        const result = await listCycles(
           ctx.gql,
           teamId,
           options.active || false,
+          { limit: parseInt(options.limit, 10), after: options.after },
         );
 
         if (options.window) {
@@ -76,7 +81,7 @@ export function setupCyclesCommands(program: Command): void {
             );
           }
 
-          const activeCycle = allCycles.find((c: Cycle) => c.isActive);
+          const activeCycle = result.nodes.find((c: Cycle) => c.isActive);
           if (!activeCycle) {
             throw notFoundError("Active cycle", options.team ?? "", "for team");
           }
@@ -85,15 +90,15 @@ export function setupCyclesCommands(program: Command): void {
           const min = activeNumber - n;
           const max = activeNumber + n;
 
-          const filtered = allCycles
+          const filteredNodes = result.nodes
             .filter((c: Cycle) => c.number >= min && c.number <= max)
             .sort((a: Cycle, b: Cycle) => a.number - b.number);
 
-          outputSuccess(filtered);
+          outputSuccess({ nodes: filteredNodes, pageInfo: result.pageInfo });
           return;
         }
 
-        outputSuccess(allCycles);
+        outputSuccess(result);
       }),
     );
 

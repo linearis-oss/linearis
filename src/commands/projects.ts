@@ -26,11 +26,18 @@ export function setupProjectsCommands(program: Command): void {
     .command("list")
     .description("list projects")
     .option("-l, --limit <n>", "max results", "100")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [{ limit: string }, Command];
+        const [options, command] = args as [
+          { limit: string; after?: string },
+          Command,
+        ];
         const ctx = createContext(command.parent!.parent!.opts());
-        const result = await listProjects(ctx.gql, parseInt(options.limit, 10));
+        const result = await listProjects(ctx.gql, {
+          limit: parseInt(options.limit, 10),
+          after: options.after,
+        });
         outputSuccess(result);
       }),
     );

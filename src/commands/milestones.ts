@@ -16,6 +16,7 @@ import {
 interface MilestoneListOptions {
   project: string;
   limit?: string;
+  after?: string;
 }
 
 interface MilestoneReadOptions {
@@ -67,6 +68,7 @@ export function setupMilestonesCommands(program: Command): void {
     .description("list milestones in a project")
     .requiredOption("--project <project>", "target project (required)")
     .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [MilestoneListOptions, Command];
@@ -75,11 +77,10 @@ export function setupMilestonesCommands(program: Command): void {
         // Resolve project ID
         const projectId = await resolveProjectId(ctx.sdk, options.project);
 
-        const milestones = await listMilestones(
-          ctx.gql,
-          projectId,
-          parseInt(options.limit || "50", 10),
-        );
+        const milestones = await listMilestones(ctx.gql, projectId, {
+          limit: parseInt(options.limit || "50", 10),
+          after: options.after,
+        });
 
         outputSuccess(milestones);
       }),

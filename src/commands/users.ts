@@ -6,6 +6,8 @@ import { listUsers } from "../services/user-service.js";
 
 interface ListUsersOptions extends CommandOptions {
   active?: boolean;
+  limit: string;
+  after?: string;
 }
 
 export const USERS_META: DomainMeta = {
@@ -28,11 +30,16 @@ export function setupUsersCommands(program: Command): void {
     .command("list")
     .description("list workspace members")
     .option("--active", "only show active users")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListUsersOptions, Command];
         const ctx = createContext(command.parent!.parent!.opts());
-        const result = await listUsers(ctx.gql, options.active || false);
+        const result = await listUsers(ctx.gql, options.active || false, {
+          limit: parseInt(options.limit, 10),
+          after: options.after,
+        });
         outputSuccess(result);
       }),
     );

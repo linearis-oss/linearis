@@ -58,8 +58,9 @@ arguments:
   <title>  string
 
 list options:
-  --query <text>  filter by text search
-  --limit <n>     max results (default: 50)
+  --query <text>    filter by text search
+  --limit <n>       max results (default: 50)
+  --after <cursor>  cursor for next page
 
 create options:
   --description <text>      issue body
@@ -129,7 +130,9 @@ commands:
   list [options]  list available labels
 
 list options:
-  --team <team>  filter by team (key, name, or UUID)
+  --team <team>     filter by team (key, name, or UUID)
+  --limit <n>       max results (default: 50)
+  --after <cursor>  cursor for next page
 
 see also: issues create --labels, issues update --labels
 
@@ -144,7 +147,8 @@ commands:
   list [options]  list projects
 
 list options:
-  --limit <n>  max results (default: 100)
+  --limit <n>       max results (default: 100)
+  --after <cursor>  cursor for next page
 
 see also: milestones list --project, documents list --project
 
@@ -163,9 +167,11 @@ arguments:
   <cycle>  cycle identifier (UUID or name)
 
 list options:
-  --team <team>  filter by team (key, name, or UUID)
-  --active       only show active cycles
-  --window <n>   active cycle +/- n neighbors (requires --team)
+  --team <team>     filter by team (key, name, or UUID)
+  --active          only show active cycles
+  --window <n>      active cycle +/- n neighbors (requires --team)
+  --limit <n>       max results (default: 50)
+  --after <cursor>  cursor for next page
 
 read options:
   --team <team>  scope name lookup to team
@@ -193,6 +199,7 @@ arguments:
 list options:
   --project <project>  target project (required)
   --limit <n>          max results (default: 50)
+  --after <cursor>     cursor for next page
 
 read options:
   --project <project>  scope name lookup to project
@@ -233,6 +240,7 @@ list options:
   --project <project>  filter by project name or ID
   --issue <issue>      filter by issue (shows documents attached to the issue)
   --limit <n>          max results (default: 50)
+  --after <cursor>     cursor for next page
 
 create options:
   --title <title>      document title (required)
@@ -279,7 +287,11 @@ a team is a group of users that owns issues, cycles, statuses, and
 labels. teams are identified by a short key (e.g. ENG), name, or UUID.
 
 commands:
-  list  list all teams
+  list [options]  list all teams
+
+list options:
+  --limit <n>       max results (default: 50)
+  --after <cursor>  cursor for next page
 
 ---
 
@@ -292,4 +304,6 @@ commands:
   list [options]  list workspace members
 
 list options:
-  --active  only show active users
+  --active          only show active users
+  --limit <n>       max results (default: 50)
+  --after <cursor>  cursor for next page
