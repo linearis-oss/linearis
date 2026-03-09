@@ -349,4 +349,145 @@ export function setupDocumentsCommands(program: Command): void {
         },
       ),
     );
+
+  /**
+   * Update document
+   *
+   * Command: `linearis documents update <documentId> [options]`
+   *
+   * Updates an existing Linear document. Supports updating title, content,
+   * project/team associations, icon, color, and trash status.
+   */
+  documents
+    .command("update <documentId>")
+    .description("Update a document")
+    .option("-t, --title <title>", "new title")
+    .option("-c, --content <content>", "new content (markdown)")
+    .option("--icon <icon>", "icon emoji or name")
+    .option("--color <color>", "icon color")
+    .option("--project <projectId>", "new project (name or ID)")
+    .option("--clear-project", "remove project association")
+    .option("--team <teamId>", "new team (key, name, or ID)")
+    .option("--clear-team", "remove team association")
+    .option("--trash", "move document to trash")
+    .option("--untrash", "restore document from trash")
+    .option("--sort-order <order>", "sort order (number)")
+    .action(
+      handleAsyncCommand(async (documentId: string, options: any, command: Command) => {
+        // Validate mutually exclusive options
+        if (options.project && options.clearProject) {
+          throw new Error(
+            "Cannot use --project and --clear-project together"
+          );
+        }
+
+        if (options.team && options.clearTeam) {
+          throw new Error(
+            "Cannot use --team and --clear-team together"
+          );
+        }
+
+        if (options.trash && options.untrash) {
+          throw new Error(
+            "Cannot use --trash and --untrash together"
+          );
+        }
+
+        const linearService = await createLinearService(
+          command.parent!.parent!.opts()
+        );
+
+        // Get Linear SDK client
+        const client = linearService.getLinearClient();
+
+        // Build update arguments
+        const updateArgs: any = {};
+
+        if (options.title !== undefined) {
+          updateArgs.title = options.title;
+        }
+
+        if (options.content !== undefined) {
+          updateArgs.content = options.content;
+        }
+
+        if (options.icon !== undefined) {
+          updateArgs.icon = options.icon;
+        }
+
+        if (options.color !== undefined) {
+          updateArgs.color = options.color;
+        }
+
+        // Resolve and set project ID
+        if (options.project) {
+          updateArgs.projectId = await linearService.resolveProjectId(
+            options.project
+          );
+        } else if (options.clearProject) {
+          updateArgs.projectId = null;
+        }
+
+        // Resolve and set team ID
+        if (options.team) {
+          updateArgs.teamId = await linearService.resolveTeamId(options.team);
+        } else if (options.clearTeam) {
+          updateArgs.teamId = null;
+        }
+
+        // Handle trash status
+        if (options.trash) {
+          updateArgs.trashed = true;
+        } else if (options.untrash) {
+          updateArgs.trashed = false;
+        }
+
+        // Handle sort order
+        if (options.sortOrder !== undefined) {
+          const sortOrder = parseFloat(options.sortOrder);
+          if (isNaN(sortOrder)) {
+            throw new Error("--sort-order must be a valid number");
+          }
+          updateArgs.sortOrder = sortOrder;
+        }
+
+        // Check if any updates were provided
+        if (Object.keys(updateArgs).length === 0) {
+          throw new Error(
+            "No update options provided. Use --help to see available options."
+          );
+        }
+
+        // Update document using Linear SDK
+        const documentPayload = await client.updateDocument(documentId, updateArgs);
+        const document = await documentPayload.document;
+
+        if (!document) {
+          throw new Error(`Failed to update document with ID "${documentId}"`);
+        }
+
+        // Fetch optional relationships for output
+        const project = await document.project;
+
+        // Output document details
+        outputSuccess({
+          id: document.id,
+          title: document.title,
+          content: document.content || undefined,
+          url: document.url,
+          createdAt: document.createdAt
+            ? new Date(document.createdAt).toISOString()
+            : new Date().toISOString(),
+          updatedAt: document.updatedAt
+            ? new Date(document.updatedAt).toISOString()
+            : new Date().toISOString(),
+          project: project
+            ? {
+                id: project.id,
+                name: project.name,
+              }
+            : undefined,
+        });
+      })
+    );
 }

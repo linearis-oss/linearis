@@ -1002,6 +1002,7 @@ export class GraphQLIssuesService {
           ? new Date(issue.updatedAt).toISOString()
           : new Date().toISOString()),
       branchName: issue.branchName || undefined,
+      url: issue.url,
     };
   }
 }

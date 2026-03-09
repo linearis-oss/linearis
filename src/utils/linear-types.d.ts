@@ -78,6 +78,7 @@ export interface LinearIssue {
   createdAt: string;
   updatedAt: string;
   branchName: string;
+  url: string;
 }
 
 export interface LinearProject {

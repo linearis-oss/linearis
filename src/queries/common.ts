@@ -21,6 +21,7 @@ export const ISSUE_CORE_FIELDS = `
   createdAt
   updatedAt
   branchName
+  url
 `;
 
 /**
