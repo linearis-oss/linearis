@@ -60,7 +60,8 @@ export function parseIssueIdentifier(identifier: string): ParsedIssueIdentifier 
 export function tryParseIssueIdentifier(identifier: string): ParsedIssueIdentifier | null {
   try {
     return parseIssueIdentifier(identifier);
-  } catch {
+  } catch (_error) {
+    // Invalid TEAM-123 values are expected in permissive parsing paths.
     return null;
   }
 }

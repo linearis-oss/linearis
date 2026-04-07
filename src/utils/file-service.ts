@@ -74,6 +74,13 @@ function getMimeType(filePath: string): string {
   return MIME_TYPES[ext] || "application/octet-stream";
 }
 
+function isMissingFileError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (("code" in error && error.code === "ENOENT") || error.message === "ENOENT")
+  );
+}
+
 export interface DownloadOptions {
   /** Custom output file path (defaults to filename from URL) */
   output?: string;
@@ -172,8 +179,15 @@ export class FileService {
           error:
             `File already exists: ${outputPath}. Use --overwrite to replace.`,
         };
-      } catch {
-        // File doesn't exist, we can proceed
+      } catch (error) {
+        if (isMissingFileError(error)) {
+          // Missing output path is expected here; we'll create it below.
+        } else {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
       }
     }
 
@@ -255,10 +269,17 @@ export class FileService {
     // Check if file exists
     try {
       await access(filePath);
-    } catch {
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return {
+          success: false,
+          error: `File not found: ${filePath}`,
+        };
+      }
+
       return {
         success: false,
-        error: `File not found: ${filePath}`,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
 

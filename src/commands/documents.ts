@@ -74,7 +74,7 @@ export function extractDocumentIdFromUrl(url: string): string | null {
     }
 
     return docSlug.substring(lastHyphenIndex + 1) || null;
-  } catch {
+  } catch (_error) {
     // URL constructor throws on malformed URLs - treat as non-Linear URL
     // This is intentional: attachments may contain arbitrary URLs that aren't
     // valid, and we simply skip them rather than failing the entire operation

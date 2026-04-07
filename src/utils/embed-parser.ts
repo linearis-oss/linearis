@@ -112,7 +112,8 @@ export function isLinearUploadUrl(url: string): boolean {
   try {
     const urlObj = new URL(url);
     return urlObj.hostname === "uploads.linear.app";
-  } catch {
+  } catch (_error) {
+    // Invalid URLs are expected when parsing arbitrary markdown content.
     return false;
   }
 }
@@ -127,7 +128,8 @@ export function extractFilenameFromUrl(url: string): string {
     const pathname = urlObj.pathname;
     const parts = pathname.split("/");
     return parts[parts.length - 1] || "download";
-  } catch {
+  } catch (_error) {
+    // Fall back to a generic filename when the URL cannot be parsed.
     return "download";
   }
 }

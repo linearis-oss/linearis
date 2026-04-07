@@ -251,8 +251,8 @@ export class LinearService {
         teamKeyOrNameOrId,
       );
       return team.id;
-    } catch {
-      // If not found by key, try by name
+    } catch (_error) {
+      // Not every caller passes a team key; fall back to an exact name lookup.
       const team = await executeLinearQuery(
         () =>
           this.client.teams({
