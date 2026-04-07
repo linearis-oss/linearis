@@ -120,7 +120,7 @@ export async function listDocumentsBySlugIds(
 export async function deleteDocument(
   client: GraphQLClient,
   id: string,
-): Promise<boolean> {
+): Promise<{ id: string; success: boolean }> {
   const result = await client.request<DocumentDeleteMutation>(
     DocumentDeleteDocument,
     { id },
@@ -130,5 +130,5 @@ export async function deleteDocument(
     throw new Error("Failed to delete document");
   }
 
-  return true;
+  return { id: result.documentDelete.entity?.id ?? id, success: true };
 }

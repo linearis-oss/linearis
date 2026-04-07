@@ -113,13 +113,13 @@ describe("findIssueRelation", () => {
 });
 
 describe("deleteIssueRelation", () => {
-  it("deletes a relation by ID", async () => {
+  it("returns id and success", async () => {
     const client = mockGqlClient({
       issueRelationDelete: { success: true, entityId: "rel-1" },
     });
 
-    await deleteIssueRelation(client, "rel-1");
-    expect(client.request).toHaveBeenCalledOnce();
+    const result = await deleteIssueRelation(client, "rel-1");
+    expect(result).toEqual({ id: "rel-1", success: true });
   });
 
   it("throws when deletion fails", async () => {
