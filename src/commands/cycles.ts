@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
 import type {
@@ -35,7 +36,7 @@ export function setupCyclesCommands(program: Command): void {
           }
 
           const linearService = await createLinearService(
-            command.parent!.parent!.opts(),
+            getRootOpts(command),
           );
 
           // Fetch cycles with automatic pagination
@@ -93,7 +94,7 @@ export function setupCyclesCommands(program: Command): void {
           command: Command,
         ) => {
           const linearService = await createLinearService(
-            command.parent!.parent!.opts(),
+            getRootOpts(command),
           );
 
           // Resolve cycle ID (handles both UUID and name-based lookup)

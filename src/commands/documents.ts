@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { createGraphQLDocumentsService } from "../utils/graphql-documents-service.js";
 import {
@@ -120,7 +121,7 @@ export function setupDocumentsCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (options: DocumentCreateOptions, command: Command) => {
-          const rootOpts = command.parent!.parent!.opts();
+          const rootOpts = getRootOpts(command);
           const [documentsService, linearService] = await Promise.all([
             createGraphQLDocumentsService(rootOpts),
             createLinearService(rootOpts),
@@ -197,7 +198,7 @@ export function setupDocumentsCommands(program: Command): void {
           options: DocumentUpdateOptions,
           command: Command,
         ) => {
-          const rootOpts = command.parent!.parent!.opts();
+          const rootOpts = getRootOpts(command);
           const [documentsService, linearService] = await Promise.all([
             createGraphQLDocumentsService(rootOpts),
             createLinearService(rootOpts),
@@ -235,7 +236,7 @@ export function setupDocumentsCommands(program: Command): void {
     .action(
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
       handleAsyncCommand(async (documentId: string, _options: unknown, command: Command) => {
-        const rootOpts = command.parent!.parent!.opts();
+        const rootOpts = getRootOpts(command);
         const documentsService = await createGraphQLDocumentsService(rootOpts);
 
         const document = await documentsService.getDocument(documentId);
@@ -268,7 +269,7 @@ export function setupDocumentsCommands(program: Command): void {
             );
           }
 
-          const rootOpts = command.parent!.parent!.opts();
+          const rootOpts = getRootOpts(command);
           const [documentsService, linearService] = await Promise.all([
             createGraphQLDocumentsService(rootOpts),
             createLinearService(rootOpts),
@@ -341,7 +342,7 @@ export function setupDocumentsCommands(program: Command): void {
       // Note: _options parameter is required by Commander.js signature (arg, options, command)
       handleAsyncCommand(
         async (documentId: string, _options: unknown, command: Command) => {
-          const rootOpts = command.parent!.parent!.opts();
+          const rootOpts = getRootOpts(command);
           const documentsService = await createGraphQLDocumentsService(rootOpts);
 
           await documentsService.deleteDocument(documentId);

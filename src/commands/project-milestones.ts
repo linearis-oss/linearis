@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createGraphQLService } from "../utils/graphql-service.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
@@ -96,9 +97,10 @@ export function setupProjectMilestonesCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (options: MilestoneListOptions, command: Command) => {
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
 
           // Resolve project ID using LinearService
@@ -134,9 +136,10 @@ export function setupProjectMilestonesCommands(program: Command): void {
           options: MilestoneReadOptions,
           command: Command,
         ) => {
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
 
           const milestoneId = await resolveMilestoneId(
@@ -173,9 +176,10 @@ export function setupProjectMilestonesCommands(program: Command): void {
           options: MilestoneCreateOptions,
           command: Command,
         ) => {
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
 
           // Resolve project ID using LinearService
@@ -223,9 +227,10 @@ export function setupProjectMilestonesCommands(program: Command): void {
           options: MilestoneUpdateOptions,
           command: Command,
         ) => {
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
 
           const milestoneId = await resolveMilestoneId(

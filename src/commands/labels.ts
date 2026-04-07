@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
 
@@ -39,7 +40,7 @@ export function setupLabelsCommands(program: Command): void {
     .option("--team <team>", "filter by team key, name, or ID")
     .action(handleAsyncCommand(async (options: any, command: Command) => {
       // Initialize Linear service for label operations
-      const service = await createLinearService(command.parent!.parent!.opts());
+      const service = await createLinearService(getRootOpts(command));
       
       // Fetch labels with optional team filtering
       const result = await service.getLabels(options.team);

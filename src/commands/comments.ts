@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
 
@@ -44,7 +45,7 @@ export function setupCommentsCommands(program: Command): void {
         async (issueId: string, options: any, command: Command) => {
           // Initialize Linear service with authentication
           const service = await createLinearService(
-            command.parent!.parent!.opts(),
+            getRootOpts(command),
           );
 
           // Validate required body flag

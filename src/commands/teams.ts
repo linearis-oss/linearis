@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
 
@@ -40,7 +41,7 @@ export function setupTeamsCommands(program: Command): void {
     .action(
       handleAsyncCommand(async (options: any, command: Command) => {
         // Initialize Linear service for team operations
-        const service = await createLinearService(command.parent!.parent!.opts());
+        const service = await createLinearService(getRootOpts(command));
 
         // Fetch all teams from the workspace
         const result = await service.getTeams();

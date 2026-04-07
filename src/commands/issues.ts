@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createGraphQLService } from "../utils/graphql-service.js";
 import { GraphQLIssuesService } from "../utils/graphql-issues-service.js";
 import { createLinearService } from "../utils/linear-service.js";
@@ -43,10 +44,11 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (options: any, command: Command) => {
+          const rootOpts = getRootOpts(command);
           // Initialize both services for comprehensive issue data
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
           const issuesService = new GraphQLIssuesService(
             graphQLService,
@@ -78,9 +80,10 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (query: string, options: any, command: Command) => {
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
           const issuesService = new GraphQLIssuesService(
             graphQLService,
@@ -134,9 +137,10 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (title: string, options: any, command: Command) => {
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
           const issuesService = new GraphQLIssuesService(
             graphQLService,
@@ -186,10 +190,11 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleAsyncCommand(
         async (issueId: string, _options: any, command: Command) => {
+          const rootOpts = getRootOpts(command);
           // Initialize both services for comprehensive issue data
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
           const issuesService = new GraphQLIssuesService(
             graphQLService,
@@ -305,9 +310,10 @@ export function setupIssuesCommands(program: Command): void {
             );
           }
 
+          const rootOpts = getRootOpts(command);
           const [graphQLService, linearService] = await Promise.all([
-            createGraphQLService(command.parent!.parent!.opts()),
-            createLinearService(command.parent!.parent!.opts()),
+            createGraphQLService(rootOpts),
+            createLinearService(rootOpts),
           ]);
           const issuesService = new GraphQLIssuesService(
             graphQLService,

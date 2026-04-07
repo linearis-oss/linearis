@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { getRootOpts } from "../utils/context.js";
 import { createLinearService } from "../utils/linear-service.js";
 import { handleAsyncCommand, outputSuccess } from "../utils/output.js";
 
@@ -44,7 +45,7 @@ export function setupProjectsCommands(program: Command): void {
     )
     .action(handleAsyncCommand(async (_options: any, command: Command) => {
       // Initialize Linear service for project operations
-      const service = await createLinearService(command.parent!.parent!.opts());
+      const service = await createLinearService(getRootOpts(command));
       
       // Fetch all projects with their relationships
       const result = await service.getProjects();
