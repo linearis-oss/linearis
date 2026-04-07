@@ -2,23 +2,25 @@
 # GraphQL mutations for Linear issue comments
 #
 # Comments are discussion threads on issues. Each comment has a body
-# (markdown-formatted text), author, and timestamp. Comments cannot
-# be nested - all comments on an issue are at the same level.
-#
-# Key behavior: Comment body supports full markdown including code
-# blocks, links, and mentions (@user). Comments cannot be edited via
-# API - only created and deleted. Use commentUpdate mutation if it
-# becomes available.
+# (markdown-formatted text), author, and timestamp. Comments can be
+# nested via replies using parentId.
 # ------------------------------------------------------------
 
 # Comment fields fragment
 #
-# Defines the basic fields for a comment entity. Body is markdown,
-# createdAt is ISO 8601 timestamp.
+# Defines the standard fields for a comment entity. Body is markdown,
+# createdAt/editedAt are ISO 8601 timestamps, parentId links to a
+# parent comment for threaded replies.
 fragment CommentFields on Comment {
   id
   body
   createdAt
+  editedAt
+  parentId
+  user {
+    id
+    displayName
+  }
 }
 
 # Create a comment on an issue
@@ -27,7 +29,8 @@ fragment CommentFields on Comment {
 # supports markdown formatting including mentions and code blocks.
 #
 # Input fields (CommentCreateInput):
-#   issueId: UUID of the issue to comment on (required)
+#   issueId: UUID of the issue to comment on (required for top-level)
+#   parentId: UUID of parent comment (required for replies)
 #   body: Comment text in markdown format (required)
 #
 # Returns: success flag and the created comment with its fields
@@ -37,5 +40,38 @@ mutation CreateComment($input: CommentCreateInput!) {
     comment {
       ...CommentFields
     }
+  }
+}
+
+# Update an existing comment
+#
+# Updates the body of an existing comment.
+#
+# Variables:
+#   id: UUID of the comment to update (required)
+#   input: CommentUpdateInput with new body (required)
+#
+# Returns: success flag and the updated comment with its fields
+mutation UpdateComment($id: String!, $input: CommentUpdateInput!) {
+  commentUpdate(id: $id, input: $input) {
+    success
+    comment {
+      ...CommentFields
+    }
+  }
+}
+
+# Delete a comment
+#
+# Permanently deletes a comment.
+#
+# Variables:
+#   id: UUID of the comment to delete (required)
+#
+# Returns: success flag and the entity ID of the deleted comment
+mutation DeleteComment($id: String!) {
+  commentDelete(id: $id) {
+    success
+    entityId
   }
 }
