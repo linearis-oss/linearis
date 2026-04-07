@@ -126,7 +126,10 @@ describe("downloadFile", () => {
 
 describe("uploadFile", () => {
   it("returns error when file not found", async () => {
-    vi.mocked(access).mockRejectedValue(new Error("ENOENT"));
+    const err = Object.assign(new Error("ENOENT: no such file or directory"), {
+      code: "ENOENT",
+    });
+    vi.mocked(access).mockRejectedValue(err);
 
     const service = new FileService(TEST_TOKEN);
     const result = await service.uploadFile("/path/to/missing.png");

@@ -60,6 +60,7 @@ export function isLinearUploadUrl(url: string): boolean {
     const urlObj = new URL(url);
     return urlObj.hostname === "uploads.linear.app";
   } catch {
+    // malformed URL → not a linear upload URL
     return false;
   }
 }
@@ -69,6 +70,7 @@ export function extractFilenameFromUrl(url: string): string {
     const parts = new URL(url).pathname.split("/");
     return parts[parts.length - 1] || "download";
   } catch {
+    // malformed URL → fall back to generic filename
     return "download";
   }
 }

@@ -36,6 +36,7 @@ export function tryParseIssueIdentifier(
   try {
     return parseIssueIdentifier(identifier);
   } catch {
+    // parseIssueIdentifier throws on malformed identifiers — expected for non-issue inputs
     return null;
   }
 }
