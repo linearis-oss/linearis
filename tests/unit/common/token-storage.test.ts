@@ -65,6 +65,12 @@ describe("getTokenDir", () => {
     process.env.XDG_CONFIG_HOME = "/custom/config";
     expect(getTokenDir()).toBe(path.join("/custom/config", "linearis"));
   });
+
+  it("ignores relative XDG_CONFIG_HOME", () => {
+    setPlatform("linux");
+    process.env.XDG_CONFIG_HOME = "relative/path";
+    expect(getTokenDir()).toBe(xdgDir);
+  });
 });
 
 describe("ensureTokenDir", () => {
@@ -224,5 +230,29 @@ describe("clearToken", () => {
     clearToken();
 
     expect(fs.unlinkSync).not.toHaveBeenCalled();
+  });
+
+  it("removes both XDG and legacy token on Linux", () => {
+    setPlatform("linux");
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.unlinkSync).mockReturnValue(undefined);
+
+    clearToken();
+
+    expect(fs.unlinkSync).toHaveBeenCalledWith(xdgToken);
+    expect(fs.unlinkSync).toHaveBeenCalledWith(legacyToken);
+  });
+
+  it("removes only XDG token on Linux when legacy is missing", () => {
+    setPlatform("linux");
+    vi.mocked(fs.existsSync)
+      .mockReturnValueOnce(true) // XDG path
+      .mockReturnValueOnce(false); // legacy path
+    vi.mocked(fs.unlinkSync).mockReturnValue(undefined);
+
+    clearToken();
+
+    expect(fs.unlinkSync).toHaveBeenCalledWith(xdgToken);
+    expect(fs.unlinkSync).not.toHaveBeenCalledWith(legacyToken);
   });
 });

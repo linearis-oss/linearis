@@ -9,9 +9,11 @@ const TOKEN_FILE = "token";
 
 export function getTokenDir(): string {
   if (process.platform === "linux") {
-    const xdgConfig =
-      process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-    return path.join(xdgConfig, DIR_NAME);
+    const xdgConfig = process.env.XDG_CONFIG_HOME;
+    if (xdgConfig && path.isAbsolute(xdgConfig)) {
+      return path.join(xdgConfig, DIR_NAME);
+    }
+    return path.join(os.homedir(), ".config", DIR_NAME);
   }
   return path.join(os.homedir(), LEGACY_DIR_NAME);
 }
@@ -74,5 +76,11 @@ export function clearToken(): void {
   const tokenPath = getTokenPath();
   if (fs.existsSync(tokenPath)) {
     fs.unlinkSync(tokenPath);
+  }
+  if (process.platform === "linux") {
+    const legacy = getLegacyTokenPath();
+    if (fs.existsSync(legacy)) {
+      fs.unlinkSync(legacy);
+    }
   }
 }
