@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
-import { createContext } from "../common/context.js";
+import { createContext, getRootOpts } from "../common/context.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -179,7 +179,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListOptions, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const paginationOptions = {
           limit: parseLimit(options.limit),
@@ -210,7 +210,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (isUuid(issue)) {
           const result = await getIssue(ctx.gql, issue);
@@ -251,7 +251,7 @@ export function setupIssuesCommands(program: Command): void {
           CreateOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         validateRelationFlags(options);
 
@@ -403,7 +403,7 @@ export function setupIssuesCommands(program: Command): void {
 
         validateRelationFlags(options);
 
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
 

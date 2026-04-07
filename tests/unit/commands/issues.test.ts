@@ -3,12 +3,17 @@ import { Command } from "commander";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock all external dependencies before importing the module under test
-vi.mock("../../../src/common/context.js", () => ({
-  createContext: vi.fn(() => ({
-    gql: { request: vi.fn() },
-    sdk: { sdk: {} },
-  })),
-}));
+vi.mock("../../../src/common/context.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/common/context.js")>();
+  return {
+    ...actual,
+    createContext: vi.fn(() => ({
+      gql: { request: vi.fn() },
+      sdk: { sdk: {} },
+    })),
+  };
+});
 
 vi.mock("../../../src/common/output.js", async (importOriginal) => {
   const actual =

@@ -22,9 +22,11 @@ vi.mock("../../../src/services/auth-service.js", () => ({
   validateToken: vi.fn(),
 }));
 
-vi.mock("../../../src/common/context.js", () => ({
-  createGraphQLClient: vi.fn(() => ({})),
-}));
+vi.mock("../../../src/common/context.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/common/context.js")>();
+  return { ...actual, createGraphQLClient: vi.fn(() => ({})) };
+});
 
 vi.mock("../../../src/common/auth.js", async (importOriginal) => {
   const actual =
