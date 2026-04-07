@@ -3,15 +3,29 @@ import os from "node:os";
 import path from "node:path";
 import { decryptToken, encryptToken } from "./encryption.js";
 
-const DIR_NAME = ".linearis";
+const DIR_NAME = "linearis";
+const LEGACY_DIR_NAME = ".linearis";
 const TOKEN_FILE = "token";
 
 export function getTokenDir(): string {
-  return path.join(os.homedir(), DIR_NAME);
+  if (process.platform === "linux") {
+    const xdgConfig =
+      process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+    return path.join(xdgConfig, DIR_NAME);
+  }
+  return path.join(os.homedir(), LEGACY_DIR_NAME);
+}
+
+function getLegacyTokenDir(): string {
+  return path.join(os.homedir(), LEGACY_DIR_NAME);
 }
 
 function getTokenPath(): string {
   return path.join(getTokenDir(), TOKEN_FILE);
+}
+
+function getLegacyTokenPath(): string {
+  return path.join(getLegacyTokenDir(), TOKEN_FILE);
 }
 
 export function ensureTokenDir(): void {
@@ -34,6 +48,18 @@ export function saveToken(token: string): void {
 export function getStoredToken(): string | null {
   const tokenPath = getTokenPath();
   if (!fs.existsSync(tokenPath)) {
+    // on linux, fall back to legacy ~/.linearis/token
+    if (process.platform === "linux") {
+      const legacy = getLegacyTokenPath();
+      if (fs.existsSync(legacy)) {
+        try {
+          const encrypted = fs.readFileSync(legacy, "utf8").trim();
+          return decryptToken(encrypted);
+        } catch {
+          return null;
+        }
+      }
+    }
     return null;
   }
   try {
