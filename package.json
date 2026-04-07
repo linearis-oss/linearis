@@ -13,9 +13,10 @@
     "LICENSE.md"
   ],
   "scripts": {
-    "build": "tsc && chmod +x dist/main.js",
+    "build": "tsc && node scripts/make-executable.mjs",
     "clean": "rm -rf dist/",
     "start": "tsx src/main.ts",
+    "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
