@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2026.4.3] - 2026-04-08
+
+[2026.4.3]: https://github.com/linearis-oss/linearis/compare/v2026.4.2...v2026.4.3
+
+### Added
+
+- **Estimate support** — `--estimate` on `issues create`, and `--estimate`/`--clear-estimate` on `issues update` with scale-neutral descriptions and `--estimate 0` support [PR#94](https://github.com/linearis-oss/linearis/pull/94)
+
+### Fixed
+
+- Replaced `postinstall` with `prepare` to fix broken consumer installs via `npm install -g linearis` [#120](https://github.com/linearis-oss/linearis/issues/120), [PR#123](https://github.com/linearis-oss/linearis/pull/123)
+
+### CI & Build
+
+- Added `clean-publish` to strip dev artifacts from published tarball [PR#123](https://github.com/linearis-oss/linearis/pull/123)
+- Added smoke test for consumer package install [PR#123](https://github.com/linearis-oss/linearis/pull/123)
+
+### Documentation
+
+- Updated contributing guide with publishing section and lifecycle hook policy [PR#123](https://github.com/linearis-oss/linearis/pull/123)
+
+---
+
 ## [2026.4.2] - 2026-04-08
 
 [2026.4.2]: https://github.com/linearis-oss/linearis/compare/v2026.4.1...v2026.4.2
