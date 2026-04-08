@@ -26,6 +26,13 @@
       "description": "Group GitHub Actions updates",
       "matchManagers": ["github-actions"],
       "groupName": "github actions"
+    },
+    {
+      "description": "Pin publish workflow to minimum supported Node version",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["node"],
+      "matchFileNames": [".github/workflows/publish.yml"],
+      "enabled": false
     }
   ]
 }
