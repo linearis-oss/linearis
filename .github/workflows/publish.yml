@@ -47,7 +47,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "22" # Pin to minimum supported version for publishing
           registry-url: "https://registry.npmjs.org"
 
       - name: Clean install
