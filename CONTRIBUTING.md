@@ -21,7 +21,7 @@ Requires **Node.js >= 22**.
 ```bash
 git clone https://github.com/linearis-oss/linearis.git
 cd linearis
-npm install        # Install deps + GraphQL codegen + lefthook
+npm install        # Install deps, codegen, and lefthook (via prepare hook)
 npm start          # Development mode (tsx, no compilation)
 npm test           # Run tests
 npm run build      # Compile to dist/
@@ -40,6 +40,16 @@ npm run build          # Compile TypeScript (required before integration tests)
 ```
 
 Integration tests (`tests/integration/`) require `LINEAR_API_TOKEN` in your environment. They are skipped automatically when the token is absent.
+
+## Publishing
+
+To publish a new version locally (maintainers only):
+
+```bash
+npm run release    # Runs tests, builds, and publishes via clean-publish
+```
+
+In CI, publishing is handled automatically by the publish workflow when a version tag is pushed. The workflow uses `clean-publish` to strip dev artifacts (scripts, devDependencies, etc.) from the published package.
 
 ## Pull Requests
 
