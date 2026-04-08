@@ -60,7 +60,7 @@ jobs:
         run: npm test
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npx clean-publish --access public -- --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

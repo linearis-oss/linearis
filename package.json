@@ -30,6 +30,7 @@
     "lint:check": "biome lint .",
     "check": "biome check --write .",
     "check:ci": "biome check .",
+    "release": "npm test && npm run build && npx clean-publish --access public",
     "prestart": "npm run generate",
     "predev": "npm run generate",
     "prebuild": "npm run generate && npm run generate:usage",
@@ -75,6 +76,7 @@
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.0",
     "@vitest/ui": "^4.0.0",
+    "clean-publish": "^6.0.5",
     "lefthook": "^2.1.0",
     "tsx": "^4.20.5",
     "typescript": "^6.0.0",
@@ -83,5 +85,11 @@
   "graphql": {
     "schema": "https://api.linear.app/graphql",
     "documents": "**/*.graphql"
+  },
+  "clean-publish": {
+    "fields": [
+      "scripts",
+      "graphql"
+    ]
   }
 }
