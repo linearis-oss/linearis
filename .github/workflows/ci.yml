@@ -75,3 +75,28 @@ jobs:
 
       - name: TypeScript type check
         run: npx tsc --noEmit
+
+  smoke-test:
+    name: Smoke test package install
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Pack and install
+        run: |
+          npm pack
+          npm install -g ./linearis-*.tgz
+          linearis --help
+          npm uninstall -g linearis
