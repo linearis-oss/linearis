@@ -6,7 +6,7 @@ import {
   resolveApiToken,
   type TokenSource,
 } from "../common/auth.js";
-import { createGraphQLClient } from "../common/context.js";
+import { createGraphQLClient, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { clearToken, saveToken } from "../common/token-storage.js";
 import type { Viewer } from "../common/types.js";
@@ -124,7 +124,7 @@ export function setupAuthCommands(program: Command): void {
       try {
         if (!options.force) {
           try {
-            const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+            const rootOpts = getRootOpts(command);
             const { token, source } = resolveApiToken(rootOpts);
             try {
               const viewer = await validateApiToken(token);
@@ -202,7 +202,7 @@ export function setupAuthCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
-        const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+        const rootOpts = getRootOpts(command);
 
         let token: string;
         let source: TokenSource;
@@ -243,7 +243,7 @@ export function setupAuthCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [, command] = args as [CommandOptions, Command];
-        const rootOpts = command.parent!.parent!.opts() as CommandOptions;
+        const rootOpts = getRootOpts(command);
 
         clearToken();
 

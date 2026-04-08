@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { type CommandOptions, getApiToken } from "../common/auth.js";
+import { getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { FileService } from "../services/file-service.js";
@@ -37,7 +38,7 @@ export function setupFilesCommands(program: Command): void {
           CommandOptions & { output?: string; overwrite?: boolean },
           Command,
         ];
-        const apiToken = getApiToken(command.parent!.parent!.opts());
+        const apiToken = getApiToken(getRootOpts(command));
         const fileService = new FileService(apiToken);
         const result = await fileService.downloadFile(url, {
           output: options.output,
@@ -61,7 +62,7 @@ export function setupFilesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [filePath, , command] = args as [string, CommandOptions, Command];
-        const apiToken = getApiToken(command.parent!.parent!.opts());
+        const apiToken = getApiToken(getRootOpts(command));
         const fileService = new FileService(apiToken);
         const result = await fileService.uploadFile(filePath);
 

@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { createContext } from "../common/context.js";
+import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { DocumentUpdateInput } from "../gql/graphql.js";
@@ -109,7 +109,7 @@ export function setupDocumentsCommands(program: Command): void {
           );
         }
 
-        const rootOpts = command.parent!.parent!.opts();
+        const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
         const limit = parseLimit(options.limit || "50");
@@ -168,7 +168,7 @@ export function setupDocumentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [document, , command] = args as [string, unknown, Command];
-        const rootOpts = command.parent!.parent!.opts();
+        const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
         const documentResult = await getDocument(ctx.gql, document);
@@ -189,7 +189,7 @@ export function setupDocumentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [DocumentCreateOptions, Command];
-        const rootOpts = command.parent!.parent!.opts();
+        const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
         const projectId = options.project
@@ -247,7 +247,7 @@ export function setupDocumentsCommands(program: Command): void {
           DocumentUpdateOptions,
           Command,
         ];
-        const rootOpts = command.parent!.parent!.opts();
+        const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
         const input: DocumentUpdateInput = {};
@@ -270,7 +270,7 @@ export function setupDocumentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [document, , command] = args as [string, unknown, Command];
-        const rootOpts = command.parent!.parent!.opts();
+        const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
         await deleteDocument(ctx.gql, document);

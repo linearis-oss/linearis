@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { createContext } from "../common/context.js";
+import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { ProjectMilestoneUpdateInput } from "../gql/graphql.js";
@@ -72,7 +72,7 @@ export function setupMilestonesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [MilestoneListOptions, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         // Resolve project ID
         const projectId = await resolveProjectId(ctx.sdk, options.project);
@@ -99,7 +99,7 @@ export function setupMilestonesCommands(program: Command): void {
           MilestoneReadOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const milestoneId = await resolveMilestoneId(
           ctx.gql,
@@ -132,7 +132,7 @@ export function setupMilestonesCommands(program: Command): void {
           MilestoneCreateOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         // Resolve project ID
         const projectId = await resolveProjectId(ctx.sdk, options.project);
@@ -167,7 +167,7 @@ export function setupMilestonesCommands(program: Command): void {
           MilestoneUpdateOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const milestoneId = await resolveMilestoneId(
           ctx.gql,

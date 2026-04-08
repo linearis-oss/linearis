@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { type CommandOptions, createContext } from "../common/context.js";
+import {
+  type CommandOptions,
+  createContext,
+  getRootOpts,
+} from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
@@ -41,7 +45,7 @@ export function setupCommentsCommands(program: Command): void {
           CreateCommentOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw new Error("--body is required");

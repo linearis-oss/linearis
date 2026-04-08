@@ -1,8 +1,17 @@
+import type { Command } from "commander";
 import { GraphQLClient } from "../client/graphql-client.js";
 import { LinearSdkClient } from "../client/linear-client.js";
 import { type CommandOptions, getApiToken } from "./auth.js";
 
 export type { CommandOptions };
+
+export function getRootOpts(command: Command): CommandOptions {
+  let current: Command | null = command;
+  while (current?.parent) {
+    current = current.parent;
+  }
+  return current.opts() as CommandOptions;
+}
 
 export interface CommandContext {
   gql: GraphQLClient;
