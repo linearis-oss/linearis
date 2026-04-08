@@ -4,6 +4,51 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2026.4.2] - 2026-04-08
+
+[2026.4.2]: https://github.com/linearis-oss/linearis/compare/v2026.4.1...v2026.4.2
+
+### Added
+
+- **Due date support** — `--due-date` option on `issues create`, and `--due-date`/`--clear-due-date` on `issues update` [PR#119](https://github.com/linearis-oss/linearis/pull/119)
+- **Project CRUD commands** — new `project read`, `project create`, and `project update` commands with label and status ID resolution [PR#118](https://github.com/linearis-oss/linearis/pull/118)
+- **Comment management** — new `comments list`, `comments reply`, `comments edit`, and `comments delete` subcommands [PR#81](https://github.com/linearis-oss/linearis/pull/81)
+- **XDG_CONFIG_HOME support** — token storage now respects `XDG_CONFIG_HOME` on Linux [#73](https://github.com/linearis-oss/linearis/issues/73)
+- **GitHub release automation** — publish workflow now creates GitHub releases automatically [PR#77](https://github.com/linearis-oss/linearis/pull/77)
+
+### Fixed
+
+- Migrated `moduleResolution` from `Node` to `Bundler` for TypeScript 6 compatibility [PR#107](https://github.com/linearis-oss/linearis/pull/107)
+- Added `prepack` script for git-based installs [PR#80](https://github.com/linearis-oss/linearis/pull/80)
+- Updated `@linear/sdk` to v80 [PR#109](https://github.com/linearis-oss/linearis/pull/109)
+- Updated `commander` to v14.0.3 [PR#103](https://github.com/linearis-oss/linearis/pull/103)
+
+### Changed
+
+- Standardized delete return types to `{id, success}` across all delete operations [PR#86](https://github.com/linearis-oss/linearis/pull/86)
+
+### CI & Build
+
+- Expanded CI matrix to test Node.js 22 and 24 [PR#112](https://github.com/linearis-oss/linearis/pull/112)
+- Pinned publish workflow to minimum supported Node version [PR#113](https://github.com/linearis-oss/linearis/pull/113)
+- Aligned action versions to v6 across CI and publish workflows [PR#92](https://github.com/linearis-oss/linearis/pull/92)
+- Added content permission to CI workflow [PR#99](https://github.com/linearis-oss/linearis/pull/99)
+- Added CODEOWNERS file for security review gates
+
+### Maintenance
+
+- Updated TypeScript to v6, Vitest to v4, `@types/node` to v24
+- Updated dev dependencies (non-major)
+- Disabled Renovate dependency dashboard
+- Updated `.gitignore` to exclude generated files
+- Removed obsolete mise config and tasks
+
+### Documentation
+
+- Replaced manual contributor list with contrib.rocks [PR#102](https://github.com/linearis-oss/linearis/pull/102)
+
+---
+
 ## [2026.4.1] - 2026-04-07
 
 [2026.4.1]: https://github.com/linearis-oss/linearis/compare/v2025.12.3...v2026.4.1

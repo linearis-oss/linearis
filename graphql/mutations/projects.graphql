@@ -1,0 +1,31 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear project operations
+#
+# Creates and updates projects with complete response data
+# including all detail fields for consistent output.
+# ------------------------------------------------------------
+
+# Create a new project
+#
+# Creates a project and returns complete detail fields.
+# Requires at minimum a name and team IDs.
+mutation CreateProject($input: ProjectCreateInput!) {
+  projectCreate(input: $input) {
+    success
+    project {
+      ...ProjectDetailFields
+    }
+  }
+}
+
+# Update an existing project
+#
+# Updates project properties and returns complete detail fields.
+mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
+  projectUpdate(id: $id, input: $input) {
+    success
+    project {
+      ...ProjectDetailFields
+    }
+  }
+}

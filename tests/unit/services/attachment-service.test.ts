@@ -48,10 +48,12 @@ describe("createAttachment", () => {
 });
 
 describe("deleteAttachment", () => {
-  it("returns true on success", async () => {
-    const client = mockGqlClient({ attachmentDelete: { success: true } });
+  it("returns id and success on success", async () => {
+    const client = mockGqlClient({
+      attachmentDelete: { success: true, entityId: "att-1" },
+    });
     const result = await deleteAttachment(client, "att-1");
-    expect(result).toBe(true);
+    expect(result).toEqual({ id: "att-1", success: true });
   });
 
   it("throws when delete fails", async () => {

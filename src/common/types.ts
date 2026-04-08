@@ -1,8 +1,10 @@
 import type {
   AttachmentCreateMutation,
+  CreateCommentMutation,
   CreateIssueMutation,
   CreateIssueRelationMutation,
   CreateProjectMilestoneMutation,
+  CreateProjectMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
   GetDocumentQuery,
@@ -10,13 +12,18 @@ import type {
   GetIssueByIdQuery,
   GetIssuesQuery,
   GetProjectMilestoneByIdQuery,
+  GetProjectQuery,
+  GetProjectsQuery,
   GetViewerQuery,
   ListAttachmentsQuery,
+  ListCommentsQuery,
   ListDocumentsQuery,
   ListProjectMilestonesQuery,
   SearchIssuesQuery,
+  UpdateCommentMutation,
   UpdateIssueMutation,
   UpdateProjectMilestoneMutation,
+  UpdateProjectMutation,
 } from "../gql/graphql.js";
 
 // Pagination types
@@ -62,6 +69,16 @@ export type Attachment =
 export type CreatedAttachment =
   AttachmentCreateMutation["attachmentCreate"]["attachment"];
 
+// Project types
+export type ProjectListItem = GetProjectsQuery["projects"]["nodes"][0];
+export type ProjectDetail = NonNullable<GetProjectQuery["project"]>;
+export type CreatedProject = NonNullable<
+  CreateProjectMutation["projectCreate"]["project"]
+>;
+export type UpdatedProject = NonNullable<
+  UpdateProjectMutation["projectUpdate"]["project"]
+>;
+
 // Milestone types
 export type MilestoneDetail = NonNullable<
   GetProjectMilestoneByIdQuery["projectMilestone"]
@@ -74,6 +91,16 @@ export type CreatedMilestone = NonNullable<
 export type UpdatedMilestone = NonNullable<
   UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
 >;
+
+// Comment types
+export type CreatedComment = NonNullable<
+  CreateCommentMutation["commentCreate"]["comment"]
+>;
+export type UpdatedComment = NonNullable<
+  UpdateCommentMutation["commentUpdate"]["comment"]
+>;
+export type CommentListItem =
+  ListCommentsQuery["issue"]["comments"]["nodes"][0];
 
 // Viewer types
 export type Viewer = GetViewerQuery["viewer"];

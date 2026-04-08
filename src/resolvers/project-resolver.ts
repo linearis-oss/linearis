@@ -19,3 +19,30 @@ export async function resolveProjectId(
 
   return result.nodes[0].id;
 }
+
+export async function resolveProjectLabelId(
+  client: LinearSdkClient,
+  nameOrId: string,
+): Promise<string> {
+  if (isUuid(nameOrId)) return nameOrId;
+
+  const result = await client.sdk.projectLabels({
+    filter: { name: { eqIgnoreCase: nameOrId } },
+    first: 1,
+  });
+
+  if (result.nodes.length === 0) {
+    throw notFoundError("Project label", nameOrId);
+  }
+
+  return result.nodes[0].id;
+}
+
+export async function resolveProjectLabelIds(
+  client: LinearSdkClient,
+  namesOrIds: string[],
+): Promise<string[]> {
+  return Promise.all(
+    namesOrIds.map((nameOrId) => resolveProjectLabelId(client, nameOrId)),
+  );
+}

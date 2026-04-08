@@ -7,9 +7,10 @@ import { AuthenticationError } from "../../../src/common/errors.js";
 vi.mock("@linear/sdk", () => {
   const mockRawRequest = vi.fn();
   return {
-    LinearClient: vi.fn().mockImplementation(() => ({
-      client: { rawRequest: mockRawRequest },
-    })),
+    // biome-ignore lint/complexity/useArrowFunction: vitest v4 requires regular function for constructor mocks
+    LinearClient: vi.fn().mockImplementation(function () {
+      return { client: { rawRequest: mockRawRequest } };
+    }),
     __mockRawRequest: mockRawRequest,
   };
 });

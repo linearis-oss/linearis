@@ -11,6 +11,9 @@ on:
       - ready_for_review
       - reopened
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,14 +25,14 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [22, 24]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup node v${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
@@ -46,7 +49,7 @@ jobs:
   lint:
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [22, 24]
 
     name: Code checks on node v${{ matrix.node-version }}
     runs-on: ubuntu-latest

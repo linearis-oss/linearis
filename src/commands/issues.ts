@@ -1,7 +1,11 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
-import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
+import {
+  isUuid,
+  parseDueDate,
+  parseIssueIdentifier,
+} from "../common/identifier.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
@@ -49,6 +53,7 @@ interface CreateOptions {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  dueDate?: string;
   blocks?: string;
   blockedBy?: string;
   relatesTo?: string;
@@ -73,6 +78,8 @@ interface UpdateOptions {
   clearProjectMilestone?: boolean;
   cycle?: string;
   clearCycle?: boolean;
+  dueDate?: string;
+  clearDueDate?: boolean;
   blocks?: string;
   blockedBy?: string;
   relatesTo?: string;
@@ -89,9 +96,10 @@ export const ISSUES_META: DomainMeta = {
     "and can be assigned to a user. issues can have estimates; valid values",
     "are integers whose meaning depends on the team's estimation scale",
     "(fibonacci, exponential, linear, or t-shirt sizes mapped to integers).",
-    "issues can have labels, belong to a project, be part of a cycle (sprint),",
-    "and reference a project milestone. parent-child relationships and issue",
-    "relations (blocks, blocked-by, relates-to, duplicate-of) are supported.",
+    "issues can have labels, a due date, belong to a project, be part of a",
+    "cycle (sprint), and reference a project milestone. parent-child",
+    "relationships and issue relations (blocks, blocked-by, relates-to,",
+    "duplicate-of) are supported.",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
@@ -246,6 +254,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--status <status>", "set status")
     .option("--estimate <n>", "set estimate")
     .option("--parent-ticket <issue>", "set parent issue")
+    .option("--due-date <date>", "due date (YYYY-MM-DD)")
     .option("--blocks <issue>", "this issue blocks <issue>")
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
     .option("--relates-to <issue>", "this issue relates to <issue>")
@@ -330,6 +339,10 @@ export function setupIssuesCommands(program: Command): void {
           input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
         }
 
+        if (options.dueDate) {
+          input.dueDate = parseDueDate(options.dueDate);
+        }
+
         const relationTargetId = await resolveRelationTarget(ctx, options);
 
         const result = await createIssue(ctx.gql, input);
@@ -366,6 +379,8 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-cycle", "clear cycle")
     .option("--estimate <n>", "new estimate")
     .option("--clear-estimate", "clear estimate")
+    .option("--due-date <date>", "set due date (YYYY-MM-DD)")
+    .option("--clear-due-date", "clear due date")
     .option("--blocks <issue>", "add blocks relation")
     .option("--blocked-by <issue>", "add blocked-by relation")
     .option("--relates-to <issue>", "add relates-to relation")
@@ -398,6 +413,12 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.cycle && options.clearCycle) {
           throw new Error("Cannot use --cycle and --clear-cycle together");
+        }
+
+        if (options.dueDate && options.clearDueDate) {
+          throw new Error(
+            "Cannot use --due-date and --clear-due-date together",
+          );
         }
 
         if (options.labelMode && !options.labels) {
@@ -524,6 +545,12 @@ export function setupIssuesCommands(program: Command): void {
               ? issueContext.team.key
               : undefined;
           input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
+        }
+
+        if (options.clearDueDate) {
+          input.dueDate = null;
+        } else if (options.dueDate) {
+          input.dueDate = parseDueDate(options.dueDate);
         }
 
         const relationTargetId = await resolveRelationTarget(ctx, options);

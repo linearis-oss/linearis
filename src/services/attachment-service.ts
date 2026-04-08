@@ -29,7 +29,7 @@ export async function createAttachment(
 export async function deleteAttachment(
   client: GraphQLClient,
   id: string,
-): Promise<boolean> {
+): Promise<{ id: string; success: boolean }> {
   const result = await client.request<AttachmentDeleteMutation>(
     AttachmentDeleteDocument,
     { id },
@@ -39,7 +39,7 @@ export async function deleteAttachment(
     throw new Error("Failed to delete attachment");
   }
 
-  return true;
+  return { id: result.attachmentDelete.entityId, success: true };
 }
 
 export async function listAttachments(
