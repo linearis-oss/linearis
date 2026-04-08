@@ -2,44 +2,137 @@
 # GraphQL queries for Linear projects
 #
 # Projects group related issues across teams toward a common goal.
-# Each project has a state (planned, started, paused, completed,
-# canceled), optional target date, and can contain milestones.
+# Each project has a status (backlog, planned, started, paused,
+# completed, canceled), optional target date, and can contain milestones.
 # Projects are workspace-level and can span multiple teams.
-#
-# Key behavior: Project slugId is a URL-friendly identifier used
-# in Linear's web UI. The state field is a string enum, not a
-# relationship to a State entity.
 # ------------------------------------------------------------
 
-# Project fields fragment
+# Project list fields fragment
 #
-# Defines the basic fields for a project entity. State is one of:
-# planned, started, paused, completed, canceled. TargetDate is nullable.
-fragment ProjectFields on Project {
+# Fields returned for each project in list results. Includes status,
+# priority, lead, teams, labels, health, and progress for rich output.
+# Retains deprecated `state` field for backward compatibility.
+fragment ProjectListFields on Project {
   id
   name
   description
   state
-  targetDate
+  status {
+    id
+    name
+    type
+  }
   slugId
+  priority
+  priorityLabel
+  health
+  progress
+  startDate
+  targetDate
+  url
+  lead {
+    id
+    name
+  }
+  teams {
+    nodes {
+      id
+      key
+      name
+    }
+  }
+  labels {
+    nodes {
+      id
+      name
+      color
+    }
+  }
+}
+
+# Project detail fields fragment
+#
+# Extended fields for single-project read view. Includes content,
+# members, milestones, initiatives, creator, lifecycle dates, and
+# visual properties.
+fragment ProjectDetailFields on Project {
+  ...ProjectListFields
+  content
+  icon
+  color
+  createdAt
+  updatedAt
+  startedAt
+  completedAt
+  canceledAt
+  creator {
+    id
+    name
+  }
+  members {
+    nodes {
+      id
+      name
+    }
+  }
+  projectMilestones {
+    nodes {
+      id
+      name
+      targetDate
+    }
+  }
+  initiatives {
+    nodes {
+      id
+      name
+    }
+  }
 }
 
 # List all projects in the workspace
 #
-# Fetches a list of projects across all teams. Projects are typically
-# limited in number (active projects < 50 is common), so pagination
-# is rarely needed.
+# Fetches a paginated list of projects across all teams with enriched
+# fields including status, priority, lead, teams, labels, health.
 #
 # Variables:
 #   $first: Maximum number of projects to return (default: 50)
+#   $after: Cursor for pagination
 query GetProjects($first: Int = 50, $after: String) {
   projects(first: $first, after: $after) {
     nodes {
-      ...ProjectFields
+      ...ProjectListFields
     }
     pageInfo {
       hasNextPage
       endCursor
+    }
+  }
+}
+
+# Get a single project by ID
+#
+# Fetches complete project details including content, members,
+# milestones, initiatives, and lifecycle timestamps.
+#
+# Variables:
+#   $id: Project UUID
+query GetProject($id: String!) {
+  project(id: $id) {
+    ...ProjectDetailFields
+  }
+}
+
+# List all project statuses in the workspace
+#
+# Fetches project statuses for name-to-UUID resolution.
+# The API does not support filter args on this connection,
+# so all statuses are fetched and filtered client-side.
+query GetProjectStatuses {
+  projectStatuses {
+    nodes {
+      id
+      name
     }
   }
 }
