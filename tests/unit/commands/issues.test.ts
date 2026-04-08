@@ -224,6 +224,89 @@ describe("issues create --due-date", () => {
   });
 });
 
+describe("issues update --due-date", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes dueDate in update input", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--due-date",
+      "2025-02-01",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ dueDate: "2025-02-01" }),
+    );
+  });
+
+  it("clears dueDate with --clear-due-date", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-due-date",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ dueDate: null }),
+    );
+  });
+
+  it("throws when --due-date and --clear-due-date are both provided", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--due-date",
+      "2025-02-01",
+      "--clear-due-date",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Cannot use --due-date and --clear-due-date together",
+      ),
+    );
+  });
+
+  it("rejects invalid date format", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--due-date",
+      "2025-13-01",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid due date"),
+    );
+  });
+});
+
 describe("issues update --assignee", () => {
   beforeEach(() => {
     vi.clearAllMocks();

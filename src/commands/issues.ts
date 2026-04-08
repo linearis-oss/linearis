@@ -75,6 +75,8 @@ interface UpdateOptions {
   clearProjectMilestone?: boolean;
   cycle?: string;
   clearCycle?: boolean;
+  dueDate?: string;
+  clearDueDate?: boolean;
   blocks?: string;
   blockedBy?: string;
   relatesTo?: string;
@@ -364,6 +366,8 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
+    .option("--due-date <date>", "set due date (YYYY-MM-DD)")
+    .option("--clear-due-date", "clear due date")
     .option("--blocks <issue>", "add blocks relation")
     .option("--blocked-by <issue>", "add blocked-by relation")
     .option("--relates-to <issue>", "add relates-to relation")
@@ -390,6 +394,12 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.cycle && options.clearCycle) {
           throw new Error("Cannot use --cycle and --clear-cycle together");
+        }
+
+        if (options.dueDate && options.clearDueDate) {
+          throw new Error(
+            "Cannot use --due-date and --clear-due-date together",
+          );
         }
 
         if (options.labelMode && !options.labels) {
@@ -510,6 +520,12 @@ export function setupIssuesCommands(program: Command): void {
               ? issueContext.team.key
               : undefined;
           input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
+        }
+
+        if (options.clearDueDate) {
+          input.dueDate = null;
+        } else if (options.dueDate) {
+          input.dueDate = parseDueDate(options.dueDate);
         }
 
         const relationTargetId = await resolveRelationTarget(ctx, options);
