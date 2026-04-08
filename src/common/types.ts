@@ -1,5 +1,6 @@
 import type {
   AttachmentCreateMutation,
+  CreateCommentMutation,
   CreateIssueMutation,
   CreateIssueRelationMutation,
   CreateProjectMilestoneMutation,
@@ -12,9 +13,11 @@ import type {
   GetProjectMilestoneByIdQuery,
   GetViewerQuery,
   ListAttachmentsQuery,
+  ListCommentsQuery,
   ListDocumentsQuery,
   ListProjectMilestonesQuery,
   SearchIssuesQuery,
+  UpdateCommentMutation,
   UpdateIssueMutation,
   UpdateProjectMilestoneMutation,
 } from "../gql/graphql.js";
@@ -74,6 +77,16 @@ export type CreatedMilestone = NonNullable<
 export type UpdatedMilestone = NonNullable<
   UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
 >;
+
+// Comment types
+export type CreatedComment = NonNullable<
+  CreateCommentMutation["commentCreate"]["comment"]
+>;
+export type UpdatedComment = NonNullable<
+  UpdateCommentMutation["commentUpdate"]["comment"]
+>;
+export type CommentListItem =
+  ListCommentsQuery["issue"]["comments"]["nodes"][0];
 
 // Viewer types
 export type Viewer = GetViewerQuery["viewer"];

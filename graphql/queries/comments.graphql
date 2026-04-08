@@ -1,0 +1,30 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear issue comments
+#
+# Queries for listing and reading comments on issues. Comments are
+# threaded — top-level comments have parentId: null, replies have
+# parentId set to their parent comment's UUID.
+# ------------------------------------------------------------
+
+# List comments on an issue (paginated)
+#
+# Fetches comments for a given issue with pagination support.
+# Returns comment nodes with all standard fields plus page info.
+#
+# Variables:
+#   issueId: UUID of the issue (required)
+#   first: number of comments to fetch (optional, default server-side)
+#   after: pagination cursor (optional)
+query ListComments($issueId: String!, $first: Int, $after: String) {
+  issue(id: $issueId) {
+    comments(first: $first, after: $after) {
+      nodes {
+        ...CommentFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
