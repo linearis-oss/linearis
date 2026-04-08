@@ -158,6 +158,72 @@ describe("issues create --assignee", () => {
   });
 });
 
+describe("issues create --due-date", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes dueDate in create input", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Fix login bug",
+      "--team",
+      "ENG",
+      "--due-date",
+      "2025-01-15",
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ dueDate: "2025-01-15" }),
+    );
+  });
+
+  it("does not include dueDate when --due-date is omitted", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Fix login bug",
+      "--team",
+      "ENG",
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ dueDate: expect.anything() }),
+    );
+  });
+
+  it("rejects invalid date format", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Fix login bug",
+      "--team",
+      "ENG",
+      "--due-date",
+      "not-a-date",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid due date format"),
+    );
+  });
+});
+
 describe("issues update --assignee", () => {
   beforeEach(() => {
     vi.clearAllMocks();
