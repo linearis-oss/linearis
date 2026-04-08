@@ -4,6 +4,7 @@ import type {
   CreateIssueMutation,
   CreateIssueRelationMutation,
   CreateProjectMilestoneMutation,
+  CreateProjectMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
   GetDocumentQuery,
@@ -11,6 +12,8 @@ import type {
   GetIssueByIdQuery,
   GetIssuesQuery,
   GetProjectMilestoneByIdQuery,
+  GetProjectQuery,
+  GetProjectsQuery,
   GetViewerQuery,
   ListAttachmentsQuery,
   ListCommentsQuery,
@@ -20,6 +23,7 @@ import type {
   UpdateCommentMutation,
   UpdateIssueMutation,
   UpdateProjectMilestoneMutation,
+  UpdateProjectMutation,
 } from "../gql/graphql.js";
 
 // Pagination types
@@ -64,6 +68,16 @@ export type Attachment =
   ListAttachmentsQuery["issue"]["attachments"]["nodes"][0];
 export type CreatedAttachment =
   AttachmentCreateMutation["attachmentCreate"]["attachment"];
+
+// Project types
+export type ProjectListItem = GetProjectsQuery["projects"]["nodes"][0];
+export type ProjectDetail = NonNullable<GetProjectQuery["project"]>;
+export type CreatedProject = NonNullable<
+  CreateProjectMutation["projectCreate"]["project"]
+>;
+export type UpdatedProject = NonNullable<
+  UpdateProjectMutation["projectUpdate"]["project"]
+>;
 
 // Milestone types
 export type MilestoneDetail = NonNullable<
