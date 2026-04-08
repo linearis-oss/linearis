@@ -45,6 +45,7 @@ interface CreateOptions {
   description?: string;
   assignee?: string;
   priority?: string;
+  estimate?: string;
   project?: string;
   team?: string;
   labels?: string;
@@ -64,6 +65,8 @@ interface UpdateOptions {
   description?: string;
   status?: string;
   priority?: string;
+  estimate?: string;
+  clearEstimate?: boolean;
   assignee?: string;
   project?: string;
   labels?: string;
@@ -90,10 +93,13 @@ export const ISSUES_META: DomainMeta = {
   context: [
     "an issue belongs to exactly one team. it has a status (e.g. backlog,",
     "todo, in progress, done — configurable per team), a priority (1-4),",
-    "and can be assigned to a user. issues can have labels, a due date,",
-    "belong to a project, be part of a cycle (sprint), and reference a",
-    "project milestone. parent-child relationships and issue relations",
-    "(blocks, blocked-by, relates-to, duplicate-of) are supported.",
+    "and can be assigned to a user. issues can have estimates; valid values",
+    "are integers whose meaning depends on the team's estimation scale",
+    "(fibonacci, exponential, linear, or t-shirt sizes mapped to integers).",
+    "issues can have labels, a due date, belong to a project, be part of a",
+    "cycle (sprint), and reference a project milestone. parent-child",
+    "relationships and issue relations (blocks, blocked-by, relates-to,",
+    "duplicate-of) are supported.",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
@@ -246,6 +252,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--project-milestone <ms>", "set milestone (requires --project)")
     .option("--cycle <cycle>", "add to cycle (requires --team)")
     .option("--status <status>", "set status")
+    .option("--estimate <n>", "set estimate")
     .option("--parent-ticket <issue>", "set parent issue")
     .option("--due-date <date>", "due date (YYYY-MM-DD)")
     .option("--blocks <issue>", "this issue blocks <issue>")
@@ -283,6 +290,10 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.priority) {
           input.priority = parseInt(options.priority, 10);
+        }
+
+        if (options.estimate !== undefined) {
+          input.estimate = parseInt(options.estimate, 10);
         }
 
         if (options.project) {
@@ -366,6 +377,8 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
+    .option("--estimate <n>", "new estimate")
+    .option("--clear-estimate", "clear estimate")
     .option("--due-date <date>", "set due date (YYYY-MM-DD)")
     .option("--clear-due-date", "clear due date")
     .option("--blocks <issue>", "add blocks relation")
@@ -389,6 +402,12 @@ export function setupIssuesCommands(program: Command): void {
         if (options.projectMilestone && options.clearProjectMilestone) {
           throw new Error(
             "Cannot use --project-milestone and --clear-project-milestone together",
+          );
+        }
+
+        if (options.estimate !== undefined && options.clearEstimate) {
+          throw new Error(
+            "Cannot use --estimate and --clear-estimate together",
           );
         }
 
@@ -460,6 +479,12 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.priority) {
           input.priority = parseInt(options.priority, 10);
+        }
+
+        if (options.clearEstimate) {
+          input.estimate = null;
+        } else if (options.estimate !== undefined) {
+          input.estimate = parseInt(options.estimate, 10);
         }
 
         if (options.assignee) {

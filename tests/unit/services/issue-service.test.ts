@@ -2,10 +2,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
+  createIssue,
   getIssue,
   getIssueByIdentifier,
   listIssues,
   searchIssues,
+  updateIssue,
 } from "../../../src/services/issue-service.js";
 
 function mockGqlClient(response: Record<string, unknown>) {
@@ -122,6 +124,81 @@ describe("getIssueByIdentifier", () => {
     await expect(getIssueByIdentifier(client, "ENG", 999)).rejects.toThrow(
       "not found",
     );
+  });
+});
+
+describe("createIssue", () => {
+  it("creates issue and returns result", async () => {
+    const client = mockGqlClient({
+      issueCreate: {
+        success: true,
+        issue: { id: "new-id", identifier: "ENG-1", title: "New", estimate: 5 },
+      },
+    });
+    const result = await createIssue(client, {
+      title: "New",
+      teamId: "team-uuid",
+      estimate: 5,
+    });
+    expect(result.id).toBe("new-id");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      input: { title: "New", teamId: "team-uuid", estimate: 5 },
+    });
+  });
+
+  it("throws when creation fails", async () => {
+    const client = mockGqlClient({
+      issueCreate: { success: false, issue: null },
+    });
+    await expect(
+      createIssue(client, { title: "Fail", teamId: "team-uuid" }),
+    ).rejects.toThrow("Failed to create issue");
+  });
+});
+
+describe("updateIssue", () => {
+  it("updates issue and returns result", async () => {
+    const client = mockGqlClient({
+      issueUpdate: {
+        success: true,
+        issue: {
+          id: "issue-id",
+          identifier: "ENG-1",
+          title: "Updated",
+          estimate: 8,
+        },
+      },
+    });
+    const result = await updateIssue(client, "issue-id", { estimate: 8 });
+    expect(result.id).toBe("issue-id");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "issue-id",
+      input: { estimate: 8 },
+    });
+  });
+
+  it("clears estimate with null", async () => {
+    const client = mockGqlClient({
+      issueUpdate: {
+        success: true,
+        issue: { id: "issue-id", identifier: "ENG-1", title: "Cleared" },
+      },
+    });
+    const result = await updateIssue(client, "issue-id", { estimate: null });
+    expect(result.id).toBe("issue-id");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "issue-id",
+      input: { estimate: null },
+    });
+  });
+
+  it("throws when update fails", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: false, issue: null },
+    });
+    await expect(
+      updateIssue(client, "issue-id", { title: "Fail" }),
+    ).rejects.toThrow("Failed to update issue");
   });
 });
 
