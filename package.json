@@ -32,9 +32,8 @@
     "check:ci": "biome check .",
     "prestart": "npm run generate",
     "predev": "npm run generate",
-    "postinstall": "npm run generate && lefthook install",
     "prebuild": "npm run generate && npm run generate:usage",
-    "prepare": "lefthook install",
+    "prepare": "npm run generate && lefthook install",
     "prepack": "npm run build",
     "prepublishOnly": "npm test"
   },
