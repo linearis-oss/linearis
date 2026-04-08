@@ -87,5 +87,26 @@ describe("GraphQLClient", () => {
         expect((error as Error).message).toBe("Entity not found");
       }
     });
+
+    it("retries on 429 and succeeds on next attempt", async () => {
+      const rateLimitError = { response: { status: 429 } };
+      mockRawRequest
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValueOnce({ data: { foo: "bar" } });
+
+      const client = new GraphQLClient("good-token");
+      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+        typeof client.request
+      >[0];
+
+      vi.useFakeTimers();
+      const promise = client.request(fakeDoc);
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result).toEqual({ foo: "bar" });
+      expect(mockRawRequest).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
   });
 });

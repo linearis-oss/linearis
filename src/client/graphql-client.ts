@@ -31,9 +31,9 @@ export class GraphQLClient {
     document: DocumentNode,
     variables?: Record<string, unknown>,
   ): Promise<TResult> {
-    return withRetry(async () => {
-      try {
-        const response = await Promise.race([
+    try {
+      const response = await withRetry(() =>
+        Promise.race([
           this.rawClient.rawRequest(print(document), variables),
           new Promise<never>((_, reject) =>
             setTimeout(
@@ -41,23 +41,23 @@ export class GraphQLClient {
               REQUEST_TIMEOUT_MS,
             ),
           ),
-        ]);
-        return response.data as TResult;
-      } catch (error: unknown) {
-        const gqlError = error as GraphQLErrorResponse;
-        const errorMessage = gqlError.response?.errors?.[0]?.message ?? "";
+        ]),
+      );
+      return response.data as TResult;
+    } catch (error: unknown) {
+      const gqlError = error as GraphQLErrorResponse;
+      const errorMessage = gqlError.response?.errors?.[0]?.message ?? "";
 
-        if (isAuthError(new Error(errorMessage))) {
-          throw new AuthenticationError(errorMessage || undefined);
-        }
-
-        if (errorMessage) {
-          throw new Error(errorMessage);
-        }
-        throw new Error(
-          `GraphQL request failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+      if (isAuthError(new Error(errorMessage))) {
+        throw new AuthenticationError(errorMessage || undefined);
       }
-    });
+
+      if (errorMessage) {
+        throw new Error(errorMessage);
+      }
+      throw new Error(
+        `GraphQL request failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }
