@@ -158,6 +158,115 @@ describe("issues create --assignee", () => {
   });
 });
 
+describe("issues create --estimate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes estimate as integer to createIssue", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Estimate test",
+      "--team",
+      "ENG",
+      "--estimate",
+      "5",
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ estimate: 5 }),
+    );
+  });
+
+  it("does not set estimate when --estimate is omitted", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "No estimate",
+      "--team",
+      "ENG",
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ estimate: expect.anything() }),
+    );
+  });
+});
+
+describe("issues update --estimate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes estimate as integer to updateIssue", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "8",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ estimate: 8 }),
+    );
+  });
+
+  it("clears estimate with --clear-estimate", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-estimate",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ estimate: null }),
+    );
+  });
+
+  it("rejects --estimate and --clear-estimate together", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "5",
+      "--clear-estimate",
+    ]);
+
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+});
+
 describe("issues update --assignee", () => {
   beforeEach(() => {
     vi.clearAllMocks();

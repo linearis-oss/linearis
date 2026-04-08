@@ -41,6 +41,7 @@ interface CreateOptions {
   description?: string;
   assignee?: string;
   priority?: string;
+  estimate?: string;
   project?: string;
   team?: string;
   labels?: string;
@@ -59,6 +60,8 @@ interface UpdateOptions {
   description?: string;
   status?: string;
   priority?: string;
+  estimate?: string;
+  clearEstimate?: boolean;
   assignee?: string;
   project?: string;
   labels?: string;
@@ -239,6 +242,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--project-milestone <ms>", "set milestone (requires --project)")
     .option("--cycle <cycle>", "add to cycle (requires --team)")
     .option("--status <status>", "set status")
+    .option("--estimate <points>", "story points estimate")
     .option("--parent-ticket <issue>", "set parent issue")
     .option("--blocks <issue>", "this issue blocks <issue>")
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
@@ -275,6 +279,10 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.priority) {
           input.priority = parseInt(options.priority, 10);
+        }
+
+        if (options.estimate) {
+          input.estimate = parseInt(options.estimate, 10);
         }
 
         if (options.project) {
@@ -354,6 +362,8 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
+    .option("--estimate <points>", "new estimate (story points)")
+    .option("--clear-estimate", "clear estimate")
     .option("--blocks <issue>", "add blocks relation")
     .option("--blocked-by <issue>", "add blocked-by relation")
     .option("--relates-to <issue>", "add relates-to relation")
@@ -375,6 +385,12 @@ export function setupIssuesCommands(program: Command): void {
         if (options.projectMilestone && options.clearProjectMilestone) {
           throw new Error(
             "Cannot use --project-milestone and --clear-project-milestone together",
+          );
+        }
+
+        if (options.estimate && options.clearEstimate) {
+          throw new Error(
+            "Cannot use --estimate and --clear-estimate together",
           );
         }
 
@@ -440,6 +456,12 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.priority) {
           input.priority = parseInt(options.priority, 10);
+        }
+
+        if (options.clearEstimate) {
+          input.estimate = null;
+        } else if (options.estimate) {
+          input.estimate = parseInt(options.estimate, 10);
         }
 
         if (options.assignee) {
