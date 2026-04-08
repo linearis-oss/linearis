@@ -20,6 +20,7 @@ fragment CompleteIssueFields on Issue {
   branchName
   priority
   estimate
+  dueDate
   createdAt
   updatedAt
   state {
@@ -117,6 +118,7 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
   branchName
   priority
   estimate
+  dueDate
   createdAt
   updatedAt
   state {

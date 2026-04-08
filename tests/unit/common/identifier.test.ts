@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isUuid,
+  parseDueDate,
   parseIssueIdentifier,
   tryParseIssueIdentifier,
 } from "../../../src/common/identifier.js";
@@ -49,5 +50,37 @@ describe("tryParseIssueIdentifier", () => {
 
   it("returns null for invalid input", () => {
     expect(tryParseIssueIdentifier("invalid")).toBeNull();
+  });
+});
+
+describe("parseDueDate", () => {
+  it("returns valid YYYY-MM-DD date string", () => {
+    expect(parseDueDate("2025-01-15")).toBe("2025-01-15");
+  });
+
+  it("returns valid leap day", () => {
+    expect(parseDueDate("2024-02-29")).toBe("2024-02-29");
+  });
+
+  it("throws on invalid format (no dashes)", () => {
+    expect(() => parseDueDate("20250115")).toThrow("Invalid due date format");
+  });
+
+  it("throws on invalid format (extra parts)", () => {
+    expect(() => parseDueDate("2025-01-15T00:00")).toThrow(
+      "Invalid due date format",
+    );
+  });
+
+  it("throws on impossible date (Feb 30)", () => {
+    expect(() => parseDueDate("2025-02-30")).toThrow("Invalid due date");
+  });
+
+  it("throws on non-leap-year Feb 29", () => {
+    expect(() => parseDueDate("2025-02-29")).toThrow("Invalid due date");
+  });
+
+  it("throws on empty string", () => {
+    expect(() => parseDueDate("")).toThrow("Invalid due date format");
   });
 });
