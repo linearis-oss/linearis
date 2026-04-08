@@ -214,15 +214,11 @@ Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.
 
 Want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Maintainer
-
-Fabian Jocks -- [github.com/iamfj](https://github.com/iamfj) | [linkedin.com/in/fabianjocks](https://linkedin.com/in/fabianjocks)
-
-## Original Author
+## Creator
 
 Carlo Zottmann -- [c.zottmann.dev](https://c.zottmann.dev) | [github.com/czottmann](https://github.com/czottmann)
 
-Carlo created Linearis and drove its early development. As interest in the project grew, he handed maintenance over to Fabian.
+Carlo created Linearis and drove its early development. As interest in the project grew, he handed maintenance over to [Fabian Jocks](https://github.com/iamfj) ([linkedin.com/in/fabianjocks](https://linkedin.com/in/fabianjocks)).
 
 This project is neither affiliated with nor endorsed by Linear.
 
@@ -237,11 +233,11 @@ Carlo doesn't accept sponsoring in the "GitHub sponsorship" sense[^1] but [next 
 
 ## Contributors
 
-- [Fabian Jocks](https://github.com/iamfj)
-- [Ryan Rozich](https://github.com/ryanrozich)
-- [Chad Walters](https://github.com/chadrwalters)
-- [Louis Mandelstam](https://github.com/man8)
-- [Ralf Schimmel](https://github.com/ralfschimmel)
+<a href="https://github.com/linearis-oss/linearis/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=linearis-oss/linearis" />
+</a>
+
+Made with [contrib.rocks](https://contrib.rocks).
 
 ## License
 
