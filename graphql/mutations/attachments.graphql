@@ -28,5 +28,6 @@ mutation AttachmentCreate($input: AttachmentCreateInput!) {
 mutation AttachmentDelete($id: String!) {
   attachmentDelete(id: $id) {
     success
+    entityId
   }
 }

@@ -61,7 +61,7 @@ export async function findIssueRelation(
 export async function deleteIssueRelation(
   client: GraphQLClient,
   relationId: string,
-): Promise<void> {
+): Promise<{ id: string; success: boolean }> {
   const result = await client.request<DeleteIssueRelationMutation>(
     DeleteIssueRelationDocument,
     { id: relationId },
@@ -69,4 +69,5 @@ export async function deleteIssueRelation(
   if (!result.issueRelationDelete.success) {
     throw new Error("Failed to delete issue relation");
   }
+  return { id: result.issueRelationDelete.entityId, success: true };
 }

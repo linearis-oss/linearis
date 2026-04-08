@@ -36,5 +36,8 @@ mutation DocumentUpdate($id: String!, $input: DocumentUpdateInput!) {
 mutation DocumentDelete($id: String!) {
   documentDelete(id: $id) {
     success
+    entity {
+      id
+    }
   }
 }

@@ -273,8 +273,8 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = command.parent!.parent!.opts();
         const ctx = createContext(rootOpts);
 
-        await deleteDocument(ctx.gql, document);
-        outputSuccess({ success: true, message: "Document moved to trash" });
+        const result = await deleteDocument(ctx.gql, document);
+        outputSuccess(result);
       }),
     );
 

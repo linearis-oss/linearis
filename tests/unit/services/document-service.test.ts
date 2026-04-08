@@ -153,10 +153,12 @@ describe("listDocumentsBySlugIds", () => {
 });
 
 describe("deleteDocument", () => {
-  it("returns true on success", async () => {
-    const client = mockGqlClient({ documentDelete: { success: true } });
+  it("returns id and success on success", async () => {
+    const client = mockGqlClient({
+      documentDelete: { success: true, entity: { id: "doc-1" } },
+    });
     const result = await deleteDocument(client, "doc-1");
-    expect(result).toBe(true);
+    expect(result).toEqual({ id: "doc-1", success: true });
   });
 
   it("throws when delete fails", async () => {
