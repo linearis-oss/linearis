@@ -86,10 +86,12 @@ export const ISSUES_META: DomainMeta = {
   context: [
     "an issue belongs to exactly one team. it has a status (e.g. backlog,",
     "todo, in progress, done — configurable per team), a priority (1-4),",
-    "and can be assigned to a user. issues can have labels, belong to a",
-    "project, be part of a cycle (sprint), and reference a project milestone.",
-    "parent-child relationships and issue relations (blocks, blocked-by,",
-    "relates-to, duplicate-of) are supported.",
+    "and can be assigned to a user. issues can have estimates; valid values",
+    "are integers whose meaning depends on the team's estimation scale",
+    "(fibonacci, exponential, linear, or t-shirt sizes mapped to integers).",
+    "issues can have labels, belong to a project, be part of a cycle (sprint),",
+    "and reference a project milestone. parent-child relationships and issue",
+    "relations (blocks, blocked-by, relates-to, duplicate-of) are supported.",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
@@ -242,7 +244,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--project-milestone <ms>", "set milestone (requires --project)")
     .option("--cycle <cycle>", "add to cycle (requires --team)")
     .option("--status <status>", "set status")
-    .option("--estimate <points>", "story points estimate")
+    .option("--estimate <n>", "set estimate")
     .option("--parent-ticket <issue>", "set parent issue")
     .option("--blocks <issue>", "this issue blocks <issue>")
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
@@ -281,7 +283,7 @@ export function setupIssuesCommands(program: Command): void {
           input.priority = parseInt(options.priority, 10);
         }
 
-        if (options.estimate) {
+        if (options.estimate !== undefined) {
           input.estimate = parseInt(options.estimate, 10);
         }
 
@@ -362,7 +364,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
-    .option("--estimate <points>", "new estimate (story points)")
+    .option("--estimate <n>", "new estimate")
     .option("--clear-estimate", "clear estimate")
     .option("--blocks <issue>", "add blocks relation")
     .option("--blocked-by <issue>", "add blocked-by relation")
@@ -388,7 +390,7 @@ export function setupIssuesCommands(program: Command): void {
           );
         }
 
-        if (options.estimate && options.clearEstimate) {
+        if (options.estimate !== undefined && options.clearEstimate) {
           throw new Error(
             "Cannot use --estimate and --clear-estimate together",
           );
@@ -460,7 +462,7 @@ export function setupIssuesCommands(program: Command): void {
 
         if (options.clearEstimate) {
           input.estimate = null;
-        } else if (options.estimate) {
+        } else if (options.estimate !== undefined) {
           input.estimate = parseInt(options.estimate, 10);
         }
 

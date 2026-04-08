@@ -186,6 +186,26 @@ describe("issues create --estimate", () => {
     );
   });
 
+  it("passes estimate 0 through to createIssue", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Zero estimate",
+      "--team",
+      "ENG",
+      "--estimate",
+      "0",
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ estimate: 0 }),
+    );
+  });
+
   it("does not set estimate when --estimate is omitted", async () => {
     const program = createProgram();
     await program.parseAsync([
@@ -260,6 +280,22 @@ describe("issues update --estimate", () => {
       "ENG-42",
       "--estimate",
       "5",
+      "--clear-estimate",
+    ]);
+
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("rejects --estimate 0 and --clear-estimate together", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "0",
       "--clear-estimate",
     ]);
 
