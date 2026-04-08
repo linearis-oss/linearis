@@ -19,24 +19,36 @@ vi.mock("../../../src/common/output.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../src/resolvers/batch-resolver.js", () => ({
+  batchResolveForCreate: vi.fn().mockResolvedValue({
+    teamId: "resolved-team-uuid",
+    projectId: "resolved-project-uuid",
+    labelIds: ["resolved-label-uuid"],
+    parentId: "resolved-parent-uuid",
+    projectMilestones: [{ id: "resolved-milestone-uuid", name: "Q1" }],
+  }),
+  batchResolveForUpdate: vi.fn().mockResolvedValue({
+    labelIds: ["resolved-label-uuid"],
+    projectId: "resolved-project-uuid",
+    milestoneId: "resolved-milestone-uuid",
+    issueContext: {
+      id: "resolved-issue-uuid",
+      team: { id: "team-uuid", key: "ENG", name: "Engineering" },
+      project: {
+        id: "project-uuid",
+        projectMilestones: { nodes: [] },
+      },
+      labels: { nodes: [] },
+    },
+  }),
+}));
+
 vi.mock("../../../src/resolvers/user-resolver.js", () => ({
   resolveUserId: vi.fn().mockResolvedValue("resolved-user-uuid"),
 }));
 
-vi.mock("../../../src/resolvers/team-resolver.js", () => ({
-  resolveTeamId: vi.fn().mockResolvedValue("resolved-team-uuid"),
-}));
-
 vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
   resolveIssueId: vi.fn().mockResolvedValue("resolved-issue-uuid"),
-}));
-
-vi.mock("../../../src/resolvers/project-resolver.js", () => ({
-  resolveProjectId: vi.fn().mockResolvedValue("resolved-project-uuid"),
-}));
-
-vi.mock("../../../src/resolvers/label-resolver.js", () => ({
-  resolveLabelIds: vi.fn().mockResolvedValue(["resolved-label-uuid"]),
 }));
 
 vi.mock("../../../src/resolvers/milestone-resolver.js", () => ({

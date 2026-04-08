@@ -9,13 +9,14 @@ import {
   IssueRelationType,
   type IssueUpdateInput,
 } from "../gql/graphql.js";
+import {
+  batchResolveForCreate,
+  batchResolveForUpdate,
+} from "../resolvers/batch-resolver.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
-import { resolveLabelIds } from "../resolvers/label-resolver.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
-import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveStatusId } from "../resolvers/status-resolver.js";
-import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
 import {
   createIssueRelation,
@@ -258,7 +259,28 @@ export function setupIssuesCommands(program: Command): void {
         if (!options.team) {
           throw new Error("--team is required");
         }
-        const teamId = await resolveTeamId(ctx.sdk, options.team);
+
+        // split labels into UUIDs (direct) and names (batch)
+        const allLabels = options.labels
+          ? options.labels.split(",").map((l) => l.trim())
+          : [];
+        const labelUuids = allLabels.filter((l) => isUuid(l));
+        const labelNames = allLabels.filter((l) => !isUuid(l));
+
+        const batch = await batchResolveForCreate(ctx.gql, {
+          team: !isUuid(options.team) ? options.team : undefined,
+          project:
+            options.project && !isUuid(options.project)
+              ? options.project
+              : undefined,
+          labelNames: labelNames.length ? labelNames : undefined,
+          parentTicket:
+            options.parentTicket && !isUuid(options.parentTicket)
+              ? options.parentTicket
+              : undefined,
+        });
+
+        const teamId = isUuid(options.team) ? options.team : batch.teamId!;
 
         const input: IssueCreateInput = {
           title,
@@ -278,12 +300,13 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.project) {
-          input.projectId = await resolveProjectId(ctx.sdk, options.project);
+          input.projectId = isUuid(options.project)
+            ? options.project
+            : batch.projectId!;
         }
 
-        if (options.labels) {
-          const labelNames = options.labels.split(",").map((l) => l.trim());
-          input.labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+        if (allLabels.length > 0) {
+          input.labelIds = [...labelUuids, ...(batch.labelIds ?? [])];
         }
 
         if (options.projectMilestone) {
@@ -292,12 +315,26 @@ export function setupIssuesCommands(program: Command): void {
               "--project-milestone requires --project to be specified",
             );
           }
-          input.projectMilestoneId = await resolveMilestoneId(
-            ctx.gql,
-            ctx.sdk,
-            options.projectMilestone,
-            options.project,
-          );
+          if (isUuid(options.projectMilestone)) {
+            input.projectMilestoneId = options.projectMilestone;
+          } else {
+            // try from project's milestones returned by batch
+            const fromBatch = batch.projectMilestones.find(
+              (m) =>
+                m.name.toLowerCase() ===
+                options.projectMilestone!.toLowerCase(),
+            );
+            if (fromBatch) {
+              input.projectMilestoneId = fromBatch.id;
+            } else {
+              input.projectMilestoneId = await resolveMilestoneId(
+                ctx.gql,
+                ctx.sdk,
+                options.projectMilestone,
+                options.project,
+              );
+            }
+          }
         }
 
         if (options.cycle) {
@@ -317,7 +354,9 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.parentTicket) {
-          input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
+          input.parentId = isUuid(options.parentTicket)
+            ? options.parentTicket
+            : batch.parentId!;
         }
 
         const relationTargetId = await resolveRelationTarget(ctx, options);
@@ -405,16 +444,44 @@ export function setupIssuesCommands(program: Command): void {
 
         const ctx = createContext(command.parent!.parent!.opts());
 
-        const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
+        const issueIsUuid = isUuid(issue);
 
-        const needsContext =
-          options.status ||
-          options.projectMilestone ||
-          options.cycle ||
-          (options.labels && options.labelMode === "add");
-        const issueContext = needsContext
-          ? await getIssue(ctx.gql, resolvedIssueId)
-          : undefined;
+        // split labels into UUIDs (direct) and names (batch)
+        const allLabels = options.labels
+          ? options.labels.split(",").map((l) => l.trim())
+          : [];
+        const labelUuids = allLabels.filter((l) => isUuid(l));
+        const labelNames = allLabels.filter((l) => !isUuid(l));
+
+        const batch = await batchResolveForUpdate(ctx.gql, {
+          issueIdentifier: !issueIsUuid ? issue : undefined,
+          project:
+            options.project && !isUuid(options.project)
+              ? options.project
+              : undefined,
+          labelNames: labelNames.length ? labelNames : undefined,
+          milestoneName:
+            options.projectMilestone && !isUuid(options.projectMilestone)
+              ? options.projectMilestone
+              : undefined,
+        });
+
+        // resolve the issue UUID — from batch if ABC-123, else direct
+        const resolvedIssueId =
+          batch.issueContext?.id ?? (await resolveIssueId(ctx.sdk, issue));
+
+        // get issue context for status/cycle/label-add — from batch if available
+        const needsFallbackContext =
+          !batch.issueContext &&
+          (options.status ||
+            options.projectMilestone ||
+            options.cycle ||
+            (options.labels && options.labelMode === "add"));
+        const issueContext =
+          batch.issueContext ??
+          (needsFallbackContext
+            ? await getIssue(ctx.gql, resolvedIssueId)
+            : undefined);
 
         const input: IssueUpdateInput = {};
 
@@ -427,10 +494,7 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.status) {
-          const teamId =
-            issueContext && "team" in issueContext && issueContext.team
-              ? issueContext.team.id
-              : undefined;
+          const teamId = issueContext?.team?.id;
           input.stateId = await resolveStatusId(
             ctx.sdk,
             options.status,
@@ -447,25 +511,22 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.project) {
-          input.projectId = await resolveProjectId(ctx.sdk, options.project);
+          input.projectId = isUuid(options.project)
+            ? options.project
+            : batch.projectId!;
         }
 
         if (options.clearLabels) {
           input.labelIds = [];
         } else if (options.labels) {
-          const labelNames = options.labels.split(",").map((l) => l.trim());
-          const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+          const resolvedIds = [...labelUuids, ...(batch.labelIds ?? [])];
 
           if (options.labelMode === "add") {
             const currentLabels =
-              issueContext &&
-              "labels" in issueContext &&
-              issueContext.labels?.nodes
-                ? issueContext.labels.nodes.map((l) => l.id)
-                : [];
-            input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+              issueContext?.labels?.nodes?.map((l) => l.id) ?? [];
+            input.labelIds = [...new Set([...currentLabels, ...resolvedIds])];
           } else {
-            input.labelIds = labelIds;
+            input.labelIds = resolvedIds;
           }
         }
 
@@ -478,27 +539,27 @@ export function setupIssuesCommands(program: Command): void {
         if (options.clearProjectMilestone) {
           input.projectMilestoneId = null;
         } else if (options.projectMilestone) {
-          const projectName =
-            issueContext &&
-            "project" in issueContext &&
-            issueContext.project?.name
-              ? issueContext.project.name
-              : undefined;
-          input.projectMilestoneId = await resolveMilestoneId(
-            ctx.gql,
-            ctx.sdk,
-            options.projectMilestone,
-            projectName,
-          );
+          if (isUuid(options.projectMilestone)) {
+            input.projectMilestoneId = options.projectMilestone;
+          } else if (batch.milestoneId) {
+            input.projectMilestoneId = batch.milestoneId;
+          } else {
+            const p = issueContext?.project;
+            const projectName =
+              p && "name" in p ? (p as { name: string }).name : undefined;
+            input.projectMilestoneId = await resolveMilestoneId(
+              ctx.gql,
+              ctx.sdk,
+              options.projectMilestone,
+              projectName,
+            );
+          }
         }
 
         if (options.clearCycle) {
           input.cycleId = null;
         } else if (options.cycle) {
-          const teamKey =
-            issueContext && "team" in issueContext && issueContext.team?.key
-              ? issueContext.team.key
-              : undefined;
+          const teamKey = issueContext?.team?.key;
           input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
         }
 
