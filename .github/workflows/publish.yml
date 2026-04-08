@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -64,7 +64,48 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+
+          # Extract compare URL from reference link
+          COMPARE_URL=$(grep -E "^\[${VERSION}\]: " CHANGELOG.md | sed "s/^\[${VERSION}\]: //")
+
+          # Extract body: convert ### to ##, strip --- separators, collapse blank lines
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") { found=1; next }
+            }
+            /^\[.*\]: https/ { next }
+            found { print }
+          ' CHANGELOG.md \
+            | sed 's/^### /## /' \
+            | sed '/^---$/d' \
+            | sed '/^$/N;/^\n$/d')
+
+          # Combine: Full Changelog link + body
+          {
+            if [ -n "$COMPARE_URL" ]; then
+              printf "**Full Changelog**: %s\n\n" "$COMPARE_URL"
+            fi
+            printf '%s\n' "$NOTES"
+          } > /tmp/release-notes.md
+
+          echo "Extracted release notes for v$VERSION"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes-file /tmp/release-notes.md \
+            --verify-tag
+
       - name: Verify publish success
         run: |
           echo "✅ Successfully published linearis@${{ steps.extract_version.outputs.version }}"
           echo "📦 Package URL: https://www.npmjs.com/package/linearis"
+          echo "📋 Release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.extract_version.outputs.version }}"
