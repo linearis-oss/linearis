@@ -74,12 +74,12 @@
     "@graphql-codegen/introspection": "5.0.1",
     "@graphql-codegen/schema-ast": "^5.0.0",
     "@types/node": "^24.0.0",
-    "@vitest/coverage-v8": "^2.1.8",
-    "@vitest/ui": "^2.1.8",
+    "@vitest/coverage-v8": "^4.0.0",
+    "@vitest/ui": "^4.0.0",
     "lefthook": "^2.1.0",
     "tsx": "^4.20.5",
     "typescript": "^5.0.0",
-    "vitest": "^2.1.8"
+    "vitest": "^4.0.0"
   },
   "graphql": {
     "schema": "https://api.linear.app/graphql",
