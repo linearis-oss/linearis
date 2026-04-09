@@ -140,7 +140,7 @@ export function setupAuthCommands(program: Command): void {
               );
             }
           } catch {
-            // No token found anywhere, proceed with login
+            // resolveApiToken throws when no token exists in any source — expected for fresh installs
           }
         }
 
@@ -211,6 +211,7 @@ export function setupAuthCommands(program: Command): void {
           token = resolved.token;
           source = resolved.source;
         } catch {
+          // resolveApiToken throws when no token is configured — not an error, just unauthenticated
           outputSuccess({
             authenticated: false,
             message:
@@ -227,6 +228,7 @@ export function setupAuthCommands(program: Command): void {
             user: { id: viewer.id, name: viewer.name, email: viewer.email },
           });
         } catch {
+          // validateApiToken throws on invalid/expired/revoked tokens
           outputSuccess({
             authenticated: false,
             source: SOURCE_LABELS[source],
@@ -255,6 +257,7 @@ export function setupAuthCommands(program: Command): void {
             warning: `A token is still active via ${SOURCE_LABELS[source]}.`,
           });
         } catch {
+          // no other token source active — clean logout
           outputSuccess({ message: "Authentication token removed." });
         }
       }),

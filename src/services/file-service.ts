@@ -183,7 +183,7 @@ export class FileService {
           error: `File already exists: ${outputPath}. Use --overwrite to replace.`,
         };
       } catch {
-        // File doesn't exist, we can proceed
+        // access() throws ENOENT when file doesn't exist — that's the expected path
       }
     }
 
@@ -266,10 +266,18 @@ export class FileService {
     // Check if file exists
     try {
       await access(filePath);
-    } catch {
+    } catch (err) {
+      // access() fails with ENOENT for missing files, EACCES for permission issues
+      const detail =
+        err instanceof Error && "code" in err
+          ? (err as NodeJS.ErrnoException).code
+          : undefined;
       return {
         success: false,
-        error: `File not found: ${filePath}`,
+        error:
+          detail === "ENOENT"
+            ? `File not found: ${filePath}`
+            : `Cannot access file: ${filePath} (${detail || (err instanceof Error ? err.message : String(err))})`,
       };
     }
 

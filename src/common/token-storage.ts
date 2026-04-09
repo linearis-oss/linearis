@@ -57,7 +57,12 @@ export function getStoredToken(): string | null {
         try {
           const encrypted = fs.readFileSync(legacy, "utf8").trim();
           return decryptToken(encrypted);
-        } catch {
+        } catch (err) {
+          // file exists but can't be decrypted — warn instead of silently returning null
+          const detail = err instanceof Error ? err.message : String(err);
+          console.error(
+            `Warning: stored token at ${legacy} is corrupted: ${detail}`,
+          );
           return null;
         }
       }
@@ -67,7 +72,11 @@ export function getStoredToken(): string | null {
   try {
     const encrypted = fs.readFileSync(tokenPath, "utf8").trim();
     return decryptToken(encrypted);
-  } catch {
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(
+      `Warning: stored token at ${tokenPath} is corrupted: ${detail}`,
+    );
     return null;
   }
 }

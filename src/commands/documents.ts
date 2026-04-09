@@ -66,6 +66,7 @@ export function extractDocumentIdFromUrl(url: string): string | null {
 
     return docSlug.substring(lastHyphenIndex + 1) || null;
   } catch {
+    // malformed URL → not a valid document link
     return null;
   }
 }
