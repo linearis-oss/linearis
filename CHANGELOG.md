@@ -6,9 +6,19 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+---
+
+## [2026.4.4] - 2026-04-09
+
+[2026.4.4]: https://github.com/linearis-oss/linearis/compare/v2026.4.3...v2026.4.4
+
 ### Changed
 
 - Restored the dedicated `issues search <query>` subcommand while keeping `issues list --query <query>` as a deprecated compatibility path for one release window; both commands now share the same filter flags [#121](https://github.com/linearis-oss/linearis/issues/121), [PR#124](https://github.com/linearis-oss/linearis/pull/124)
+
+### CI & Build
+
+- Switched the publish workflow from `npm install` to `npm ci` for reproducible clean installs in CI [PR#122](https://github.com/linearis-oss/linearis/pull/122)
 
 ---
 
