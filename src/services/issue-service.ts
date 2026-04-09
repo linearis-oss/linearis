@@ -12,6 +12,8 @@ import type {
 import {
   CreateIssueDocument,
   type CreateIssueMutation,
+  FilteredSearchIssuesDocument,
+  type FilteredSearchIssuesQuery,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   type GetIssueByIdentifierQuery,
@@ -19,22 +21,53 @@ import {
   GetIssuesDocument,
   type GetIssuesQuery,
   type IssueCreateInput,
+  type IssueFilter,
   type IssueUpdateInput,
+  PaginationOrderBy,
   SearchIssuesDocument,
   type SearchIssuesQuery,
+  type SearchIssuesQueryVariables,
   UpdateIssueDocument,
   type UpdateIssueMutation,
 } from "../gql/graphql.js";
 
+const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
+  state: { type: { neq: "completed" } },
+};
+
+function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
+  return {
+    and: [NON_COMPLETED_ISSUES_FILTER, filter],
+  };
+}
+
 export async function listIssues(
   client: GraphQLClient,
   options: PaginationOptions = {},
+  filter?: IssueFilter,
 ): Promise<PaginatedResult<Issue>> {
   const { limit = 25, after } = options;
+
+  if (filter) {
+    const result = await client.request<FilteredSearchIssuesQuery>(
+      FilteredSearchIssuesDocument,
+      {
+        first: limit,
+        after,
+        filter: buildListIssuesFilter(filter),
+        orderBy: PaginationOrderBy.UpdatedAt,
+      },
+    );
+    return {
+      nodes: result.issues?.nodes ?? [],
+      pageInfo: result.issues.pageInfo,
+    };
+  }
+
   const result = await client.request<GetIssuesQuery>(GetIssuesDocument, {
     first: limit,
     after,
-    orderBy: "updatedAt",
+    orderBy: PaginationOrderBy.UpdatedAt,
   });
   return {
     nodes: result.issues?.nodes ?? [],
@@ -76,13 +109,19 @@ export async function searchIssues(
   client: GraphQLClient,
   term: string,
   options: PaginationOptions = {},
+  filter?: IssueFilter,
 ): Promise<PaginatedResult<IssueSearchResult>> {
   const { limit = 25, after } = options;
-  const result = await client.request<SearchIssuesQuery>(SearchIssuesDocument, {
+  const variables: SearchIssuesQueryVariables = {
     term,
     first: limit,
     after,
-  });
+    ...(filter && { filter }),
+  };
+  const result = await client.request<SearchIssuesQuery>(
+    SearchIssuesDocument,
+    variables,
+  );
   return {
     nodes: result.searchIssues?.nodes ?? [],
     pageInfo: result.searchIssues.pageInfo,

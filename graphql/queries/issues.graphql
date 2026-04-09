@@ -250,11 +250,17 @@ query GetIssueTeam($issueId: String!) {
 #
 # Provides full-text search across Linear issues with complete
 # relationship data for each match.
-query SearchIssues($term: String!, $first: Int!, $after: String) {
+query SearchIssues(
+  $term: String!
+  $first: Int!
+  $after: String
+  $filter: IssueFilter
+) {
   searchIssues(
     term: $term
     first: $first
     after: $after
+    filter: $filter
     includeArchived: false
   ) {
     nodes {
@@ -290,42 +296,6 @@ query FilteredSearchIssues(
     pageInfo {
       hasNextPage
       endCursor
-    }
-  }
-}
-
-# Batch resolve query for search filters
-#
-# Resolves human-readable identifiers to UUIDs in a single batch query.
-# Used to pre-resolve teams, projects, and assignees before executing
-# main search query to avoid N+1 queries.
-query BatchResolveForSearch(
-  $teamKey: String
-  $teamName: String
-  $projectName: String
-  $assigneeEmail: String
-) {
-  teams(
-    filter: { or: [{ key: { eq: $teamKey } }, { name: { eq: $teamName } }] }
-    first: 1
-  ) {
-    nodes {
-      id
-      key
-      name
-    }
-  }
-  projects(filter: { name: { eqIgnoreCase: $projectName } }, first: 1) {
-    nodes {
-      id
-      name
-    }
-  }
-  users(filter: { email: { eq: $assigneeEmail } }, first: 1) {
-    nodes {
-      id
-      name
-      email
     }
   }
 }

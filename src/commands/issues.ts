@@ -6,7 +6,9 @@ import {
   parseDueDate,
   parseIssueIdentifier,
 } from "../common/identifier.js";
+import type { RawFilterFlags } from "../common/issue-filter.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { resolveFilterOptions } from "../common/resolve-filters.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
   type IssueCreateInput,
@@ -21,6 +23,7 @@ import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveStatusId } from "../resolvers/status-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
+import { buildIssueFilter } from "../services/issue-filter.js";
 import {
   createIssueRelation,
   deleteIssueRelation,
@@ -35,10 +38,10 @@ import {
   updateIssue,
 } from "../services/issue-service.js";
 
-interface ListOptions {
-  query?: string;
+interface FilterOptions extends RawFilterFlags {
   limit: string;
   after?: string;
+  query?: string;
 }
 
 interface CreateOptions {
@@ -104,6 +107,7 @@ export const ISSUES_META: DomainMeta = {
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
     title: "string",
+    query: "full-text search term",
   },
   seeAlso: ["comments create <issue>", "documents list --issue <issue>"],
 };
@@ -178,40 +182,109 @@ async function applyRelation(
   }
 }
 
+function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
+  return cmd
+    .option("--team <team>", "filter by team")
+    .option("--assignee <user>", "filter by assignee")
+    .option("--creator <user>", "filter by creator")
+    .option("--project <project>", "filter by project")
+    .option(
+      "--status <statuses>",
+      "filter by status (comma-separated, requires --team)",
+    )
+    .option("--label <labels>", "filter by labels (comma-separated)")
+    .option("--cycle <cycle>", "filter by cycle (requires --team)")
+    .option("--parent <issue>", "filter by parent issue")
+    .option(
+      "--milestone <milestone>",
+      "filter by milestone (requires --project)",
+    )
+    .option("--priority <n>", "filter by priority (0-4)")
+    .option("--estimate <n>", "filter by estimate")
+    .option("--due-before <date>", "due before date (YYYY-MM-DD)")
+    .option("--due-after <date>", "due after date (YYYY-MM-DD)")
+    .option("--created-after <date>", "created after date (YYYY-MM-DD)")
+    .option("--created-before <date>", "created before date (YYYY-MM-DD)")
+    .option("--completed-after <date>", "completed after date (YYYY-MM-DD)")
+    .option("--completed-before <date>", "completed before date (YYYY-MM-DD)")
+    .option("--updated-after <date>", "updated after date (YYYY-MM-DD)")
+    .option("--updated-before <date>", "updated before date (YYYY-MM-DD)")
+    .option("--has-blockers", "only issues that are blocked")
+    .option("--is-blocking", "only issues that block others");
+}
+
 export function setupIssuesCommands(program: Command): void {
   const issues = program.command("issues").description("Issue operations");
 
   issues.action(() => issues.help());
 
-  issues
-    .command("list")
-    .description("list issues with optional filters")
-    .option("--query <text>", "filter by text search")
-    .option("-l, --limit <n>", "max results", "50")
-    .option("--after <cursor>", "cursor for next page")
-    .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [ListOptions, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+  addFilterOptions(
+    issues
+      .command("list")
+      .description("list issues with optional filters")
+      .option("--query <query>", "deprecated: use `issues search <query>`")
+      .option("-l, --limit <n>", "max results", "50")
+      .option("--after <cursor>", "cursor for next page"),
+  ).action(
+    handleCommand(async (...args: unknown[]) => {
+      const [options, command] = args as [FilterOptions, Command];
+      const ctx = createContext(command.parent!.parent!.opts());
 
-        const paginationOptions = {
-          limit: parseLimit(options.limit),
-          after: options.after,
-        };
+      const paginationOptions = {
+        limit: parseLimit(options.limit),
+        after: options.after,
+      };
 
-        if (options.query) {
-          const result = await searchIssues(
-            ctx.gql,
-            options.query,
-            paginationOptions,
-          );
-          outputSuccess(result);
-        } else {
-          const result = await listIssues(ctx.gql, paginationOptions);
-          outputSuccess(result);
-        }
-      }),
-    );
+      const filterOptions = await resolveFilterOptions(ctx, options);
+      const filter = buildIssueFilter(filterOptions);
+
+      if (options.query) {
+        const result = await searchIssues(
+          ctx.gql,
+          options.query,
+          paginationOptions,
+          filter,
+        );
+        outputSuccess(result);
+        return;
+      }
+
+      const result = await listIssues(ctx.gql, paginationOptions, filter);
+      outputSuccess(result);
+    }),
+  );
+
+  addFilterOptions(
+    issues
+      .command("search <query>")
+      .description("full-text search issues")
+      .option("-l, --limit <n>", "max results", "50")
+      .option("--after <cursor>", "cursor for next page"),
+  ).action(
+    handleCommand(async (...args: unknown[]) => {
+      const [query, options, command] = args as [
+        string,
+        FilterOptions,
+        Command,
+      ];
+      const ctx = createContext(command.parent!.parent!.opts());
+
+      const paginationOptions = {
+        limit: parseLimit(options.limit),
+        after: options.after,
+      };
+
+      const filterOptions = await resolveFilterOptions(ctx, options);
+      const filter = buildIssueFilter(filterOptions);
+      const result = await searchIssues(
+        ctx.gql,
+        query,
+        paginationOptions,
+        filter,
+      );
+      outputSuccess(result);
+    }),
+  );
 
   issues
     .command("read <issue>")

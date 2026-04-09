@@ -48,121 +48,32 @@ linearis usage                # overview of all domains
 linearis issues usage         # detailed usage for one domain
 ```
 
-### Issues
+### Quick Start
 
 ```bash
+# Discover available commands
+linearis usage
+
+# Drill into a domain
+linearis issues usage
+
 # List recent issues
 linearis issues list --limit 10
 
-# Search issues by text
-linearis issues list --query "authentication" --team Platform
+# Search for issues
+linearis issues search "authentication bug"
 
 # Create an issue
-linearis issues create "Fix login timeout" --team Backend \
-  --assignee "Jane Doe" --labels "Bug,Critical" --priority 1 \
-  --description "Users report session expiry after 5 minutes"
+linearis issues create "Fix login flow" --team Platform --priority 2
 
-# Read issue details (supports ABC-123 identifiers)
-linearis issues read DEV-456
-
-# Update status, priority, labels
-linearis issues update ABC-123 --status "In Review" --priority 2
-linearis issues update DEV-789 --labels "Frontend,UX" --label-mode add
-linearis issues update ABC-123 --clear-labels
-
-# Parent-child relationships
-linearis issues update SUB-001 --parent-ticket EPIC-100
-
-# Issue relations
-linearis issues create "Blocked task" --team Backend --blocked-by DEV-123
-linearis issues update ABC-123 --blocks DEV-456
-linearis issues update ABC-123 --relates-to DEV-789
-linearis issues update ABC-123 --remove-relation DEV-456
+# Add a comment
+linearis comments create ENG-42 --body "Investigating this now"
 ```
 
-### Comments
+For the full reference of every command and flag, run:
 
 ```bash
-linearis comments create ABC-123 --body "Fixed in PR #456"
-```
-
-### Documents
-
-```bash
-# Create a document (optionally link to a project and/or issue)
-linearis documents create --title "API Design" --content "# Overview..."
-linearis documents create --title "Bug Analysis" --project "Backend" --issue ABC-123
-
-# List documents
-linearis documents list
-linearis documents list --project "Backend"
-linearis documents list --issue ABC-123
-
-# Read, update, delete
-linearis documents read <document-id>
-linearis documents update <document-id> --title "New Title" --content "Updated content"
-linearis documents delete <document-id>
-```
-
-### Cycles
-
-```bash
-# List cycles for a team
-linearis cycles list --team Backend --limit 10
-
-# Active cycle only
-linearis cycles list --team Backend --active
-
-# Active cycle +/- 3 neighbors
-linearis cycles list --team Backend --window 3
-
-# Read cycle details
-linearis cycles read "Sprint 2025-10" --team Backend
-```
-
-### Milestones
-
-```bash
-# List milestones in a project
-linearis milestones list --project "Backend"
-
-# Read milestone details
-linearis milestones read "Beta Release" --project "Backend"
-
-# Create and update milestones
-linearis milestones create "v2.0" --project "Backend" --target-date 2025-06-01
-linearis milestones update "v2.0" --project "Backend" --description "Major release"
-```
-
-### Files
-
-```bash
-# Download a file from Linear storage
-linearis files download "https://uploads.linear.app/.../file.png" --output ./screenshot.png
-
-# Upload and reference in a comment
-URL=$(linearis files upload ./bug.png | jq -r .assetUrl)
-linearis comments create ABC-123 --body "Screenshot: ![$URL]($URL)"
-```
-
-### Projects, Labels, Teams, Users
-
-```bash
-linearis projects list
-linearis labels list --team Backend
-linearis teams list
-linearis users list --active
-```
-
-### Pagination
-
-All list commands support cursor-based pagination:
-
-```bash
-linearis issues list --limit 25
-# Response includes pageInfo with endCursor and hasNextPage
-
-linearis issues list --limit 25 --after "cursor-from-previous-response"
+linearis <domain> usage
 ```
 
 ## AI Agent Integration

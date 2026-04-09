@@ -1,6 +1,11 @@
-// tests/unit/services/issue-service.test.ts
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import {
+  FilteredSearchIssuesDocument,
+  GetIssuesDocument,
+  PaginationOrderBy,
+  SearchIssuesDocument,
+} from "../../../src/gql/graphql.js";
 import {
   createIssue,
   getIssue,
@@ -56,7 +61,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 25,
       after: undefined,
-      orderBy: "updatedAt",
+      orderBy: PaginationOrderBy.UpdatedAt,
     });
   });
 
@@ -71,7 +76,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 5,
       after: "cursor1",
-      orderBy: "updatedAt",
+      orderBy: PaginationOrderBy.UpdatedAt,
     });
   });
 
@@ -86,6 +91,44 @@ describe("listIssues", () => {
     expect(result.pageInfo).toEqual({
       hasNextPage: true,
       endCursor: "nextCursor",
+    });
+  });
+
+  it("passes filter to FilteredSearchIssues when filter provided", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [{ id: "1", title: "Filtered" }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    const filter = { team: { id: { eq: "team-uuid" } } };
+    const result = await listIssues(client, { limit: 10 }, filter);
+    expect(result.nodes).toHaveLength(1);
+    expect(client.request).toHaveBeenCalledWith(FilteredSearchIssuesDocument, {
+      first: 10,
+      after: undefined,
+      filter: {
+        and: [
+          { state: { type: { neq: "completed" } } },
+          { team: { id: { eq: "team-uuid" } } },
+        ],
+      },
+      orderBy: PaginationOrderBy.UpdatedAt,
+    });
+  });
+
+  it("uses GetIssues query when no filter provided (no regression)", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    await listIssues(client);
+    expect(client.request).toHaveBeenCalledWith(GetIssuesDocument, {
+      first: 25,
+      after: undefined,
+      orderBy: PaginationOrderBy.UpdatedAt,
     });
   });
 });
@@ -231,6 +274,39 @@ describe("searchIssues", () => {
       term: "query",
       first: 5,
       after: "prevCursor",
+    });
+  });
+
+  it("passes filter to SearchIssues query when filter provided", async () => {
+    const client = mockGqlClient({
+      searchIssues: {
+        nodes: [{ id: "1", title: "Match" }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    const filter = { priority: { eq: 1 } };
+    const result = await searchIssues(client, "bug", { limit: 10 }, filter);
+    expect(result.nodes).toHaveLength(1);
+    expect(client.request).toHaveBeenCalledWith(SearchIssuesDocument, {
+      term: "bug",
+      first: 10,
+      after: undefined,
+      filter,
+    });
+  });
+
+  it("omits filter when not provided (no regression)", async () => {
+    const client = mockGqlClient({
+      searchIssues: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    await searchIssues(client, "test");
+    expect(client.request).toHaveBeenCalledWith(SearchIssuesDocument, {
+      term: "test",
+      first: 25,
+      after: undefined,
     });
   });
 });
