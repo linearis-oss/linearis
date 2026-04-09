@@ -75,6 +75,8 @@ import { setupIssuesCommands } from "../../../src/commands/issues.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createIssue,
+  listIssues,
+  searchIssues,
   updateIssue,
 } from "../../../src/services/issue-service.js";
 
@@ -449,6 +451,106 @@ describe("issues update --due-date", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid due date"),
     );
+  });
+});
+
+describe("issues list/search filters", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes resolved filters to issues list", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "list",
+      "--team",
+      "ENG",
+      "--status",
+      "Todo",
+      "--limit",
+      "10",
+      "--after",
+      "cursor-1",
+    ]);
+
+    expect(listIssues).toHaveBeenCalledWith(
+      expect.anything(),
+      { limit: 10, after: "cursor-1" },
+      {
+        and: [
+          { team: { id: { eq: "resolved-team-uuid" } } },
+          { state: { id: { in: ["resolved-status-uuid"] } } },
+        ],
+      },
+    );
+  });
+
+  it("passes resolved filters to issues search", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "search",
+      "authentication bug",
+      "--team",
+      "ENG",
+      "--status",
+      "Todo",
+      "--limit",
+      "10",
+    ]);
+
+    expect(searchIssues).toHaveBeenCalledWith(
+      expect.anything(),
+      "authentication bug",
+      { limit: 10, after: undefined },
+      {
+        and: [
+          { team: { id: { eq: "resolved-team-uuid" } } },
+          { state: { id: { in: ["resolved-status-uuid"] } } },
+        ],
+      },
+    );
+  });
+
+  it("keeps issues list --query as a deprecated search compatibility path", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "list",
+      "--query",
+      "authentication bug",
+      "--team",
+      "ENG",
+      "--status",
+      "Todo",
+      "--limit",
+      "10",
+      "--after",
+      "cursor-1",
+    ]);
+
+    expect(searchIssues).toHaveBeenCalledWith(
+      expect.anything(),
+      "authentication bug",
+      { limit: 10, after: "cursor-1" },
+      {
+        and: [
+          { team: { id: { eq: "resolved-team-uuid" } } },
+          { state: { id: { in: ["resolved-status-uuid"] } } },
+        ],
+      },
+    );
+    expect(listIssues).not.toHaveBeenCalled();
   });
 });
 
