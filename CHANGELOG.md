@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Restored the dedicated `issues search <query>` subcommand while keeping `issues list --query <query>` as a deprecated compatibility path for one release window; both commands now share the same filter flags [#121](https://github.com/linearis-oss/linearis/issues/121), [PR#124](https://github.com/linearis-oss/linearis/pull/124)
+
+---
+
 ## [2026.4.3] - 2026-04-08
 
 [2026.4.3]: https://github.com/linearis-oss/linearis/compare/v2026.4.2...v2026.4.3
