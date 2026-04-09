@@ -70,4 +70,35 @@ describe("withRetry", () => {
     );
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it("uses exponential backoff: 500ms → 1s → 2s", async () => {
+    vi.useFakeTimers();
+    const delays: number[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+
+    // track each setTimeout call to capture the delay values
+    const spy = vi
+      .spyOn(globalThis, "setTimeout")
+      .mockImplementation((cb: TimerHandler, ms?: number) => {
+        delays.push(ms ?? 0);
+        return realSetTimeout(cb as () => void, 0);
+      });
+
+    const err = { response: { status: 503 } };
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(err)
+      .mockRejectedValueOnce(err)
+      .mockRejectedValueOnce(err)
+      .mockResolvedValueOnce("ok");
+
+    const promise = withRetry(fn, { maxRetries: 3, baseDelayMs: 500 });
+    await vi.runAllTimersAsync();
+    await promise;
+
+    spy.mockRestore();
+    vi.useRealTimers();
+
+    expect(delays).toEqual([500, 1000, 2000]);
+  });
 });
