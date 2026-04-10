@@ -165,15 +165,59 @@ describe("getStoredToken", () => {
     expect(getStoredToken()).toBeNull();
   });
 
-  it("returns null when token file is corrupted", () => {
+  it("logs a warning to stderr when stored token cannot be decrypted", () => {
     setPlatform("darwin");
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue("corrupted-data");
     vi.mocked(decryptToken).mockImplementationOnce(() => {
       throw new Error("Invalid encrypted token format");
     });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    expect(getStoredToken()).toBeNull();
+    const result = getStoredToken();
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("could not be decrypted"),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("returns null silently when file disappears between exists check and read", () => {
+    setPlatform("darwin");
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw enoent;
+    });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = getStoredToken();
+
+    expect(result).toBeNull();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("logs a warning when legacy token on Linux is corrupted", () => {
+    setPlatform("linux");
+    vi.mocked(fs.existsSync)
+      .mockReturnValueOnce(false) // XDG path
+      .mockReturnValueOnce(true); // legacy path
+    vi.mocked(fs.readFileSync).mockReturnValue("corrupted-data");
+    vi.mocked(decryptToken).mockImplementationOnce(() => {
+      throw new Error("Invalid encrypted token format");
+    });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = getStoredToken();
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("could not be decrypted"),
+    );
+    consoleSpy.mockRestore();
   });
 
   it("falls back to legacy path on Linux", () => {

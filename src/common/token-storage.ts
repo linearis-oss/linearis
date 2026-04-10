@@ -57,7 +57,19 @@ export function getStoredToken(): string | null {
         try {
           const encrypted = fs.readFileSync(legacy, "utf8").trim();
           return decryptToken(encrypted);
-        } catch {
+        } catch (err) {
+          // File disappeared between existsSync and readFileSync — treat as absent
+          if (
+            err instanceof Error &&
+            (err as NodeJS.ErrnoException).code === "ENOENT"
+          ) {
+            return null;
+          }
+          // Decryption failure, corrupt content, or permission error — warn and degrade
+          console.error(
+            "Warning: stored token could not be decrypted and will be ignored. " +
+              "Run 'linearis auth login' to reauthenticate.",
+          );
           return null;
         }
       }
@@ -67,7 +79,19 @@ export function getStoredToken(): string | null {
   try {
     const encrypted = fs.readFileSync(tokenPath, "utf8").trim();
     return decryptToken(encrypted);
-  } catch {
+  } catch (err) {
+    // File disappeared between existsSync and readFileSync — treat as absent
+    if (
+      err instanceof Error &&
+      (err as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      return null;
+    }
+    // Decryption failure, corrupt content, or permission error — warn and degrade
+    console.error(
+      "Warning: stored token could not be decrypted and will be ignored. " +
+        "Run 'linearis auth login' to reauthenticate.",
+    );
     return null;
   }
 }
