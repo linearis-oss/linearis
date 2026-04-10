@@ -36,6 +36,7 @@ export function tryParseIssueIdentifier(
   try {
     return parseIssueIdentifier(identifier);
   } catch {
+    // parseIssueIdentifier throws on invalid format — return null per try-parse contract
     return null;
   }
 }

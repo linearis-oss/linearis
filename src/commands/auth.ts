@@ -211,6 +211,7 @@ export function setupAuthCommands(program: Command): void {
           token = resolved.token;
           source = resolved.source;
         } catch {
+          // resolveApiToken throws when no token found — report unauthenticated
           outputSuccess({
             authenticated: false,
             message:
@@ -227,6 +228,7 @@ export function setupAuthCommands(program: Command): void {
             user: { id: viewer.id, name: viewer.name, email: viewer.email },
           });
         } catch {
+          // Token is invalid or expired — report unauthenticated with source
           outputSuccess({
             authenticated: false,
             source: SOURCE_LABELS[source],
@@ -255,6 +257,7 @@ export function setupAuthCommands(program: Command): void {
             warning: `A token is still active via ${SOURCE_LABELS[source]}.`,
           });
         } catch {
+          // No token remaining after logout — nothing to warn about
           outputSuccess({ message: "Authentication token removed." });
         }
       }),

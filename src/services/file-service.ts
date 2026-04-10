@@ -267,6 +267,7 @@ export class FileService {
     try {
       await access(filePath);
     } catch {
+      // access() throws ENOENT when file does not exist
       return {
         success: false,
         error: `File not found: ${filePath}`,
