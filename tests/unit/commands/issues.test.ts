@@ -31,6 +31,23 @@ vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
   resolveIssueId: vi.fn().mockResolvedValue("resolved-issue-uuid"),
 }));
 
+vi.mock("../../../src/resolvers/issue-batch-resolver.js", () => ({
+  resolveIssueCreateRefs: vi.fn().mockResolvedValue({
+    teamId: "resolved-team-uuid",
+    projectId: "resolved-project-uuid",
+    labelIds: ["resolved-label-uuid"],
+    parentId: "resolved-parent-uuid",
+    projectMilestoneId: "resolved-milestone-uuid",
+  }),
+  resolveIssueUpdateRefs: vi.fn().mockResolvedValue({
+    projectId: "resolved-project-uuid",
+    labelIds: ["resolved-label-uuid"],
+    currentLabelIds: ["current-label-uuid"],
+    parentId: "resolved-parent-uuid",
+    projectMilestoneId: "resolved-milestone-uuid",
+  }),
+}));
+
 vi.mock("../../../src/resolvers/project-resolver.js", () => ({
   resolveProjectId: vi.fn().mockResolvedValue("resolved-project-uuid"),
 }));
@@ -72,6 +89,10 @@ vi.mock("../../../src/services/issue-relation-service.js", () => ({
 }));
 
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
+import {
+  resolveIssueCreateRefs,
+  resolveIssueUpdateRefs,
+} from "../../../src/resolvers/issue-batch-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createIssue,
@@ -156,6 +177,55 @@ describe("issues create --assignee", () => {
     expect(createIssue).toHaveBeenCalledWith(
       expect.anything(),
       expect.not.objectContaining({ assigneeId: expect.anything() }),
+    );
+  });
+});
+
+describe("issues create batches refs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("issues create batches team/project/labels/parent/milestone refs", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Fix login bug",
+      "--team",
+      "ENG",
+      "--project",
+      "Platform",
+      "--labels",
+      "bug,backend",
+      "--parent-ticket",
+      "ENG-42",
+      "--project-milestone",
+      "Q2",
+    ]);
+
+    expect(resolveIssueCreateRefs).toHaveBeenCalledWith(expect.anything(), {
+      team: "ENG",
+      project: "Platform",
+      labels: ["bug", "backend"],
+      parentTicket: "ENG-42",
+      projectMilestone: "Q2",
+    });
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        teamId: "resolved-team-uuid",
+        projectId: "resolved-project-uuid",
+        labelIds: ["resolved-label-uuid"],
+        parentId: "resolved-parent-uuid",
+        projectMilestoneId: "resolved-milestone-uuid",
+      }),
     );
   });
 });
@@ -551,6 +621,73 @@ describe("issues list/search filters", () => {
       },
     );
     expect(listIssues).not.toHaveBeenCalled();
+  });
+});
+
+describe("issues update batches refs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("issues update batches project/labels/parent/milestone refs", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--project",
+      "Platform",
+      "--labels",
+      "bug",
+      "--parent-ticket",
+      "ENG-99",
+      "--project-milestone",
+      "Q3",
+    ]);
+
+    expect(resolveIssueUpdateRefs).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        project: "Platform",
+        labels: ["bug"],
+        parentTicket: "ENG-99",
+        projectMilestone: "Q3",
+      }),
+    );
+  });
+
+  it("issues update label add still merges current labels with resolved label IDs", async () => {
+    vi.mocked(resolveIssueUpdateRefs).mockResolvedValueOnce({
+      labelIds: ["resolved-label-uuid"],
+      currentLabelIds: ["current-label-uuid"],
+    });
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--labels",
+      "bug",
+      "--label-mode",
+      "add",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({
+        labelIds: ["current-label-uuid", "resolved-label-uuid"],
+      }),
+    );
   });
 });
 
