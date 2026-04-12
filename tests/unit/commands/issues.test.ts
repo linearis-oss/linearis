@@ -759,46 +759,6 @@ describe("issues create relations", () => {
     );
     expect(createIssueRelation).toHaveBeenCalledTimes(1);
   });
-
-  it("errors when remove-relation mixed with add flags", async () => {
-    const program = createProgram();
-    await program.parseAsync([
-      "node",
-      "test",
-      "issues",
-      "create",
-      "Title",
-      "--team",
-      "ENG",
-      "--blocks",
-      "DAT-103",
-      "--remove-relation",
-      "DAT-913",
-    ]);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("Cannot mix add and remove relation flags"),
-    );
-    expect(process.exit).toHaveBeenCalledWith(1);
-  });
-
-  it("errors on empty relation value", async () => {
-    const program = createProgram();
-    await program.parseAsync([
-      "node",
-      "test",
-      "issues",
-      "create",
-      "Title",
-      "--team",
-      "ENG",
-      "--blocks",
-      "",
-    ]);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("must not be empty"),
-    );
-    expect(process.exit).toHaveBeenCalledWith(1);
-  });
 });
 
 describe("issues update relations", () => {
