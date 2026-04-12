@@ -111,7 +111,12 @@ export const ISSUES_META: DomainMeta = {
     title: "string",
     query: "full-text search term",
   },
-  seeAlso: ["comments create <issue>", "documents list --issue <issue>"],
+  seeAlso: [
+    "comments create <issue>",
+    "documents list --issue <issue>",
+    "attachments list <issue>",
+    "issues read --with-attachments",
+  ],
 };
 
 interface RelationFlags {
