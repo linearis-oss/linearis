@@ -6,6 +6,7 @@ import {
   type AttachmentCreateMutation,
   AttachmentDeleteDocument,
   type AttachmentDeleteMutation,
+  type AttachmentFilter,
   ListAttachmentsDocument,
   type ListAttachmentsQuery,
 } from "../gql/graphql.js";
@@ -45,10 +46,11 @@ export async function deleteAttachment(
 export async function listAttachments(
   client: GraphQLClient,
   issueId: string,
+  filter?: AttachmentFilter,
 ): Promise<Attachment[]> {
   const result = await client.request<ListAttachmentsQuery>(
     ListAttachmentsDocument,
-    { issueId },
+    { issueId, ...(filter && { filter }) },
   );
 
   if (!result.issue) {

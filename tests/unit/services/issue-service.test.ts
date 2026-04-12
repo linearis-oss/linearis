@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   FilteredSearchIssuesDocument,
+  GetIssueByIdentifierWithAttachmentsDocument,
+  GetIssueByIdWithAttachmentsDocument,
   GetIssuesDocument,
   PaginationOrderBy,
   SearchIssuesDocument,
@@ -10,6 +12,8 @@ import {
   createIssue,
   getIssue,
   getIssueByIdentifier,
+  getIssueByIdentifierWithAttachments,
+  getIssueWithAttachments,
   listIssues,
   searchIssues,
   updateIssue,
@@ -242,6 +246,64 @@ describe("updateIssue", () => {
     await expect(
       updateIssue(client, "issue-id", { title: "Fail" }),
     ).rejects.toThrow("Failed to update issue");
+  });
+});
+
+describe("getIssueWithAttachments", () => {
+  it("returns issue with attachments by UUID", async () => {
+    const client = mockGqlClient({
+      issue: {
+        id: "issue-1",
+        title: "Found",
+        attachments: {
+          nodes: [{ id: "att-1", title: "PR #42", sourceType: "github" }],
+        },
+      },
+    });
+    const result = await getIssueWithAttachments(client, "issue-1");
+    expect(result.id).toBe("issue-1");
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdWithAttachmentsDocument,
+      { id: "issue-1" },
+    );
+  });
+
+  it("throws when issue not found", async () => {
+    const client = mockGqlClient({ issue: null });
+    await expect(getIssueWithAttachments(client, "missing")).rejects.toThrow(
+      "not found",
+    );
+  });
+});
+
+describe("getIssueByIdentifierWithAttachments", () => {
+  it("returns issue with attachments by identifier", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [
+          {
+            id: "issue-1",
+            title: "Found",
+            attachments: {
+              nodes: [{ id: "att-1", title: "PR #42" }],
+            },
+          },
+        ],
+      },
+    });
+    const result = await getIssueByIdentifierWithAttachments(client, "ENG", 42);
+    expect(result.id).toBe("issue-1");
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdentifierWithAttachmentsDocument,
+      { teamKey: "ENG", number: 42 },
+    );
+  });
+
+  it("throws when issue not found", async () => {
+    const client = mockGqlClient({ issues: { nodes: [] } });
+    await expect(
+      getIssueByIdentifierWithAttachments(client, "ENG", 999),
+    ).rejects.toThrow("not found");
   });
 });
 

@@ -94,4 +94,21 @@ describe("listAttachments", () => {
       "not found",
     );
   });
+
+  it("passes filter to GraphQL request", async () => {
+    const client = mockGqlClient({
+      issue: {
+        attachments: {
+          nodes: [{ id: "1", title: "PR #42", sourceType: "github" }],
+        },
+      },
+    });
+    const filter = { sourceType: { eq: "github" } };
+    const result = await listAttachments(client, "issue-1", filter);
+    expect(result).toHaveLength(1);
+    expect(client.request).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ filter }),
+    );
+  });
 });
