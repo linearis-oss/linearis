@@ -80,6 +80,7 @@ import { setupIssuesCommands } from "../../../src/commands/issues.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createIssue,
+  getIssueByIdentifierWithAttachments,
   getIssueWithAttachments,
   listIssues,
   searchIssues,
@@ -626,6 +627,24 @@ describe("issues read --with-attachments", () => {
     expect(getIssueWithAttachments).toHaveBeenCalledWith(
       expect.anything(),
       "550e8400-e29b-41d4-a716-446655440000",
+    );
+  });
+
+  it("calls getIssueByIdentifierWithAttachments when flag is set with identifier", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "ENG-42",
+      "--with-attachments",
+    ]);
+
+    expect(getIssueByIdentifierWithAttachments).toHaveBeenCalledWith(
+      expect.anything(),
+      "ENG",
+      42,
     );
   });
 });
