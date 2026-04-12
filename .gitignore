@@ -6,6 +6,7 @@ docs/superpowers/
 
 # pi
 /.pi/superpowers*.json
+/.pi/pr-writing-artifacts/
 
 # ------------------------------------------------------------
 # DO NOT EDIT THE PATHS BELOW THIS LINE
