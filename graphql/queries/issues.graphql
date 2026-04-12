@@ -470,3 +470,32 @@ query BatchResolveForCreate(
 
   # Resolve cycles by name (team-scoped lookup is preferred but we also provide global fallback)
 }
+
+# Complete issue fragment with attachments
+fragment CompleteIssueWithAttachmentsFields on Issue {
+  ...CompleteIssueWithCommentsFields
+  attachments {
+    nodes {
+      ...AttachmentFields
+    }
+  }
+}
+
+# Get single issue by UUID with attachments
+query GetIssueByIdWithAttachments($id: String!) {
+  issue(id: $id) {
+    ...CompleteIssueWithAttachmentsFields
+  }
+}
+
+# Get issue by identifier with attachments
+query GetIssueByIdentifierWithAttachments($teamKey: String!, $number: Float!) {
+  issues(
+    filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
+    first: 1
+  ) {
+    nodes {
+      ...CompleteIssueWithAttachmentsFields
+    }
+  }
+}
