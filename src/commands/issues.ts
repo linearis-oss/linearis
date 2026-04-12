@@ -33,6 +33,8 @@ import {
   createIssue,
   getIssue,
   getIssueByIdentifier,
+  getIssueByIdentifierWithAttachments,
+  getIssueWithAttachments,
   listIssues,
   searchIssues,
   updateIssue,
@@ -109,7 +111,12 @@ export const ISSUES_META: DomainMeta = {
     title: "string",
     query: "full-text search term",
   },
-  seeAlso: ["comments create <issue>", "documents list --issue <issue>"],
+  seeAlso: [
+    "comments create <issue>",
+    "documents list --issue <issue>",
+    "attachments list <issue>",
+    "issues read --with-attachments",
+  ],
 };
 
 interface RelationFlags {
@@ -289,16 +296,34 @@ export function setupIssuesCommands(program: Command): void {
   issues
     .command("read <issue>")
     .description("get full issue details including description")
+    .option("--with-attachments", "include issue attachments")
     .addHelpText(
       "after",
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [issue, , command] = args as [string, unknown, Command];
+        const [issue, options, command] = args as [
+          string,
+          { withAttachments?: boolean },
+          Command,
+        ];
         const ctx = createContext(command.parent!.parent!.opts());
 
-        if (isUuid(issue)) {
+        if (options.withAttachments) {
+          if (isUuid(issue)) {
+            const result = await getIssueWithAttachments(ctx.gql, issue);
+            outputSuccess(result);
+          } else {
+            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+            const result = await getIssueByIdentifierWithAttachments(
+              ctx.gql,
+              teamKey,
+              issueNumber,
+            );
+            outputSuccess(result);
+          }
+        } else if (isUuid(issue)) {
           const result = await getIssue(ctx.gql, issue);
           outputSuccess(result);
         } else {

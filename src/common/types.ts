@@ -9,7 +9,9 @@ import type {
   DocumentUpdateMutation,
   GetDocumentQuery,
   GetIssueByIdentifierQuery,
+  GetIssueByIdentifierWithAttachmentsQuery,
   GetIssueByIdQuery,
+  GetIssueByIdWithAttachmentsQuery,
   GetIssuesQuery,
   GetProjectMilestoneByIdQuery,
   GetProjectQuery,
@@ -43,6 +45,11 @@ export interface PaginationOptions {
 export type Issue = GetIssuesQuery["issues"]["nodes"][0];
 export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
 export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
+export type IssueDetailWithAttachments = NonNullable<
+  GetIssueByIdWithAttachmentsQuery["issue"]
+>;
+export type IssueByIdentifierWithAttachments =
+  GetIssueByIdentifierWithAttachmentsQuery["issues"]["nodes"][0];
 export type IssueSearchResult = SearchIssuesQuery["searchIssues"]["nodes"][0];
 export type CreatedIssue = NonNullable<
   CreateIssueMutation["issueCreate"]["issue"]

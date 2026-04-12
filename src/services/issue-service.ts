@@ -3,7 +3,9 @@ import type {
   CreatedIssue,
   Issue,
   IssueByIdentifier,
+  IssueByIdentifierWithAttachments,
   IssueDetail,
+  IssueDetailWithAttachments,
   IssueSearchResult,
   PaginatedResult,
   PaginationOptions,
@@ -17,7 +19,11 @@ import {
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   type GetIssueByIdentifierQuery,
+  GetIssueByIdentifierWithAttachmentsDocument,
+  type GetIssueByIdentifierWithAttachmentsQuery,
   type GetIssueByIdQuery,
+  GetIssueByIdWithAttachmentsDocument,
+  type GetIssueByIdWithAttachmentsQuery,
   GetIssuesDocument,
   type GetIssuesQuery,
   type IssueCreateInput,
@@ -95,6 +101,37 @@ export async function getIssueByIdentifier(
 ): Promise<IssueByIdentifier> {
   const result = await client.request<GetIssueByIdentifierQuery>(
     GetIssueByIdentifierDocument,
+    { teamKey, number: issueNumber },
+  );
+  if (!result.issues.nodes.length) {
+    throw new Error(
+      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+    );
+  }
+  return result.issues.nodes[0];
+}
+
+export async function getIssueWithAttachments(
+  client: GraphQLClient,
+  id: string,
+): Promise<IssueDetailWithAttachments> {
+  const result = await client.request<GetIssueByIdWithAttachmentsQuery>(
+    GetIssueByIdWithAttachmentsDocument,
+    { id },
+  );
+  if (!result.issue) {
+    throw new Error(`Issue with ID "${id}" not found`);
+  }
+  return result.issue;
+}
+
+export async function getIssueByIdentifierWithAttachments(
+  client: GraphQLClient,
+  teamKey: string,
+  issueNumber: number,
+): Promise<IssueByIdentifierWithAttachments> {
+  const result = await client.request<GetIssueByIdentifierWithAttachmentsQuery>(
+    GetIssueByIdentifierWithAttachmentsDocument,
     { teamKey, number: issueNumber },
   );
   if (!result.issues.nodes.length) {

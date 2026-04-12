@@ -17,6 +17,9 @@ fragment AttachmentFields on Attachment {
   title
   subtitle
   url
+  sourceType
+  metadata
+  source
   createdAt
   updatedAt
 }
@@ -24,9 +27,9 @@ fragment AttachmentFields on Attachment {
 # List attachments on an issue
 #
 # Fetches a list of attachments for a given issue.
-query ListAttachments($issueId: String!) {
+query ListAttachments($issueId: String!, $filter: AttachmentFilter) {
   issue(id: $issueId) {
-    attachments {
+    attachments(filter: $filter) {
       nodes {
         ...AttachmentFields
       }

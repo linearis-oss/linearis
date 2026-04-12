@@ -2,6 +2,10 @@
 
 import { Option, program } from "commander";
 import pkg from "../package.json" with { type: "json" };
+import {
+  ATTACHMENTS_META,
+  setupAttachmentsCommands,
+} from "./commands/attachments.js";
 import { AUTH_META, setupAuthCommands } from "./commands/auth.js";
 import { COMMENTS_META, setupCommentsCommands } from "./commands/comments.js";
 import { CYCLES_META, setupCyclesCommands } from "./commands/cycles.js";
@@ -41,6 +45,7 @@ const allMetas: DomainMeta[] = [
   MILESTONES_META,
   DOCUMENTS_META,
   FILES_META,
+  ATTACHMENTS_META,
   TEAMS_META,
   USERS_META,
 ];
@@ -55,6 +60,7 @@ setupProjectsCommands(program);
 setupCyclesCommands(program);
 setupMilestonesCommands(program);
 setupFilesCommands(program);
+setupAttachmentsCommands(program);
 setupTeamsCommands(program);
 setupUsersCommands(program);
 setupDocumentsCommands(program);
