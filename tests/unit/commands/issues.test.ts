@@ -61,6 +61,11 @@ vi.mock("../../../src/services/issue-service.js", () => ({
     labels: { nodes: [] },
   }),
   getIssueByIdentifier: vi.fn(),
+  getIssueWithAttachments: vi.fn().mockResolvedValue({
+    id: "resolved-issue-uuid",
+    attachments: { nodes: [{ id: "att-1", title: "PR #42" }] },
+  }),
+  getIssueByIdentifierWithAttachments: vi.fn(),
   listIssues: vi.fn().mockResolvedValue([]),
   searchIssues: vi.fn().mockResolvedValue([]),
 }));
@@ -75,6 +80,7 @@ import { setupIssuesCommands } from "../../../src/commands/issues.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createIssue,
+  getIssueWithAttachments,
   listIssues,
   searchIssues,
   updateIssue,
@@ -595,5 +601,31 @@ describe("issues update --assignee", () => {
     ]);
 
     expect(resolveUserId).not.toHaveBeenCalled();
+  });
+});
+
+describe("issues read --with-attachments", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("calls getIssueWithAttachments when flag is set with UUID", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+      "--with-attachments",
+    ]);
+
+    expect(getIssueWithAttachments).toHaveBeenCalledWith(
+      expect.anything(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
   });
 });
