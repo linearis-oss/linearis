@@ -648,3 +648,198 @@ describe("issues read --with-attachments", () => {
     );
   });
 });
+
+describe("issues create relations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("creates single relation", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--blocks",
+      "DAT-103",
+    ]);
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledTimes(1);
+    expect(createIssueRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "blocks" }),
+    );
+  });
+
+  it("creates multiple relations of same type", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--blocks",
+      "DAT-103,DAT-104",
+    ]);
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates multiple relations of different types", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--blocks",
+      "DAT-103",
+      "--relates-to",
+      "DAT-913",
+    ]);
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledTimes(2);
+  });
+
+  it("errors on cross-flag duplicate target", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--blocks",
+      "DAT-103",
+      "--relates-to",
+      "DAT-103",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("appears in multiple relation flags"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("deduplicates intra-flag duplicates silently", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--blocks",
+      "DAT-103,DAT-103",
+    ]);
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("issues update relations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("removes single relation", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--remove-relation",
+      "DAT-103",
+    ]);
+    const { deleteIssueRelation, findIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(findIssueRelation).toHaveBeenCalledTimes(1);
+    expect(deleteIssueRelation).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes multiple relations", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--remove-relation",
+      "DAT-103,DAT-913",
+    ]);
+    const { deleteIssueRelation, findIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(findIssueRelation).toHaveBeenCalledTimes(2);
+    expect(deleteIssueRelation).toHaveBeenCalledTimes(2);
+  });
+
+  it("errors on cross-flag duplicate in update", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--blocks",
+      "DAT-103",
+      "--relates-to",
+      "DAT-103",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("appears in multiple relation flags"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("errors when remove-relation mixed with add flags in update", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--blocks",
+      "DAT-103",
+      "--remove-relation",
+      "DAT-913",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Cannot mix add and remove relation flags"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+});

@@ -119,73 +119,134 @@ export const ISSUES_META: DomainMeta = {
   ],
 };
 
-interface RelationFlags {
+interface RelationAction {
+  type: "blocks" | "blockedBy" | "relatesTo" | "duplicateOf" | "remove";
+  targets: string[];
+}
+
+function parseRelationFlags(flags: {
   blocks?: string;
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
   removeRelation?: string;
-}
+}): RelationAction[] {
+  const entries: Array<{
+    type: RelationAction["type"];
+    raw: string | undefined;
+  }> = [
+    { type: "blocks", raw: flags.blocks },
+    { type: "blockedBy", raw: flags.blockedBy },
+    { type: "relatesTo", raw: flags.relatesTo },
+    { type: "duplicateOf", raw: flags.duplicateOf },
+    { type: "remove", raw: flags.removeRelation },
+  ];
 
-function validateRelationFlags(flags: RelationFlags): void {
-  const active = [
-    flags.blocks,
-    flags.blockedBy,
-    flags.relatesTo,
-    flags.duplicateOf,
-    flags.removeRelation,
-  ].filter(Boolean);
-  if (active.length > 1) {
-    throw new Error("Only one relation flag can be used at a time");
+  const actions: RelationAction[] = [];
+  const hasAdd = entries.some((e) => e.type !== "remove" && e.raw);
+  const hasRemove = entries.some((e) => e.type === "remove" && e.raw);
+
+  if (hasAdd && hasRemove) {
+    throw new Error("Cannot mix add and remove relation flags");
   }
+
+  for (const { type, raw } of entries) {
+    if (!raw) continue;
+
+    const targets = [
+      ...new Set(
+        raw
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (targets.length === 0) {
+      throw new Error(
+        `Relation flag --${type === "remove" ? "remove-relation" : type} must not be empty`,
+      );
+    }
+    actions.push({ type, targets });
+  }
+
+  // Cross-flag collision check
+  const seen = new Map<string, string>();
+  for (const action of actions) {
+    for (const target of action.targets) {
+      const prev = seen.get(target);
+      if (prev) {
+        throw new Error(
+          `${target} appears in multiple relation flags (${prev} and --${action.type === "remove" ? "remove-relation" : action.type})`,
+        );
+      }
+      seen.set(
+        target,
+        `--${action.type === "remove" ? "remove-relation" : action.type}`,
+      );
+    }
+  }
+
+  return actions;
 }
 
-async function resolveRelationTarget(
-  ctx: CommandContext,
-  flags: RelationFlags,
-): Promise<string | undefined> {
-  const target =
-    flags.blocks ??
-    flags.blockedBy ??
-    flags.relatesTo ??
-    flags.duplicateOf ??
-    flags.removeRelation;
-  return target ? resolveIssueId(ctx.sdk, target) : undefined;
-}
-
-async function applyRelation(
+async function resolveAndApplyRelations(
   ctx: CommandContext,
   issueId: string,
-  targetId: string,
-  flags: RelationFlags,
+  actions: RelationAction[],
 ): Promise<void> {
-  if (flags.blocks) {
-    await createIssueRelation(ctx.gql, {
-      issueId,
-      relatedIssueId: targetId,
-      type: IssueRelationType.Blocks,
-    });
-  } else if (flags.blockedBy) {
-    await createIssueRelation(ctx.gql, {
-      issueId: targetId,
-      relatedIssueId: issueId,
-      type: IssueRelationType.Blocks,
-    });
-  } else if (flags.relatesTo) {
-    await createIssueRelation(ctx.gql, {
-      issueId,
-      relatedIssueId: targetId,
-      type: IssueRelationType.Related,
-    });
-  } else if (flags.duplicateOf) {
-    await createIssueRelation(ctx.gql, {
-      issueId,
-      relatedIssueId: targetId,
-      type: IssueRelationType.Duplicate,
-    });
-  } else if (flags.removeRelation) {
-    const relationId = await findIssueRelation(ctx.gql, issueId, targetId);
-    await deleteIssueRelation(ctx.gql, relationId);
+  // Resolve all unique targets to UUIDs
+  const uniqueTargets = new Set(actions.flatMap((a) => a.targets));
+  const resolved = new Map<string, string>();
+  await Promise.all(
+    [...uniqueTargets].map(async (target) => {
+      resolved.set(target, await resolveIssueId(ctx.sdk, target));
+    }),
+  );
+
+  for (const action of actions) {
+    for (const target of action.targets) {
+      const targetId = resolved.get(target)!;
+
+      switch (action.type) {
+        case "blocks":
+          await createIssueRelation(ctx.gql, {
+            issueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Blocks,
+          });
+          break;
+        case "blockedBy":
+          await createIssueRelation(ctx.gql, {
+            issueId: targetId,
+            relatedIssueId: issueId,
+            type: IssueRelationType.Blocks,
+          });
+          break;
+        case "relatesTo":
+          await createIssueRelation(ctx.gql, {
+            issueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Related,
+          });
+          break;
+        case "duplicateOf":
+          await createIssueRelation(ctx.gql, {
+            issueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Duplicate,
+          });
+          break;
+        case "remove": {
+          const relationId = await findIssueRelation(
+            ctx.gql,
+            issueId,
+            targetId,
+          );
+          await deleteIssueRelation(ctx.gql, relationId);
+          break;
+        }
+      }
+    }
   }
 }
 
@@ -366,7 +427,7 @@ export function setupIssuesCommands(program: Command): void {
         ];
         const ctx = createContext(command.parent!.parent!.opts());
 
-        validateRelationFlags(options);
+        const relationActions = parseRelationFlags(options);
 
         if (!options.team) {
           throw new Error("--team is required");
@@ -441,12 +502,10 @@ export function setupIssuesCommands(program: Command): void {
           input.dueDate = parseDueDate(options.dueDate);
         }
 
-        const relationTargetId = await resolveRelationTarget(ctx, options);
-
         const result = await createIssue(ctx.gql, input);
 
-        if (relationTargetId) {
-          await applyRelation(ctx, result.id, relationTargetId, options);
+        if (relationActions.length > 0) {
+          await resolveAndApplyRelations(ctx, result.id, relationActions);
         }
 
         outputSuccess(result);
@@ -538,7 +597,7 @@ export function setupIssuesCommands(program: Command): void {
           throw new Error("--label-mode must be either 'add' or 'overwrite'");
         }
 
-        validateRelationFlags(options);
+        const relationActions = parseRelationFlags(options);
 
         const ctx = createContext(command.parent!.parent!.opts());
 
@@ -651,12 +710,10 @@ export function setupIssuesCommands(program: Command): void {
           input.dueDate = parseDueDate(options.dueDate);
         }
 
-        const relationTargetId = await resolveRelationTarget(ctx, options);
-
         const result = await updateIssue(ctx.gql, resolvedIssueId, input);
 
-        if (relationTargetId) {
-          await applyRelation(ctx, resolvedIssueId, relationTargetId, options);
+        if (relationActions.length > 0) {
+          await resolveAndApplyRelations(ctx, resolvedIssueId, relationActions);
         }
 
         outputSuccess(result);
