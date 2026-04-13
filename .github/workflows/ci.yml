@@ -100,3 +100,46 @@ jobs:
           npm install -g ./linearis-*.tgz
           linearis --help
           npm uninstall -g linearis
+
+  guard-plan-files:
+    name: Reject plan files
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check for docs/plans/*.md in branch history
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          plan_files=$(git log main...HEAD \
+            --diff-filter=A --name-only --pretty=format: \
+            -- 'docs/plans/*.md' | sed '/^$/d')
+
+          if [ -n "$plan_files" ]; then
+            echo "::error::Found plan files in branch history"
+
+            printf '%s\n' \
+              '<!-- linearis:guard-plan-files -->' \
+              '' \
+              '> [!WARNING]' \
+              '> Found `docs/plans/*.md` files in this branch'"'"'s history.' \
+              '>' \
+              '> Plan files in `docs/plans/` are working artifacts created by AI agents during the design phase. Once the implementation they describe is complete and the PR is ready for review, these files serve no further purpose — they are not reference docs, not changelogs, and not part of the shipped project.' \
+              '>' \
+              '> Leaving them in the commit history would add noise and suggest unresolved or incomplete work.' \
+              '>' \
+              '> **Remove them by rebasing and dropping the commits that introduced them:**' \
+              '> ```bash' \
+              '> git rebase -i main' \
+              '> # drop the commits that added docs/plans/*.md, then force-push' \
+              '> git push --force-with-lease' \
+              '> ```' \
+            | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+
+            exit 1
+          fi
+          echo "No plan files found — OK"
