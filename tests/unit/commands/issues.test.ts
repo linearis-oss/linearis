@@ -167,6 +167,124 @@ describe("issues create --assignee", () => {
   });
 });
 
+describe("issues create --priority validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects non-numeric --priority", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Bug",
+      "--team",
+      "ENG",
+      "--priority",
+      "abc",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+  });
+
+  it("rejects --priority out of range (0)", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Bug",
+      "--team",
+      "ENG",
+      "--priority",
+      "0",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+  });
+
+  it("rejects --priority out of range (5)", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Bug",
+      "--team",
+      "ENG",
+      "--priority",
+      "5",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+  });
+});
+
+describe("issues create --estimate validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects non-numeric --estimate", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Bug",
+      "--team",
+      "ENG",
+      "--estimate",
+      "abc",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
+    );
+  });
+
+  it("rejects negative --estimate", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Bug",
+      "--team",
+      "ENG",
+      "--estimate",
+      "-1",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
+    );
+  });
+});
+
 describe("issues create --estimate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -296,6 +414,96 @@ describe("issues create --due-date", () => {
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid due date format"),
+    );
+  });
+});
+
+describe("issues update --priority validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects non-numeric --priority", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--priority",
+      "abc",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+  });
+
+  it("rejects --priority out of range (0)", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--priority",
+      "0",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+  });
+});
+
+describe("issues update --estimate validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects non-numeric --estimate", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "abc",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
+    );
+  });
+
+  it("rejects negative --estimate", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "-1",
+    ]);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
     );
   });
 });

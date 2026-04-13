@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
+import { invalidParameterError } from "../common/errors.js";
 import {
   isUuid,
   parseDueDate,
@@ -90,6 +91,23 @@ interface UpdateOptions {
   relatesTo?: string;
   duplicateOf?: string;
   removeRelation?: string;
+}
+
+function parseIntegerOption(
+  value: string,
+  flag: string,
+  min: number,
+  max: number,
+): number {
+  const n = parseInt(value, 10);
+  if (Number.isNaN(n) || !Number.isInteger(n) || n < min || n > max) {
+    const range =
+      max === Infinity
+        ? `must be ${min === 0 ? "a non-negative" : `at least ${min}`} integer`
+        : `must be an integer between ${min} and ${max}`;
+    throw invalidParameterError(flag, range);
+  }
+  return n;
 }
 
 export const ISSUES_META: DomainMeta = {
@@ -448,11 +466,21 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.priority) {
-          input.priority = parseInt(options.priority, 10);
+          input.priority = parseIntegerOption(
+            options.priority,
+            "--priority",
+            1,
+            4,
+          );
         }
 
         if (options.estimate !== undefined) {
-          input.estimate = parseInt(options.estimate, 10);
+          input.estimate = parseIntegerOption(
+            options.estimate,
+            "--estimate",
+            0,
+            Infinity,
+          );
         }
 
         if (options.project) {
@@ -635,13 +663,23 @@ export function setupIssuesCommands(program: Command): void {
         }
 
         if (options.priority) {
-          input.priority = parseInt(options.priority, 10);
+          input.priority = parseIntegerOption(
+            options.priority,
+            "--priority",
+            1,
+            4,
+          );
         }
 
         if (options.clearEstimate) {
           input.estimate = null;
         } else if (options.estimate !== undefined) {
-          input.estimate = parseInt(options.estimate, 10);
+          input.estimate = parseIntegerOption(
+            options.estimate,
+            "--estimate",
+            0,
+            Infinity,
+          );
         }
 
         if (options.assignee) {
