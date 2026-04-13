@@ -62,7 +62,7 @@
   },
   "homepage": "https://github.com/linearis-oss/linearis#readme",
   "dependencies": {
-    "@linear/sdk": "80.1.0",
+    "@linear/sdk": "81.0.0",
     "commander": "14.0.3"
   },
   "devDependencies": {
