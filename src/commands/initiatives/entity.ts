@@ -9,10 +9,13 @@ import {
 } from "../../common/output.js";
 import {
   type InitiativeCreateInput,
+  type InitiativeSortInput,
   InitiativeStatus,
   type InitiativeUpdateInput,
   type ListInitiativesQueryVariables,
+  PaginationNulls,
   PaginationOrderBy,
+  PaginationSortOrder,
 } from "../../gql/graphql.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import { resolveTeamId } from "../../resolvers/team-resolver.js";
@@ -27,17 +30,7 @@ import {
   updateInitiative,
 } from "../../services/initiative-service.js";
 
-interface InitiativeExpandOptions {
-  withProjects?: boolean;
-  withSubInitiatives?: boolean;
-  withParentInitiatives?: boolean;
-  withUpdates?: boolean;
-  withLinks?: boolean;
-  withHistory?: boolean;
-  withDocuments?: boolean;
-}
-
-interface InitiativeListOptions extends InitiativeExpandOptions {
+interface InitiativeListOptions {
   limit: string;
   after?: string;
   includeArchived?: boolean;
@@ -62,11 +55,8 @@ interface InitiativeListOptions extends InitiativeExpandOptions {
   createdBefore?: string;
   updatedAfter?: string;
   updatedBefore?: string;
-  parent?: string;
   ancestor?: string;
 }
-
-interface InitiativeReadOptions extends InitiativeExpandOptions {}
 
 interface InitiativeCreateOptions {
   description?: string;
@@ -135,15 +125,47 @@ function parseSortBy(value?: string): InitiativeSortBy | undefined {
 }
 
 function mapSortByToPaginationOrderBy(
-  sortBy: InitiativeSortBy,
-): PaginationOrderBy {
+  sortBy?: InitiativeSortBy,
+): PaginationOrderBy | undefined {
   if (sortBy === "createdAt") return PaginationOrderBy.CreatedAt;
   if (sortBy === "updatedAt") return PaginationOrderBy.UpdatedAt;
+  return undefined;
+}
 
-  throw invalidParameterError(
-    "--sort-by",
-    `"${sortBy}" is not supported by current Linear initiatives API; supported sort fields: createdAt, updatedAt`,
-  );
+function mapSortByToInitiativeSort(
+  sortBy?: InitiativeSortBy,
+  sortOrder?: "asc" | "desc",
+): ListInitiativesQueryVariables["sort"] | undefined {
+  if (!sortBy) return undefined;
+
+  const order =
+    sortOrder === "desc"
+      ? PaginationSortOrder.Descending
+      : PaginationSortOrder.Ascending;
+
+  const withNulls = {
+    order,
+    nulls: PaginationNulls.Last,
+  };
+
+  const sortEntry: InitiativeSortInput =
+    sortBy === "manual"
+      ? { manual: withNulls }
+      : sortBy === "name"
+        ? { name: withNulls }
+        : sortBy === "createdAt"
+          ? { createdAt: withNulls }
+          : sortBy === "updatedAt"
+            ? { updatedAt: withNulls }
+            : sortBy === "targetDate"
+              ? { targetDate: withNulls }
+              : sortBy === "health"
+                ? { health: withNulls }
+                : sortBy === "healthUpdatedAt"
+                  ? { healthUpdatedAt: withNulls }
+                  : { owner: withNulls };
+
+  return [sortEntry];
 }
 
 function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
@@ -183,19 +205,6 @@ function applyNullableDateRange(
   if (before !== undefined) {
     target.lte = before;
   }
-}
-
-function acknowledgeExpandFlags(options: InitiativeExpandOptions): void {
-  // Current initiative GraphQL list/read documents are fixed selections and do not
-  // expose per-request expansion toggles, so these flags are currently accepted
-  // for CLI compatibility only.
-  void options.withProjects;
-  void options.withSubInitiatives;
-  void options.withParentInitiatives;
-  void options.withUpdates;
-  void options.withLinks;
-  void options.withHistory;
-  void options.withDocuments;
 }
 
 async function buildInitiativeFilter(
@@ -294,11 +303,6 @@ async function buildInitiativeFilter(
     filter.ancestors = { some: { id: { eq: ancestorId } } };
   }
 
-  // InitiativeFilter does not currently expose a direct parent comparator, only
-  // ancestor collection matching. Keep --parent accepted for CLI compatibility,
-  // but intentionally do not forward it to GraphQL until schema support exists.
-  void options.parent;
-
   return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
@@ -333,15 +337,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--created-before <date>", "filter created date <= value")
     .option("--updated-after <date>", "filter updated date >= value")
     .option("--updated-before <date>", "filter updated date <= value")
-    .option("--parent <initiative>", "filter by direct parent initiative")
     .option("--ancestor <initiative>", "filter by ancestor initiative")
-    .option("--with-projects", "expand linked projects")
-    .option("--with-sub-initiatives", "expand child initiatives")
-    .option("--with-parent-initiatives", "expand parent initiatives")
-    .option("--with-updates", "expand initiative updates")
-    .option("--with-links", "expand related links")
-    .option("--with-history", "expand initiative history")
-    .option("--with-documents", "expand linked documents")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [InitiativeListOptions, Command];
@@ -357,20 +353,10 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           );
         }
 
-        if (sortOrder) {
-          throw invalidParameterError(
-            "--sort-order",
-            "is not supported by current Linear initiatives API",
-          );
-        }
-
-        const orderBy = sortBy
-          ? mapSortByToPaginationOrderBy(sortBy)
-          : undefined;
+        const orderBy = mapSortByToPaginationOrderBy(sortBy);
+        const sort = mapSortByToInitiativeSort(sortBy, sortOrder);
 
         const filter = await buildInitiativeFilter(ctx.sdk, options);
-
-        acknowledgeExpandFlags(options);
 
         const result = await listInitiatives(ctx.gql, {
           limit: parseLimit(options.limit),
@@ -378,6 +364,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           includeArchived: options.includeArchived ?? false,
           filter,
           orderBy,
+          sort,
         });
 
         outputSuccess(result);
@@ -387,24 +374,11 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
   initiatives
     .command("read <initiative>")
     .description("get initiative details")
-    .option("--with-projects", "expand linked projects")
-    .option("--with-sub-initiatives", "expand child initiatives")
-    .option("--with-parent-initiatives", "expand parent initiatives")
-    .option("--with-updates", "expand initiative updates")
-    .option("--with-links", "expand related links")
-    .option("--with-history", "expand initiative history")
-    .option("--with-documents", "expand linked documents")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [initiative, options, command] = args as [
-          string,
-          InitiativeReadOptions,
-          Command,
-        ];
+        const [initiative, , command] = args as [string, unknown, Command];
         const ctx = createContext(rootOptions(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-
-        acknowledgeExpandFlags(options);
 
         const result = await getInitiative(ctx.gql, initiativeId);
         outputSuccess(result);

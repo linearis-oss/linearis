@@ -39,6 +39,7 @@ describe("listInitiatives", () => {
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
       orderBy: { createdAt: "Asc" },
+      sort: undefined,
     });
   });
 

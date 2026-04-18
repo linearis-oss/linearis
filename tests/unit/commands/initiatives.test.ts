@@ -139,7 +139,7 @@ describe("initiatives list", () => {
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   });
 
-  it("parses and forwards includeArchived and supported sort", async () => {
+  it("parses and forwards includeArchived and sort", async () => {
     const program = createProgram();
 
     await program.parseAsync([
@@ -150,6 +150,8 @@ describe("initiatives list", () => {
       "--include-archived",
       "--sort-by",
       "updatedAt",
+      "--sort-order",
+      "desc",
       "--limit",
       "5",
     ]);
@@ -160,6 +162,14 @@ describe("initiatives list", () => {
         includeArchived: true,
         limit: 5,
         orderBy: "updatedAt",
+        sort: [
+          {
+            updatedAt: {
+              order: "Descending",
+              nulls: "last",
+            },
+          },
+        ],
       }),
     );
     expect(outputSuccess).toHaveBeenCalled();
@@ -181,48 +191,6 @@ describe("initiatives list", () => {
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid --sort-order"),
-    );
-    expect(listInitiatives).not.toHaveBeenCalled();
-  });
-
-  it("rejects unsupported sort-by values", async () => {
-    const program = createProgram();
-
-    await program.parseAsync([
-      "node",
-      "test",
-      "initiatives",
-      "list",
-      "--sort-by",
-      "name",
-    ]);
-
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "not supported by current Linear initiatives API",
-      ),
-    );
-    expect(listInitiatives).not.toHaveBeenCalled();
-  });
-
-  it("rejects sort-order because API does not support direction", async () => {
-    const program = createProgram();
-
-    await program.parseAsync([
-      "node",
-      "test",
-      "initiatives",
-      "list",
-      "--sort-by",
-      "updatedAt",
-      "--sort-order",
-      "desc",
-    ]);
-
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "is not supported by current Linear initiatives API",
-      ),
     );
     expect(listInitiatives).not.toHaveBeenCalled();
   });
@@ -400,7 +368,7 @@ describe("initiative updates wiring", () => {
     );
   });
 
-  it("wires updates create with title positional", async () => {
+  it("wires updates create", async () => {
     const program = createProgram();
 
     await program.parseAsync([
@@ -409,7 +377,6 @@ describe("initiative updates wiring", () => {
       "initiatives",
       "updates",
       "create",
-      "Weekly update",
       "--initiative",
       "Growth",
       "--body",
@@ -422,7 +389,6 @@ describe("initiative updates wiring", () => {
       expect.anything(),
       expect.objectContaining({
         initiativeId: "resolved-initiative-uuid",
-        title: "Weekly update",
         body: "Steady progress",
       }),
     );

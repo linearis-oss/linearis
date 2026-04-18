@@ -36,6 +36,7 @@ export interface InitiativeListOptions {
   includeArchived?: boolean;
   filter?: ListInitiativesQueryVariables["filter"];
   orderBy?: ListInitiativesQueryVariables["orderBy"];
+  sort?: ListInitiativesQueryVariables["sort"];
 }
 
 export async function listInitiatives(
@@ -48,6 +49,7 @@ export async function listInitiatives(
     includeArchived = false,
     filter,
     orderBy,
+    sort,
   } = options;
 
   const result = await client.request<ListInitiativesQuery>(
@@ -58,6 +60,7 @@ export async function listInitiatives(
       includeArchived,
       filter,
       orderBy,
+      sort,
     },
   );
 

@@ -112,15 +112,14 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
     );
 
   updates
-    .command("create <title>")
+    .command("create")
     .description("create an initiative update")
     .requiredOption("--initiative <initiative>", "initiative name or UUID")
     .option("--body <text>", "update body (markdown)")
     .option("--health <health>", "onTrack, atRisk, offTrack")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [title, options, command] = args as [
-          string,
+        const [options, command] = args as [
           InitiativeUpdatesCreateOptions,
           Command,
         ];
@@ -131,10 +130,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           options.initiative,
         );
 
-        const input: InitiativeUpdateCreateInput & { title: string } = {
-          initiativeId,
-          title,
-        };
+        const input: InitiativeUpdateCreateInput = { initiativeId };
 
         if (options.body !== undefined) {
           input.body = options.body;

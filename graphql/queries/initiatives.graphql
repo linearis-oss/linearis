@@ -110,6 +110,7 @@ query ListInitiatives(
   $includeArchived: Boolean = false
   $filter: InitiativeFilter
   $orderBy: PaginationOrderBy
+  $sort: [InitiativeSortInput!]
 ) {
   initiatives(
     first: $first
@@ -117,6 +118,7 @@ query ListInitiatives(
     includeArchived: $includeArchived
     filter: $filter
     orderBy: $orderBy
+    sort: $sort
   ) {
     nodes {
       ...InitiativeCoreFields
