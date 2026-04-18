@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import type { LinearSdkClient } from "../../client/linear-client.js";
 import { createContext } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
 import {
@@ -10,9 +11,11 @@ import {
   type InitiativeCreateInput,
   InitiativeStatus,
   type InitiativeUpdateInput,
+  type ListInitiativesQueryVariables,
   PaginationOrderBy,
 } from "../../gql/graphql.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
+import { resolveTeamId } from "../../resolvers/team-resolver.js";
 import { resolveUserId } from "../../resolvers/user-resolver.js";
 import {
   archiveInitiative,
@@ -24,13 +27,46 @@ import {
   updateInitiative,
 } from "../../services/initiative-service.js";
 
-interface InitiativeListOptions {
+interface InitiativeExpandOptions {
+  withProjects?: boolean;
+  withSubInitiatives?: boolean;
+  withParentInitiatives?: boolean;
+  withUpdates?: boolean;
+  withLinks?: boolean;
+  withHistory?: boolean;
+  withDocuments?: boolean;
+}
+
+interface InitiativeListOptions extends InitiativeExpandOptions {
   limit: string;
   after?: string;
   includeArchived?: boolean;
   sortBy?: string;
   sortOrder?: string;
+  id?: string;
+  slug?: string;
+  name?: string;
+  status?: string;
+  health?: string;
+  healthWithAge?: string;
+  owner?: string;
+  creator?: string;
+  team?: string;
+  targetAfter?: string;
+  targetBefore?: string;
+  startedAfter?: string;
+  startedBefore?: string;
+  completedAfter?: string;
+  completedBefore?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  updatedAfter?: string;
+  updatedBefore?: string;
+  parent?: string;
+  ancestor?: string;
 }
+
+interface InitiativeReadOptions extends InitiativeExpandOptions {}
 
 interface InitiativeCreateOptions {
   description?: string;
@@ -51,6 +87,16 @@ interface InitiativeUpdateOptions {
   sortOrder?: string;
 }
 
+type InitiativeSortBy =
+  | "name"
+  | "createdAt"
+  | "updatedAt"
+  | "targetDate"
+  | "health"
+  | "healthUpdatedAt"
+  | "manual"
+  | "owner";
+
 function rootOptions(command: Command): Record<string, unknown> {
   let current: Command = command;
   while (current.parent) {
@@ -68,17 +114,32 @@ function parseSortOrder(value?: string): "asc" | "desc" | undefined {
   throw invalidParameterError("--sort-order", "must be one of: asc, desc");
 }
 
-function parseOrderBy(value?: string): PaginationOrderBy | undefined {
+function parseSortBy(value?: string): InitiativeSortBy | undefined {
   if (!value) return undefined;
 
   const normalized = value.toLowerCase();
-  if (normalized === "createdat") return PaginationOrderBy.CreatedAt;
-  if (normalized === "updatedat") return PaginationOrderBy.UpdatedAt;
+
+  if (normalized === "name") return "name";
+  if (normalized === "createdat") return "createdAt";
+  if (normalized === "updatedat") return "updatedAt";
+  if (normalized === "targetdate") return "targetDate";
+  if (normalized === "health") return "health";
+  if (normalized === "healthupdatedat") return "healthUpdatedAt";
+  if (normalized === "manual") return "manual";
+  if (normalized === "owner") return "owner";
 
   throw invalidParameterError(
     "--sort-by",
-    'must be one of: "createdAt", "updatedAt"',
+    'must be one of: "name", "createdAt", "updatedAt", "targetDate", "health", "healthUpdatedAt", "manual", "owner"',
   );
+}
+
+function mapSortByToPaginationOrderBy(
+  sortBy?: InitiativeSortBy,
+): PaginationOrderBy | undefined {
+  if (sortBy === "createdAt") return PaginationOrderBy.CreatedAt;
+  if (sortBy === "updatedAt") return PaginationOrderBy.UpdatedAt;
+  return undefined;
 }
 
 function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
@@ -107,6 +168,136 @@ function parseSortOrderNumber(value?: string): number | undefined {
   return parsed;
 }
 
+function applyNullableDateRange(
+  target: { gte?: string; lte?: string },
+  after?: string,
+  before?: string,
+): void {
+  if (after !== undefined) {
+    target.gte = after;
+  }
+  if (before !== undefined) {
+    target.lte = before;
+  }
+}
+
+function acknowledgeExpandFlags(options: InitiativeExpandOptions): void {
+  // Current initiative GraphQL list/read documents are fixed selections and do not
+  // expose per-request expansion toggles, so these flags are currently accepted
+  // for CLI compatibility only.
+  void options.withProjects;
+  void options.withSubInitiatives;
+  void options.withParentInitiatives;
+  void options.withUpdates;
+  void options.withLinks;
+  void options.withHistory;
+  void options.withDocuments;
+}
+
+async function buildInitiativeFilter(
+  sdk: LinearSdkClient,
+  options: InitiativeListOptions,
+): Promise<ListInitiativesQueryVariables["filter"] | undefined> {
+  const filter: NonNullable<ListInitiativesQueryVariables["filter"]> = {};
+
+  if (options.id) {
+    filter.id = { eq: options.id };
+  }
+
+  if (options.slug) {
+    filter.slugId = { eqIgnoreCase: options.slug };
+  }
+
+  if (options.name) {
+    filter.name = { eqIgnoreCase: options.name };
+  }
+
+  const status = parseInitiativeStatus(options.status);
+  if (status) {
+    filter.status = { eq: status };
+  }
+
+  if (options.health) {
+    filter.health = { eq: options.health };
+  }
+
+  if (options.healthWithAge) {
+    filter.healthWithAge = { eq: options.healthWithAge };
+  }
+
+  if (options.owner) {
+    const ownerId = await resolveUserId(sdk, options.owner);
+    filter.owner = { id: { eq: ownerId } };
+  }
+
+  if (options.creator) {
+    const creatorId = await resolveUserId(sdk, options.creator);
+    filter.creator = { id: { eq: creatorId } };
+  }
+
+  if (options.team) {
+    const teamId = await resolveTeamId(sdk, options.team);
+    filter.teams = { some: { id: { eq: teamId } } };
+  }
+
+  if (options.targetAfter || options.targetBefore) {
+    filter.targetDate = {};
+    applyNullableDateRange(
+      filter.targetDate,
+      options.targetAfter,
+      options.targetBefore,
+    );
+  }
+
+  if (options.startedAfter || options.startedBefore) {
+    filter.startedAt = {};
+    applyNullableDateRange(
+      filter.startedAt,
+      options.startedAfter,
+      options.startedBefore,
+    );
+  }
+
+  if (options.completedAfter || options.completedBefore) {
+    filter.completedAt = {};
+    applyNullableDateRange(
+      filter.completedAt,
+      options.completedAfter,
+      options.completedBefore,
+    );
+  }
+
+  if (options.createdAfter || options.createdBefore) {
+    filter.createdAt = {};
+    applyNullableDateRange(
+      filter.createdAt,
+      options.createdAfter,
+      options.createdBefore,
+    );
+  }
+
+  if (options.updatedAfter || options.updatedBefore) {
+    filter.updatedAt = {};
+    applyNullableDateRange(
+      filter.updatedAt,
+      options.updatedAfter,
+      options.updatedBefore,
+    );
+  }
+
+  if (options.ancestor) {
+    const ancestorId = await resolveInitiativeId(sdk, options.ancestor);
+    filter.ancestors = { some: { id: { eq: ancestorId } } };
+  }
+
+  // InitiativeFilter does not currently expose a direct parent comparator, only
+  // ancestor collection matching. Keep --parent accepted for CLI compatibility,
+  // but intentionally do not forward it to GraphQL until schema support exists.
+  void options.parent;
+
+  return Object.keys(filter).length > 0 ? filter : undefined;
+}
+
 export function setupInitiativeEntityCommands(initiatives: Command): void {
   initiatives
     .command("list")
@@ -114,27 +305,64 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
     .option("--include-archived", "include archived initiatives")
-    .option("--sort-by <field>", "createdAt or updatedAt")
+    .option(
+      "--sort-by <field>",
+      "name, createdAt, updatedAt, targetDate, health, healthUpdatedAt, manual, owner",
+    )
     .option("--sort-order <order>", "asc or desc")
+    .option("--id <id>", "filter by initiative UUID")
+    .option("--slug <slug>", "filter by slug")
+    .option("--name <name>", "filter by name")
+    .option("--status <status>", "filter by status: planned, active, completed")
+    .option("--health <health>", "filter by health")
+    .option("--health-with-age <health>", "filter by health with age")
+    .option("--owner <user>", "filter by owner (name, email, or UUID)")
+    .option("--creator <user>", "filter by creator (name, email, or UUID)")
+    .option("--team <team>", "filter by team (name, key, or UUID)")
+    .option("--target-after <date>", "filter target date >= value")
+    .option("--target-before <date>", "filter target date <= value")
+    .option("--started-after <date>", "filter started date >= value")
+    .option("--started-before <date>", "filter started date <= value")
+    .option("--completed-after <date>", "filter completed date >= value")
+    .option("--completed-before <date>", "filter completed date <= value")
+    .option("--created-after <date>", "filter created date >= value")
+    .option("--created-before <date>", "filter created date <= value")
+    .option("--updated-after <date>", "filter updated date >= value")
+    .option("--updated-before <date>", "filter updated date <= value")
+    .option("--parent <initiative>", "filter by direct parent initiative")
+    .option("--ancestor <initiative>", "filter by ancestor initiative")
+    .option("--with-projects", "expand linked projects")
+    .option("--with-sub-initiatives", "expand child initiatives")
+    .option("--with-parent-initiatives", "expand parent initiatives")
+    .option("--with-updates", "expand initiative updates")
+    .option("--with-links", "expand related links")
+    .option("--with-history", "expand initiative history")
+    .option("--with-documents", "expand linked documents")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [InitiativeListOptions, Command];
         const ctx = createContext(rootOptions(command));
 
         const sortOrder = parseSortOrder(options.sortOrder);
-        const orderBy = parseOrderBy(options.sortBy);
+        const sortBy = parseSortBy(options.sortBy);
+        const orderBy = mapSortByToPaginationOrderBy(sortBy);
 
-        if (sortOrder && !orderBy) {
+        if (sortOrder && !sortBy) {
           throw invalidParameterError(
             "--sort-order",
             "requires --sort-by to be specified",
           );
         }
 
+        const filter = await buildInitiativeFilter(ctx.sdk, options);
+
+        acknowledgeExpandFlags(options);
+
         const result = await listInitiatives(ctx.gql, {
           limit: parseLimit(options.limit),
           after: options.after,
           includeArchived: options.includeArchived ?? false,
+          filter,
           orderBy,
         });
 
@@ -145,11 +373,25 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
   initiatives
     .command("read <initiative>")
     .description("get initiative details")
+    .option("--with-projects", "expand linked projects")
+    .option("--with-sub-initiatives", "expand child initiatives")
+    .option("--with-parent-initiatives", "expand parent initiatives")
+    .option("--with-updates", "expand initiative updates")
+    .option("--with-links", "expand related links")
+    .option("--with-history", "expand initiative history")
+    .option("--with-documents", "expand linked documents")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [initiative, , command] = args as [string, unknown, Command];
+        const [initiative, options, command] = args as [
+          string,
+          InitiativeReadOptions,
+          Command,
+        ];
         const ctx = createContext(rootOptions(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+
+        acknowledgeExpandFlags(options);
+
         const result = await getInitiative(ctx.gql, initiativeId);
         outputSuccess(result);
       }),

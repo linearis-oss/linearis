@@ -106,6 +106,7 @@ import { setupInitiativesCommands } from "../../../src/commands/initiatives/inde
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveInitiativeId } from "../../../src/resolvers/initiative-resolver.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
+import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createInitiativeProjectLink,
   deleteInitiativeProjectLink,
@@ -184,6 +185,32 @@ describe("initiatives list", () => {
       expect.stringContaining("Invalid --sort-order"),
     );
     expect(listInitiatives).not.toHaveBeenCalled();
+  });
+
+  it("forwards supported filters including resolved owner", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "list",
+      "--name",
+      "Growth",
+      "--owner",
+      "Alice",
+    ]);
+
+    expect(resolveUserId).toHaveBeenCalledWith(expect.anything(), "Alice");
+    expect(listInitiatives).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        filter: expect.objectContaining({
+          name: { eqIgnoreCase: "Growth" },
+          owner: { id: { eq: "resolved-user-uuid" } },
+        }),
+      }),
+    );
   });
 });
 
