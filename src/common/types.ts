@@ -1,13 +1,22 @@
 import type {
+  ArchiveInitiativeMutation,
+  ArchiveInitiativeUpdateMutation,
   AttachmentCreateMutation,
   CreateCommentMutation,
+  CreateInitiativeMutation,
+  CreateInitiativeRelationMutation,
+  CreateInitiativeToProjectMutation,
+  CreateInitiativeUpdateMutation,
   CreateIssueMutation,
   CreateIssueRelationMutation,
   CreateProjectMilestoneMutation,
   CreateProjectMutation,
+  DeleteInitiativeMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
   GetDocumentQuery,
+  GetInitiativeQuery,
+  GetInitiativeUpdateQuery,
   GetIssueByIdentifierQuery,
   GetIssueByIdentifierWithAttachmentsQuery,
   GetIssueByIdQuery,
@@ -20,9 +29,15 @@ import type {
   ListAttachmentsQuery,
   ListCommentsQuery,
   ListDocumentsQuery,
+  ListInitiativesQuery,
+  ListInitiativeUpdatesQuery,
   ListProjectMilestonesQuery,
   SearchIssuesQuery,
+  UnarchiveInitiativeMutation,
+  UnarchiveInitiativeUpdateMutation,
   UpdateCommentMutation,
+  UpdateInitiativeMutation,
+  UpdateInitiativeUpdateMutation,
   UpdateIssueMutation,
   UpdateProjectMilestoneMutation,
   UpdateProjectMutation,
@@ -97,6 +112,54 @@ export type CreatedMilestone = NonNullable<
 >;
 export type UpdatedMilestone = NonNullable<
   UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
+>;
+
+// Initiative types
+export type InitiativeListItem =
+  ListInitiativesQuery["initiatives"]["nodes"][0];
+export type InitiativeDetail = NonNullable<GetInitiativeQuery["initiative"]>;
+export type CreatedInitiative = NonNullable<
+  CreateInitiativeMutation["initiativeCreate"]["initiative"]
+>;
+export type UpdatedInitiative = NonNullable<
+  UpdateInitiativeMutation["initiativeUpdate"]["initiative"]
+>;
+export type ArchivedInitiative = NonNullable<
+  ArchiveInitiativeMutation["initiativeArchive"]["entity"]
+>;
+export type UnarchivedInitiative = NonNullable<
+  UnarchiveInitiativeMutation["initiativeUnarchive"]["entity"]
+>;
+
+export type InitiativeRelation = NonNullable<
+  CreateInitiativeRelationMutation["initiativeRelationCreate"]["initiativeRelation"]
+>;
+
+export type InitiativeProjectLink = NonNullable<
+  CreateInitiativeToProjectMutation["initiativeToProjectCreate"]["initiativeToProject"]
+>;
+
+export type DeletedInitiative = {
+  id: NonNullable<DeleteInitiativeMutation["initiativeDelete"]["entityId"]>;
+  success: true;
+};
+
+export type InitiativeUpdateListItem =
+  ListInitiativeUpdatesQuery["initiativeUpdates"]["nodes"][0];
+export type InitiativeUpdateDetail = NonNullable<
+  GetInitiativeUpdateQuery["initiativeUpdate"]
+>;
+export type CreatedInitiativeUpdate = NonNullable<
+  CreateInitiativeUpdateMutation["initiativeUpdateCreate"]["initiativeUpdate"]
+>;
+export type UpdatedInitiativeUpdate = NonNullable<
+  UpdateInitiativeUpdateMutation["initiativeUpdateUpdate"]["initiativeUpdate"]
+>;
+export type ArchivedInitiativeUpdate = NonNullable<
+  ArchiveInitiativeUpdateMutation["initiativeUpdateArchive"]["entity"]
+>;
+export type UnarchivedInitiativeUpdate = NonNullable<
+  UnarchiveInitiativeUpdateMutation["initiativeUpdateUnarchive"]["entity"]
 >;
 
 // Comment types
