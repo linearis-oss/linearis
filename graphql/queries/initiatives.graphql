@@ -6,7 +6,6 @@ fragment InitiativeCoreFields on Initiative {
   id
   name
   description
-  content
   targetDate
   sortOrder
   archivedAt
@@ -30,6 +29,7 @@ fragment InitiativeCoreFields on Initiative {
 }
 
 fragment InitiativeExpandedFields on Initiative {
+  content
   projects {
     nodes {
       id
@@ -78,6 +78,15 @@ fragment InitiativeExpandedFields on Initiative {
   }
 }
 
+fragment InitiativeNameLookupFields on Initiative {
+  id
+  name
+  owner {
+    id
+    name
+  }
+}
+
 fragment InitiativeUpdateCoreFields on InitiativeUpdate {
   id
   body
@@ -111,7 +120,6 @@ query ListInitiatives(
   ) {
     nodes {
       ...InitiativeCoreFields
-      ...InitiativeExpandedFields
     }
     pageInfo {
       hasNextPage
@@ -155,7 +163,51 @@ query GetInitiativeUpdate($id: String!) {
   }
 }
 
-query FindInitiativesByName($name: String!, $teamId: ID, $ownerId: ID) {
+query FindInitiativesByNameUnscoped($name: String!) {
+  initiatives(first: 20, filter: { name: { eqIgnoreCase: $name } }) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameInTeam($name: String!, $teamId: ID!) {
+  initiatives(
+    first: 20
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $name } }
+        { teams: { some: { id: { eq: $teamId } } } }
+      ]
+    }
+  ) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameByOwner($name: String!, $ownerId: ID!) {
+  initiatives(
+    first: 20
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $name } }
+        { owner: { id: { eq: $ownerId } } }
+      ]
+    }
+  ) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameInTeamByOwner(
+  $name: String!
+  $teamId: ID!
+  $ownerId: ID!
+) {
   initiatives(
     first: 20
     filter: {
@@ -167,24 +219,7 @@ query FindInitiativesByName($name: String!, $teamId: ID, $ownerId: ID) {
     }
   ) {
     nodes {
-      id
-      name
-      owner {
-        id
-        name
-      }
-      projects {
-        nodes {
-          id
-          teams {
-            nodes {
-              id
-              key
-              name
-            }
-          }
-        }
-      }
+      ...InitiativeNameLookupFields
     }
   }
 }
@@ -205,6 +240,10 @@ query FindInitiativeRelationByPair($parentId: String!, $childId: String!) {
       relatedInitiative {
         id
       }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -228,6 +267,10 @@ query FindInitiativeProjectLinkByPair(
       project {
         id
       }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
