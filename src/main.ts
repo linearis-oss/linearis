@@ -14,6 +14,10 @@ import {
   setupDocumentsCommands,
 } from "./commands/documents.js";
 import { FILES_META, setupFilesCommands } from "./commands/files.js";
+import {
+  INITIATIVES_META,
+  setupInitiativesCommands,
+} from "./commands/initiatives/index.js";
 import { ISSUES_META, setupIssuesCommands } from "./commands/issues.js";
 import { LABELS_META, setupLabelsCommands } from "./commands/labels.js";
 import {
@@ -48,6 +52,7 @@ const allMetas: DomainMeta[] = [
   ATTACHMENTS_META,
   TEAMS_META,
   USERS_META,
+  INITIATIVES_META,
 ];
 
 program.action(() => console.log(formatOverview(pkg.version, allMetas)));
@@ -63,6 +68,7 @@ setupFilesCommands(program);
 setupAttachmentsCommands(program);
 setupTeamsCommands(program);
 setupUsersCommands(program);
+setupInitiativesCommands(program);
 setupDocumentsCommands(program);
 
 program
