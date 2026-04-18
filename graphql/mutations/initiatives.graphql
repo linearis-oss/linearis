@@ -1,0 +1,137 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear initiative operations
+# ------------------------------------------------------------
+
+mutation CreateInitiative($input: InitiativeCreateInput!) {
+  initiativeCreate(input: $input) {
+    success
+    initiative {
+      ...InitiativeCoreFields
+      ...InitiativeExpandedFields
+    }
+  }
+}
+
+mutation UpdateInitiative($id: String!, $input: InitiativeUpdateInput!) {
+  initiativeUpdate(id: $id, input: $input) {
+    success
+    initiative {
+      ...InitiativeCoreFields
+      ...InitiativeExpandedFields
+    }
+  }
+}
+
+mutation ArchiveInitiative($id: String!) {
+  initiativeArchive(id: $id) {
+    success
+    entity {
+      ...InitiativeCoreFields
+      ...InitiativeExpandedFields
+    }
+  }
+}
+
+mutation UnarchiveInitiative($id: String!) {
+  initiativeUnarchive(id: $id) {
+    success
+    entity {
+      ...InitiativeCoreFields
+      ...InitiativeExpandedFields
+    }
+  }
+}
+
+mutation DeleteInitiative($id: String!) {
+  initiativeDelete(id: $id) {
+    success
+    entityId
+  }
+}
+
+mutation CreateInitiativeRelation($input: InitiativeRelationCreateInput!) {
+  initiativeRelationCreate(input: $input) {
+    success
+    initiativeRelation {
+      id
+      initiative {
+        id
+        name
+      }
+      relatedInitiative {
+        id
+        name
+      }
+    }
+  }
+}
+
+mutation DeleteInitiativeRelation($id: String!) {
+  initiativeRelationDelete(id: $id) {
+    success
+    entityId
+  }
+}
+
+mutation CreateInitiativeToProject($input: InitiativeToProjectCreateInput!) {
+  initiativeToProjectCreate(input: $input) {
+    success
+    initiativeToProject {
+      id
+      initiative {
+        id
+        name
+      }
+      project {
+        id
+        name
+      }
+    }
+  }
+}
+
+mutation DeleteInitiativeToProject($id: String!) {
+  initiativeToProjectDelete(id: $id) {
+    success
+    entityId
+  }
+}
+
+mutation CreateInitiativeUpdate($input: InitiativeUpdateCreateInput!) {
+  initiativeUpdateCreate(input: $input) {
+    success
+    initiativeUpdate {
+      ...InitiativeUpdateCoreFields
+    }
+  }
+}
+
+mutation UpdateInitiativeUpdate(
+  $id: String!
+  $input: InitiativeUpdateUpdateInput!
+) {
+  initiativeUpdateUpdate(id: $id, input: $input) {
+    success
+    initiativeUpdate {
+      ...InitiativeUpdateCoreFields
+    }
+  }
+}
+
+mutation ArchiveInitiativeUpdate($id: String!) {
+  initiativeUpdateArchive(id: $id) {
+    success
+    entity {
+      ...InitiativeUpdateCoreFields
+    }
+  }
+}
+
+mutation UnarchiveInitiativeUpdate($id: String!) {
+  initiativeUpdateUnarchive(id: $id) {
+    success
+    entity {
+      ...InitiativeUpdateCoreFields
+    }
+  }
+}
