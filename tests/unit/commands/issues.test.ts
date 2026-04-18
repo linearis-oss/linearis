@@ -258,7 +258,9 @@ describe("issues create numeric option validation", () => {
     ]);
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid --priority: must be an integer between 1 and 4"),
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
     );
     expect(resolveTeamId).not.toHaveBeenCalled();
     expect(createIssue).not.toHaveBeenCalled();
@@ -279,7 +281,9 @@ describe("issues create numeric option validation", () => {
     ]);
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid --estimate: must be a non-negative integer"),
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
     );
     expect(resolveTeamId).not.toHaveBeenCalled();
     expect(createIssue).not.toHaveBeenCalled();

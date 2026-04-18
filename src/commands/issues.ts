@@ -8,14 +8,10 @@ import {
 } from "../common/identifier.js";
 import type { RawFilterFlags } from "../common/issue-filter.js";
 import {
-  handleCommand,
-  outputSuccess,
-  parseLimit,
-} from "../common/output.js";
-import {
   parseEstimateOption,
   parsePriorityOption,
 } from "../common/number-options.js";
+import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
