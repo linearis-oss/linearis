@@ -41,9 +41,32 @@ describe("listInitiatives", () => {
       orderBy: { createdAt: "Asc" },
     });
   });
+
+  it("propagates GraphQL request failures", async () => {
+    const expectedError = new Error("network exploded");
+    const client = {
+      request: vi.fn().mockRejectedValue(expectedError),
+    } as unknown as GraphQLClient;
+
+    await expect(listInitiatives(client)).rejects.toBe(expectedError);
+  });
 });
 
 describe("getInitiative", () => {
+  it("returns initiative when found", async () => {
+    const client = mockGqlClient({
+      initiative: {
+        id: "init-1",
+        name: "Growth",
+      },
+    });
+
+    await expect(getInitiative(client, "init-1")).resolves.toEqual({
+      id: "init-1",
+      name: "Growth",
+    });
+  });
+
   it("throws when initiative is not found", async () => {
     const client = mockGqlClient({ initiative: null });
 
