@@ -26,6 +26,18 @@ function mockGqlClient(response: Record<string, unknown>) {
   } as unknown as GraphQLClient;
 }
 
+function mockPagedGqlClient(responses: Array<Record<string, unknown>>) {
+  const request = vi.fn();
+
+  responses.forEach((response) => {
+    request.mockResolvedValueOnce(response);
+  });
+
+  return {
+    request,
+  } as unknown as GraphQLClient;
+}
+
 describe("resolveInitiativeId", () => {
   it("returns UUID as-is", async () => {
     const sdk = mockSdkClient([]);
@@ -137,28 +149,79 @@ describe("resolveInitiativeRelationId", () => {
     );
   });
 
-  it("throws explicit truncation guard when unmatched and has next page", async () => {
-    const gql = mockGqlClient({
-      parent: { id: "parent-id" },
-      child: { id: "child-id" },
-      initiativeRelations: {
-        nodes: [
-          {
-            id: "rel-other",
-            initiative: { id: "wrong-parent" },
-            relatedInitiative: { id: "wrong-child" },
-          },
-        ],
-        pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+  it("continues pagination and finds relation on later page", async () => {
+    const gql = mockPagedGqlClient([
+      {
+        parent: { id: "parent-id" },
+        child: { id: "child-id" },
+        initiativeRelations: {
+          nodes: [
+            {
+              id: "rel-other",
+              initiative: { id: "wrong-parent" },
+              relatedInitiative: { id: "wrong-child" },
+            },
+          ],
+          pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+        },
       },
-    });
+      {
+        parent: { id: "parent-id" },
+        child: { id: "child-id" },
+        initiativeRelations: {
+          nodes: [
+            {
+              id: "rel-2",
+              initiative: { id: "parent-id" },
+              relatedInitiative: { id: "child-id" },
+            },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    ]);
 
     await expect(
       resolveInitiativeRelationId(gql, "parent-id", "child-id"),
-    ).rejects.toThrow("lookup truncated");
+    ).resolves.toBe("rel-2");
+
+    expect(gql.request).toHaveBeenNthCalledWith(1, expect.anything(), {
+      parentId: "parent-id",
+      childId: "child-id",
+      after: undefined,
+    });
+    expect(gql.request).toHaveBeenNthCalledWith(2, expect.anything(), {
+      parentId: "parent-id",
+      childId: "child-id",
+      after: "cursor-1",
+    });
+  });
+
+  it("throws when relation pair is not found after exhausting pages", async () => {
+    const gql = mockPagedGqlClient([
+      {
+        parent: { id: "parent-id" },
+        child: { id: "child-id" },
+        initiativeRelations: {
+          nodes: [],
+          pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+        },
+      },
+      {
+        parent: { id: "parent-id" },
+        child: { id: "child-id" },
+        initiativeRelations: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    ]);
+
     await expect(
       resolveInitiativeRelationId(gql, "parent-id", "child-id"),
-    ).rejects.toThrow("use UUID path or add pagination support");
+    ).rejects.toThrow(
+      'Initiative relation "between parent-id and child-id" not found',
+    );
   });
 });
 
@@ -206,27 +269,78 @@ describe("resolveInitiativeProjectLinkId", () => {
     );
   });
 
-  it("throws explicit truncation guard when unmatched and has next page", async () => {
-    const gql = mockGqlClient({
-      initiative: { id: "init-id" },
-      project: { id: "project-id" },
-      initiativeToProjects: {
-        nodes: [
-          {
-            id: "link-other",
-            initiative: { id: "wrong-init" },
-            project: { id: "wrong-project" },
-          },
-        ],
-        pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+  it("continues pagination and finds link on later page", async () => {
+    const gql = mockPagedGqlClient([
+      {
+        initiative: { id: "init-id" },
+        project: { id: "project-id" },
+        initiativeToProjects: {
+          nodes: [
+            {
+              id: "link-other",
+              initiative: { id: "wrong-init" },
+              project: { id: "wrong-project" },
+            },
+          ],
+          pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+        },
       },
-    });
+      {
+        initiative: { id: "init-id" },
+        project: { id: "project-id" },
+        initiativeToProjects: {
+          nodes: [
+            {
+              id: "link-2",
+              initiative: { id: "init-id" },
+              project: { id: "project-id" },
+            },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    ]);
 
     await expect(
       resolveInitiativeProjectLinkId(gql, "init-id", "project-id"),
-    ).rejects.toThrow("lookup truncated");
+    ).resolves.toBe("link-2");
+
+    expect(gql.request).toHaveBeenNthCalledWith(1, expect.anything(), {
+      initiativeId: "init-id",
+      projectId: "project-id",
+      after: undefined,
+    });
+    expect(gql.request).toHaveBeenNthCalledWith(2, expect.anything(), {
+      initiativeId: "init-id",
+      projectId: "project-id",
+      after: "cursor-1",
+    });
+  });
+
+  it("throws when initiative-project pair is not found after exhausting pages", async () => {
+    const gql = mockPagedGqlClient([
+      {
+        initiative: { id: "init-id" },
+        project: { id: "project-id" },
+        initiativeToProjects: {
+          nodes: [],
+          pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+        },
+      },
+      {
+        initiative: { id: "init-id" },
+        project: { id: "project-id" },
+        initiativeToProjects: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    ]);
+
     await expect(
       resolveInitiativeProjectLinkId(gql, "init-id", "project-id"),
-    ).rejects.toThrow("use UUID path or add pagination support");
+    ).rejects.toThrow(
+      'Initiative project link "between init-id and project-id" not found',
+    );
   });
 });

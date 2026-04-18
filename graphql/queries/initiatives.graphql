@@ -182,75 +182,18 @@ query FindInitiativesByName($name: String!, $teamId: ID, $ownerId: ID) {
   }
 }
 
-query FindInitiativesByNameUnscoped($name: String!) {
-  initiatives(first: 20, filter: { name: { eqIgnoreCase: $name } }) {
-    nodes {
-      ...InitiativeNameLookupFields
-    }
-  }
-}
-
-query FindInitiativesByNameInTeam($name: String!, $teamId: ID!) {
-  initiatives(
-    first: 20
-    filter: {
-      and: [
-        { name: { eqIgnoreCase: $name } }
-        { teams: { some: { id: { eq: $teamId } } } }
-      ]
-    }
-  ) {
-    nodes {
-      ...InitiativeNameLookupFields
-    }
-  }
-}
-
-query FindInitiativesByNameByOwner($name: String!, $ownerId: ID!) {
-  initiatives(
-    first: 20
-    filter: {
-      and: [
-        { name: { eqIgnoreCase: $name } }
-        { owner: { id: { eq: $ownerId } } }
-      ]
-    }
-  ) {
-    nodes {
-      ...InitiativeNameLookupFields
-    }
-  }
-}
-
-query FindInitiativesByNameInTeamByOwner(
-  $name: String!
-  $teamId: ID!
-  $ownerId: ID!
+query FindInitiativeRelationByPair(
+  $parentId: String!
+  $childId: String!
+  $after: String
 ) {
-  initiatives(
-    first: 20
-    filter: {
-      and: [
-        { name: { eqIgnoreCase: $name } }
-        { teams: { some: { id: { eq: $teamId } } } }
-        { owner: { id: { eq: $ownerId } } }
-      ]
-    }
-  ) {
-    nodes {
-      ...InitiativeNameLookupFields
-    }
-  }
-}
-
-query FindInitiativeRelationByPair($parentId: String!, $childId: String!) {
   parent: initiative(id: $parentId) {
     id
   }
   child: initiative(id: $childId) {
     id
   }
-  initiativeRelations(first: 250, includeArchived: true) {
+  initiativeRelations(first: 250, after: $after, includeArchived: true) {
     nodes {
       id
       initiative {
@@ -270,6 +213,7 @@ query FindInitiativeRelationByPair($parentId: String!, $childId: String!) {
 query FindInitiativeProjectLinkByPair(
   $initiativeId: String!
   $projectId: String!
+  $after: String
 ) {
   initiative(id: $initiativeId) {
     id
@@ -277,7 +221,7 @@ query FindInitiativeProjectLinkByPair(
   project(id: $projectId) {
     id
   }
-  initiativeToProjects(first: 250, includeArchived: true) {
+  initiativeToProjects(first: 250, after: $after, includeArchived: true) {
     nodes {
       id
       initiative {

@@ -62,37 +62,34 @@ export async function resolveInitiativeId(
   );
 }
 
-function truncatedLookupError(
-  entity: string,
-  leftId: string,
-  rightId: string,
-): Error {
-  return new Error(
-    `${entity} lookup truncated before finding a match between ${leftId} and ${rightId}; use UUID path or add pagination support`,
-  );
-}
-
 export async function resolveInitiativeRelationId(
   client: GraphQLClient,
   parentId: string,
   childId: string,
 ): Promise<string> {
-  const result = await client.request<FindInitiativeRelationByPairQuery>(
-    FindInitiativeRelationByPairDocument,
-    { parentId, childId },
-  );
+  let after: string | undefined;
 
-  const relation = result.initiativeRelations.nodes.find(
-    (node) =>
-      node.initiative.id === parentId && node.relatedInitiative.id === childId,
-  );
+  while (true) {
+    const result = await client.request<FindInitiativeRelationByPairQuery>(
+      FindInitiativeRelationByPairDocument,
+      { parentId, childId, after },
+    );
 
-  if (relation) {
-    return relation.id;
-  }
+    const relation = result.initiativeRelations.nodes.find(
+      (node) =>
+        node.initiative.id === parentId &&
+        node.relatedInitiative.id === childId,
+    );
 
-  if (result.initiativeRelations.pageInfo.hasNextPage) {
-    throw truncatedLookupError("Initiative relation", parentId, childId);
+    if (relation) {
+      return relation.id;
+    }
+
+    if (!result.initiativeRelations.pageInfo.hasNextPage) {
+      break;
+    }
+
+    after = result.initiativeRelations.pageInfo.endCursor ?? undefined;
   }
 
   throw notFoundError(
@@ -106,26 +103,28 @@ export async function resolveInitiativeProjectLinkId(
   initiativeId: string,
   projectId: string,
 ): Promise<string> {
-  const result = await client.request<FindInitiativeProjectLinkByPairQuery>(
-    FindInitiativeProjectLinkByPairDocument,
-    { initiativeId, projectId },
-  );
+  let after: string | undefined;
 
-  const link = result.initiativeToProjects.nodes.find(
-    (node) =>
-      node.initiative.id === initiativeId && node.project.id === projectId,
-  );
-
-  if (link) {
-    return link.id;
-  }
-
-  if (result.initiativeToProjects.pageInfo.hasNextPage) {
-    throw truncatedLookupError(
-      "Initiative project link",
-      initiativeId,
-      projectId,
+  while (true) {
+    const result = await client.request<FindInitiativeProjectLinkByPairQuery>(
+      FindInitiativeProjectLinkByPairDocument,
+      { initiativeId, projectId, after },
     );
+
+    const link = result.initiativeToProjects.nodes.find(
+      (node) =>
+        node.initiative.id === initiativeId && node.project.id === projectId,
+    );
+
+    if (link) {
+      return link.id;
+    }
+
+    if (!result.initiativeToProjects.pageInfo.hasNextPage) {
+      break;
+    }
+
+    after = result.initiativeToProjects.pageInfo.endCursor ?? undefined;
   }
 
   throw notFoundError(
