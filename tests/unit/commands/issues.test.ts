@@ -77,6 +77,7 @@ vi.mock("../../../src/services/issue-relation-service.js", () => ({
 }));
 
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
+import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
 import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
@@ -464,7 +465,7 @@ describe("issues update numeric option validation", () => {
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   });
 
-  it("rejects invalid --priority before service calls", async () => {
+  it("rejects invalid --priority before resolver/service calls", async () => {
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -481,10 +482,11 @@ describe("issues update numeric option validation", () => {
         "Invalid --priority: must be an integer between 1 and 4",
       ),
     );
+    expect(resolveIssueId).not.toHaveBeenCalled();
     expect(updateIssue).not.toHaveBeenCalled();
   });
 
-  it("rejects invalid --estimate before service calls", async () => {
+  it("rejects invalid --estimate before resolver/service calls", async () => {
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -501,6 +503,7 @@ describe("issues update numeric option validation", () => {
         "Invalid --estimate: must be a non-negative integer",
       ),
     );
+    expect(resolveIssueId).not.toHaveBeenCalled();
     expect(updateIssue).not.toHaveBeenCalled();
   });
 
