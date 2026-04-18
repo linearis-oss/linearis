@@ -333,7 +333,7 @@ describe("initiative updates wiring", () => {
     );
   });
 
-  it("wires updates create", async () => {
+  it("wires updates create with title positional", async () => {
     const program = createProgram();
 
     await program.parseAsync([
@@ -342,6 +342,7 @@ describe("initiative updates wiring", () => {
       "initiatives",
       "updates",
       "create",
+      "Weekly update",
       "--initiative",
       "Growth",
       "--body",
@@ -354,6 +355,7 @@ describe("initiative updates wiring", () => {
       expect.anything(),
       expect.objectContaining({
         initiativeId: "resolved-initiative-uuid",
+        title: "Weekly update",
         body: "Steady progress",
       }),
     );

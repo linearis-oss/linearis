@@ -14,10 +14,6 @@ import {
   setupDocumentsCommands,
 } from "./commands/documents.js";
 import { FILES_META, setupFilesCommands } from "./commands/files.js";
-import {
-  INITIATIVES_META,
-  setupInitiativesCommands,
-} from "./commands/initiatives/index.js";
 import { ISSUES_META, setupIssuesCommands } from "./commands/issues.js";
 import { LABELS_META, setupLabelsCommands } from "./commands/labels.js";
 import {
@@ -45,7 +41,6 @@ const allMetas: DomainMeta[] = [
   COMMENTS_META,
   LABELS_META,
   PROJECTS_META,
-  INITIATIVES_META,
   CYCLES_META,
   MILESTONES_META,
   DOCUMENTS_META,
@@ -62,7 +57,6 @@ setupIssuesCommands(program);
 setupCommentsCommands(program);
 setupLabelsCommands(program);
 setupProjectsCommands(program);
-setupInitiativesCommands(program);
 setupCyclesCommands(program);
 setupMilestonesCommands(program);
 setupFilesCommands(program);
