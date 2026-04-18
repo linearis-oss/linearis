@@ -456,6 +456,76 @@ describe("issues update --estimate", () => {
   });
 });
 
+describe("issues update numeric option validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects invalid --priority before service calls", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--priority",
+      "5",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid --estimate before service calls", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
+    );
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("maps valid numeric update options into updateIssue input", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--priority",
+      "1",
+      "--estimate",
+      "8",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ priority: 1, estimate: 8 }),
+    );
+  });
+});
+
 describe("issues update --due-date", () => {
   beforeEach(() => {
     vi.clearAllMocks();

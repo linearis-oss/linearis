@@ -610,6 +610,15 @@ export function setupIssuesCommands(program: Command): void {
           throw new Error("--label-mode must be either 'add' or 'overwrite'");
         }
 
+        const parsedPriority =
+          options.priority !== undefined
+            ? parsePriorityOption(options.priority)
+            : undefined;
+        const parsedEstimate =
+          options.estimate !== undefined
+            ? parseEstimateOption(options.estimate)
+            : undefined;
+
         const relationActions = parseRelationFlags(options);
 
         const ctx = createContext(command.parent!.parent!.opts());
@@ -647,14 +656,14 @@ export function setupIssuesCommands(program: Command): void {
           );
         }
 
-        if (options.priority) {
-          input.priority = parseInt(options.priority, 10);
+        if (parsedPriority !== undefined) {
+          input.priority = parsedPriority;
         }
 
         if (options.clearEstimate) {
           input.estimate = null;
-        } else if (options.estimate !== undefined) {
-          input.estimate = parseInt(options.estimate, 10);
+        } else if (parsedEstimate !== undefined) {
+          input.estimate = parsedEstimate;
         }
 
         if (options.assignee) {
