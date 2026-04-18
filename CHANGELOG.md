@@ -8,6 +8,37 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2026.4.5] - 2026-04-19
+
+[2026.4.5]: https://github.com/linearis-oss/linearis/compare/v2026.4.4...v2026.4.5
+
+### Added
+
+- **Initiatives domain support** — new `initiatives` command group with typed GraphQL operations, service layer CRUD/relation/project-link flows, resolver ID translation, and CLI usage metadata wiring
+- **Issue attachments management** — new `attachments` command group (`list`, `create`, `delete`) and `issues read --with-attachments` for embedded issue attachment expansion [#55](https://github.com/linearis-oss/linearis/issues/55)
+- **Reusable numeric option parsing** — shared integer parsers for issue CLI flags to standardize validation and option handling
+- **Retry backoff for transient API failures** — exponential retry delays for retryable HTTP/GraphQL failures
+
+### Fixed
+
+- Initiatives GraphQL operations now align with current schema shape and pagination behavior for relation/link lookups
+- Initiative command surface corrected for sorting and update/create signatures to match implementation constraints
+- Issue create/update now validate `--priority` and `--estimate` values early before resolver/service calls
+- Retry middleware now wraps only raw HTTP transport so retry classification inspects original status codes
+- Auth error handling now discriminates empty catch paths explicitly for safer failure reporting
+
+### CI & Build
+
+- Added CI guard preventing accidental `docs/plans/*.md` history in PR branches
+- Updated runtime dependency `@linear/sdk` to v81 and refreshed non-major dev dependencies
+
+### Testing
+
+- Expanded issue numeric validation test coverage and retry backoff timer coverage
+- Added failing/coverage tests for multi-relation and initiative service/update flows
+
+---
+
 ## [2026.4.4] - 2026-04-09
 
 [2026.4.4]: https://github.com/linearis-oss/linearis/compare/v2026.4.3...v2026.4.4
