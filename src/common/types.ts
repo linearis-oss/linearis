@@ -12,6 +12,8 @@ import type {
   CreateProjectMilestoneMutation,
   CreateProjectMutation,
   DeleteInitiativeMutation,
+  DeleteInitiativeRelationMutation,
+  DeleteInitiativeToProjectMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
   GetDocumentQuery,
@@ -141,6 +143,20 @@ export type InitiativeProjectLink = NonNullable<
 
 export type DeletedInitiative = {
   id: NonNullable<DeleteInitiativeMutation["initiativeDelete"]["entityId"]>;
+  success: true;
+};
+
+export type DeletedInitiativeRelation = {
+  id: NonNullable<
+    DeleteInitiativeRelationMutation["initiativeRelationDelete"]["entityId"]
+  >;
+  success: true;
+};
+
+export type DeletedInitiativeProjectLink = {
+  id: NonNullable<
+    DeleteInitiativeToProjectMutation["initiativeToProjectDelete"]["entityId"]
+  >;
   success: true;
 };
 
