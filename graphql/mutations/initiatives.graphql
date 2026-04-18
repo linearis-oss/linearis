@@ -1,3 +1,7 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear initiative operations
+# ------------------------------------------------------------
+
 mutation CreateInitiative($input: InitiativeCreateInput!) {
   initiativeCreate(input: $input) {
     success
@@ -21,7 +25,7 @@ mutation UpdateInitiative($id: String!, $input: InitiativeUpdateInput!) {
 mutation ArchiveInitiative($id: String!) {
   initiativeArchive(id: $id) {
     success
-    initiative {
+    entity {
       ...InitiativeCoreFields
       ...InitiativeExpandedFields
     }
@@ -31,7 +35,7 @@ mutation ArchiveInitiative($id: String!) {
 mutation UnarchiveInitiative($id: String!) {
   initiativeUnarchive(id: $id) {
     success
-    initiative {
+    entity {
       ...InitiativeCoreFields
       ...InitiativeExpandedFields
     }
@@ -50,11 +54,11 @@ mutation CreateInitiativeRelation($input: InitiativeRelationCreateInput!) {
     success
     initiativeRelation {
       id
-      parent {
+      initiative {
         id
         name
       }
-      initiative {
+      relatedInitiative {
         id
         name
       }
@@ -117,7 +121,7 @@ mutation UpdateInitiativeUpdate(
 mutation ArchiveInitiativeUpdate($id: String!) {
   initiativeUpdateArchive(id: $id) {
     success
-    initiativeUpdate {
+    entity {
       ...InitiativeUpdateCoreFields
     }
   }
@@ -126,7 +130,7 @@ mutation ArchiveInitiativeUpdate($id: String!) {
 mutation UnarchiveInitiativeUpdate($id: String!) {
   initiativeUpdateUnarchive(id: $id) {
     success
-    initiativeUpdate {
+    entity {
       ...InitiativeUpdateCoreFields
     }
   }

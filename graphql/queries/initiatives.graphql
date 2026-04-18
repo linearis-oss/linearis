@@ -1,8 +1,11 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear initiatives
+# ------------------------------------------------------------
+
 fragment InitiativeCoreFields on Initiative {
   id
   name
   description
-  content
   targetDate
   sortOrder
   archivedAt
@@ -10,10 +13,10 @@ fragment InitiativeCoreFields on Initiative {
   updatedAt
   startedAt
   completedAt
-  canceledAt
   health
   healthUpdatedAt
   status
+  slugId
   url
   creator {
     id
@@ -23,14 +26,10 @@ fragment InitiativeCoreFields on Initiative {
     id
     name
   }
-  team {
-    id
-    key
-    name
-  }
 }
 
 fragment InitiativeExpandedFields on Initiative {
+  content
   projects {
     nodes {
       id
@@ -38,7 +37,7 @@ fragment InitiativeExpandedFields on Initiative {
       slugId
     }
   }
-  initiatives {
+  subInitiatives {
     nodes {
       id
       name
@@ -50,10 +49,10 @@ fragment InitiativeExpandedFields on Initiative {
       name
     }
   }
-  updates {
+  initiativeUpdates {
     nodes {
       id
-      title
+      body
       health
       createdAt
     }
@@ -62,7 +61,7 @@ fragment InitiativeExpandedFields on Initiative {
     nodes {
       id
       url
-      title
+      label
     }
   }
   history {
@@ -79,9 +78,17 @@ fragment InitiativeExpandedFields on Initiative {
   }
 }
 
+fragment InitiativeNameLookupFields on Initiative {
+  id
+  name
+  owner {
+    id
+    name
+  }
+}
+
 fragment InitiativeUpdateCoreFields on InitiativeUpdate {
   id
-  title
   body
   health
   createdAt
@@ -102,7 +109,8 @@ query ListInitiatives(
   $after: String
   $includeArchived: Boolean = false
   $filter: InitiativeFilter
-  $orderBy: InitiativeSortInput
+  $orderBy: PaginationOrderBy
+  $sort: [InitiativeSortInput!]
 ) {
   initiatives(
     first: $first
@@ -110,10 +118,10 @@ query ListInitiatives(
     includeArchived: $includeArchived
     filter: $filter
     orderBy: $orderBy
+    sort: $sort
   ) {
     nodes {
       ...InitiativeCoreFields
-      ...InitiativeExpandedFields
     }
     pageInfo {
       hasNextPage
@@ -130,7 +138,7 @@ query GetInitiative($id: String!) {
 }
 
 query ListInitiativeUpdates(
-  $initiativeId: String!
+  $initiativeId: ID!
   $first: Int = 50
   $after: String
   $includeArchived: Boolean = false
@@ -157,45 +165,104 @@ query GetInitiativeUpdate($id: String!) {
   }
 }
 
-query FindInitiativesByName($name: String!, $teamId: String, $ownerId: String) {
+query FindInitiativesByName($name: String!, $teamId: ID, $ownerId: ID) {
   initiatives(
     first: 20
     filter: {
       and: [
         { name: { eqIgnoreCase: $name } }
-        { team: { id: { eq: $teamId } } }
+        { teams: { some: { id: { eq: $teamId } } } }
         { owner: { id: { eq: $ownerId } } }
       ]
     }
   ) {
     nodes {
-      id
-      name
-      team {
-        id
-        key
-        name
-      }
-      owner {
-        id
-        name
-      }
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameUnscoped($name: String!) {
+  initiatives(first: 20, filter: { name: { eqIgnoreCase: $name } }) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameInTeam($name: String!, $teamId: ID!) {
+  initiatives(
+    first: 20
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $name } }
+        { teams: { some: { id: { eq: $teamId } } } }
+      ]
+    }
+  ) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameByOwner($name: String!, $ownerId: ID!) {
+  initiatives(
+    first: 20
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $name } }
+        { owner: { id: { eq: $ownerId } } }
+      ]
+    }
+  ) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
+query FindInitiativesByNameInTeamByOwner(
+  $name: String!
+  $teamId: ID!
+  $ownerId: ID!
+) {
+  initiatives(
+    first: 20
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $name } }
+        { teams: { some: { id: { eq: $teamId } } } }
+        { owner: { id: { eq: $ownerId } } }
+      ]
+    }
+  ) {
+    nodes {
+      ...InitiativeNameLookupFields
     }
   }
 }
 
 query FindInitiativeRelationByPair($parentId: String!, $childId: String!) {
-  initiativeRelations(
-    first: 1
-    filter: {
-      and: [
-        { parent: { id: { eq: $parentId } } }
-        { initiative: { id: { eq: $childId } } }
-      ]
-    }
-  ) {
+  parent: initiative(id: $parentId) {
+    id
+  }
+  child: initiative(id: $childId) {
+    id
+  }
+  initiativeRelations(first: 250, includeArchived: true) {
     nodes {
       id
+      initiative {
+        id
+      }
+      relatedInitiative {
+        id
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -204,17 +271,25 @@ query FindInitiativeProjectLinkByPair(
   $initiativeId: String!
   $projectId: String!
 ) {
-  initiativeToProjects(
-    first: 1
-    filter: {
-      and: [
-        { initiative: { id: { eq: $initiativeId } } }
-        { project: { id: { eq: $projectId } } }
-      ]
-    }
-  ) {
+  initiative(id: $initiativeId) {
+    id
+  }
+  project(id: $projectId) {
+    id
+  }
+  initiativeToProjects(first: 250, includeArchived: true) {
     nodes {
       id
+      initiative {
+        id
+      }
+      project {
+        id
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
