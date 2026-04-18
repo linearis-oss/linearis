@@ -139,7 +139,7 @@ describe("initiatives list", () => {
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   });
 
-  it("parses and forwards includeArchived and sort", async () => {
+  it("parses and forwards includeArchived and supported sort", async () => {
     const program = createProgram();
 
     await program.parseAsync([
@@ -150,8 +150,6 @@ describe("initiatives list", () => {
       "--include-archived",
       "--sort-by",
       "updatedAt",
-      "--sort-order",
-      "desc",
       "--limit",
       "5",
     ]);
@@ -183,6 +181,48 @@ describe("initiatives list", () => {
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid --sort-order"),
+    );
+    expect(listInitiatives).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsupported sort-by values", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "list",
+      "--sort-by",
+      "name",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "not supported by current Linear initiatives API",
+      ),
+    );
+    expect(listInitiatives).not.toHaveBeenCalled();
+  });
+
+  it("rejects sort-order because API does not support direction", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "list",
+      "--sort-by",
+      "updatedAt",
+      "--sort-order",
+      "desc",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "is not supported by current Linear initiatives API",
+      ),
     );
     expect(listInitiatives).not.toHaveBeenCalled();
   });

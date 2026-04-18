@@ -135,11 +135,15 @@ function parseSortBy(value?: string): InitiativeSortBy | undefined {
 }
 
 function mapSortByToPaginationOrderBy(
-  sortBy?: InitiativeSortBy,
-): PaginationOrderBy | undefined {
+  sortBy: InitiativeSortBy,
+): PaginationOrderBy {
   if (sortBy === "createdAt") return PaginationOrderBy.CreatedAt;
   if (sortBy === "updatedAt") return PaginationOrderBy.UpdatedAt;
-  return undefined;
+
+  throw invalidParameterError(
+    "--sort-by",
+    `"${sortBy}" is not supported by current Linear initiatives API; supported sort fields: createdAt, updatedAt`,
+  );
 }
 
 function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
@@ -345,7 +349,6 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
         const sortOrder = parseSortOrder(options.sortOrder);
         const sortBy = parseSortBy(options.sortBy);
-        const orderBy = mapSortByToPaginationOrderBy(sortBy);
 
         if (sortOrder && !sortBy) {
           throw invalidParameterError(
@@ -353,6 +356,17 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
             "requires --sort-by to be specified",
           );
         }
+
+        if (sortOrder) {
+          throw invalidParameterError(
+            "--sort-order",
+            "is not supported by current Linear initiatives API",
+          );
+        }
+
+        const orderBy = sortBy
+          ? mapSortByToPaginationOrderBy(sortBy)
+          : undefined;
 
         const filter = await buildInitiativeFilter(ctx.sdk, options);
 
