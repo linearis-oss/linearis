@@ -26,7 +26,7 @@ import {
   type UpdateInitiativeUpdateMutation,
 } from "../gql/graphql.js";
 
-interface InitiativeUpdateListOptions {
+export interface InitiativeUpdateListOptions {
   initiativeId: string;
   limit?: number;
   after?: string;

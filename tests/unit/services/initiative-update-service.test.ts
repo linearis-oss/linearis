@@ -53,6 +53,25 @@ describe("listInitiativeUpdates", () => {
       includeArchived: true,
     });
   });
+
+  it("propagates request errors", async () => {
+    const requestError = new Error("network failure");
+    const request = vi.fn().mockRejectedValue(requestError);
+    const client = {
+      request,
+    } as unknown as GraphQLClient;
+
+    await expect(
+      listInitiativeUpdates(client, { initiativeId: "init-1" }),
+    ).rejects.toThrow(requestError);
+
+    expect(request).toHaveBeenCalledWith(ListInitiativeUpdatesDocument, {
+      initiativeId: "init-1",
+      first: 50,
+      after: undefined,
+      includeArchived: false,
+    });
+  });
 });
 
 describe("getInitiativeUpdate", () => {
