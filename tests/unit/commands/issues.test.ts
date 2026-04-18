@@ -77,6 +77,8 @@ vi.mock("../../../src/services/issue-relation-service.js", () => ({
 }));
 
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
+import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
+import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createIssue,
@@ -234,6 +236,83 @@ describe("issues create --estimate", () => {
   });
 });
 
+describe("issues create numeric option validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects invalid --priority before resolver/service calls", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Invalid priority",
+      "--team",
+      "ENG",
+      "--priority",
+      "0",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(createIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid --estimate before resolver/service calls", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Invalid estimate",
+      "--team",
+      "ENG",
+      "--estimate",
+      "-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
+    );
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(createIssue).not.toHaveBeenCalled();
+  });
+
+  it("maps valid numeric create options into createIssue input", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Valid numbers",
+      "--team",
+      "ENG",
+      "--priority",
+      "2",
+      "--estimate",
+      "3",
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ priority: 2, estimate: 3 }),
+    );
+  });
+});
+
 describe("issues create --due-date", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -375,6 +454,78 @@ describe("issues update --estimate", () => {
     ]);
 
     expect(process.exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("issues update numeric option validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("rejects invalid --priority before resolver/service calls", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--priority",
+      "5",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --priority: must be an integer between 1 and 4",
+      ),
+    );
+    expect(resolveIssueId).not.toHaveBeenCalled();
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid --estimate before resolver/service calls", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --estimate: must be a non-negative integer",
+      ),
+    );
+    expect(resolveIssueId).not.toHaveBeenCalled();
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("maps valid numeric update options into updateIssue input", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--priority",
+      "1",
+      "--estimate",
+      "8",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ priority: 1, estimate: 8 }),
+    );
   });
 });
 
