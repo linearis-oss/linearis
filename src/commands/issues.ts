@@ -7,7 +7,15 @@ import {
   parseIssueIdentifier,
 } from "../common/identifier.js";
 import type { RawFilterFlags } from "../common/issue-filter.js";
-import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import {
+  handleCommand,
+  outputSuccess,
+  parseLimit,
+} from "../common/output.js";
+import {
+  parseEstimateOption,
+  parsePriorityOption,
+} from "../common/number-options.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
@@ -429,6 +437,15 @@ export function setupIssuesCommands(program: Command): void {
 
         const relationActions = parseRelationFlags(options);
 
+        const parsedPriority =
+          options.priority !== undefined
+            ? parsePriorityOption(options.priority)
+            : undefined;
+        const parsedEstimate =
+          options.estimate !== undefined
+            ? parseEstimateOption(options.estimate)
+            : undefined;
+
         if (!options.team) {
           throw new Error("--team is required");
         }
@@ -447,12 +464,12 @@ export function setupIssuesCommands(program: Command): void {
           input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
         }
 
-        if (options.priority) {
-          input.priority = parseInt(options.priority, 10);
+        if (parsedPriority !== undefined) {
+          input.priority = parsedPriority;
         }
 
-        if (options.estimate !== undefined) {
-          input.estimate = parseInt(options.estimate, 10);
+        if (parsedEstimate !== undefined) {
+          input.estimate = parsedEstimate;
         }
 
         if (options.project) {
