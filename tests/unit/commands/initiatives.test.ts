@@ -131,6 +131,19 @@ function createProgram(): Command {
   return program;
 }
 
+describe("initiatives command registration", () => {
+  it("registers initiatives domain", () => {
+    const root = new Command();
+    root.option("--api-token <token>");
+    setupInitiativesCommands(root);
+
+    const cmd = root.commands.find(
+      (command) => command.name() === "initiatives",
+    );
+    expect(cmd).toBeDefined();
+  });
+});
+
 describe("initiatives list", () => {
   beforeEach(() => {
     vi.clearAllMocks();
