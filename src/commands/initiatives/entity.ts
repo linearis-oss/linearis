@@ -30,7 +30,17 @@ import {
   updateInitiative,
 } from "../../services/initiative-service.js";
 
-interface InitiativeListOptions {
+interface InitiativeExpandOptions {
+  withProjects?: boolean;
+  withSubInitiatives?: boolean;
+  withParentInitiatives?: boolean;
+  withUpdates?: boolean;
+  withLinks?: boolean;
+  withHistory?: boolean;
+  withDocuments?: boolean;
+}
+
+interface InitiativeListOptions extends InitiativeExpandOptions {
   limit: string;
   after?: string;
   includeArchived?: boolean;
@@ -55,8 +65,11 @@ interface InitiativeListOptions {
   createdBefore?: string;
   updatedAfter?: string;
   updatedBefore?: string;
+  parent?: string;
   ancestor?: string;
 }
+
+interface InitiativeReadOptions extends InitiativeExpandOptions {}
 
 interface InitiativeCreateOptions {
   description?: string;
@@ -207,6 +220,20 @@ function applyNullableDateRange(
   }
 }
 
+function getExpandFlags(options: InitiativeExpandOptions): string[] {
+  const map: Array<[boolean | undefined, string]> = [
+    [options.withProjects, "--with-projects"],
+    [options.withSubInitiatives, "--with-sub-initiatives"],
+    [options.withParentInitiatives, "--with-parent-initiatives"],
+    [options.withUpdates, "--with-updates"],
+    [options.withLinks, "--with-links"],
+    [options.withHistory, "--with-history"],
+    [options.withDocuments, "--with-documents"],
+  ];
+
+  return map.filter(([enabled]) => enabled).map(([, flag]) => flag);
+}
+
 async function buildInitiativeFilter(
   sdk: LinearSdkClient,
   options: InitiativeListOptions,
@@ -303,6 +330,13 @@ async function buildInitiativeFilter(
     filter.ancestors = { some: { id: { eq: ancestorId } } };
   }
 
+  if (options.parent) {
+    throw invalidParameterError(
+      "--parent",
+      "is not supported by current Linear initiatives filter API",
+    );
+  }
+
   return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
@@ -337,7 +371,21 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--created-before <date>", "filter created date <= value")
     .option("--updated-after <date>", "filter updated date >= value")
     .option("--updated-before <date>", "filter updated date <= value")
+    .option("--parent <initiative>", "filter by direct parent initiative")
     .option("--ancestor <initiative>", "filter by ancestor initiative")
+    .option("--with-projects", "include linked projects in list output")
+    .option(
+      "--with-sub-initiatives",
+      "include child initiatives in list output",
+    )
+    .option(
+      "--with-parent-initiatives",
+      "include parent initiatives in list output",
+    )
+    .option("--with-updates", "include updates in list output")
+    .option("--with-links", "include links in list output")
+    .option("--with-history", "include history in list output")
+    .option("--with-documents", "include documents in list output")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [InitiativeListOptions, Command];
@@ -345,6 +393,14 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
         const sortOrder = parseSortOrder(options.sortOrder);
         const sortBy = parseSortBy(options.sortBy);
+
+        const expandFlags = getExpandFlags(options);
+        if (expandFlags.length > 0) {
+          throw invalidParameterError(
+            "expand flags",
+            `${expandFlags.join(", ")} are not supported for initiatives list yet`,
+          );
+        }
 
         if (sortOrder && !sortBy) {
           throw invalidParameterError(
@@ -374,11 +430,32 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
   initiatives
     .command("read <initiative>")
     .description("get initiative details")
+    .option("--with-projects", "include linked projects in read output")
+    .option(
+      "--with-sub-initiatives",
+      "include child initiatives in read output",
+    )
+    .option(
+      "--with-parent-initiatives",
+      "include parent initiatives in read output",
+    )
+    .option("--with-updates", "include updates in read output")
+    .option("--with-links", "include links in read output")
+    .option("--with-history", "include history in read output")
+    .option("--with-documents", "include documents in read output")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [initiative, , command] = args as [string, unknown, Command];
+        const [initiative, options, command] = args as [
+          string,
+          InitiativeReadOptions,
+          Command,
+        ];
         const ctx = createContext(rootOptions(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+
+        // Read query already returns expanded fields. Keep flags accepted for
+        // CLI contract compatibility until conditional field selection is added.
+        void getExpandFlags(options);
 
         const result = await getInitiative(ctx.gql, initiativeId);
         outputSuccess(result);

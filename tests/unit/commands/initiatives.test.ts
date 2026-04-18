@@ -220,6 +220,41 @@ describe("initiatives list", () => {
       }),
     );
   });
+
+  it("rejects unsupported list expand flags explicitly", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "list",
+      "--with-projects",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("not supported for initiatives list yet"),
+    );
+    expect(listInitiatives).not.toHaveBeenCalled();
+  });
+
+  it("rejects --parent filter explicitly", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "list",
+      "--parent",
+      "Growth",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("--parent"),
+    );
+    expect(listInitiatives).not.toHaveBeenCalled();
+  });
 });
 
 describe("initiatives update", () => {
