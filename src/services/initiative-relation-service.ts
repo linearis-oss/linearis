@@ -12,14 +12,14 @@ import {
 
 export async function createInitiativeRelation(
   client: GraphQLClient,
-  input: { parentId: string; initiativeId: string },
+  input: { parentId: string; childId: string },
 ): Promise<InitiativeRelation> {
   const result = await client.request<CreateInitiativeRelationMutation>(
     CreateInitiativeRelationDocument,
     {
       input: {
         initiativeId: input.parentId,
-        relatedInitiativeId: input.initiativeId,
+        relatedInitiativeId: input.childId,
       },
     },
   );
@@ -29,7 +29,7 @@ export async function createInitiativeRelation(
     !result.initiativeRelationCreate.initiativeRelation
   ) {
     throw new Error(
-      `Failed to create initiative relation from "${input.parentId}" to "${input.initiativeId}"`,
+      `Failed to create initiative relation from "${input.parentId}" to "${input.childId}"`,
     );
   }
 

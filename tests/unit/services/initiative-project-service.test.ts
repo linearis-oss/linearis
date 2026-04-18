@@ -1,14 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
+  CreateInitiativeToProjectDocument,
+  DeleteInitiativeToProjectDocument,
+} from "../../../src/gql/graphql.js";
+import {
   createInitiativeProjectLink,
   deleteInitiativeProjectLink,
 } from "../../../src/services/initiative-project-service.js";
 
-function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
+function mockGqlClient(response: Record<string, unknown>): {
+  client: GraphQLClient;
+  request: ReturnType<typeof vi.fn>;
+} {
+  const request = vi.fn().mockResolvedValue(response);
   return {
-    request: vi.fn().mockResolvedValue(response),
-  } as unknown as GraphQLClient;
+    client: {
+      request,
+    } as unknown as GraphQLClient,
+    request,
+  };
 }
 
 describe("createInitiativeProjectLink", () => {
@@ -18,7 +29,7 @@ describe("createInitiativeProjectLink", () => {
       initiative: { id: "init-1", name: "Growth" },
       project: { id: "proj-1", name: "Website" },
     };
-    const client = mockGqlClient({
+    const { client, request } = mockGqlClient({
       initiativeToProjectCreate: {
         success: true,
         initiativeToProject: link,
@@ -31,10 +42,37 @@ describe("createInitiativeProjectLink", () => {
         projectId: "proj-1",
       }),
     ).resolves.toEqual(link);
+
+    expect(request).toHaveBeenCalledWith(CreateInitiativeToProjectDocument, {
+      input: {
+        initiativeId: "init-1",
+        projectId: "proj-1",
+      },
+    });
   });
 
-  it("throws when mutation success is false or payload missing", async () => {
-    const client = mockGqlClient({
+  it("throws when mutation success is false", async () => {
+    const { client } = mockGqlClient({
+      initiativeToProjectCreate: {
+        success: false,
+        initiativeToProject: {
+          id: "link-1",
+        },
+      },
+    });
+
+    await expect(
+      createInitiativeProjectLink(client, {
+        initiativeId: "init-1",
+        projectId: "proj-1",
+      }),
+    ).rejects.toThrow(
+      'Failed to create initiative-project link for initiative "init-1" and project "proj-1"',
+    );
+  });
+
+  it("throws when payload is missing", async () => {
+    const { client } = mockGqlClient({
       initiativeToProjectCreate: {
         success: true,
         initiativeToProject: null,
@@ -54,7 +92,7 @@ describe("createInitiativeProjectLink", () => {
 
 describe("deleteInitiativeProjectLink", () => {
   it("returns id and success on delete", async () => {
-    const client = mockGqlClient({
+    const { client, request } = mockGqlClient({
       initiativeToProjectDelete: {
         success: true,
         entityId: "link-1",
@@ -67,10 +105,27 @@ describe("deleteInitiativeProjectLink", () => {
       id: "link-1",
       success: true,
     });
+
+    expect(request).toHaveBeenCalledWith(DeleteInitiativeToProjectDocument, {
+      id: "link-1",
+    });
   });
 
-  it("throws when mutation success is false or payload missing", async () => {
-    const client = mockGqlClient({
+  it("throws when mutation success is false", async () => {
+    const { client } = mockGqlClient({
+      initiativeToProjectDelete: {
+        success: false,
+        entityId: "link-1",
+      },
+    });
+
+    await expect(deleteInitiativeProjectLink(client, "link-1")).rejects.toThrow(
+      'Failed to delete initiative-project link "link-1"',
+    );
+  });
+
+  it("throws when payload is missing", async () => {
+    const { client } = mockGqlClient({
       initiativeToProjectDelete: {
         success: true,
         entityId: null,
