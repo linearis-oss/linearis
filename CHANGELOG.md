@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Fixed
+
+- enforce strict team-scale estimate validation for `issues create --estimate` and `issues update --estimate`, including hard fail when team estimates are disabled (`notUsed`)
+
 ---
 
 ## [2026.4.5] - 2026-04-19
