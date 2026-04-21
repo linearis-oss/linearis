@@ -21,6 +21,39 @@ fragment TeamFields on Team {
   name
 }
 
+fragment TeamDetailFields on Team {
+  id
+  key
+  name
+  description
+  private
+  timezone
+  color
+  icon
+  issueCount
+  parent {
+    id
+    key
+    name
+  }
+  issueEstimationType
+  issueEstimationExtended
+  issueEstimationAllowZero
+  defaultIssueEstimate
+  inheritIssueEstimation
+  cyclesEnabled
+  cycleDuration
+  cycleCooldownTime
+  cycleStartDay
+  upcomingCycleCount
+  triageEnabled
+  requirePriorityToLeaveTriage
+  autoClosePeriod
+  autoArchivePeriod
+  autoCloseChildIssues
+  autoCloseParentIssues
+}
+
 # List all teams in the workspace
 #
 # Fetches a list of all teams. Teams are typically limited in number
@@ -37,5 +70,11 @@ query GetTeams($first: Int = 50, $after: String) {
       hasNextPage
       endCursor
     }
+  }
+}
+
+query GetTeamById($id: String!) {
+  team(id: $id) {
+    ...TeamDetailFields
   }
 }
