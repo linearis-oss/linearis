@@ -94,12 +94,8 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Pack and install
-        run: |
-          npm pack
-          npm install -g ./linearis-*.tgz
-          linearis --help
-          npm uninstall -g linearis
+      - name: Verify packed binaries
+        run: npm run verify:packed-binaries
 
   guard-plan-files:
     name: Reject plan files
