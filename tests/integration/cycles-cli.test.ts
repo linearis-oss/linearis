@@ -52,16 +52,16 @@ describe("Cycles CLI Commands", () => {
       expect(stderr).not.toContain("complexity");
 
       // Should return valid JSON
-      const cycles = JSON.parse(stdout);
-      expect(Array.isArray(cycles)).toBe(true);
+      const response = JSON.parse(stdout);
+      expect(Array.isArray(response.nodes)).toBe(true);
     });
 
     it.skipIf(!hasApiToken)("should return valid cycle structure", async () => {
       const { stdout } = await execAsync(`node ${CLI_PATH} cycles list`);
-      const cycles = JSON.parse(stdout);
+      const response = JSON.parse(stdout);
 
-      if (cycles.length > 0) {
-        const cycle = cycles[0];
+      if (response.nodes.length > 0) {
+        const cycle = response.nodes[0];
 
         // Verify cycle has expected fields
         expect(cycle).toHaveProperty("id");
@@ -80,19 +80,19 @@ describe("Cycles CLI Commands", () => {
       const { stdout: teamsOutput } = await execAsync(
         `node ${CLI_PATH} teams list`,
       );
-      const teams = JSON.parse(teamsOutput);
+      const teamsResponse = JSON.parse(teamsOutput);
 
-      if (teams.length > 0) {
-        const teamKey = teams[0].key;
+      if (teamsResponse.nodes.length > 0) {
+        const teamKey = teamsResponse.nodes[0].key;
 
         // Now test active filter
         const { stdout } = await execAsync(
           `node ${CLI_PATH} cycles list --active --team ${teamKey}`,
         );
-        const activeCycles = JSON.parse(stdout);
+        const activeCyclesResponse = JSON.parse(stdout);
 
         // All returned cycles should be active
-        activeCycles.forEach((cycle: { isActive: boolean }) => {
+        activeCyclesResponse.nodes.forEach((cycle: { isActive: boolean }) => {
           expect(cycle.isActive).toBe(true);
         });
       }
@@ -100,15 +100,16 @@ describe("Cycles CLI Commands", () => {
 
     it.skipIf(!hasApiToken)(
       "should work with --window flag",
+      { timeout: 30000 },
       async () => {
         // First, get a team key from teams list
         const { stdout: teamsOutput } = await execAsync(
           `node ${CLI_PATH} teams list`,
         );
-        const teams = JSON.parse(teamsOutput);
+        const teamsResponse = JSON.parse(teamsOutput);
 
-        if (teams.length > 0) {
-          const teamKey = teams[0].key;
+        if (teamsResponse.nodes.length > 0) {
+          const teamKey = teamsResponse.nodes[0].key;
 
           // Test window (may fail if no active cycle, which is ok)
           try {
@@ -119,8 +120,8 @@ describe("Cycles CLI Commands", () => {
             // Should not have complexity errors
             expect(stderr).not.toContain("query too complex");
 
-            const cycles = JSON.parse(stdout);
-            expect(Array.isArray(cycles)).toBe(true);
+            const response = JSON.parse(stdout);
+            expect(Array.isArray(response.nodes)).toBe(true);
           } catch (error: unknown) {
             // It's ok if there's no active cycle
             const execError = error as { stderr?: string };
@@ -130,7 +131,6 @@ describe("Cycles CLI Commands", () => {
           }
         }
       },
-      { timeout: 30000 },
     );
 
     it("should require --team when using --window", async () => {
@@ -151,10 +151,10 @@ describe("Cycles CLI Commands", () => {
       const { stdout: listOutput } = await execAsync(
         `node ${CLI_PATH} cycles list`,
       );
-      const cycles = JSON.parse(listOutput);
+      const cyclesResponse = JSON.parse(listOutput);
 
-      if (cycles.length > 0) {
-        const cycleId = cycles[0].id;
+      if (cyclesResponse.nodes.length > 0) {
+        const cycleId = cyclesResponse.nodes[0].id;
 
         const { stdout, stderr } = await execAsync(
           `node ${CLI_PATH} cycles read ${cycleId}`,
@@ -179,23 +179,25 @@ describe("Cycles CLI Commands", () => {
       const { stdout: teamsOutput } = await execAsync(
         `node ${CLI_PATH} teams list`,
       );
-      const teams = JSON.parse(teamsOutput);
+      const teamsResponse = JSON.parse(teamsOutput);
 
-      if (teams.length === 0) {
+      if (teamsResponse.nodes.length === 0) {
         console.log("Skipping: No teams found in workspace");
         return;
       }
 
-      const teamKey = teams[0].key;
+      const teamKey = teamsResponse.nodes[0].key;
 
       // Get cycles for this team
       const { stdout: listOutput } = await execAsync(
         `node ${CLI_PATH} cycles list --team ${teamKey}`,
       );
-      const cycles = JSON.parse(listOutput);
+      const cyclesResponse = JSON.parse(listOutput);
 
       // Find a cycle that has a name
-      const cycleWithName = cycles.find((c: { name?: string }) => c.name);
+      const cycleWithName = cyclesResponse.nodes.find(
+        (c: { name?: string }) => c.name,
+      );
 
       if (cycleWithName) {
         const cycleName = cycleWithName.name;
@@ -232,10 +234,10 @@ describe("Cycles CLI Commands", () => {
         const { stdout: teamsOutput } = await execAsync(
           `node ${CLI_PATH} teams list`,
         );
-        const teams = JSON.parse(teamsOutput);
+        const teamsResponse = JSON.parse(teamsOutput);
 
-        if (teams.length > 0) {
-          const teamKey = teams[0].key;
+        if (teamsResponse.nodes.length > 0) {
+          const teamKey = teamsResponse.nodes[0].key;
 
           try {
             await execAsync(
@@ -260,10 +262,10 @@ describe("Cycles CLI Commands", () => {
         const { stdout: teamsOutput } = await execAsync(
           `node ${CLI_PATH} teams list`,
         );
-        const teams = JSON.parse(teamsOutput);
+        const teamsResponse = JSON.parse(teamsOutput);
 
-        if (teams.length > 0) {
-          const teamKey = teams[0].key;
+        if (teamsResponse.nodes.length > 0) {
+          const teamKey = teamsResponse.nodes[0].key;
 
           try {
             await execAsync(
