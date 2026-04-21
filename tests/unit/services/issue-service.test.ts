@@ -1,21 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
+  ArchiveIssueDocument,
+  DeleteIssueDocument,
   FilteredSearchIssuesDocument,
   GetIssueByIdentifierWithAttachmentsDocument,
   GetIssueByIdWithAttachmentsDocument,
   GetIssuesDocument,
   PaginationOrderBy,
   SearchIssuesDocument,
+  UnarchiveIssueDocument,
 } from "../../../src/gql/graphql.js";
 import {
+  archiveIssue,
   createIssue,
+  deleteIssue,
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
   getIssueWithAttachments,
   listIssues,
   searchIssues,
+  unarchiveIssue,
   updateIssue,
 } from "../../../src/services/issue-service.js";
 
@@ -370,5 +376,88 @@ describe("searchIssues", () => {
       first: 25,
       after: undefined,
     });
+  });
+});
+
+describe("archiveIssue", () => {
+  it("returns archived issue entity on success", async () => {
+    const client = mockGqlClient({
+      issueArchive: {
+        success: true,
+        entity: { id: "issue-1", identifier: "ENG-1", title: "Archived" },
+      },
+    });
+
+    const result = await archiveIssue(client, "issue-1");
+
+    expect(result.id).toBe("issue-1");
+    expect(client.request).toHaveBeenCalledWith(ArchiveIssueDocument, {
+      id: "issue-1",
+    });
+  });
+
+  it("throws when archive fails", async () => {
+    const client = mockGqlClient({
+      issueArchive: { success: false, entity: null },
+    });
+
+    await expect(archiveIssue(client, "issue-1")).rejects.toThrow(
+      'Failed to archive issue "issue-1"',
+    );
+  });
+});
+
+describe("unarchiveIssue", () => {
+  it("returns unarchived issue entity on success", async () => {
+    const client = mockGqlClient({
+      issueUnarchive: {
+        success: true,
+        entity: { id: "issue-1", identifier: "ENG-1", title: "Restored" },
+      },
+    });
+
+    const result = await unarchiveIssue(client, "issue-1");
+
+    expect(result.id).toBe("issue-1");
+    expect(client.request).toHaveBeenCalledWith(UnarchiveIssueDocument, {
+      id: "issue-1",
+    });
+  });
+
+  it("throws when unarchive fails", async () => {
+    const client = mockGqlClient({
+      issueUnarchive: { success: false, entity: null },
+    });
+
+    await expect(unarchiveIssue(client, "issue-1")).rejects.toThrow(
+      'Failed to unarchive issue "issue-1"',
+    );
+  });
+});
+
+describe("deleteIssue", () => {
+  it("returns normalized delete result on success", async () => {
+    const client = mockGqlClient({
+      issueDelete: { success: true, entity: { id: "issue-1" } },
+    });
+
+    await expect(deleteIssue(client, "issue-1")).resolves.toEqual({
+      id: "issue-1",
+      success: true,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(DeleteIssueDocument, {
+      id: "issue-1",
+    });
+  });
+
+  it("throws when delete fails", async () => {
+    const client = mockGqlClient({
+      issueDelete: { success: false, entity: null },
+    });
+
+    await expect(deleteIssue(client, "issue-1")).rejects.toThrow(
+      'Failed to delete issue "issue-1"',
+    );
   });
 });
