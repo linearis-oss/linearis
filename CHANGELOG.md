@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+---
+
+## [2026.4.6] - 2026-04-21
+
+[2026.4.6]: https://github.com/linearis-oss/linearis/compare/v2026.4.5...v2026.4.6
+
 ### Fixed
 
 - enforce strict team-scale estimate validation for `issues create --estimate` and `issues update --estimate`, including hard fail when team estimates are disabled (`notUsed`)
