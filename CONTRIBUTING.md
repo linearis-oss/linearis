@@ -46,8 +46,22 @@ Integration tests (`tests/integration/`) require `LINEAR_API_TOKEN` in your envi
 To publish a new version locally (maintainers only):
 
 ```bash
-npm run release    # Runs tests, builds, and publishes via clean-publish
+npm run release    # Runs tests, builds, verifies packed binaries, and publishes via clean-publish
 ```
+
+Manual final guard (run from packed artifact/environment):
+
+```bash
+npm pack
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+npm init -y
+npm install /path/to/linearis-<version>.tgz
+npx linearis usage
+npx linear usage
+```
+
+Both commands must exit with status code 0.
 
 In CI, publishing is handled automatically by the publish workflow when a version tag is pushed. The workflow uses `clean-publish` to strip dev artifacts (scripts, devDependencies, etc.) from the published package.
 

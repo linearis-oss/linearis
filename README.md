@@ -16,6 +16,8 @@ The trade-off is coverage. An MCP exposes the entire Linear API; Linearis covers
 npm install -g linearis
 ```
 
+`linearis` is the canonical documented command; `linear` is a fully supported alias that runs the same CLI.
+
 Requires Node.js >= 22.
 
 ## Authentication
