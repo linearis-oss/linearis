@@ -12,8 +12,12 @@ import type {
   UpdatedIssue,
 } from "../common/types.js";
 import {
+  ArchiveIssueDocument,
+  type ArchiveIssueMutation,
   CreateIssueDocument,
   type CreateIssueMutation,
+  DeleteIssueDocument,
+  type DeleteIssueMutation,
   FilteredSearchIssuesDocument,
   type FilteredSearchIssuesQuery,
   GetIssueByIdDocument,
@@ -33,6 +37,8 @@ import {
   SearchIssuesDocument,
   type SearchIssuesQuery,
   type SearchIssuesQueryVariables,
+  UnarchiveIssueDocument,
+  type UnarchiveIssueMutation,
   UpdateIssueDocument,
   type UpdateIssueMutation,
 } from "../gql/graphql.js";
@@ -192,4 +198,57 @@ export async function updateIssue(
     throw new Error("Failed to update issue");
   }
   return result.issueUpdate.issue;
+}
+
+export async function archiveIssue(
+  client: GraphQLClient,
+  id: string,
+): Promise<IssueDetail> {
+  const result = await client.request<ArchiveIssueMutation>(
+    ArchiveIssueDocument,
+    { id },
+  );
+
+  if (!result.issueArchive.success || !result.issueArchive.entity) {
+    throw new Error(`Failed to archive issue "${id}"`);
+  }
+
+  return result.issueArchive.entity;
+}
+
+export async function unarchiveIssue(
+  client: GraphQLClient,
+  id: string,
+): Promise<IssueDetail> {
+  const result = await client.request<UnarchiveIssueMutation>(
+    UnarchiveIssueDocument,
+    { id },
+  );
+
+  if (!result.issueUnarchive.success || !result.issueUnarchive.entity) {
+    throw new Error(`Failed to unarchive issue "${id}"`);
+  }
+
+  return result.issueUnarchive.entity;
+}
+
+export async function deleteIssue(
+  client: GraphQLClient,
+  id: string,
+): Promise<{ id: string; success: true }> {
+  const result = await client.request<DeleteIssueMutation>(
+    DeleteIssueDocument,
+    {
+      id,
+    },
+  );
+
+  if (!result.issueDelete.success || !result.issueDelete.entity?.id) {
+    throw new Error(`Failed to delete issue "${id}"`);
+  }
+
+  return {
+    id: result.issueDelete.entity.id,
+    success: true,
+  };
 }

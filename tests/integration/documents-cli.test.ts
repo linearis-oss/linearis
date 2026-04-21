@@ -49,20 +49,20 @@ describe("Documents CLI Commands", () => {
       // Should not have errors
       expect(stderr).not.toContain("error");
 
-      // Should return valid JSON array
-      const documents = JSON.parse(stdout);
-      expect(Array.isArray(documents)).toBe(true);
+      // Should return valid JSON
+      const response = JSON.parse(stdout);
+      expect(Array.isArray(response.nodes)).toBe(true);
     });
 
     it.skipIf(!hasApiToken)(
       "should return valid document structure when documents exist",
       async () => {
         const { stdout } = await execAsync(`node ${CLI_PATH} documents list`);
-        const documents = JSON.parse(stdout);
+        const response = JSON.parse(stdout);
 
         // If there are documents, verify structure
-        if (documents.length > 0) {
-          const doc = documents[0];
+        if (response.nodes.length > 0) {
+          const doc = response.nodes[0];
           expect(doc).toHaveProperty("id");
           expect(doc).toHaveProperty("title");
           expect(doc).toHaveProperty("slugId");
@@ -136,9 +136,9 @@ describe("Documents CLI Commands", () => {
         const { stdout: teamsOutput } = await execAsync(
           `node ${CLI_PATH} teams list`,
         );
-        const teams = JSON.parse(teamsOutput);
-        expect(teams.length).toBeGreaterThan(0);
-        const teamKey = teams[0].key;
+        const teamsResponse = JSON.parse(teamsOutput);
+        expect(teamsResponse.nodes.length).toBeGreaterThan(0);
+        const teamKey = teamsResponse.nodes[0].key;
 
         // CREATE
         const { stdout: createOutput } = await execAsync(

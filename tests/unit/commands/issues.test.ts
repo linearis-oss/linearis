@@ -71,8 +71,13 @@ vi.mock("../../../src/resolvers/status-resolver.js", () => ({
 }));
 
 vi.mock("../../../src/services/issue-service.js", () => ({
+  archiveIssue: vi.fn().mockResolvedValue({ id: "resolved-issue-uuid" }),
   createIssue: vi.fn().mockResolvedValue({ id: "new-issue-id" }),
+  deleteIssue: vi
+    .fn()
+    .mockResolvedValue({ id: "resolved-issue-uuid", success: true }),
   updateIssue: vi.fn().mockResolvedValue({ id: "updated-issue-id" }),
+  unarchiveIssue: vi.fn().mockResolvedValue({ id: "resolved-issue-uuid" }),
   getIssue: vi.fn().mockResolvedValue({
     id: "resolved-issue-uuid",
     team: { id: "team-uuid", key: "ENG" },
@@ -106,11 +111,14 @@ import {
 } from "../../../src/resolvers/team-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
+  archiveIssue,
   createIssue,
+  deleteIssue,
   getIssueByIdentifierWithAttachments,
   getIssueWithAttachments,
   listIssues,
   searchIssues,
+  unarchiveIssue,
   updateIssue,
 } from "../../../src/services/issue-service.js";
 
@@ -944,6 +952,51 @@ describe("issues read --with-attachments", () => {
       expect.anything(),
       "ENG",
       42,
+    );
+  });
+});
+
+describe("issues lifecycle commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("issues archive resolves identifier and calls archiveIssue", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "archive", "ENG-42"]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(archiveIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+    );
+  });
+
+  it("issues unarchive resolves identifier and calls unarchiveIssue", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "unarchive", "ENG-42"]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(unarchiveIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+    );
+  });
+
+  it("issues delete resolves identifier and calls deleteIssue", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "delete", "ENG-42"]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(deleteIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
     );
   });
 });
