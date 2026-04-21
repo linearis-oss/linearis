@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
+import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
 import {
   isUuid,
   parseDueDate,
@@ -20,12 +21,18 @@ import {
   type IssueUpdateInput,
 } from "../gql/graphql.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
-import { resolveIssueId } from "../resolvers/issue-resolver.js";
+import {
+  resolveIssueEstimateContext,
+  resolveIssueId,
+} from "../resolvers/issue-resolver.js";
 import { resolveLabelIds } from "../resolvers/label-resolver.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveStatusId } from "../resolvers/status-resolver.js";
-import { resolveTeamId } from "../resolvers/team-resolver.js";
+import {
+  resolveTeamEstimateContext,
+  resolveTeamId,
+} from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
 import { buildIssueFilter } from "../services/issue-filter.js";
 import {
@@ -445,7 +452,26 @@ export function setupIssuesCommands(program: Command): void {
         if (!options.team) {
           throw new Error("--team is required");
         }
-        const teamId = await resolveTeamId(ctx.sdk, options.team);
+
+        const teamEstimateContext =
+          parsedEstimate !== undefined
+            ? await resolveTeamEstimateContext(ctx.sdk, options.team)
+            : undefined;
+
+        const teamId = teamEstimateContext
+          ? teamEstimateContext.teamId
+          : await resolveTeamId(ctx.sdk, options.team);
+
+        if (parsedEstimate !== undefined && teamEstimateContext) {
+          validateEstimateAgainstTeamConfig(parsedEstimate, {
+            teamKey: teamEstimateContext.teamKey,
+            issueEstimationType: teamEstimateContext.issueEstimationType,
+            issueEstimationExtended:
+              teamEstimateContext.issueEstimationExtended,
+            issueEstimationAllowZero:
+              teamEstimateContext.issueEstimationAllowZero,
+          });
+        }
 
         const input: IssueCreateInput = {
           title,
@@ -623,7 +649,25 @@ export function setupIssuesCommands(program: Command): void {
 
         const ctx = createContext(command.parent!.parent!.opts());
 
-        const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
+        const issueEstimateContext =
+          parsedEstimate !== undefined
+            ? await resolveIssueEstimateContext(ctx.sdk, issue)
+            : undefined;
+
+        const resolvedIssueId = issueEstimateContext
+          ? issueEstimateContext.issueId
+          : await resolveIssueId(ctx.sdk, issue);
+
+        if (parsedEstimate !== undefined && issueEstimateContext) {
+          validateEstimateAgainstTeamConfig(parsedEstimate, {
+            teamKey: issueEstimateContext.team.teamKey,
+            issueEstimationType: issueEstimateContext.team.issueEstimationType,
+            issueEstimationExtended:
+              issueEstimateContext.team.issueEstimationExtended,
+            issueEstimationAllowZero:
+              issueEstimateContext.team.issueEstimationAllowZero,
+          });
+        }
 
         const needsContext =
           options.status ||

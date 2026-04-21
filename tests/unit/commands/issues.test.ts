@@ -25,10 +25,29 @@ vi.mock("../../../src/resolvers/user-resolver.js", () => ({
 
 vi.mock("../../../src/resolvers/team-resolver.js", () => ({
   resolveTeamId: vi.fn().mockResolvedValue("resolved-team-uuid"),
+  resolveTeamEstimateContext: vi.fn().mockResolvedValue({
+    teamId: "resolved-team-uuid",
+    teamKey: "ENG",
+    teamName: "Engineering",
+    issueEstimationType: "fibonacci",
+    issueEstimationExtended: false,
+    issueEstimationAllowZero: false,
+  }),
 }));
 
 vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
   resolveIssueId: vi.fn().mockResolvedValue("resolved-issue-uuid"),
+  resolveIssueEstimateContext: vi.fn().mockResolvedValue({
+    issueId: "resolved-issue-uuid",
+    team: {
+      teamId: "team-uuid",
+      teamKey: "ENG",
+      teamName: "Engineering",
+      issueEstimationType: "linear",
+      issueEstimationExtended: false,
+      issueEstimationAllowZero: false,
+    },
+  }),
 }));
 
 vi.mock("../../../src/resolvers/project-resolver.js", () => ({
@@ -77,8 +96,14 @@ vi.mock("../../../src/services/issue-relation-service.js", () => ({
 }));
 
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
-import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
-import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
+import {
+  resolveIssueEstimateContext,
+  resolveIssueId,
+} from "../../../src/resolvers/issue-resolver.js";
+import {
+  resolveTeamEstimateContext,
+  resolveTeamId,
+} from "../../../src/resolvers/team-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createIssue,
@@ -197,7 +222,16 @@ describe("issues create --estimate", () => {
     );
   });
 
-  it("passes estimate 0 through to createIssue", async () => {
+  it("passes estimate 0 through to createIssue when team allows zero", async () => {
+    vi.mocked(resolveTeamEstimateContext).mockResolvedValueOnce({
+      teamId: "resolved-team-uuid",
+      teamKey: "ENG",
+      teamName: "Engineering",
+      issueEstimationType: "fibonacci",
+      issueEstimationExtended: false,
+      issueEstimationAllowZero: true,
+    });
+
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -233,6 +267,62 @@ describe("issues create --estimate", () => {
       expect.anything(),
       expect.not.objectContaining({ estimate: expect.anything() }),
     );
+  });
+
+  it("rejects create estimate outside team scale before mutation", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Strict estimate",
+      "--team",
+      "ENG",
+      "--estimate",
+      "9",
+    ]);
+
+    const outOfScaleCreateError = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+    expect(outOfScaleCreateError.error).toBe(
+      'Invalid --estimate: must be one of [1, 2, 3, 5, 8] for team "ENG" (fibonacci)',
+    );
+    expect(createIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects create estimate when team estimation disabled", async () => {
+    vi.mocked(resolveTeamEstimateContext).mockResolvedValueOnce({
+      teamId: "resolved-team-uuid",
+      teamKey: "ENG",
+      teamName: "Engineering",
+      issueEstimationType: "notUsed",
+      issueEstimationExtended: false,
+      issueEstimationAllowZero: false,
+    });
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Strict estimate",
+      "--team",
+      "ENG",
+      "--estimate",
+      "3",
+    ]);
+
+    const disabledEstimationCreateError = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+    expect(disabledEstimationCreateError.error).toBe(
+      'Invalid --estimate: team "ENG" has estimates disabled (issueEstimationType=notUsed)',
+    );
+    expect(createIssue).not.toHaveBeenCalled();
   });
 });
 
@@ -396,13 +486,13 @@ describe("issues update --estimate", () => {
       "update",
       "ENG-42",
       "--estimate",
-      "8",
+      "3",
     ]);
 
     expect(updateIssue).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-issue-uuid",
-      expect.objectContaining({ estimate: 8 }),
+      expect.objectContaining({ estimate: 3 }),
     );
   });
 
@@ -421,6 +511,45 @@ describe("issues update --estimate", () => {
       expect.anything(),
       "resolved-issue-uuid",
       expect.objectContaining({ estimate: null }),
+    );
+  });
+
+  it("rejects update estimate outside issue team scale before mutation", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "8",
+    ]);
+
+    const outOfScaleUpdateError = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+    expect(outOfScaleUpdateError.error).toBe(
+      'Invalid --estimate: must be one of [1, 2, 3, 4, 5] for team "ENG" (linear)',
+    );
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("uses issue estimate context resolver when --estimate is present", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "3",
+    ]);
+
+    expect(resolveIssueEstimateContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "ENG-42",
     );
   });
 
@@ -454,6 +583,25 @@ describe("issues update --estimate", () => {
     ]);
 
     expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("skips scale validation when --clear-estimate is used", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-estimate",
+    ]);
+
+    expect(resolveIssueEstimateContext).not.toHaveBeenCalled();
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ estimate: null }),
+    );
   });
 });
 
@@ -518,13 +666,13 @@ describe("issues update numeric option validation", () => {
       "--priority",
       "1",
       "--estimate",
-      "8",
+      "5",
     ]);
 
     expect(updateIssue).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-issue-uuid",
-      expect.objectContaining({ priority: 1, estimate: 8 }),
+      expect.objectContaining({ priority: 1, estimate: 5 }),
     );
   });
 });
