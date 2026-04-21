@@ -28,6 +28,9 @@ describe("formatOverview", () => {
     const result = formatOverview("2025.12.3", metas);
 
     expect(result).toContain("linearis v2025.12.3");
+    expect(result).toContain(
+      "alias: linear (supported alias; docs/examples use linearis)",
+    );
     expect(result).toContain("CLI for Linear.app");
     expect(result).toContain(
       "auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token",
