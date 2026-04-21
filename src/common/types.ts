@@ -27,6 +27,7 @@ import type {
   GetProjectMilestoneByIdQuery,
   GetProjectQuery,
   GetProjectsQuery,
+  GetTeamByIdQuery,
   GetViewerQuery,
   ListAttachmentsQuery,
   ListCommentsQuery,
@@ -57,6 +58,19 @@ export interface PaginationOptions {
   limit?: number;
   after?: string;
 }
+
+// Team types
+export type TeamEstimateOption = {
+  value: number;
+  label: string;
+};
+
+export type TeamEstimationSource = "self" | "parent" | "self_fallback";
+
+export type TeamDetail = NonNullable<GetTeamByIdQuery["team"]> & {
+  validEstimates: TeamEstimateOption[];
+  estimationSource: TeamEstimationSource;
+};
 
 // Issue types
 export type Issue = GetIssuesQuery["issues"]["nodes"][0];

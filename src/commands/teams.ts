@@ -2,7 +2,8 @@ import type { Command } from "commander";
 import { createContext } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import { listTeams } from "../services/team-service.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { getTeam, listTeams } from "../services/team-service.js";
 
 export const TEAMS_META: DomainMeta = {
   name: "teams",
@@ -36,6 +37,20 @@ export function setupTeamsCommands(program: Command): void {
           limit: parseLimit(options.limit),
           after: options.after,
         });
+        outputSuccess(result);
+      }),
+    );
+
+  teams
+    .command("read <team>")
+    .description("get team details")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const team = args[0] as string;
+        const command = args.at(-1) as Command;
+        const ctx = createContext(command.parent!.parent!.opts());
+        const teamId = await resolveTeamId(ctx.sdk, team);
+        const result = await getTeam(ctx.gql, { id: teamId });
         outputSuccess(result);
       }),
     );
