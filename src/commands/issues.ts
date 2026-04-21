@@ -23,11 +23,14 @@ import {
   findIssueRelation,
 } from "../services/issue-relation-service.js";
 import {
+  archiveIssue,
   createIssue,
+  deleteIssue,
   getIssue,
   getIssueByIdentifier,
   listIssues,
   searchIssues,
+  unarchiveIssue,
   updateIssue,
 } from "../services/issue-service.js";
 
@@ -92,7 +95,13 @@ export const ISSUES_META: DomainMeta = {
     issue: "issue identifier (UUID or ABC-123)",
     title: "string",
   },
-  seeAlso: ["comments create <issue>", "documents list --issue <issue>"],
+  seeAlso: [
+    "comments create <issue>",
+    "documents list --issue <issue>",
+    "issues archive <issue>",
+    "issues unarchive <issue>",
+    "issues delete <issue>",
+  ],
 };
 
 interface RelationFlags {
@@ -510,6 +519,45 @@ export function setupIssuesCommands(program: Command): void {
           await applyRelation(ctx, resolvedIssueId, relationTargetId, options);
         }
 
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("archive <issue>")
+    .description("archive an issue")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await archiveIssue(ctx.gql, issueId);
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("unarchive <issue>")
+    .description("unarchive an issue")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await unarchiveIssue(ctx.gql, issueId);
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("delete <issue>")
+    .description("delete an issue")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await deleteIssue(ctx.gql, issueId);
         outputSuccess(result);
       }),
     );
