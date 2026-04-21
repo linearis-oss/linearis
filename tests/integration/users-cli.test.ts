@@ -44,18 +44,18 @@ describe("Users CLI Commands", () => {
       expect(stderr).not.toContain("error");
 
       // Should return valid JSON
-      const users = JSON.parse(stdout);
-      expect(Array.isArray(users)).toBe(true);
+      const response = JSON.parse(stdout);
+      expect(Array.isArray(response.nodes)).toBe(true);
     });
 
     it.skipIf(!hasApiToken)("should return valid user structure", async () => {
       const { stdout } = await execAsync(`node ${CLI_PATH} users list`);
-      const users = JSON.parse(stdout);
+      const response = JSON.parse(stdout);
 
       // Should have at least one user
-      expect(users.length).toBeGreaterThan(0);
+      expect(response.nodes.length).toBeGreaterThan(0);
 
-      const user = users[0];
+      const user = response.nodes[0];
 
       // Verify user has expected fields
       expect(user).toHaveProperty("id");
@@ -69,23 +69,23 @@ describe("Users CLI Commands", () => {
       const { stdout } = await execAsync(
         `node ${CLI_PATH} users list --active`,
       );
-      const users = JSON.parse(stdout);
+      const response = JSON.parse(stdout);
 
       // All returned users should be active
-      for (const user of users) {
+      for (const user of response.nodes) {
         expect(user.active).toBe(true);
       }
     });
 
     it.skipIf(!hasApiToken)("should return users sorted by name", async () => {
       const { stdout } = await execAsync(`node ${CLI_PATH} users list`);
-      const users = JSON.parse(stdout);
+      const response = JSON.parse(stdout);
 
-      if (users.length > 1) {
+      if (response.nodes.length > 1) {
         // Verify alphabetical order
-        for (let i = 1; i < users.length; i++) {
-          const prev = users[i - 1].name.toLowerCase();
-          const curr = users[i].name.toLowerCase();
+        for (let i = 1; i < response.nodes.length; i++) {
+          const prev = response.nodes[i - 1].name.toLowerCase();
+          const curr = response.nodes[i].name.toLowerCase();
           expect(prev.localeCompare(curr)).toBeLessThanOrEqual(0);
         }
       }

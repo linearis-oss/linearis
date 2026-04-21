@@ -44,18 +44,18 @@ describe("Teams CLI Commands", () => {
       expect(stderr).not.toContain("error");
 
       // Should return valid JSON
-      const teams = JSON.parse(stdout);
-      expect(Array.isArray(teams)).toBe(true);
+      const response = JSON.parse(stdout);
+      expect(Array.isArray(response.nodes)).toBe(true);
     });
 
     it.skipIf(!hasApiToken)("should return valid team structure", async () => {
       const { stdout } = await execAsync(`node ${CLI_PATH} teams list`);
-      const teams = JSON.parse(stdout);
+      const response = JSON.parse(stdout);
 
       // Should have at least one team
-      expect(teams.length).toBeGreaterThan(0);
+      expect(response.nodes.length).toBeGreaterThan(0);
 
-      const team = teams[0];
+      const team = response.nodes[0];
 
       // Verify team has expected fields
       expect(team).toHaveProperty("id");
@@ -66,13 +66,13 @@ describe("Teams CLI Commands", () => {
 
     it.skipIf(!hasApiToken)("should return teams sorted by name", async () => {
       const { stdout } = await execAsync(`node ${CLI_PATH} teams list`);
-      const teams = JSON.parse(stdout);
+      const response = JSON.parse(stdout);
 
-      if (teams.length > 1) {
+      if (response.nodes.length > 1) {
         // Verify alphabetical order
-        for (let i = 1; i < teams.length; i++) {
-          const prev = teams[i - 1].name.toLowerCase();
-          const curr = teams[i].name.toLowerCase();
+        for (let i = 1; i < response.nodes.length; i++) {
+          const prev = response.nodes[i - 1].name.toLowerCase();
+          const curr = response.nodes[i].name.toLowerCase();
           expect(prev.localeCompare(curr)).toBeLessThanOrEqual(0);
         }
       }
