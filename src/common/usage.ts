@@ -13,6 +13,7 @@ export function formatOverview(version: string, metas: DomainMeta[]): string {
   lines.push(
     `linearis v${version} — CLI for Linear.app (project management / issue tracking)`,
   );
+  lines.push("alias: linear (supported alias; docs/examples use linearis)");
   lines.push(
     "auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token",
   );

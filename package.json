@@ -5,7 +5,8 @@
   "main": "dist/main.js",
   "type": "module",
   "bin": {
-    "linearis": "dist/main.js"
+    "linearis": "dist/main.js",
+    "linear": "dist/main.js"
   },
   "files": [
     "dist/",
@@ -31,7 +32,8 @@
     "lint:check": "biome lint .",
     "check": "biome check --write .",
     "check:ci": "biome check .",
-    "release": "npm test && npm run build && npx clean-publish --access public",
+    "verify:packed-binaries": "node scripts/verify-packed-binaries.mjs",
+    "release": "npm test && npm run build && npm run verify:packed-binaries && npx clean-publish --access public",
     "prestart": "npm run generate",
     "predev": "npm run generate",
     "prebuild": "npm run generate && npm run generate:usage",
