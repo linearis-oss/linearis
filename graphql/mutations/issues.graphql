@@ -32,3 +32,30 @@ mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
     }
   }
 }
+
+mutation ArchiveIssue($id: String!) {
+  issueArchive(id: $id) {
+    success
+    entity {
+      ...CompleteIssueWithCommentsFields
+    }
+  }
+}
+
+mutation UnarchiveIssue($id: String!) {
+  issueUnarchive(id: $id) {
+    success
+    entity {
+      ...CompleteIssueWithCommentsFields
+    }
+  }
+}
+
+mutation DeleteIssue($id: String!) {
+  issueDelete(id: $id) {
+    success
+    entity {
+      id
+    }
+  }
+}
