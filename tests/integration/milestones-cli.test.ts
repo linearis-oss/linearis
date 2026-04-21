@@ -80,6 +80,7 @@ describe("Milestones CLI Commands", () => {
 
     it.skipIf(!hasApiToken)(
       "should list milestones when project exists",
+      { timeout: 30000 },
       async () => {
         try {
           // First get a project
@@ -111,7 +112,6 @@ describe("Milestones CLI Commands", () => {
           }
         }
       },
-      { timeout: 30000 },
     );
   });
 });
