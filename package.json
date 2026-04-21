@@ -18,6 +18,7 @@
     "clean": "rm -rf dist/",
     "start": "tsx src/main.ts",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
