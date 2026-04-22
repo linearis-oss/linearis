@@ -123,6 +123,17 @@ File handling: `issues read` returns an `embeds` array with signed download URLs
 
 Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.md` so every agent session has it in context automatically.
 
+## Release Automation Policy
+
+Releases are automated by GitHub Actions via `.github/workflows/release-check.yml`.
+
+- `next` (default branch): release runs on every push (prerelease channel)
+- `main` (stable branch): release runs on weekly schedule
+- Manual `workflow_dispatch` supports releasing from either `main` or `next`
+- `CHANGELOG.md` is automation-owned and must not be edited in pull requests
+
+If a pull request branch contains `CHANGELOG.md` changes anywhere in `main...HEAD` history, CI fails and posts rebase instructions.
+
 ## Contributing
 
 Want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md).

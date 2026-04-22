@@ -39,7 +39,9 @@
     "prebuild": "npm run generate && npm run generate:usage",
     "prepare": "npm run generate && lefthook install",
     "prepack": "npm run build",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "release:dry-run": "semantic-release --dry-run --no-ci",
+    "release:run": "semantic-release"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -83,7 +85,15 @@
     "lefthook": "^2.1.0",
     "tsx": "^4.20.5",
     "typescript": "^6.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "semantic-release": "^25.0.1"
   },
   "graphql": {
     "schema": "https://api.linear.app/graphql",
