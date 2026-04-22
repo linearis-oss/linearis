@@ -88,6 +88,48 @@ describe("GraphQLClient", () => {
       }
     });
 
+    it("clears timeout timer when request succeeds before timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        mockRawRequest.mockResolvedValueOnce({ data: { ok: true } });
+
+        const client = new GraphQLClient("good-token");
+        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+          typeof client.request
+        >[0];
+
+        const result = await client.request<{ ok: boolean }>(fakeDoc);
+
+        expect(result).toEqual({ ok: true });
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("clears timeout timer on non-retryable GraphQL error", async () => {
+      vi.useFakeTimers();
+      try {
+        mockRawRequest.mockRejectedValueOnce({
+          response: {
+            errors: [{ message: "Entity not found" }],
+          },
+        });
+
+        const client = new GraphQLClient("good-token");
+        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+          typeof client.request
+        >[0];
+
+        await expect(client.request(fakeDoc)).rejects.toThrow(
+          "Entity not found",
+        );
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("retries on 429 and succeeds on next attempt", async () => {
       const rateLimitError = { response: { status: 429 } };
       mockRawRequest
@@ -100,13 +142,41 @@ describe("GraphQLClient", () => {
       >[0];
 
       vi.useFakeTimers();
-      const promise = client.request(fakeDoc);
-      await vi.runAllTimersAsync();
-      const result = await promise;
+      try {
+        const promise = client.request(fakeDoc);
+        await vi.runAllTimersAsync();
+        const result = await promise;
 
-      expect(result).toEqual({ foo: "bar" });
-      expect(mockRawRequest).toHaveBeenCalledTimes(2);
-      vi.useRealTimers();
+        expect(result).toEqual({ foo: "bar" });
+        expect(mockRawRequest).toHaveBeenCalledTimes(2);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("clears timeout timers across retry attempts", async () => {
+      vi.useFakeTimers();
+      try {
+        const rateLimitError = { response: { status: 429 } };
+        mockRawRequest
+          .mockRejectedValueOnce(rateLimitError)
+          .mockResolvedValueOnce({ data: { foo: "bar" } });
+
+        const client = new GraphQLClient("good-token");
+        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+          typeof client.request
+        >[0];
+
+        const promise = client.request(fakeDoc);
+        await vi.runAllTimersAsync();
+
+        await expect(promise).resolves.toEqual({ foo: "bar" });
+        expect(mockRawRequest).toHaveBeenCalledTimes(2);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
