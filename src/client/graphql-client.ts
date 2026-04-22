@@ -14,17 +14,24 @@ interface GraphQLErrorResponse {
 }
 
 export class GraphQLClient {
-  private rawClient: InstanceType<typeof LinearClient>["client"];
+  private readonly apiToken: string;
 
   constructor(apiToken: string) {
+    this.apiToken = apiToken;
+  }
+
+  private createRawClient(
+    signal?: AbortSignal,
+  ): InstanceType<typeof LinearClient>["client"] {
     const linearClient = new LinearClient({
-      apiKey: apiToken,
+      apiKey: this.apiToken,
+      signal,
       headers: {
         // Request 1-hour signed URLs for file downloads (see file-service.ts)
         "public-file-urls-expire-in": "3600",
       },
     });
-    this.rawClient = linearClient.client;
+    return linearClient.client;
   }
 
   async request<TResult>(
@@ -33,24 +40,26 @@ export class GraphQLClient {
   ): Promise<TResult> {
     try {
       const response = await withRetry(async () => {
-        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+        const timeoutController = new AbortController();
+        const timeoutHandle = setTimeout(() => {
+          timeoutController.abort();
+        }, REQUEST_TIMEOUT_MS);
 
         try {
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            timeoutHandle = setTimeout(
-              () => reject(new Error("Request timed out")),
-              REQUEST_TIMEOUT_MS,
-            );
-          });
-
-          return await Promise.race([
-            this.rawClient.rawRequest(print(document), variables),
-            timeoutPromise,
-          ]);
-        } finally {
-          if (timeoutHandle !== undefined) {
-            clearTimeout(timeoutHandle);
+          return await this.createRawClient(
+            timeoutController.signal,
+          ).rawRequest(print(document), variables);
+        } catch (error: unknown) {
+          if (
+            timeoutController.signal.aborted &&
+            error instanceof Error &&
+            error.message.toLowerCase().includes("aborted")
+          ) {
+            throw new Error("Request timed out");
           }
+          throw error;
+        } finally {
+          clearTimeout(timeoutHandle);
         }
       });
       return response.data as TResult;
