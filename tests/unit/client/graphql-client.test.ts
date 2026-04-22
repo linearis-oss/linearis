@@ -169,7 +169,9 @@ describe("GraphQLClient", () => {
         >[0];
 
         const promise = client.request(fakeDoc);
-        await vi.runAllTimersAsync();
+
+        // Advance only the first retry backoff (500ms), without draining unrelated timers.
+        await vi.advanceTimersByTimeAsync(500);
 
         await expect(promise).resolves.toEqual({ foo: "bar" });
         expect(mockRawRequest).toHaveBeenCalledTimes(2);
