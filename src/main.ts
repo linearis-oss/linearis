@@ -92,4 +92,5 @@ program
     }
   });
 
+program.hook("postAction", () => process.exit(0));
 program.parse();
