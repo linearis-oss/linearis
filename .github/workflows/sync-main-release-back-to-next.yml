@@ -1,0 +1,51 @@
+name: Sync main release back to next
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-main-release-back-to-next
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: ${{ github.event.release.prerelease == false && github.event.release.target_commitish == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout next
+        uses: actions/checkout@v6
+        with:
+          ref: next
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge main into next
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main next
+          git checkout next
+
+          if git merge --ff-only origin/main; then
+            git push origin HEAD:next
+            echo "Synced main release commit(s) back to next (fast-forward)"
+            exit 0
+          fi
+
+          if git merge --no-ff origin/main -m "chore(sync): merge main release back into next"; then
+            git push origin HEAD:next
+            echo "Synced main release commit(s) back to next (merge commit)"
+            exit 0
+          fi
+
+          echo "::error::Automatic merge main -> next failed. Resolve conflicts manually."
+          exit 1

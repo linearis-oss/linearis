@@ -1,0 +1,98 @@
+name: Promote next to main
+
+on:
+  push:
+    branches:
+      - next
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: promote-next-to-main
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    if: ${{ github.event_name != 'release' || (github.event.release.prerelease == true && github.event.release.target_commitish == 'next') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: next
+          fetch-depth: 0
+
+      - name: Fetch main and next refs
+        run: git fetch origin main next
+
+      - name: Build PR metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version=$(node -p "require('./package.json').version.replace(/-next\\.\\d+$/, '')")
+          title="release ${version} to stable channel"
+          compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/main...next"
+
+          commits=$(git log --no-merges --pretty='- %h %s' origin/main..origin/next | head -n 200)
+          if [ -z "$commits" ]; then
+            commits="- (no new commits; branches currently aligned)"
+          fi
+
+          {
+            echo "title=$title"
+            echo "version=$version"
+            echo "compare_url=$compare_url"
+            echo "body<<EOF"
+            echo "## Purpose"
+            echo "Promote tested prerelease changes from \\`next\\` into stable channel on \\`main\\`."
+            echo
+            echo "## Target stable version"
+            echo "\\`$version\\`"
+            echo
+            echo "## Included commits (next ahead of main)"
+            echo "$commits"
+            echo
+            echo "## Compare"
+            echo "$compare_url"
+            echo
+            echo "## Notes"
+            echo "- This PR is auto-maintained on every push to \\`next\\`."
+            echo "- Merge this PR to promote current prerelease train to stable."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upsert promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing=$(gh pr list \
+            --state open \
+            --base main \
+            --head next \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" \
+              --title "${{ steps.meta.outputs.title }}" \
+              --body "${{ steps.meta.outputs.body }}"
+            echo "Updated PR #$existing"
+          else
+            gh pr create \
+              --base main \
+              --head next \
+              --title "${{ steps.meta.outputs.title }}" \
+              --body "${{ steps.meta.outputs.body }}"
+            echo "Created promotion PR"
+          fi
