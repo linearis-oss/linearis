@@ -112,7 +112,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          plan_files=$(git log main...HEAD \
+          base_ref="origin/${GITHUB_BASE_REF:-main}"
+          plan_files=$(git log "$base_ref"...HEAD \
             --diff-filter=A --name-only --pretty=format: \
             -- 'docs/plans/*.md' | sed '/^$/d')
 
@@ -140,3 +141,37 @@ jobs:
             exit 1
           fi
           echo "No plan files found — OK"
+
+  guard-changelog-history:
+    name: Guard CHANGELOG history in PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect CHANGELOG.md in branch history
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_HEAD_REF:-}" = "next" ] && [ "${GITHUB_BASE_REF:-}" = "main" ]; then
+            echo "Promotion PR next -> main detected. Skipping changelog history guard."
+            exit 0
+          fi
+
+          base_ref="origin/${GITHUB_BASE_REF:-main}"
+          output=$(git log "$base_ref"...HEAD --name-status --pretty=format: -- CHANGELOG.md | sed '/^$/d')
+
+          if [ -n "$output" ]; then
+            echo "::error::CHANGELOG.md is release-workflow-owned and must not appear in PR branch history"
+            echo "Drop or amend commits that touch CHANGELOG.md, then push with --force-with-lease"
+            echo
+            echo "$output"
+            exit 1
+          fi
+
+          echo "No CHANGELOG.md history violations — OK"
