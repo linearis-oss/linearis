@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { verifyRelease } from "../../../scripts/release/calver-plugin.cjs";
 
 describe("calver plugin", () => {
-  it("sets nextRelease.version in verifyRelease", async () => {
+  it("sets nextRelease.version in verifyRelease for main", async () => {
     expect(verifyRelease).toBeTypeOf("function");
 
     vi.useFakeTimers();
@@ -20,6 +20,27 @@ describe("calver plugin", () => {
     expect(context.nextRelease.version).toBe("2026.4.6");
     expect(context.logger.log).toHaveBeenCalledWith(
       "calver-plugin: forcing next release version to 2026.4.6",
+    );
+
+    vi.useRealTimers();
+  });
+
+  it("increments prerelease counter on next branch", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-20T10:00:00.000Z"));
+
+    const context = {
+      lastRelease: { version: "2026.4.6-next.2" },
+      branch: { name: "next" },
+      logger: { log: vi.fn<(message: string) => void>() },
+      nextRelease: { version: "0.0.0" },
+    };
+
+    await verifyRelease({}, context);
+
+    expect(context.nextRelease.version).toBe("2026.4.6-next.3");
+    expect(context.logger.log).toHaveBeenCalledWith(
+      "calver-plugin: forcing next release version to 2026.4.6-next.3",
     );
 
     vi.useRealTimers();

@@ -22,9 +22,9 @@ describe("computeCalverVersion", () => {
     expect(next).toBe("2026.5.1");
   });
 
-  it("creates prerelease on next branch", () => {
+  it("creates first prerelease from stable version on next branch", () => {
     const next = computeCalverVersion({
-      lastVersion: "2026.4.5-next.2",
+      lastVersion: "2026.4.5",
       branchName: "next",
       nowIso: "2026-04-20T10:00:00.000Z",
     });
@@ -32,9 +32,19 @@ describe("computeCalverVersion", () => {
     expect(next).toBe("2026.4.6-next.1");
   });
 
-  it("resets next prerelease counter on month rollover", () => {
+  it("increments next prerelease counter without bumping patch", () => {
     const next = computeCalverVersion({
-      lastVersion: "2026.4.5-next.9",
+      lastVersion: "2026.4.6-next.2",
+      branchName: "next",
+      nowIso: "2026-04-20T10:00:00.000Z",
+    });
+
+    expect(next).toBe("2026.4.6-next.3");
+  });
+
+  it("resets next prerelease train on month rollover", () => {
+    const next = computeCalverVersion({
+      lastVersion: "2026.4.6-next.9",
       branchName: "next",
       nowIso: "2026-05-01T00:00:00.000Z",
     });

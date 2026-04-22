@@ -15,6 +15,7 @@ function parseLastVersion(lastVersion, branchName) {
         month: Number(nextMatch[2]),
         patch: Number(nextMatch[3]),
         nextCounter: Number(nextMatch[4]),
+        fromPrerelease: true,
       };
     }
   }
@@ -31,6 +32,7 @@ function parseLastVersion(lastVersion, branchName) {
     month: Number(mainMatch[2]),
     patch: Number(mainMatch[3]),
     nextCounter: 0,
+    fromPrerelease: false,
   };
 }
 
@@ -39,14 +41,19 @@ function computeCalverVersion({ lastVersion, branchName, nowIso }) {
   const last = parseLastVersion(lastVersion, branchName);
 
   const sameMonth = last.year === now.year && last.month === now.month;
-  const patch = sameMonth ? last.patch + 1 : 1;
-  const base = `${now.year}.${now.month}.${patch}`;
 
   if (branchName === "next") {
-    return `${base}-next.1`;
+    if (!sameMonth) {
+      return `${now.year}.${now.month}.1-next.1`;
+    }
+
+    const patch = last.fromPrerelease ? last.patch : last.patch + 1;
+    const counter = last.fromPrerelease ? last.nextCounter + 1 : 1;
+    return `${now.year}.${now.month}.${patch}-next.${counter}`;
   }
 
-  return base;
+  const patch = sameMonth ? last.patch + 1 : 1;
+  return `${now.year}.${now.month}.${patch}`;
 }
 
 module.exports = {
