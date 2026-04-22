@@ -1,4 +1,7 @@
 module.exports = {
+  repositoryUrl:
+    process.env.SEMANTIC_RELEASE_REPOSITORY_URL ??
+    "git@github.com:linearis-oss/linearis.git",
   branches: ["main", { name: "next", prerelease: "next" }],
   tagFormat: `v\${version}`,
   plugins: [

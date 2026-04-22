@@ -22,9 +22,12 @@ jobs:
         with:
           ref: next
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+          persist-credentials: false
 
       - name: Configure git
         run: |
+          git remote set-url origin git@github.com:${GITHUB_REPOSITORY}.git
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
