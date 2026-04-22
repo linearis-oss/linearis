@@ -32,17 +32,27 @@ export class GraphQLClient {
     variables?: Record<string, unknown>,
   ): Promise<TResult> {
     try {
-      const response = await withRetry(() =>
-        Promise.race([
-          this.rawClient.rawRequest(print(document), variables),
-          new Promise<never>((_, reject) =>
-            setTimeout(
+      const response = await withRetry(async () => {
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(
               () => reject(new Error("Request timed out")),
               REQUEST_TIMEOUT_MS,
-            ),
-          ),
-        ]),
-      );
+            );
+          });
+
+          return await Promise.race([
+            this.rawClient.rawRequest(print(document), variables),
+            timeoutPromise,
+          ]);
+        } finally {
+          if (timeoutHandle !== undefined) {
+            clearTimeout(timeoutHandle);
+          }
+        }
+      });
       return response.data as TResult;
     } catch (error: unknown) {
       const gqlError = error as GraphQLErrorResponse;
