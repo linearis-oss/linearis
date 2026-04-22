@@ -8,6 +8,16 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2026.4.7] - 2026-04-22
+
+[2026.4.7]: https://github.com/linearis-oss/linearis/compare/v2026.4.6...v2026.4.7
+
+### Fixed
+
+- Process now exits immediately after command completion to prevent hanging runs in automation workflows — thanks, [@eveld](https://github.com/eveld)! [PR#156](https://github.com/linearis-oss/linearis/pull/156)
+
+---
+
 ## [2026.4.6] - 2026-04-21
 
 [2026.4.6]: https://github.com/linearis-oss/linearis/compare/v2026.4.5...v2026.4.6
