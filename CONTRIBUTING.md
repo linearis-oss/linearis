@@ -43,27 +43,19 @@ Integration tests (`tests/integration/`) require `LINEAR_API_TOKEN` in your envi
 
 ## Publishing
 
-To publish a new version locally (maintainers only):
+Publishing is fully automated by the `Release` workflow (`.github/workflows/release-check.yml`).
 
-```bash
-npm run release    # Runs tests, builds, verifies packed binaries, and publishes via clean-publish
-```
+- `next` (default branch): releases run on every push (prerelease channel)
+- `main` (stable branch): releases run on weekly schedule
+- Can be started manually with `workflow_dispatch` for either branch
+- Executes build/test/lint/type-check gates before release
+- Uses semantic-release to decide if a release is required
+- Publishes npm package, creates tag, and creates GitHub release when releasable commits exist
 
-Manual final guard (run from packed artifact/environment):
+### Changelog ownership
 
-```bash
-npm pack
-TMP_DIR=$(mktemp -d)
-cd "$TMP_DIR"
-npm init -y
-npm install /path/to/linearis-<version>.tgz
-npx linearis usage
-npx linear usage
-```
-
-Both commands must exit with status code 0.
-
-In CI, publishing is handled automatically by the publish workflow when a version tag is pushed. The workflow uses `clean-publish` to strip dev artifacts (scripts, devDependencies, etc.) from the published package.
+`CHANGELOG.md` is release-workflow-owned. Do not edit it in feature/fix PRs.
+If CI reports changelog history violations, rebase on `main` and drop/amend commits that touched `CHANGELOG.md`.
 
 ## Pull Requests
 
