@@ -37,7 +37,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          version=$(node -p "require('./package.json').version.replace(/-next\\.\\d+$/, '')")
+          latest_next_tag=$(git tag --list 'v*-next.*' --sort=-v:refname | head -n 1)
+          if [ -n "$latest_next_tag" ]; then
+            version=${latest_next_tag#v}
+            version=${version%-next.*}
+          else
+            version=$(node -p "require('./package.json').version.replace(/-next\\.\\d+$/, '')")
+          fi
+
           title="release ${version} to stable channel"
           compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/main...next"
 
