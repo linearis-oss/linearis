@@ -5,7 +5,27 @@ module.exports = {
   branches: ["main", { name: "next", prerelease: "next" }],
   tagFormat: `v\${version}`,
   plugins: [
-    ["@semantic-release/commit-analyzer", { preset: "conventionalcommits" }],
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        preset: "conventionalcommits",
+        releaseRules: [
+          // Calver plugin controls final version string.
+          // Custom rules here only suppress non-deliverable commits.
+          // Releasable commits (feat/fix/perf/revert/breaking) follow default analyzer rules.
+          { type: "refactor", release: false },
+          { type: "chore", release: false },
+          { type: "ci", release: false },
+          { type: "docs", release: false },
+          { type: "style", release: false },
+          { type: "test", release: false },
+          { type: "build", release: false },
+          { scope: "ci", release: false },
+          { scope: "release", release: false },
+          { scope: "workflow", release: false },
+        ],
+      },
+    ],
     [
       "@semantic-release/release-notes-generator",
       { preset: "conventionalcommits" },
