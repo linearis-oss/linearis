@@ -1,3 +1,16 @@
+## [2026.5.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.6...v2026.5.0-next.1) (2026-04-23)
+
+### Features
+
+* **labels:** add project label listing support ([99b8288](https://github.com/linearis-oss/linearis/commit/99b82882d96ec100a11165752d2e2ba403642eb6)), closes [#115](https://github.com/linearis-oss/linearis/issues/115)
+
+### Bug Fixes
+
+* **ci:** avoid bash regex parser error in promotion metadata ([b42b0c2](https://github.com/linearis-oss/linearis/commit/b42b0c276871055f6ad1ff43cc8b8fa1373b0341))
+* **release:** classify promotion PR content by releasability ([a54ad22](https://github.com/linearis-oss/linearis/commit/a54ad225f361d504ba265f882bbea01a68dd2c8a))
+* **release:** gate version bumps to deliverable-impact commits ([3744496](https://github.com/linearis-oss/linearis/commit/3744496dd88963333db00896019e9763660bf2bd))
+* **release:** rely on defaults for releasable commit types ([4d3c0ad](https://github.com/linearis-oss/linearis/commit/4d3c0ad417ea0d98aa086ff3a821de170c348500))
+
 ## [2026.4.8-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.5...v2026.4.8-next.6) (2026-04-23)
 
 ### Bug Fixes
