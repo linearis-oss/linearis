@@ -134,12 +134,12 @@ export async function deleteProject(
     { id },
   );
 
-  if (!result.projectDelete.success || !result.projectDelete.entity) {
+  if (!result.projectDelete.success) {
     throw new Error(`Failed to delete project "${id}"`);
   }
 
   return {
-    id: result.projectDelete.entity.id,
+    id: result.projectDelete.entity?.id ?? id,
     success: true,
   };
 }

@@ -368,6 +368,17 @@ describe("deleteProject", () => {
     });
   });
 
+  it("returns the requested id when delete succeeds with null entity", async () => {
+    const client = mockGqlClient({
+      projectDelete: { success: true, entity: null },
+    });
+
+    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+      id: "proj-1",
+      success: true,
+    });
+  });
+
   it("throws on failure", async () => {
     const client = mockGqlClient({
       projectDelete: { success: false, entity: null },

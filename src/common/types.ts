@@ -15,7 +15,6 @@ import type {
   DeleteInitiativeMutation,
   DeleteInitiativeRelationMutation,
   DeleteInitiativeToProjectMutation,
-  DeleteProjectMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
   GetDocumentQuery,
@@ -151,7 +150,7 @@ export type UnarchivedProject = NonNullable<
   UnarchiveProjectMutation["projectUnarchive"]["entity"]
 >;
 export type DeletedProject = {
-  id: NonNullable<DeleteProjectMutation["projectDelete"]["entity"]>["id"];
+  id: string;
   success: true;
 };
 
