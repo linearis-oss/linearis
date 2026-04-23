@@ -21,8 +21,10 @@ import type {
   GetInitiativeUpdateQuery,
   GetIssueByIdentifierQuery,
   GetIssueByIdentifierWithAttachmentsQuery,
+  GetIssueByIdentifierWithCommentsQuery,
   GetIssueByIdQuery,
   GetIssueByIdWithAttachmentsQuery,
+  GetIssueByIdWithCommentsQuery,
   GetIssuesQuery,
   GetProjectMilestoneByIdQuery,
   GetProjectQuery,
@@ -76,6 +78,29 @@ export type TeamDetail = NonNullable<GetTeamByIdQuery["team"]> & {
 export type Issue = GetIssuesQuery["issues"]["nodes"][0];
 export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
 export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
+export type IssueDetailWithComments = NonNullable<
+  GetIssueByIdWithCommentsQuery["issue"]
+>;
+export type IssueByIdentifierWithComments =
+  GetIssueByIdentifierWithCommentsQuery["issues"]["nodes"][0];
+export type IssueComment = NonNullable<
+  NonNullable<IssueDetailWithComments["comments"]>["nodes"][0]
+>;
+export type IssueCommentThread = IssueComment & {
+  replies: IssueCommentThread[];
+};
+export type IssueDetailWithCommentThreads = Omit<
+  IssueDetailWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
+export type IssueByIdentifierWithCommentThreads = Omit<
+  IssueByIdentifierWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
 export type IssueDetailWithAttachments = NonNullable<
   GetIssueByIdWithAttachmentsQuery["issue"]
 >;

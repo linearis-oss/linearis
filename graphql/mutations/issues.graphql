@@ -14,7 +14,7 @@ mutation CreateIssue($input: IssueCreateInput!) {
   issueCreate(input: $input) {
     success
     issue {
-      ...CompleteIssueWithCommentsFields
+      ...CompleteIssueWithDefaultCommentsFields
     }
   }
 }
@@ -28,7 +28,7 @@ mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
   issueUpdate(id: $id, input: $input) {
     success
     issue {
-      ...CompleteIssueWithCommentsFields
+      ...CompleteIssueWithDefaultCommentsFields
     }
   }
 }
@@ -37,7 +37,7 @@ mutation ArchiveIssue($id: String!) {
   issueArchive(id: $id) {
     success
     entity {
-      ...CompleteIssueWithCommentsFields
+      ...CompleteIssueWithDefaultCommentsFields
     }
   }
 }
@@ -46,7 +46,7 @@ mutation UnarchiveIssue($id: String!) {
   issueUnarchive(id: $id) {
     success
     entity {
-      ...CompleteIssueWithCommentsFields
+      ...CompleteIssueWithDefaultCommentsFields
     }
   }
 }

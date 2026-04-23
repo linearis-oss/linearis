@@ -47,7 +47,11 @@ import {
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
+  getIssueByIdentifierWithComments,
+  getIssueByIdentifierWithCommentThreads,
   getIssueWithAttachments,
+  getIssueWithComments,
+  getIssueWithCommentThreads,
   listIssues,
   searchIssues,
   unarchiveIssue,
@@ -104,6 +108,12 @@ interface UpdateOptions {
   relatesTo?: string;
   duplicateOf?: string;
   removeRelation?: string;
+}
+
+interface ReadOptions {
+  withAttachments?: boolean;
+  withComments?: boolean;
+  withCommentThreads?: boolean;
 }
 
 export const ISSUES_META: DomainMeta = {
@@ -375,6 +385,11 @@ export function setupIssuesCommands(program: Command): void {
     .command("read <issue>")
     .description("get full issue details including description")
     .option("--with-attachments", "include issue attachments")
+    .option("--with-comments", "include full issue comments")
+    .option(
+      "--with-comment-threads",
+      "group issue comments into root comments with replies",
+    )
     .addHelpText(
       "after",
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
@@ -383,7 +398,7 @@ export function setupIssuesCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [issue, options, command] = args as [
           string,
-          { withAttachments?: boolean },
+          ReadOptions,
           Command,
         ];
         const ctx = createContext(command.parent!.parent!.opts());
@@ -401,7 +416,42 @@ export function setupIssuesCommands(program: Command): void {
             );
             outputSuccess(result);
           }
-        } else if (isUuid(issue)) {
+          return;
+        }
+
+        if (options.withCommentThreads) {
+          if (isUuid(issue)) {
+            const result = await getIssueWithCommentThreads(ctx.gql, issue);
+            outputSuccess(result);
+          } else {
+            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+            const result = await getIssueByIdentifierWithCommentThreads(
+              ctx.gql,
+              teamKey,
+              issueNumber,
+            );
+            outputSuccess(result);
+          }
+          return;
+        }
+
+        if (options.withComments) {
+          if (isUuid(issue)) {
+            const result = await getIssueWithComments(ctx.gql, issue);
+            outputSuccess(result);
+          } else {
+            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+            const result = await getIssueByIdentifierWithComments(
+              ctx.gql,
+              teamKey,
+              issueNumber,
+            );
+            outputSuccess(result);
+          }
+          return;
+        }
+
+        if (isUuid(issue)) {
           const result = await getIssue(ctx.gql, issue);
           outputSuccess(result);
         } else {
