@@ -163,6 +163,7 @@ describe("projects lifecycle", () => {
     expect(resolveProjectId).toHaveBeenCalledWith(
       expect.anything(),
       "My Project",
+      { includeArchived: true },
     );
     expect(deleteProject).toHaveBeenCalledWith(
       expect.anything(),
