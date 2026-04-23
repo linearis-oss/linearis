@@ -11,12 +11,8 @@ module.exports = {
         preset: "conventionalcommits",
         releaseRules: [
           // Calver plugin controls final version string.
-          // major/minor/patch here only control releasability/prioritization.
-          { breaking: true, release: "major" },
-          { revert: true, release: "patch" },
-          { type: "feat", release: "minor" },
-          { type: "fix", release: "patch" },
-          { type: "perf", release: "patch" },
+          // Custom rules here only suppress non-deliverable commits.
+          // Releasable commits (feat/fix/perf/revert/breaking) follow default analyzer rules.
           { type: "refactor", release: false },
           { type: "chore", release: false },
           { type: "ci", release: false },
