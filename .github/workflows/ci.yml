@@ -113,7 +113,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           base_ref="origin/${GITHUB_BASE_REF:-main}"
-          plan_files=$(git log "$base_ref"...HEAD \
+          plan_files=$(git log "$base_ref"..HEAD \
             --diff-filter=A --name-only --pretty=format: \
             -- 'docs/plans/*.md' | sed '/^$/d')
 
@@ -164,7 +164,7 @@ jobs:
           fi
 
           base_ref="origin/${GITHUB_BASE_REF:-main}"
-          output=$(git log "$base_ref"...HEAD --name-status --pretty=format: -- CHANGELOG.md | sed '/^$/d')
+          output=$(git log "$base_ref"..HEAD --name-status --pretty=format: -- CHANGELOG.md | sed '/^$/d')
 
           if [ -n "$output" ]; then
             echo "::error::CHANGELOG.md is release-workflow-owned and must not appear in PR branch history"
