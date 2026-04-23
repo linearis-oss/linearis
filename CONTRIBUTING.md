@@ -46,11 +46,14 @@ Integration tests (`tests/integration/`) require `LINEAR_API_TOKEN` in your envi
 Publishing is fully automated by the `Release` workflow (`.github/workflows/release-check.yml`).
 
 - `next` (default branch): releases run on every push (prerelease channel)
-- `main` (stable branch): releases run on weekly schedule
+- `main` (stable branch): releases run on every push (stable channel)
 - Can be started manually with `workflow_dispatch` for either branch
-- Executes build/test/lint/type-check gates before release
+- No scheduled release run is configured
+- Release workflow is lean and depends on PR required checks for quality gates
 - Uses semantic-release to decide if a release is required
 - Publishes npm package, creates tag, and creates GitHub release when releasable commits exist
+
+Required check names for the repository ruleset are documented in [`docs/ci-run-model.md`](docs/ci-run-model.md).
 
 ### Changelog ownership
 

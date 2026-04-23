@@ -128,9 +128,13 @@ Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.
 Releases are automated by GitHub Actions via `.github/workflows/release-check.yml`.
 
 - `next` (default branch): release runs on every push (prerelease channel)
-- `main` (stable branch): release runs on weekly schedule
+- `main` (stable branch): release runs on every push (stable channel)
 - Manual `workflow_dispatch` supports releasing from either `main` or `next`
+- No scheduled release run is configured
+- Release workflow is lean and relies on PR required checks for quality gates
 - `CHANGELOG.md` is automation-owned and must not be edited in pull requests
+
+Required PR checks are documented in [`docs/ci-run-model.md`](docs/ci-run-model.md).
 
 If a pull request branch contains `CHANGELOG.md` changes anywhere in `main...HEAD` history, CI fails and posts rebase instructions.
 
