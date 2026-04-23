@@ -4,8 +4,12 @@ import {
   ArchiveIssueDocument,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
+  GetIssueByIdDocument,
+  GetIssueByIdentifierDocument,
   GetIssueByIdentifierWithAttachmentsDocument,
+  GetIssueByIdentifierWithCommentsDocument,
   GetIssueByIdWithAttachmentsDocument,
+  GetIssueByIdWithCommentsDocument,
   GetIssuesDocument,
   PaginationOrderBy,
   SearchIssuesDocument,
@@ -18,7 +22,11 @@ import {
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
+  getIssueByIdentifierWithComments,
+  getIssueByIdentifierWithCommentThreads,
   getIssueWithAttachments,
+  getIssueWithComments,
+  getIssueWithCommentThreads,
   listIssues,
   searchIssues,
   unarchiveIssue,
@@ -144,7 +152,7 @@ describe("listIssues", () => {
 });
 
 describe("getIssue", () => {
-  it("returns issue by UUID", async () => {
+  it("returns issue by UUID with the lean read query", async () => {
     const client = mockGqlClient({
       issue: { id: "550e8400-e29b-41d4-a716-446655440000", title: "Found" },
     });
@@ -153,6 +161,9 @@ describe("getIssue", () => {
       "550e8400-e29b-41d4-a716-446655440000",
     );
     expect(result.id).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(client.request).toHaveBeenCalledWith(GetIssueByIdDocument, {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+    });
   });
 
   it("throws when issue not found by UUID", async () => {
@@ -164,18 +175,216 @@ describe("getIssue", () => {
 });
 
 describe("getIssueByIdentifier", () => {
-  it("returns issue by team key and number", async () => {
+  it("returns issue by team key and number with the lean read query", async () => {
     const client = mockGqlClient({
       issues: { nodes: [{ id: "issue-1", title: "Found" }] },
     });
     const result = await getIssueByIdentifier(client, "ENG", 42);
     expect(result.id).toBe("issue-1");
+    expect(client.request).toHaveBeenCalledWith(GetIssueByIdentifierDocument, {
+      teamKey: "ENG",
+      number: 42,
+    });
   });
 
   it("throws when issue not found by identifier", async () => {
     const client = mockGqlClient({ issues: { nodes: [] } });
     await expect(getIssueByIdentifier(client, "ENG", 999)).rejects.toThrow(
       "not found",
+    );
+  });
+});
+
+describe("getIssueWithComments", () => {
+  it("returns issue by UUID with full comment metadata", async () => {
+    const client = mockGqlClient({
+      issue: {
+        id: "issue-1",
+        title: "Found",
+        comments: {
+          nodes: [
+            {
+              id: "comment-1",
+              body: "First",
+              createdAt: "2026-04-23T12:00:00.000Z",
+              editedAt: null,
+              parentId: null,
+              user: { id: "user-1", displayName: "Ada" },
+            },
+          ],
+        },
+      },
+    });
+    const result = await getIssueWithComments(client, "issue-1");
+
+    expect(result.comments.nodes[0]).toEqual({
+      id: "comment-1",
+      body: "First",
+      createdAt: "2026-04-23T12:00:00.000Z",
+      editedAt: null,
+      parentId: null,
+      user: { id: "user-1", displayName: "Ada" },
+    });
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdWithCommentsDocument,
+      {
+        id: "issue-1",
+      },
+    );
+  });
+});
+
+describe("getIssueByIdentifierWithComments", () => {
+  it("returns issue by identifier with full comment metadata", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [
+          {
+            id: "issue-1",
+            title: "Found",
+            comments: {
+              nodes: [
+                {
+                  id: "comment-1",
+                  body: "First",
+                  createdAt: "2026-04-23T12:00:00.000Z",
+                  editedAt: null,
+                  parentId: null,
+                  user: { id: "user-1", displayName: "Ada" },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const result = await getIssueByIdentifierWithComments(client, "ENG", 42);
+
+    expect(result.comments.nodes[0].user.displayName).toBe("Ada");
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdentifierWithCommentsDocument,
+      {
+        teamKey: "ENG",
+        number: 42,
+      },
+    );
+  });
+});
+
+describe("getIssueWithCommentThreads", () => {
+  it("groups comments into root comments with ordered replies", async () => {
+    const client = mockGqlClient({
+      issue: {
+        id: "issue-1",
+        title: "Found",
+        comments: {
+          nodes: [
+            {
+              id: "comment-1",
+              body: "Root 1",
+              createdAt: "2026-04-23T12:00:00.000Z",
+              editedAt: null,
+              parentId: null,
+              user: { id: "user-1", displayName: "Ada" },
+            },
+            {
+              id: "comment-2",
+              body: "Reply 1",
+              createdAt: "2026-04-23T12:01:00.000Z",
+              editedAt: null,
+              parentId: "comment-1",
+              user: { id: "user-2", displayName: "Bea" },
+            },
+            {
+              id: "comment-3",
+              body: "Root 2",
+              createdAt: "2026-04-23T12:02:00.000Z",
+              editedAt: null,
+              parentId: null,
+              user: { id: "user-3", displayName: "Cam" },
+            },
+            {
+              id: "comment-4",
+              body: "Nested reply",
+              createdAt: "2026-04-23T12:03:00.000Z",
+              editedAt: null,
+              parentId: "comment-2",
+              user: { id: "user-4", displayName: "Dee" },
+            },
+            {
+              id: "comment-5",
+              body: "Reply 2",
+              createdAt: "2026-04-23T12:04:00.000Z",
+              editedAt: null,
+              parentId: "comment-1",
+              user: { id: "user-5", displayName: "Eli" },
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await getIssueWithCommentThreads(client, "issue-1");
+
+    expect(result.comments.nodes).toHaveLength(2);
+    expect(result.comments.nodes[0].id).toBe("comment-1");
+    expect(result.comments.nodes[0].replies.map((reply) => reply.id)).toEqual([
+      "comment-2",
+      "comment-5",
+    ]);
+    expect(
+      result.comments.nodes[0].replies[0].replies.map((reply) => reply.id),
+    ).toEqual(["comment-4"]);
+    expect(result.comments.nodes[1].id).toBe("comment-3");
+  });
+});
+
+describe("getIssueByIdentifierWithCommentThreads", () => {
+  it("groups comments by identifier reads as well", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [
+          {
+            id: "issue-1",
+            title: "Found",
+            comments: {
+              nodes: [
+                {
+                  id: "comment-1",
+                  body: "Root 1",
+                  createdAt: "2026-04-23T12:00:00.000Z",
+                  editedAt: null,
+                  parentId: null,
+                  user: { id: "user-1", displayName: "Ada" },
+                },
+                {
+                  id: "comment-2",
+                  body: "Reply 1",
+                  createdAt: "2026-04-23T12:01:00.000Z",
+                  editedAt: null,
+                  parentId: "comment-1",
+                  user: { id: "user-2", displayName: "Bea" },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await getIssueByIdentifierWithCommentThreads(
+      client,
+      "ENG",
+      42,
+    );
+
+    expect(result.comments.nodes[0].replies[0].id).toBe("comment-2");
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdentifierWithCommentsDocument,
+      {
+        teamKey: "ENG",
+        number: 42,
+      },
     );
   });
 });

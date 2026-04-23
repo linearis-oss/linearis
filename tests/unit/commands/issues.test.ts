@@ -85,6 +85,18 @@ vi.mock("../../../src/services/issue-service.js", () => ({
     labels: { nodes: [] },
   }),
   getIssueByIdentifier: vi.fn(),
+  getIssueWithComments: vi.fn().mockResolvedValue({
+    id: "resolved-issue-uuid",
+    comments: { nodes: [{ id: "comment-1", user: { displayName: "Ada" } }] },
+  }),
+  getIssueByIdentifierWithComments: vi.fn(),
+  getIssueWithCommentThreads: vi.fn().mockResolvedValue({
+    id: "resolved-issue-uuid",
+    comments: {
+      nodes: [{ id: "comment-1", replies: [{ id: "comment-2" }] }],
+    },
+  }),
+  getIssueByIdentifierWithCommentThreads: vi.fn(),
   getIssueWithAttachments: vi.fn().mockResolvedValue({
     id: "resolved-issue-uuid",
     attachments: { nodes: [{ id: "att-1", title: "PR #42" }] },
@@ -114,8 +126,14 @@ import {
   archiveIssue,
   createIssue,
   deleteIssue,
+  getIssue,
+  getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
+  getIssueByIdentifierWithComments,
+  getIssueByIdentifierWithCommentThreads,
   getIssueWithAttachments,
+  getIssueWithComments,
+  getIssueWithCommentThreads,
   listIssues,
   searchIssues,
   unarchiveIssue,
@@ -912,12 +930,138 @@ describe("issues update --assignee", () => {
   });
 });
 
-describe("issues read --with-attachments", () => {
+describe("issues read", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("uses the lean issue read for UUIDs by default", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+    ]);
+
+    expect(getIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(getIssueWithComments).not.toHaveBeenCalled();
+    expect(getIssueWithCommentThreads).not.toHaveBeenCalled();
+    expect(getIssueWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("uses the lean issue read for identifiers by default", async () => {
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "issues", "read", "ENG-42"]);
+
+    expect(getIssueByIdentifier).toHaveBeenCalledWith(
+      expect.anything(),
+      "ENG",
+      42,
+    );
+    expect(getIssueByIdentifierWithComments).not.toHaveBeenCalled();
+    expect(getIssueByIdentifierWithCommentThreads).not.toHaveBeenCalled();
+    expect(getIssueByIdentifierWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("calls getIssueWithComments when flag is set with UUID", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+      "--with-comments",
+    ]);
+
+    expect(getIssueWithComments).toHaveBeenCalledWith(
+      expect.anything(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(getIssueWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("calls getIssueByIdentifierWithComments when flag is set with identifier", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "ENG-42",
+      "--with-comments",
+    ]);
+
+    expect(getIssueByIdentifierWithComments).toHaveBeenCalledWith(
+      expect.anything(),
+      "ENG",
+      42,
+    );
+    expect(getIssueByIdentifierWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("calls getIssueWithCommentThreads when flag is set with UUID", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+      "--with-comment-threads",
+    ]);
+
+    expect(getIssueWithCommentThreads).toHaveBeenCalledWith(
+      expect.anything(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(getIssueWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("calls getIssueByIdentifierWithCommentThreads when flag is set with identifier", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "ENG-42",
+      "--with-comment-threads",
+    ]);
+
+    expect(getIssueByIdentifierWithCommentThreads).toHaveBeenCalledWith(
+      expect.anything(),
+      "ENG",
+      42,
+    );
+    expect(getIssueByIdentifierWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("keeps attachment reads on the attachment path when combined with --with-comments", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+      "--with-attachments",
+      "--with-comments",
+    ]);
+
+    expect(getIssueWithAttachments).toHaveBeenCalledWith(
+      expect.anything(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(getIssueWithComments).not.toHaveBeenCalled();
   });
 
   it("calls getIssueWithAttachments when flag is set with UUID", async () => {

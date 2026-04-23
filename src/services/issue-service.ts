@@ -4,8 +4,14 @@ import type {
   Issue,
   IssueByIdentifier,
   IssueByIdentifierWithAttachments,
+  IssueByIdentifierWithComments,
+  IssueByIdentifierWithCommentThreads,
+  IssueComment,
+  IssueCommentThread,
   IssueDetail,
   IssueDetailWithAttachments,
+  IssueDetailWithComments,
+  IssueDetailWithCommentThreads,
   IssueSearchResult,
   PaginatedResult,
   PaginationOptions,
@@ -25,9 +31,13 @@ import {
   type GetIssueByIdentifierQuery,
   GetIssueByIdentifierWithAttachmentsDocument,
   type GetIssueByIdentifierWithAttachmentsQuery,
+  GetIssueByIdentifierWithCommentsDocument,
+  type GetIssueByIdentifierWithCommentsQuery,
   type GetIssueByIdQuery,
   GetIssueByIdWithAttachmentsDocument,
   type GetIssueByIdWithAttachmentsQuery,
+  GetIssueByIdWithCommentsDocument,
+  type GetIssueByIdWithCommentsQuery,
   GetIssuesDocument,
   type GetIssuesQuery,
   type IssueCreateInput,
@@ -50,6 +60,59 @@ const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
 function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
   return {
     and: [NON_COMPLETED_ISSUES_FILTER, filter],
+  };
+}
+
+function groupCommentsIntoThreads(
+  comments: readonly IssueComment[],
+): IssueCommentThread[] {
+  const commentsById = new Map<string, IssueCommentThread>();
+
+  for (const comment of comments) {
+    commentsById.set(comment.id, { ...comment, replies: [] });
+  }
+
+  const rootComments: IssueCommentThread[] = [];
+
+  for (const comment of comments) {
+    const threadedComment = commentsById.get(comment.id);
+
+    if (!threadedComment) {
+      continue;
+    }
+
+    if (!comment.parentId) {
+      rootComments.push(threadedComment);
+      continue;
+    }
+
+    const parentComment = commentsById.get(comment.parentId);
+
+    if (!parentComment) {
+      rootComments.push(threadedComment);
+      continue;
+    }
+
+    parentComment.replies.push(threadedComment);
+  }
+
+  return rootComments;
+}
+
+function threadIssueComments(
+  issue: IssueDetailWithComments,
+): IssueDetailWithCommentThreads;
+function threadIssueComments(
+  issue: IssueByIdentifierWithComments,
+): IssueByIdentifierWithCommentThreads;
+function threadIssueComments(
+  issue: IssueDetailWithComments | IssueByIdentifierWithComments,
+): IssueDetailWithCommentThreads | IssueByIdentifierWithCommentThreads {
+  return {
+    ...issue,
+    comments: {
+      nodes: groupCommentsIntoThreads(issue.comments?.nodes ?? []),
+    },
   };
 }
 
@@ -100,6 +163,28 @@ export async function getIssue(
   return result.issue;
 }
 
+export async function getIssueWithComments(
+  client: GraphQLClient,
+  id: string,
+): Promise<IssueDetailWithComments> {
+  const result = await client.request<GetIssueByIdWithCommentsQuery>(
+    GetIssueByIdWithCommentsDocument,
+    { id },
+  );
+  if (!result.issue) {
+    throw new Error(`Issue with ID "${id}" not found`);
+  }
+  return result.issue;
+}
+
+export async function getIssueWithCommentThreads(
+  client: GraphQLClient,
+  id: string,
+): Promise<IssueDetailWithCommentThreads> {
+  const issue = await getIssueWithComments(client, id);
+  return threadIssueComments(issue);
+}
+
 export async function getIssueByIdentifier(
   client: GraphQLClient,
   teamKey: string,
@@ -115,6 +200,36 @@ export async function getIssueByIdentifier(
     );
   }
   return result.issues.nodes[0];
+}
+
+export async function getIssueByIdentifierWithComments(
+  client: GraphQLClient,
+  teamKey: string,
+  issueNumber: number,
+): Promise<IssueByIdentifierWithComments> {
+  const result = await client.request<GetIssueByIdentifierWithCommentsQuery>(
+    GetIssueByIdentifierWithCommentsDocument,
+    { teamKey, number: issueNumber },
+  );
+  if (!result.issues.nodes.length) {
+    throw new Error(
+      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+    );
+  }
+  return result.issues.nodes[0];
+}
+
+export async function getIssueByIdentifierWithCommentThreads(
+  client: GraphQLClient,
+  teamKey: string,
+  issueNumber: number,
+): Promise<IssueByIdentifierWithCommentThreads> {
+  const issue = await getIssueByIdentifierWithComments(
+    client,
+    teamKey,
+    issueNumber,
+  );
+  return threadIssueComments(issue);
 }
 
 export async function getIssueWithAttachments(
