@@ -1,0 +1,38 @@
+name: CI Post-merge Sentinel
+
+on:
+  push:
+    branches:
+      - next
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-merge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sentinel:
+    name: Post-merge sentinel (node v22)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup node v22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Verify packed binaries
+        run: npm run verify:packed-binaries
