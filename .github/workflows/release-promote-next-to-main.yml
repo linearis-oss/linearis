@@ -62,6 +62,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          next_version=$(node -p "require('./package.json').version")
           version=$(node -p "require('./package.json').version.replace(/-next\\.\\d+$/, '')")
           title="release ${version} to stable channel"
           compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/main...next"
@@ -219,6 +220,16 @@ jobs:
             echo
             echo "## Compare"
             echo "$compare_url"
+            echo
+            echo "## Install release candidate"
+            echo
+            echo "> [!NOTE]"
+            echo "> Please test prerelease changes in this PR and share feedback directly on this PR so we can address issues before stable release. Mention your installed version (\`linearis --version\`) and repro steps. Use \`@next\` for rolling prerelease train, or exact version below for this staged candidate."
+            echo
+            echo "\`\`\`bash"
+            echo "npm install -g linearis@next"
+            echo "npm install -g linearis@$next_version"
+            echo "\`\`\`"
             echo
             echo "## Notes"
             echo "- This PR is auto-maintained when a prerelease is published from \`next\`."
