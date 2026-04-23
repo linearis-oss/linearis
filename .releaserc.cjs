@@ -15,7 +15,10 @@ module.exports = {
     ["@semantic-release/npm", { npmPublish: false, pkgRoot: "." }],
     [
       "@semantic-release/exec",
-      { publishCmd: "npx clean-publish --access public -- --provenance" },
+      {
+        publishCmd:
+          'npx clean-publish --access public --tag $( [ "$GITHUB_REF_NAME" = "next" ] && echo next || echo latest ) -- --provenance',
+      },
     ],
     ["@semantic-release/github", { successComment: false, failComment: false }],
     [

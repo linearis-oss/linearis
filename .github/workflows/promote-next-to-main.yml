@@ -31,8 +31,17 @@ jobs:
       - name: Fetch main and next refs
         run: git fetch origin main next
 
+      - name: Generate linearis-bot app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Build PR metadata
         id: meta
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -40,10 +49,43 @@ jobs:
           version=$(node -p "require('./package.json').version.replace(/-next\\.\\d+$/, '')")
           title="release ${version} to stable channel"
           compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/main...next"
+          owner="${GITHUB_REPOSITORY%/*}"
+          repo="${GITHUB_REPOSITORY#*/}"
 
-          commits=$(git log --no-merges --pretty='- %h %s' origin/main..origin/next | head -n 200)
-          if [ -z "$commits" ]; then
-            commits="- (no new commits; branches currently aligned)"
+          mapfile -t commit_shas < <(git rev-list --no-merges origin/main..origin/next)
+
+          declare -A seen_prs=()
+          included_prs=""
+
+          for sha in "${commit_shas[@]}"; do
+            response=$(gh api graphql \
+              -f owner="$owner" \
+              -f repo="$repo" \
+              -f oid="$sha" \
+              -f query='query($owner: String!, $repo: String!, $oid: GitObjectID!) { repository(owner: $owner, name: $repo) { object(oid: $oid) { ... on Commit { associatedPullRequests(first: 10) { nodes { number title url author { login } } } } } } }' \
+              2>/dev/null || true)
+
+            if [ -z "$response" ]; then
+              continue
+            fi
+
+            while IFS=$'\t' read -r number pr_title pr_url pr_author; do
+              if [ -z "$number" ] || [ -n "${seen_prs[$number]:-}" ]; then
+                continue
+              fi
+
+              seen_prs[$number]=1
+
+              if [ -z "$pr_author" ] || [ "$pr_author" = "null" ]; then
+                pr_author="unknown"
+              fi
+
+              included_prs+="- [#${number}](${pr_url}) ${pr_title} by @${pr_author} — thanks @${pr_author}!\n"
+            done < <(printf '%s' "$response" | jq -r '.data.repository.object.associatedPullRequests.nodes[]? | [.number, .title, .url, .author.login] | @tsv')
+          done
+
+          if [ -z "$included_prs" ]; then
+            included_prs="- (no included pull requests found; branches may be aligned)"
           fi
 
           {
@@ -57,8 +99,8 @@ jobs:
             echo "## Target stable version"
             echo "\\`$version\\`"
             echo
-            echo "## Included commits (next ahead of main)"
-            echo "$commits"
+            echo "## Included pull requests (next ahead of main)"
+            printf '%b\n' "$included_prs"
             echo
             echo "## Compare"
             echo "$compare_url"
@@ -71,7 +113,7 @@ jobs:
 
       - name: Upsert promotion PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
