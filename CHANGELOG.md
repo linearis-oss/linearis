@@ -1,3 +1,9 @@
+## [2026.4.8-next.5](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.4...v2026.4.8-next.5) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** bind release job to npm-publish environment ([0339929](https://github.com/linearis-oss/linearis/commit/0339929663cf9bcc3c0be854a40b66cc40a8abd9))
+
 ## [2026.4.8-next.4](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.3...v2026.4.8-next.4) (2026-04-23)
 
 ### Bug Fixes
