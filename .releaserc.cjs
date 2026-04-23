@@ -6,13 +6,13 @@ module.exports = {
   tagFormat: `v\${version}`,
   plugins: [
     [
-      "@semantic-release/commit-analyzer",
+      "./scripts/release/calver-plugin.cjs",
       {
         preset: "conventionalcommits",
         releaseRules: [
-          // Calver plugin controls final version string.
-          // Custom rules here only suppress non-deliverable commits.
-          // Releasable commits (feat/fix/perf/revert/breaking) follow default analyzer rules.
+          // Suppress non-deliverable commits.
+          // Releasable commits (feat/fix/perf/revert/breaking) still trigger release,
+          // then calver-plugin maps analyzer output to patch cadence.
           { type: "refactor", release: false },
           { type: "chore", release: false },
           { type: "ci", release: false },
@@ -30,7 +30,6 @@ module.exports = {
       "@semantic-release/release-notes-generator",
       { preset: "conventionalcommits" },
     ],
-    "./scripts/release/calver-plugin.cjs",
     ["@semantic-release/changelog", { changelogFile: "CHANGELOG.md" }],
     ["@semantic-release/npm", { npmPublish: false, pkgRoot: "." }],
     [
