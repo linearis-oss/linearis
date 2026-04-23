@@ -12,14 +12,14 @@ describe("computeCalverVersion", () => {
     expect(next).toBe("2026.4.6");
   });
 
-  it("resets patch to 1 when UTC month rolls", () => {
+  it("resets patch to 0 when UTC month rolls", () => {
     const next = computeCalverVersion({
       lastVersion: "2026.4.5",
       branchName: "main",
       nowIso: "2026-05-01T00:00:00.000Z",
     });
 
-    expect(next).toBe("2026.5.1");
+    expect(next).toBe("2026.5.0");
   });
 
   it("creates first prerelease from stable version on next branch", () => {
@@ -49,7 +49,7 @@ describe("computeCalverVersion", () => {
       nowIso: "2026-05-01T00:00:00.000Z",
     });
 
-    expect(next).toBe("2026.5.1-next.1");
+    expect(next).toBe("2026.5.0-next.1");
   });
 
   it("throws for invalid lastVersion", () => {
