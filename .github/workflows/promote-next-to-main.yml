@@ -114,9 +114,14 @@ jobs:
       - name: Upsert promotion PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PROMOTION_PR_TITLE: ${{ steps.meta.outputs.title }}
+          PROMOTION_PR_BODY: ${{ steps.meta.outputs.body }}
         shell: bash
         run: |
           set -euo pipefail
+
+          body_file=$(mktemp)
+          printf '%s\n' "$PROMOTION_PR_BODY" > "$body_file"
 
           existing=$(gh pr list \
             --state open \
@@ -127,14 +132,14 @@ jobs:
 
           if [ -n "$existing" ]; then
             gh pr edit "$existing" \
-              --title "${{ steps.meta.outputs.title }}" \
-              --body "${{ steps.meta.outputs.body }}"
+              --title "$PROMOTION_PR_TITLE" \
+              --body-file "$body_file"
             echo "Updated PR #$existing"
           else
             gh pr create \
               --base main \
               --head next \
-              --title "${{ steps.meta.outputs.title }}" \
-              --body "${{ steps.meta.outputs.body }}"
+              --title "$PROMOTION_PR_TITLE" \
+              --body-file "$body_file"
             echo "Created promotion PR"
           fi
