@@ -1,0 +1,51 @@
+module.exports = {
+  repositoryUrl:
+    process.env.SEMANTIC_RELEASE_REPOSITORY_URL ??
+    "git@github.com:linearis-oss/linearis.git",
+  branches: ["main", { name: "next", prerelease: "next" }],
+  tagFormat: `v\${version}`,
+  plugins: [
+    [
+      "./scripts/release/calver-plugin.cjs",
+      {
+        preset: "conventionalcommits",
+        releaseRules: [
+          // Suppress non-deliverable commits.
+          // Releasable commits (feat/fix/perf/revert/breaking) still trigger release,
+          // then calver-plugin maps analyzer output to patch cadence.
+          { type: "refactor", release: false },
+          { type: "chore", release: false },
+          { type: "ci", release: false },
+          { type: "docs", release: false },
+          { type: "style", release: false },
+          { type: "test", release: false },
+          { type: "build", release: false },
+          { scope: "ci", release: false },
+          { scope: "release", release: false },
+          { scope: "workflow", release: false },
+        ],
+      },
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      { preset: "conventionalcommits" },
+    ],
+    ["@semantic-release/changelog", { changelogFile: "CHANGELOG.md" }],
+    ["@semantic-release/npm", { npmPublish: false, pkgRoot: "." }],
+    [
+      "@semantic-release/exec",
+      {
+        publishCmd:
+          'npx clean-publish --access public --tag $( [ "$GITHUB_REF_NAME" = "next" ] && echo next || echo latest ) -- --provenance',
+      },
+    ],
+    ["@semantic-release/github", { successComment: false, failComment: false }],
+    [
+      "@semantic-release/git",
+      {
+        assets: ["package.json", "package-lock.json", "CHANGELOG.md"],
+        message: `chore(release): \${nextRelease.version} [skip ci]\n\n\${nextRelease.notes}`,
+      },
+    ],
+  ],
+};

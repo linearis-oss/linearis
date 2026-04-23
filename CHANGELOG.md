@@ -1,3 +1,77 @@
+## [2026.4.8-next.8](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.7...v2026.4.8-next.8) (2026-04-23)
+
+### Features
+
+* **projects:** add lifecycle commands ([80e89f7](https://github.com/linearis-oss/linearis/commit/80e89f760e60868526c2ce9575d311fa0b8fa18b)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+
+### Bug Fixes
+
+* **projects:** handle archived project archive lifecycle ([84ecd4e](https://github.com/linearis-oss/linearis/commit/84ecd4e69124cbd707e902a8e08750e47d19922a)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** handle nullable deleteProject entity ([f670ce1](https://github.com/linearis-oss/linearis/commit/f670ce181c326a39d6abb8371cea2bafcdf0d9f3)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** reject ambiguous project name resolution ([a76eafd](https://github.com/linearis-oss/linearis/commit/a76eafd6484fcf4cff50cd19dab2b6e92d5578e0)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** resolve archived names on delete ([52727e7](https://github.com/linearis-oss/linearis/commit/52727e7f2507d8908f82e71c8885d285a6a62285)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** restore archive mutation path ([4f123ef](https://github.com/linearis-oss/linearis/commit/4f123ef315772d8906ea821d4fd77fa61bba0e19)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** restore distinct archive mutation ([4f718d8](https://github.com/linearis-oss/linearis/commit/4f718d80417efb1e3a88c696f0aaf8a657236191)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+
+## [2026.4.8-next.7](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.6...v2026.4.8-next.7) (2026-04-23)
+
+### Features
+
+* **issues:** add discussion flags to issue read ([8e3608e](https://github.com/linearis-oss/linearis/commit/8e3608eb156a99045c48b6007921c94d240f6d81)), closes [#145](https://github.com/linearis-oss/linearis/issues/145)
+* **labels:** add project label listing support ([99b8288](https://github.com/linearis-oss/linearis/commit/99b82882d96ec100a11165752d2e2ba403642eb6)), closes [#115](https://github.com/linearis-oss/linearis/issues/115)
+
+### Bug Fixes
+
+* **ci:** avoid bash regex parser error in promotion metadata ([b42b0c2](https://github.com/linearis-oss/linearis/commit/b42b0c276871055f6ad1ff43cc8b8fa1373b0341))
+* **issues:** keep attachment reads on default comments ([ab6717d](https://github.com/linearis-oss/linearis/commit/ab6717d6f0d2687febea8081b7bd8639c9288962)), closes [#145](https://github.com/linearis-oss/linearis/issues/145)
+* **issues:** keep mutation comment payload lean ([fbb373a](https://github.com/linearis-oss/linearis/commit/fbb373a6dcc8f3d5d109518331466e721a059a91))
+* **issues:** restore default read comments ([5c33015](https://github.com/linearis-oss/linearis/commit/5c33015be63baef571c571f3cd76408aad1fdc4c)), closes [#145](https://github.com/linearis-oss/linearis/issues/145)
+* **release:** classify promotion PR content by releasability ([a54ad22](https://github.com/linearis-oss/linearis/commit/a54ad225f361d504ba265f882bbea01a68dd2c8a))
+* **release:** enforce calver-safe semantic-release behavior ([3f7ffb7](https://github.com/linearis-oss/linearis/commit/3f7ffb7c33f061551bc8d08b803b3b6382ee3c51))
+* **release:** gate version bumps to deliverable-impact commits ([3744496](https://github.com/linearis-oss/linearis/commit/3744496dd88963333db00896019e9763660bf2bd))
+* **release:** make calver month rollover semantic-compatible ([d3ab35c](https://github.com/linearis-oss/linearis/commit/d3ab35ce2b795e0642b9719bf2823e0e2a1c1775))
+* **release:** rely on defaults for releasable commit types ([4d3c0ad](https://github.com/linearis-oss/linearis/commit/4d3c0ad417ea0d98aa086ff3a821de170c348500))
+
+## [2026.4.8-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.5...v2026.4.8-next.6) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** restore release trigger fallback for promotion PR ([0b358b1](https://github.com/linearis-oss/linearis/commit/0b358b17331bb2d7a047332d81a9f97bea9aadd0))
+
+## [2026.4.8-next.5](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.4...v2026.4.8-next.5) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** bind release job to npm-publish environment ([0339929](https://github.com/linearis-oss/linearis/commit/0339929663cf9bcc3c0be854a40b66cc40a8abd9))
+
+## [2026.4.8-next.4](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.3...v2026.4.8-next.4) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** avoid shell interpolation in promotion PR body ([c297307](https://github.com/linearis-oss/linearis/commit/c2973072f60a313227ef41f4f4acacda8d1919b9))
+
+## [2026.4.8-next.3](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.2...v2026.4.8-next.3) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** escape markdown backticks in promotion PR body ([21d31c7](https://github.com/linearis-oss/linearis/commit/21d31c7b82711d62524645af602e4387dbf82356))
+
+## [2026.4.8-next.2](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.1...v2026.4.8-next.2) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** address review feedback for release and history guards ([db27e14](https://github.com/linearis-oss/linearis/commit/db27e148bc95acb610e8dea6471e14896e13be26))
+
+## [2026.4.8-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.7...v2026.4.8-next.1) (2026-04-23)
+
+### Bug Fixes
+
+* abort timed-out GraphQL requests ([332da1e](https://github.com/linearis-oss/linearis/commit/332da1efd6c86a299ea5639b561bc8383013740c))
+* **ci:** migrate release automation to GitHub App auth ([f0ba4e0](https://github.com/linearis-oss/linearis/commit/f0ba4e0c0a200b70ffa68c367ebce7829b1d29e4))
+* **ci:** use deploy key for release automation git pushes ([5b42037](https://github.com/linearis-oss/linearis/commit/5b42037911b1cf44bfa71757326ecbeceee6d2a1))
+* clear graphql timeout timers on all request paths ([1de7887](https://github.com/linearis-oss/linearis/commit/1de78871d52f106d9b7956f6eaa908f14395653b))
+* **release:** keep prerelease train on stable patch ([0964e75](https://github.com/linearis-oss/linearis/commit/0964e75113d6dbee13e2da5487c9ec08733334fc))
+
 # Changelog
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).

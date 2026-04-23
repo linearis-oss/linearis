@@ -123,6 +123,18 @@ File handling: `issues read` returns an `embeds` array with signed download URLs
 
 Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.md` so every agent session has it in context automatically.
 
+## Release Automation Policy
+
+Linearis uses three CI/release workflows:
+
+- `ci.yml` for required pull request checks
+- `ci-post-merge.yml` for post-merge sentinel validation on `main`/`next` pushes
+- `release-check.yml` for push-driven and manual releases
+
+For the authoritative trigger matrix, required checks, and operational verification commands, see [`docs/ci-run-model.md`](docs/ci-run-model.md) (source of truth).
+
+`CHANGELOG.md` is automation-owned and must not be edited in pull requests. If a pull request branch contains `CHANGELOG.md` changes anywhere in `main...HEAD` history, CI fails and posts rebase instructions.
+
 ## Contributing
 
 Want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md).

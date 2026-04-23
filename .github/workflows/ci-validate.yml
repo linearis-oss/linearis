@@ -1,11 +1,11 @@
-name: CI
+name: Validate CI
 
 on:
-  push:
-    branches: 
-      - main
   pull_request:
-    types: 
+    branches:
+      - next
+      - main
+    types:
       - opened
       - synchronize
       - ready_for_review
@@ -20,12 +20,12 @@ concurrency:
 
 jobs:
   test:
-    name: Unit tests on node v${{ matrix.node-version }}
+    name: Run Unit Tests on Node v${{ matrix.node-version }}
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [22, 24]
+        node-version: [22]
 
     steps:
       - name: Checkout code
@@ -49,9 +49,9 @@ jobs:
   lint:
     strategy:
       matrix:
-        node-version: [22, 24]
+        node-version: [22]
 
-    name: Code checks on node v${{ matrix.node-version }}
+    name: Run Code Checks on Node v${{ matrix.node-version }}
     runs-on: ubuntu-latest
 
     steps:
@@ -77,7 +77,7 @@ jobs:
         run: npx tsc --noEmit
 
   smoke-test:
-    name: Smoke test package install
+    name: Run Package Install Smoke Test
     runs-on: ubuntu-latest
     needs: [test]
 
@@ -98,7 +98,7 @@ jobs:
         run: npm run verify:packed-binaries
 
   guard-plan-files:
-    name: Reject plan files
+    name: Reject Plan Files
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     permissions:
@@ -112,7 +112,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          plan_files=$(git log main...HEAD \
+          base_ref="origin/${GITHUB_BASE_REF:-main}"
+          plan_files=$(git log "$base_ref"..HEAD \
             --diff-filter=A --name-only --pretty=format: \
             -- 'docs/plans/*.md' | sed '/^$/d')
 
@@ -140,3 +141,37 @@ jobs:
             exit 1
           fi
           echo "No plan files found — OK"
+
+  guard-changelog-history:
+    name: Guard CHANGELOG History in PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect CHANGELOG.md in branch history
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_HEAD_REF:-}" = "next" ] && [ "${GITHUB_BASE_REF:-}" = "main" ]; then
+            echo "Promotion PR next -> main detected. Skipping changelog history guard."
+            exit 0
+          fi
+
+          base_ref="origin/${GITHUB_BASE_REF:-main}"
+          output=$(git log "$base_ref"..HEAD --name-status --pretty=format: -- CHANGELOG.md | sed '/^$/d')
+
+          if [ -n "$output" ]; then
+            echo "::error::CHANGELOG.md is release-workflow-owned and must not appear in PR branch history"
+            echo "Drop or amend commits that touch CHANGELOG.md, then push with --force-with-lease"
+            echo
+            echo "$output"
+            exit 1
+          fi
+
+          echo "No CHANGELOG.md history violations — OK"

@@ -90,6 +90,38 @@ fragment CompleteIssueFields on Issue {
   }
 }
 
+# Minimal comment fields preserved for default issue reads
+fragment IssueReadDefaultCommentFields on Comment {
+  id
+  body
+}
+
+# Comment fields for issue read discussion expansion
+fragment IssueReadCommentFields on Comment {
+  id
+  body
+  createdAt
+  editedAt
+  parentId
+  user {
+    id
+    displayName
+  }
+}
+
+# Complete issue fragment with all relationships and default comments
+#
+# Preserves the historical issue read payload while keeping richer
+# discussion metadata behind explicit flags.
+fragment CompleteIssueWithDefaultCommentsFields on Issue {
+  ...CompleteIssueFields
+  comments {
+    nodes {
+      ...IssueReadDefaultCommentFields
+    }
+  }
+}
+
 # Complete issue fragment with all relationships and comments
 #
 # Combines all issue fragments into a comprehensive field selection.
@@ -99,8 +131,7 @@ fragment CompleteIssueWithCommentsFields on Issue {
   ...CompleteIssueFields
   comments {
     nodes {
-      id
-      body
+      ...IssueReadCommentFields
     }
   }
 }
@@ -210,21 +241,40 @@ query GetIssues($first: Int!, $after: String, $orderBy: PaginationOrderBy) {
   }
 }
 
-# Get single issue by UUID with comments and all relationships
+# Get single issue by UUID with lean fields
 #
-# Fetches complete issue data including comments by direct UUID lookup.
-# Uses the comprehensive fragment with comment data for detailed view.
+# Fetches issue data by direct UUID lookup with the backward-compatible
+# default comment payload.
 query GetIssueById($id: String!) {
+  issue(id: $id) {
+    ...CompleteIssueWithDefaultCommentsFields
+  }
+}
+
+# Get issue by identifier (team key + number) with lean fields
+#
+# Fetches issue using TEAM-123 format with the backward-compatible
+# default comment payload.
+query GetIssueByIdentifier($teamKey: String!, $number: Float!) {
+  issues(
+    filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
+    first: 1
+  ) {
+    nodes {
+      ...CompleteIssueWithDefaultCommentsFields
+    }
+  }
+}
+
+# Get single issue by UUID with full comments
+query GetIssueByIdWithComments($id: String!) {
   issue(id: $id) {
     ...CompleteIssueWithCommentsFields
   }
 }
 
-# Get issue by identifier (team key + number)
-#
-# Fetches issue using TEAM-123 format. Resolves team key and
-# issue number to find the exact issue, returning complete data with comments.
-query GetIssueByIdentifier($teamKey: String!, $number: Float!) {
+# Get issue by identifier with full comments
+query GetIssueByIdentifierWithComments($teamKey: String!, $number: Float!) {
   issues(
     filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
     first: 1
@@ -473,7 +523,7 @@ query BatchResolveForCreate(
 
 # Complete issue fragment with attachments
 fragment CompleteIssueWithAttachmentsFields on Issue {
-  ...CompleteIssueWithCommentsFields
+  ...CompleteIssueWithDefaultCommentsFields
   attachments {
     nodes {
       ...AttachmentFields

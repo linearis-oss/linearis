@@ -29,3 +29,30 @@ mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
     }
   }
 }
+
+mutation ArchiveProject($id: String!) {
+  projectArchive(id: $id) {
+    success
+    entity {
+      ...ProjectDetailFields
+    }
+  }
+}
+
+mutation UnarchiveProject($id: String!) {
+  projectUnarchive(id: $id) {
+    success
+    entity {
+      ...ProjectDetailFields
+    }
+  }
+}
+
+mutation DeleteProject($id: String!) {
+  projectDelete(id: $id) {
+    success
+    entity {
+      ...ProjectDetailFields
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import type {
   ArchiveInitiativeMutation,
   ArchiveInitiativeUpdateMutation,
+  ArchiveProjectMutation,
   AttachmentCreateMutation,
   CreateCommentMutation,
   CreateInitiativeMutation,
@@ -21,8 +22,10 @@ import type {
   GetInitiativeUpdateQuery,
   GetIssueByIdentifierQuery,
   GetIssueByIdentifierWithAttachmentsQuery,
+  GetIssueByIdentifierWithCommentsQuery,
   GetIssueByIdQuery,
   GetIssueByIdWithAttachmentsQuery,
+  GetIssueByIdWithCommentsQuery,
   GetIssuesQuery,
   GetProjectMilestoneByIdQuery,
   GetProjectQuery,
@@ -38,6 +41,7 @@ import type {
   SearchIssuesQuery,
   UnarchiveInitiativeMutation,
   UnarchiveInitiativeUpdateMutation,
+  UnarchiveProjectMutation,
   UpdateCommentMutation,
   UpdateInitiativeMutation,
   UpdateInitiativeUpdateMutation,
@@ -76,6 +80,29 @@ export type TeamDetail = NonNullable<GetTeamByIdQuery["team"]> & {
 export type Issue = GetIssuesQuery["issues"]["nodes"][0];
 export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
 export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
+export type IssueDetailWithComments = NonNullable<
+  GetIssueByIdWithCommentsQuery["issue"]
+>;
+export type IssueByIdentifierWithComments =
+  GetIssueByIdentifierWithCommentsQuery["issues"]["nodes"][0];
+export type IssueComment = NonNullable<
+  NonNullable<IssueDetailWithComments["comments"]>["nodes"][0]
+>;
+export type IssueCommentThread = IssueComment & {
+  replies: IssueCommentThread[];
+};
+export type IssueDetailWithCommentThreads = Omit<
+  IssueDetailWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
+export type IssueByIdentifierWithCommentThreads = Omit<
+  IssueByIdentifierWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
 export type IssueDetailWithAttachments = NonNullable<
   GetIssueByIdWithAttachmentsQuery["issue"]
 >;
@@ -116,6 +143,16 @@ export type CreatedProject = NonNullable<
 export type UpdatedProject = NonNullable<
   UpdateProjectMutation["projectUpdate"]["project"]
 >;
+export type ArchivedProject = NonNullable<
+  ArchiveProjectMutation["projectArchive"]["entity"]
+>;
+export type UnarchivedProject = NonNullable<
+  UnarchiveProjectMutation["projectUnarchive"]["entity"]
+>;
+export type DeletedProject = {
+  id: string;
+  success: true;
+};
 
 // Milestone types
 export type MilestoneDetail = NonNullable<

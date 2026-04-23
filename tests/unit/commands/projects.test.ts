@@ -35,9 +35,12 @@ vi.mock("../../../src/resolvers/user-resolver.js", () => ({
 }));
 
 vi.mock("../../../src/services/project-service.js", () => ({
+  archiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Archived" }),
   listProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
   getProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
   createProject: vi.fn().mockResolvedValue({ id: "proj-new" }),
+  deleteProject: vi.fn().mockResolvedValue({ id: "proj-1", success: true }),
+  unarchiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Active" }),
   updateProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
 }));
 
@@ -45,8 +48,11 @@ import { setupProjectsCommands } from "../../../src/commands/projects.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
 import {
+  archiveProject,
   createProject,
+  deleteProject,
   getProject,
+  unarchiveProject,
   updateProject,
 } from "../../../src/services/project-service.js";
 
@@ -84,6 +90,89 @@ describe("projects read", () => {
       "resolved-project-uuid",
     );
     expect(outputSuccess).toHaveBeenCalledWith({ id: "proj-1" });
+  });
+});
+
+describe("projects lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("archive resolves project and outputs result", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "archive",
+      "My Project",
+    ]);
+
+    expect(resolveProjectId).toHaveBeenCalledWith(
+      expect.anything(),
+      "My Project",
+    );
+    expect(archiveProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "proj-1",
+      name: "Archived",
+    });
+  });
+
+  it("unarchive resolves project and outputs result", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "unarchive",
+      "My Project",
+    ]);
+
+    expect(resolveProjectId).toHaveBeenCalledWith(
+      expect.anything(),
+      "My Project",
+      { includeArchived: true },
+    );
+    expect(unarchiveProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "proj-1",
+      name: "Active",
+    });
+  });
+
+  it("delete resolves project and outputs result", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "delete",
+      "My Project",
+    ]);
+
+    expect(resolveProjectId).toHaveBeenCalledWith(
+      expect.anything(),
+      "My Project",
+      { includeArchived: true },
+    );
+    expect(deleteProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "proj-1",
+      success: true,
+    });
   });
 });
 
