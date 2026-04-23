@@ -1,3 +1,22 @@
+## [2026.4.8-next.7](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.6...v2026.4.8-next.7) (2026-04-23)
+
+### Features
+
+* **issues:** add discussion flags to issue read ([8e3608e](https://github.com/linearis-oss/linearis/commit/8e3608eb156a99045c48b6007921c94d240f6d81)), closes [#145](https://github.com/linearis-oss/linearis/issues/145)
+* **labels:** add project label listing support ([99b8288](https://github.com/linearis-oss/linearis/commit/99b82882d96ec100a11165752d2e2ba403642eb6)), closes [#115](https://github.com/linearis-oss/linearis/issues/115)
+
+### Bug Fixes
+
+* **ci:** avoid bash regex parser error in promotion metadata ([b42b0c2](https://github.com/linearis-oss/linearis/commit/b42b0c276871055f6ad1ff43cc8b8fa1373b0341))
+* **issues:** keep attachment reads on default comments ([ab6717d](https://github.com/linearis-oss/linearis/commit/ab6717d6f0d2687febea8081b7bd8639c9288962)), closes [#145](https://github.com/linearis-oss/linearis/issues/145)
+* **issues:** keep mutation comment payload lean ([fbb373a](https://github.com/linearis-oss/linearis/commit/fbb373a6dcc8f3d5d109518331466e721a059a91))
+* **issues:** restore default read comments ([5c33015](https://github.com/linearis-oss/linearis/commit/5c33015be63baef571c571f3cd76408aad1fdc4c)), closes [#145](https://github.com/linearis-oss/linearis/issues/145)
+* **release:** classify promotion PR content by releasability ([a54ad22](https://github.com/linearis-oss/linearis/commit/a54ad225f361d504ba265f882bbea01a68dd2c8a))
+* **release:** enforce calver-safe semantic-release behavior ([3f7ffb7](https://github.com/linearis-oss/linearis/commit/3f7ffb7c33f061551bc8d08b803b3b6382ee3c51))
+* **release:** gate version bumps to deliverable-impact commits ([3744496](https://github.com/linearis-oss/linearis/commit/3744496dd88963333db00896019e9763660bf2bd))
+* **release:** make calver month rollover semantic-compatible ([d3ab35c](https://github.com/linearis-oss/linearis/commit/d3ab35ce2b795e0642b9719bf2823e0e2a1c1775))
+* **release:** rely on defaults for releasable commit types ([4d3c0ad](https://github.com/linearis-oss/linearis/commit/4d3c0ad417ea0d98aa086ff3a821de170c348500))
+
 ## [2026.4.8-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.5...v2026.4.8-next.6) (2026-04-23)
 
 ### Bug Fixes
