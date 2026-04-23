@@ -78,7 +78,8 @@ jobs:
             local scope=""
             local bang=""
 
-            if [[ "$subject" =~ ^([a-z]+)(\(([^)]+)\))?(!)?:[[:space:]] ]]; then
+            local conventional_re='^([a-z]+)(\(([^()]*)\))?(!)?:[[:space:]]'
+            if [[ "$subject" =~ $conventional_re ]]; then
               type="${BASH_REMATCH[1]}"
               scope="${BASH_REMATCH[3]:-}"
               bang="${BASH_REMATCH[4]:-}"
