@@ -1,4 +1,4 @@
-name: Sync main release back to next
+name: Sync Main Back to Next
 
 on:
   release:
@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   sync:
+    name: Sync Main Back to Next
     if: ${{ github.event.release.prerelease == false && github.event.release.target_commitish == 'main' }}
     runs-on: ubuntu-latest
     steps:

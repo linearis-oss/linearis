@@ -28,10 +28,10 @@
       "groupName": "github actions"
     },
     {
-      "description": "Pin release-check workflow to minimum supported Node version",
+      "description": "Pin release-publish workflow to minimum supported Node version",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["node"],
-      "matchFileNames": [".github/workflows/release-check.yml"],
+      "matchFileNames": [".github/workflows/release-publish.yml"],
       "enabled": false
     }
   ]

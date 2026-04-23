@@ -1,4 +1,4 @@
-name: Promote next to main
+name: Promote Next to Main
 
 on:
   push:
@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   promote:
+    name: Promote Next to Main
     if: ${{ github.event_name != 'release' || (github.event.release.prerelease == true && github.event.release.target_commitish == 'next') }}
     runs-on: ubuntu-latest
     steps:

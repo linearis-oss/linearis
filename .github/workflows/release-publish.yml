@@ -1,4 +1,4 @@
-name: Release
+name: Publish Release
 
 on:
   push:
@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   release:
+    name: Publish Release
     runs-on: ubuntu-latest
     environment: npm-publish
     steps:
