@@ -50,7 +50,7 @@ describe("resolveProjectId", () => {
     expect(result).toBe("archived-proj-uuid");
     expect(client.sdk.projects).toHaveBeenCalledWith({
       filter: { name: { eqIgnoreCase: "Archived Project" } },
-      first: 1,
+      first: 2,
       includeArchived: true,
     });
   });
@@ -59,6 +59,19 @@ describe("resolveProjectId", () => {
     const client = mockSdkClient([]);
     await expect(resolveProjectId(client, "Nonexistent")).rejects.toThrow(
       'Project "Nonexistent" not found',
+    );
+  });
+
+  it("throws when multiple projects match same name", async () => {
+    const client = mockSdkClient([
+      { id: "proj-uuid-1" },
+      { id: "proj-uuid-2" },
+    ]);
+
+    await expect(
+      resolveProjectId(client, "Mobile App", { includeArchived: true }),
+    ).rejects.toThrow(
+      'Multiple Projects found matching "Mobile App". Candidates: proj-uuid-1, proj-uuid-2. Please provide project UUID.',
     );
   });
 });
