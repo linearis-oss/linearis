@@ -152,15 +152,22 @@ describe("listIssues", () => {
 });
 
 describe("getIssue", () => {
-  it("returns issue by UUID with the lean read query", async () => {
+  it("returns issue by UUID with the default comment payload", async () => {
     const client = mockGqlClient({
-      issue: { id: "550e8400-e29b-41d4-a716-446655440000", title: "Found" },
+      issue: {
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        title: "Found",
+        comments: {
+          nodes: [{ id: "comment-1", body: "First" }],
+        },
+      },
     });
     const result = await getIssue(
       client,
       "550e8400-e29b-41d4-a716-446655440000",
     );
     expect(result.id).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(result.comments.nodes).toEqual([{ id: "comment-1", body: "First" }]);
     expect(client.request).toHaveBeenCalledWith(GetIssueByIdDocument, {
       id: "550e8400-e29b-41d4-a716-446655440000",
     });
@@ -175,12 +182,23 @@ describe("getIssue", () => {
 });
 
 describe("getIssueByIdentifier", () => {
-  it("returns issue by team key and number with the lean read query", async () => {
+  it("returns issue by team key and number with the default comment payload", async () => {
     const client = mockGqlClient({
-      issues: { nodes: [{ id: "issue-1", title: "Found" }] },
+      issues: {
+        nodes: [
+          {
+            id: "issue-1",
+            title: "Found",
+            comments: {
+              nodes: [{ id: "comment-1", body: "First" }],
+            },
+          },
+        ],
+      },
     });
     const result = await getIssueByIdentifier(client, "ENG", 42);
     expect(result.id).toBe("issue-1");
+    expect(result.comments.nodes).toEqual([{ id: "comment-1", body: "First" }]);
     expect(client.request).toHaveBeenCalledWith(GetIssueByIdentifierDocument, {
       teamKey: "ENG",
       number: 42,
@@ -272,13 +290,29 @@ describe("getIssueByIdentifierWithComments", () => {
 });
 
 describe("getIssueWithCommentThreads", () => {
-  it("groups comments into root comments with ordered replies", async () => {
+  it("groups comments into chronological threads for out-of-order inputs", async () => {
     const client = mockGqlClient({
       issue: {
         id: "issue-1",
         title: "Found",
         comments: {
           nodes: [
+            {
+              id: "comment-5",
+              body: "Reply 2",
+              createdAt: "2026-04-23T12:04:00.000Z",
+              editedAt: null,
+              parentId: "comment-1",
+              user: { id: "user-5", displayName: "Eli" },
+            },
+            {
+              id: "comment-3",
+              body: "Root 2",
+              createdAt: "2026-04-23T12:02:00.000Z",
+              editedAt: null,
+              parentId: null,
+              user: { id: "user-3", displayName: "Cam" },
+            },
             {
               id: "comment-1",
               body: "Root 1",
@@ -296,28 +330,12 @@ describe("getIssueWithCommentThreads", () => {
               user: { id: "user-2", displayName: "Bea" },
             },
             {
-              id: "comment-3",
-              body: "Root 2",
-              createdAt: "2026-04-23T12:02:00.000Z",
-              editedAt: null,
-              parentId: null,
-              user: { id: "user-3", displayName: "Cam" },
-            },
-            {
               id: "comment-4",
               body: "Nested reply",
               createdAt: "2026-04-23T12:03:00.000Z",
               editedAt: null,
               parentId: "comment-2",
               user: { id: "user-4", displayName: "Dee" },
-            },
-            {
-              id: "comment-5",
-              body: "Reply 2",
-              createdAt: "2026-04-23T12:04:00.000Z",
-              editedAt: null,
-              parentId: "comment-1",
-              user: { id: "user-5", displayName: "Eli" },
             },
           ],
         },

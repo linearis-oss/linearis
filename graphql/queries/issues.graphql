@@ -90,6 +90,12 @@ fragment CompleteIssueFields on Issue {
   }
 }
 
+# Minimal comment fields preserved for default issue reads
+fragment IssueReadDefaultCommentFields on Comment {
+  id
+  body
+}
+
 # Comment fields for issue read discussion expansion
 fragment IssueReadCommentFields on Comment {
   id
@@ -100,6 +106,19 @@ fragment IssueReadCommentFields on Comment {
   user {
     id
     displayName
+  }
+}
+
+# Complete issue fragment with all relationships and default comments
+#
+# Preserves the historical issue read payload while keeping richer
+# discussion metadata behind explicit flags.
+fragment CompleteIssueWithDefaultCommentsFields on Issue {
+  ...CompleteIssueFields
+  comments {
+    nodes {
+      ...IssueReadDefaultCommentFields
+    }
   }
 }
 
@@ -224,23 +243,25 @@ query GetIssues($first: Int!, $after: String, $orderBy: PaginationOrderBy) {
 
 # Get single issue by UUID with lean fields
 #
-# Fetches issue data by direct UUID lookup without discussion expansion.
+# Fetches issue data by direct UUID lookup with the backward-compatible
+# default comment payload.
 query GetIssueById($id: String!) {
   issue(id: $id) {
-    ...CompleteIssueFields
+    ...CompleteIssueWithDefaultCommentsFields
   }
 }
 
 # Get issue by identifier (team key + number) with lean fields
 #
-# Fetches issue using TEAM-123 format without discussion expansion.
+# Fetches issue using TEAM-123 format with the backward-compatible
+# default comment payload.
 query GetIssueByIdentifier($teamKey: String!, $number: Float!) {
   issues(
     filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
     first: 1
   ) {
     nodes {
-      ...CompleteIssueFields
+      ...CompleteIssueWithDefaultCommentsFields
     }
   }
 }

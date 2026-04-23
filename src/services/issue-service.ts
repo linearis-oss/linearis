@@ -63,6 +63,37 @@ function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
   };
 }
 
+function compareCommentsChronologically(
+  a: Pick<IssueComment, "createdAt" | "editedAt" | "id">,
+  b: Pick<IssueComment, "createdAt" | "editedAt" | "id">,
+): number {
+  const createdAtComparison = a.createdAt.localeCompare(b.createdAt);
+
+  if (createdAtComparison !== 0) {
+    return createdAtComparison;
+  }
+
+  const editedAtComparison = (a.editedAt ?? "").localeCompare(b.editedAt ?? "");
+
+  if (editedAtComparison !== 0) {
+    return editedAtComparison;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
+function sortCommentThreads(
+  comments: IssueCommentThread[],
+): IssueCommentThread[] {
+  comments.sort(compareCommentsChronologically);
+
+  for (const comment of comments) {
+    sortCommentThreads(comment.replies);
+  }
+
+  return comments;
+}
+
 function groupCommentsIntoThreads(
   comments: readonly IssueComment[],
 ): IssueCommentThread[] {
@@ -96,7 +127,7 @@ function groupCommentsIntoThreads(
     parentComment.replies.push(threadedComment);
   }
 
-  return rootComments;
+  return sortCommentThreads(rootComments);
 }
 
 function threadIssueComments(
