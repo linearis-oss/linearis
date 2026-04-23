@@ -1,3 +1,9 @@
+## [2026.4.8-next.3](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.2...v2026.4.8-next.3) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** escape markdown backticks in promotion PR body ([21d31c7](https://github.com/linearis-oss/linearis/commit/21d31c7b82711d62524645af602e4387dbf82356))
+
 ## [2026.4.8-next.2](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.1...v2026.4.8-next.2) (2026-04-23)
 
 ### Bug Fixes
