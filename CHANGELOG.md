@@ -1,3 +1,18 @@
+## [2026.4.8-next.8](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.7...v2026.4.8-next.8) (2026-04-23)
+
+### Features
+
+* **projects:** add lifecycle commands ([80e89f7](https://github.com/linearis-oss/linearis/commit/80e89f760e60868526c2ce9575d311fa0b8fa18b)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+
+### Bug Fixes
+
+* **projects:** handle archived project archive lifecycle ([84ecd4e](https://github.com/linearis-oss/linearis/commit/84ecd4e69124cbd707e902a8e08750e47d19922a)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** handle nullable deleteProject entity ([f670ce1](https://github.com/linearis-oss/linearis/commit/f670ce181c326a39d6abb8371cea2bafcdf0d9f3)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** reject ambiguous project name resolution ([a76eafd](https://github.com/linearis-oss/linearis/commit/a76eafd6484fcf4cff50cd19dab2b6e92d5578e0)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** resolve archived names on delete ([52727e7](https://github.com/linearis-oss/linearis/commit/52727e7f2507d8908f82e71c8885d285a6a62285)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** restore archive mutation path ([4f123ef](https://github.com/linearis-oss/linearis/commit/4f123ef315772d8906ea821d4fd77fa61bba0e19)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+* **projects:** restore distinct archive mutation ([4f718d8](https://github.com/linearis-oss/linearis/commit/4f718d80417efb1e3a88c696f0aaf8a657236191)), closes [#141](https://github.com/linearis-oss/linearis/issues/141)
+
 ## [2026.4.8-next.7](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.6...v2026.4.8-next.7) (2026-04-23)
 
 ### Features
