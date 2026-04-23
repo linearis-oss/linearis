@@ -7,15 +7,16 @@ This document defines how pull request checks and release runs are wired togethe
 | Workflow | Purpose |
 | --- | --- |
 | `ci.yml` | Runs required pull request checks used by branch protection/rulesets. |
+| `ci-post-merge.yml` | Runs post-merge sentinel validation on `main`/`next` pushes. |
 | `release-check.yml` | Performs semantic-release on release branches after required checks have already passed in PR. |
 
 ## Trigger matrix
 
-| Event | Branch | `ci.yml` | `release-check.yml` |
-| --- | --- | --- | --- |
-| `pull_request` | `main`, `next` | ✅ required checks | ❌ |
-| `push` | `main`, `next` | ✅ sanity verification | ✅ release run |
-| `workflow_dispatch` | selected ref | optional manual CI run | ✅ manual release run |
+| Event | Branch | `ci.yml` | `ci-post-merge.yml` | `release-check.yml` |
+| --- | --- | --- | --- | --- |
+| `pull_request` | `main`, `next` | ✅ required checks | ❌ | ❌ |
+| `push` | `main`, `next` | ❌ | ✅ post-merge sentinel | ✅ release run |
+| `workflow_dispatch` | selected ref | ❌ | ❌ | ✅ manual release run |
 
 ## Required checks for repository ruleset
 
@@ -44,6 +45,14 @@ Use GitHub CLI to confirm the run model:
 # CI required checks from PRs
 
 gh run list --workflow ci.yml --event pull_request --limit 20
+
+# Post-merge sentinel runs on push (next)
+
+gh run list --workflow ci-post-merge.yml --event push --branch next --limit 20
+
+# Post-merge sentinel runs on push (main)
+
+gh run list --workflow ci-post-merge.yml --event push --branch main --limit 20
 
 # Release runs on push (main + next)
 

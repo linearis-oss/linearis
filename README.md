@@ -125,18 +125,15 @@ Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.
 
 ## Release Automation Policy
 
-Releases are automated by GitHub Actions via `.github/workflows/release-check.yml`.
+Linearis uses three CI/release workflows:
 
-- `next` (default branch): release runs on every push (prerelease channel)
-- `main` (stable branch): release runs on every push (stable channel)
-- Manual `workflow_dispatch` supports releasing from either `main` or `next`
-- No scheduled release run is configured
-- Release workflow is lean and relies on PR required checks for quality gates
-- `CHANGELOG.md` is automation-owned and must not be edited in pull requests
+- `ci.yml` for required pull request checks
+- `ci-post-merge.yml` for post-merge sentinel validation on `main`/`next` pushes
+- `release-check.yml` for push-driven and manual releases
 
-Required PR checks are documented in [`docs/ci-run-model.md`](docs/ci-run-model.md).
+For the authoritative trigger matrix, required checks, and operational verification commands, see [`docs/ci-run-model.md`](docs/ci-run-model.md) (source of truth).
 
-If a pull request branch contains `CHANGELOG.md` changes anywhere in `main...HEAD` history, CI fails and posts rebase instructions.
+`CHANGELOG.md` is automation-owned and must not be edited in pull requests. If a pull request branch contains `CHANGELOG.md` changes anywhere in `main...HEAD` history, CI fails and posts rebase instructions.
 
 ## Contributing
 
