@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - next
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 permissions:
@@ -16,6 +19,7 @@ concurrency:
 
 jobs:
   promote:
+    if: ${{ github.event_name != 'release' || (github.event.release.prerelease == true && github.event.release.target_commitish == 'next') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
