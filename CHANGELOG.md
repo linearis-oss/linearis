@@ -1,3 +1,13 @@
+## [2026.4.8-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.7...v2026.4.8-next.1) (2026-04-23)
+
+### Bug Fixes
+
+* abort timed-out GraphQL requests ([332da1e](https://github.com/linearis-oss/linearis/commit/332da1efd6c86a299ea5639b561bc8383013740c))
+* **ci:** migrate release automation to GitHub App auth ([f0ba4e0](https://github.com/linearis-oss/linearis/commit/f0ba4e0c0a200b70ffa68c367ebce7829b1d29e4))
+* **ci:** use deploy key for release automation git pushes ([5b42037](https://github.com/linearis-oss/linearis/commit/5b42037911b1cf44bfa71757326ecbeceee6d2a1))
+* clear graphql timeout timers on all request paths ([1de7887](https://github.com/linearis-oss/linearis/commit/1de78871d52f106d9b7956f6eaa908f14395653b))
+* **release:** keep prerelease train on stable patch ([0964e75](https://github.com/linearis-oss/linearis/commit/0964e75113d6dbee13e2da5487c9ec08733334fc))
+
 # Changelog
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
