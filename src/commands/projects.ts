@@ -12,9 +12,12 @@ import { resolveProjectStatusId } from "../resolvers/project-status-resolver.js"
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
 import {
+  archiveProject,
   createProject,
+  deleteProject,
   getProject,
   listProjects,
+  unarchiveProject,
   updateProject,
 } from "../services/project-service.js";
 
@@ -303,6 +306,45 @@ export function setupProjectsCommands(program: Command): void {
         }
 
         const result = await updateProject(ctx.gql, projectId, input);
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("archive <project>")
+    .description("archive a project")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [project, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const projectId = await resolveProjectId(ctx.sdk, project);
+        const result = await archiveProject(ctx.gql, projectId);
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("unarchive <project>")
+    .description("unarchive a project")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [project, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const projectId = await resolveProjectId(ctx.sdk, project);
+        const result = await unarchiveProject(ctx.gql, projectId);
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("delete <project>")
+    .description("delete a project")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [project, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const projectId = await resolveProjectId(ctx.sdk, project);
+        const result = await deleteProject(ctx.gql, projectId);
         outputSuccess(result);
       }),
     );

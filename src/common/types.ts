@@ -1,6 +1,7 @@
 import type {
   ArchiveInitiativeMutation,
   ArchiveInitiativeUpdateMutation,
+  ArchiveProjectMutation,
   AttachmentCreateMutation,
   CreateCommentMutation,
   CreateInitiativeMutation,
@@ -14,6 +15,7 @@ import type {
   DeleteInitiativeMutation,
   DeleteInitiativeRelationMutation,
   DeleteInitiativeToProjectMutation,
+  DeleteProjectMutation,
   DocumentCreateMutation,
   DocumentUpdateMutation,
   GetDocumentQuery,
@@ -40,6 +42,7 @@ import type {
   SearchIssuesQuery,
   UnarchiveInitiativeMutation,
   UnarchiveInitiativeUpdateMutation,
+  UnarchiveProjectMutation,
   UpdateCommentMutation,
   UpdateInitiativeMutation,
   UpdateInitiativeUpdateMutation,
@@ -141,6 +144,16 @@ export type CreatedProject = NonNullable<
 export type UpdatedProject = NonNullable<
   UpdateProjectMutation["projectUpdate"]["project"]
 >;
+export type ArchivedProject = NonNullable<
+  ArchiveProjectMutation["projectArchive"]["entity"]
+>;
+export type UnarchivedProject = NonNullable<
+  UnarchiveProjectMutation["projectUnarchive"]["entity"]
+>;
+export type DeletedProject = {
+  id: NonNullable<DeleteProjectMutation["projectDelete"]["entity"]>["id"];
+  success: true;
+};
 
 // Milestone types
 export type MilestoneDetail = NonNullable<
