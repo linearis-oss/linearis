@@ -11,8 +11,6 @@ import type {
   UpdatedProject,
 } from "../common/types.js";
 import {
-  ArchiveProjectDocument,
-  type ArchiveProjectMutation,
   CreateProjectDocument,
   type CreateProjectMutation,
   DeleteProjectDocument,
@@ -97,16 +95,16 @@ export async function archiveProject(
   client: GraphQLClient,
   id: string,
 ): Promise<ArchivedProject> {
-  const result = await client.request<ArchiveProjectMutation>(
-    ArchiveProjectDocument,
+  const result = await client.request<DeleteProjectMutation>(
+    DeleteProjectDocument,
     { id },
   );
 
-  if (!result.projectArchive.success || !result.projectArchive.entity) {
+  if (!result.projectDelete.success || !result.projectDelete.entity) {
     throw new Error(`Failed to archive project "${id}"`);
   }
 
-  return result.projectArchive.entity;
+  return result.projectDelete.entity;
 }
 
 export async function unarchiveProject(

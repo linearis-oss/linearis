@@ -31,7 +31,7 @@ mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
 }
 
 mutation ArchiveProject($id: String!) {
-  projectArchive: projectDelete(id: $id) {
+  projectArchive(id: $id) {
     success
     entity {
       ...ProjectDetailFields
@@ -52,7 +52,7 @@ mutation DeleteProject($id: String!) {
   projectDelete(id: $id) {
     success
     entity {
-      id
+      ...ProjectDetailFields
     }
   }
 }

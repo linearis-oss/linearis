@@ -1,6 +1,7 @@
 // tests/unit/services/project-service.test.ts
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { DeleteProjectDocument } from "../../../src/gql/graphql.js";
 import {
   archiveProject,
   createProject,
@@ -294,7 +295,7 @@ describe("updateProject", () => {
 describe("archiveProject", () => {
   it("returns archived project on success", async () => {
     const client = mockGqlClient({
-      projectArchive: {
+      projectDelete: {
         success: true,
         entity: { id: "proj-1", name: "Archived Project" },
       },
@@ -305,14 +306,14 @@ describe("archiveProject", () => {
       name: "Archived Project",
     });
 
-    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+    expect(client.request).toHaveBeenCalledWith(DeleteProjectDocument, {
       id: "proj-1",
     });
   });
 
   it("throws on failure", async () => {
     const client = mockGqlClient({
-      projectArchive: { success: false, entity: null },
+      projectDelete: { success: false, entity: null },
     });
 
     await expect(archiveProject(client, "proj-1")).rejects.toThrow(
