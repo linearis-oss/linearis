@@ -94,10 +94,10 @@ jobs:
             echo "compare_url=$compare_url"
             echo "body<<EOF"
             echo "## Purpose"
-            echo "Promote tested prerelease changes from \\`next\\` into stable channel on \\`main\\`."
+            echo "Promote tested prerelease changes from \`next\` into stable channel on \`main\`."
             echo
             echo "## Target stable version"
-            echo "\\`$version\\`"
+            echo "\`$version\`"
             echo
             echo "## Included pull requests (next ahead of main)"
             printf '%b\n' "$included_prs"
@@ -106,7 +106,7 @@ jobs:
             echo "$compare_url"
             echo
             echo "## Notes"
-            echo "- This PR is auto-maintained on every push to \\`next\\`."
+            echo "- This PR is auto-maintained on every push to \`next\`."
             echo "- Merge this PR to promote current prerelease train to stable."
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
