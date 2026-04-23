@@ -1,3 +1,9 @@
+## [2026.4.8-next.2](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.1...v2026.4.8-next.2) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** address review feedback for release and history guards ([db27e14](https://github.com/linearis-oss/linearis/commit/db27e148bc95acb610e8dea6471e14896e13be26))
+
 ## [2026.4.8-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.7...v2026.4.8-next.1) (2026-04-23)
 
 ### Bug Fixes
