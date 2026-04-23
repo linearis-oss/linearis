@@ -16,7 +16,9 @@ This document defines how pull request checks and release runs are wired togethe
 | --- | --- | --- | --- | --- |
 | `pull_request` | `main`, `next` | ✅ required checks | ❌ | ❌ |
 | `push` | `main`, `next` | ❌ | ✅ post-merge sentinel | ✅ release run |
-| `workflow_dispatch` | selected ref | ❌ | ❌ | ✅ manual release run |
+| `workflow_dispatch` | selected ref (only `main`/`next` accepted by job validation) | ❌ | ❌ | ✅ manual release run (main/next only) |
+
+> **Constraint:** Although GitHub UI lets you choose any ref for `workflow_dispatch`, `release-check.yml` enforces `main` or `next` only and fails early for other refs.
 
 ## Required checks for repository ruleset
 
@@ -33,7 +35,7 @@ Release workflow is lean and intentionally does not run a weekly schedule:
 
 - Push to `next` → prerelease channel
 - Push to `main` → stable release channel
-- Manual `workflow_dispatch` → ad-hoc release from selected ref
+- Manual `workflow_dispatch` → ad-hoc release from `main` or `next` only (validated in the release job)
 
 Because release runs happen only after merges, quality gates live in PR required checks, not duplicated release-time full matrices.
 
