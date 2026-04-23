@@ -1,3 +1,9 @@
+## [2026.4.8-next.4](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.3...v2026.4.8-next.4) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** avoid shell interpolation in promotion PR body ([c297307](https://github.com/linearis-oss/linearis/commit/c2973072f60a313227ef41f4f4acacda8d1919b9))
+
 ## [2026.4.8-next.3](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.2...v2026.4.8-next.3) (2026-04-23)
 
 ### Bug Fixes
