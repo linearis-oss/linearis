@@ -72,16 +72,33 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ steps.target.outputs.branch }}
-          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
           persist-credentials: false
 
-      - name: Configure git remote for SSH pushes
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Resolve GitHub App bot identity
+        id: app-bot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          slug='${{ steps.app-token.outputs.app-slug }}'
+          id="$(gh api "/users/${slug}[bot]" --jq .id)"
+          echo "name=${slug}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${id}+${slug}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git identity
         shell: bash
         run: |
           set -euo pipefail
-          git remote set-url origin git@github.com:${GITHUB_REPOSITORY}.git
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${{ steps.app-bot.outputs.name }}"
+          git config user.email "${{ steps.app-bot.outputs.email }}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -107,9 +124,9 @@ jobs:
 
       - name: Run semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_REF: refs/heads/${{ steps.target.outputs.branch }}
           GITHUB_REF_NAME: ${{ steps.target.outputs.branch }}
-          SEMANTIC_RELEASE_REPOSITORY_URL: git@github.com:${{ github.repository }}.git
         run: npm run release:run
