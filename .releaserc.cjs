@@ -5,7 +5,29 @@ module.exports = {
   branches: ["main", { name: "next", prerelease: "next" }],
   tagFormat: `v\${version}`,
   plugins: [
-    ["@semantic-release/commit-analyzer", { preset: "conventionalcommits" }],
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        preset: "conventionalcommits",
+        releaseRules: [
+          { breaking: true, release: "major" },
+          { revert: true, release: "patch" },
+          { type: "feat", release: "minor" },
+          { type: "fix", release: "patch" },
+          { type: "perf", release: "patch" },
+          { type: "refactor", release: false },
+          { type: "chore", release: false },
+          { type: "ci", release: false },
+          { type: "docs", release: false },
+          { type: "style", release: false },
+          { type: "test", release: false },
+          { type: "build", release: false },
+          { scope: "ci", release: false },
+          { scope: "release", release: false },
+          { scope: "workflow", release: false },
+        ],
+      },
+    ],
     [
       "@semantic-release/release-notes-generator",
       { preset: "conventionalcommits" },

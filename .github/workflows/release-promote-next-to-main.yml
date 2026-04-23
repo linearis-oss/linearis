@@ -1,9 +1,6 @@
 name: Promote Next to Main
 
 on:
-  push:
-    branches:
-      - next
   release:
     types:
       - published
