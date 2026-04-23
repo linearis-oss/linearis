@@ -19,6 +19,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: npm-publish
     steps:
       - name: Guard workflow_dispatch caller permissions
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -121,6 +122,16 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Verify npm auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          test -n "${NODE_AUTH_TOKEN}" || {
+            echo "NPM_TOKEN missing (check job environment + secret scope)"
+            exit 1
+          }
+          npm whoami --registry=https://registry.npmjs.org/
 
       - name: Run semantic-release
         env:
