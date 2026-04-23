@@ -330,7 +330,9 @@ export function setupProjectsCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [project, , command] = args as [string, unknown, Command];
         const ctx = createContext(command.parent!.parent!.opts());
-        const projectId = await resolveProjectId(ctx.sdk, project);
+        const projectId = await resolveProjectId(ctx.sdk, project, {
+          includeArchived: true,
+        });
         const result = await unarchiveProject(ctx.gql, projectId);
         outputSuccess(result);
       }),

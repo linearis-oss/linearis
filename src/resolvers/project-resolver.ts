@@ -2,15 +2,21 @@ import type { LinearSdkClient } from "../client/linear-client.js";
 import { notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
 
+export interface ResolveProjectIdOptions {
+  includeArchived?: boolean;
+}
+
 export async function resolveProjectId(
   client: LinearSdkClient,
   nameOrId: string,
+  options: ResolveProjectIdOptions = {},
 ): Promise<string> {
   if (isUuid(nameOrId)) return nameOrId;
 
   const result = await client.sdk.projects({
     filter: { name: { eqIgnoreCase: nameOrId } },
     first: 1,
+    includeArchived: options.includeArchived,
   });
 
   if (result.nodes.length === 0) {

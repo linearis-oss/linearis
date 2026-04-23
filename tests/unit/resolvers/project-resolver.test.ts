@@ -40,6 +40,21 @@ describe("resolveProjectId", () => {
     expect(result).toBe("proj-uuid");
   });
 
+  it("includes archived projects when requested", async () => {
+    const client = mockSdkClient([{ id: "archived-proj-uuid" }]);
+
+    const result = await resolveProjectId(client, "Archived Project", {
+      includeArchived: true,
+    });
+
+    expect(result).toBe("archived-proj-uuid");
+    expect(client.sdk.projects).toHaveBeenCalledWith({
+      filter: { name: { eqIgnoreCase: "Archived Project" } },
+      first: 1,
+      includeArchived: true,
+    });
+  });
+
   it("throws when project not found", async () => {
     const client = mockSdkClient([]);
     await expect(resolveProjectId(client, "Nonexistent")).rejects.toThrow(
