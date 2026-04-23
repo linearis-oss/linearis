@@ -523,7 +523,7 @@ query BatchResolveForCreate(
 
 # Complete issue fragment with attachments
 fragment CompleteIssueWithAttachmentsFields on Issue {
-  ...CompleteIssueWithCommentsFields
+  ...CompleteIssueWithDefaultCommentsFields
   attachments {
     nodes {
       ...AttachmentFields

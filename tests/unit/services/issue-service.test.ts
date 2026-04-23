@@ -1,3 +1,4 @@
+import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
@@ -38,6 +39,67 @@ function mockGqlClient(response: Record<string, unknown>) {
     request: vi.fn().mockResolvedValue(response),
   } as unknown as GraphQLClient;
 }
+
+function getFragment(
+  document: DocumentNode,
+  name: string,
+): FragmentDefinitionNode {
+  const fragment = document.definitions.find(
+    (definition): definition is FragmentDefinitionNode =>
+      definition.kind === Kind.FRAGMENT_DEFINITION &&
+      definition.name.value === name,
+  );
+
+  if (!fragment) {
+    throw new Error(`Fragment ${name} not found`);
+  }
+
+  return fragment;
+}
+
+describe("attachment issue read documents", () => {
+  it("keep attachment reads on the default comment payload", () => {
+    const documents = [
+      GetIssueByIdWithAttachmentsDocument,
+      GetIssueByIdentifierWithAttachmentsDocument,
+    ];
+
+    for (const document of documents) {
+      const attachmentsFragment = getFragment(
+        document,
+        "CompleteIssueWithAttachmentsFields",
+      );
+      const attachmentsSelections = attachmentsFragment.selectionSet.selections
+        .filter((selection) => selection.kind === Kind.FRAGMENT_SPREAD)
+        .map((selection) => selection.name.value);
+
+      expect(attachmentsSelections).toContain(
+        "CompleteIssueWithDefaultCommentsFields",
+      );
+      expect(attachmentsSelections).not.toContain(
+        "CompleteIssueWithCommentsFields",
+      );
+      expect(
+        document.definitions.some(
+          (definition) =>
+            definition.kind === Kind.FRAGMENT_DEFINITION &&
+            definition.name.value === "IssueReadCommentFields",
+        ),
+      ).toBe(false);
+
+      const defaultCommentFragment = getFragment(
+        document,
+        "IssueReadDefaultCommentFields",
+      );
+      const defaultCommentSelections =
+        defaultCommentFragment.selectionSet.selections
+          .filter((selection) => selection.kind === Kind.FIELD)
+          .map((selection) => selection.name.value);
+
+      expect(defaultCommentSelections).toEqual(["id", "body"]);
+    }
+  });
+});
 
 describe("listIssues", () => {
   it("returns issues from query", async () => {
