@@ -36,6 +36,13 @@ function parseLastVersion(lastVersion, branchName) {
   };
 }
 
+function isMonthRollover({ lastVersion, branchName, nowIso }) {
+  const now = getUtcYearMonth(nowIso);
+  const last = parseLastVersion(lastVersion, branchName);
+
+  return !(last.year === now.year && last.month === now.month);
+}
+
 function computeCalverVersion({ lastVersion, branchName, nowIso }) {
   const now = getUtcYearMonth(nowIso);
   const last = parseLastVersion(lastVersion, branchName);
@@ -44,7 +51,7 @@ function computeCalverVersion({ lastVersion, branchName, nowIso }) {
 
   if (branchName === "next") {
     if (!sameMonth) {
-      return `${now.year}.${now.month}.1-next.1`;
+      return `${now.year}.${now.month}.0-next.1`;
     }
 
     const patch = last.fromPrerelease ? last.patch : last.patch + 1;
@@ -52,10 +59,11 @@ function computeCalverVersion({ lastVersion, branchName, nowIso }) {
     return `${now.year}.${now.month}.${patch}-next.${counter}`;
   }
 
-  const patch = sameMonth ? last.patch + 1 : 1;
+  const patch = sameMonth ? last.patch + 1 : 0;
   return `${now.year}.${now.month}.${patch}`;
 }
 
 module.exports = {
   computeCalverVersion,
+  isMonthRollover,
 };

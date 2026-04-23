@@ -6,19 +6,58 @@ import {
 } from "../../../scripts/release/calver-plugin.cjs";
 
 describe("calver plugin", () => {
-  it("maps releasable commits to patch for main and next", () => {
-    expect(mapCalverReleaseType("main", "minor")).toBe("patch");
-    expect(mapCalverReleaseType("main", "major")).toBe("patch");
-    expect(mapCalverReleaseType("next", "minor")).toBe("patch");
-    expect(mapCalverReleaseType("next", "patch")).toBe("patch");
+  it("maps releasable commits to patch within same month", () => {
+    expect(
+      mapCalverReleaseType({
+        branchName: "main",
+        releaseType: "minor",
+        lastVersion: "2026.4.8",
+        nowIso: "2026-04-20T10:00:00.000Z",
+      }),
+    ).toBe("patch");
+
+    expect(
+      mapCalverReleaseType({
+        branchName: "next",
+        releaseType: "major",
+        lastVersion: "2026.4.8-next.6",
+        nowIso: "2026-04-20T10:00:00.000Z",
+      }),
+    ).toBe("patch");
+  });
+
+  it("maps releasable commits to minor on month rollover", () => {
+    expect(
+      mapCalverReleaseType({
+        branchName: "main",
+        releaseType: "patch",
+        lastVersion: "2026.4.8",
+        nowIso: "2026-05-01T00:00:00.000Z",
+      }),
+    ).toBe("minor");
+
+    expect(
+      mapCalverReleaseType({
+        branchName: "next",
+        releaseType: "patch",
+        lastVersion: "2026.4.8-next.6",
+        nowIso: "2026-05-01T00:00:00.000Z",
+      }),
+    ).toBe("minor");
   });
 
   it("preserves null release type", () => {
-    expect(mapCalverReleaseType("main", null)).toBeNull();
-    expect(mapCalverReleaseType("next", null)).toBeNull();
+    expect(
+      mapCalverReleaseType({
+        branchName: "main",
+        releaseType: null,
+        lastVersion: "2026.4.8",
+        nowIso: "2026-04-20T10:00:00.000Z",
+      }),
+    ).toBeNull();
   });
 
-  it("delegates commit analysis but normalizes to patch cadence", async () => {
+  it("delegates commit analysis and normalizes to patch cadence", async () => {
     const pluginConfig = {
       preset: "conventionalcommits",
       releaseRules: [{ type: "chore", release: false }],
@@ -31,9 +70,34 @@ describe("calver plugin", () => {
       env: process.env,
       logger: { log: vi.fn<(message: string) => void>() },
       options: {},
+      lastRelease: { version: "2026.4.8-next.6" },
     };
 
     await expect(analyzeCommits(pluginConfig, context)).resolves.toBe("patch");
+  });
+
+  it("rolls over to minor on month change during analyzeCommits", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T00:00:00.000Z"));
+
+    const pluginConfig = {
+      preset: "conventionalcommits",
+      releaseRules: [{ type: "chore", release: false }],
+    };
+
+    const context = {
+      branch: { name: "next" },
+      commits: [{ message: "fix(labels): repair filters" }],
+      cwd: process.cwd(),
+      env: process.env,
+      logger: { log: vi.fn<(message: string) => void>() },
+      options: {},
+      lastRelease: { version: "2026.4.8-next.6" },
+    };
+
+    await expect(analyzeCommits(pluginConfig, context)).resolves.toBe("minor");
+
+    vi.useRealTimers();
   });
 
   it("fails when semantic-release next version diverges from calver", async () => {
@@ -54,7 +118,7 @@ describe("calver plugin", () => {
     vi.useRealTimers();
   });
 
-  it("fails loudly for month-rollover version gap", async () => {
+  it("passes month-rollover semantic-release version", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-01T00:00:00.000Z"));
 
@@ -62,12 +126,10 @@ describe("calver plugin", () => {
       lastRelease: { version: "2026.4.8" },
       branch: { name: "main" },
       logger: { log: vi.fn<(message: string) => void>() },
-      nextRelease: { version: "2026.4.9" },
+      nextRelease: { version: "2026.5.0" },
     };
 
-    await expect(verifyRelease({}, context)).rejects.toThrow(
-      "semantic-release computed 2026.4.9 but calver requires 2026.5.1",
-    );
+    await expect(verifyRelease({}, context)).resolves.toBeUndefined();
 
     vi.useRealTimers();
   });

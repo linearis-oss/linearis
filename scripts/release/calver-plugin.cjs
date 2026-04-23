@@ -1,16 +1,25 @@
 const commitAnalyzer = require("@semantic-release/commit-analyzer");
-const { computeCalverVersion } = require("./calver.cjs");
+const { computeCalverVersion, isMonthRollover } = require("./calver.cjs");
 
-function mapCalverReleaseType(branchName, releaseType) {
+function mapCalverReleaseType({
+  branchName,
+  releaseType,
+  lastVersion,
+  nowIso,
+}) {
   if (!releaseType) {
     return null;
   }
 
-  if (branchName === "main" || branchName === "next") {
-    return "patch";
+  if (branchName !== "main" && branchName !== "next") {
+    return releaseType;
   }
 
-  return releaseType;
+  if (isMonthRollover({ lastVersion, branchName, nowIso })) {
+    return "minor";
+  }
+
+  return "patch";
 }
 
 async function analyzeCommits(pluginConfig, context) {
@@ -18,9 +27,17 @@ async function analyzeCommits(pluginConfig, context) {
     pluginConfig,
     context,
   );
-  const branchName = context.branch?.name ?? "main";
 
-  const mappedReleaseType = mapCalverReleaseType(branchName, releaseType);
+  const branchName = context.branch?.name ?? "main";
+  const lastVersion = context.lastRelease?.version ?? "1970.1.0";
+  const nowIso = new Date().toISOString();
+
+  const mappedReleaseType = mapCalverReleaseType({
+    branchName,
+    releaseType,
+    lastVersion,
+    nowIso,
+  });
 
   if (releaseType !== mappedReleaseType) {
     context.logger.log(
@@ -48,8 +65,7 @@ async function verifyRelease(_, context) {
 
   if (semanticVersion !== expectedVersion) {
     throw new Error(
-      `calver-plugin: semantic-release computed ${semanticVersion} but calver requires ${expectedVersion}. ` +
-        "Current semantic-release version model cannot represent this calver transition.",
+      `calver-plugin: semantic-release computed ${semanticVersion} but calver requires ${expectedVersion}`,
     );
   }
 
