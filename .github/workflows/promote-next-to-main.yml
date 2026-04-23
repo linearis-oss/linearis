@@ -31,7 +31,24 @@ jobs:
       - name: Fetch main and next refs
         run: git fetch origin main next
 
+      - name: No-op when next has no commits ahead of main
+        id: commits-check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          commit_ahead=$(git rev-list --max-count=1 origin/main..origin/next)
+
+          if [ -z "$commit_ahead" ]; then
+            echo "No commits to promote (origin/main..origin/next is empty)."
+            echo "has_commits=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_commits=true" >> "$GITHUB_OUTPUT"
+
       - name: Generate linearis-bot app token
+        if: ${{ steps.commits-check.outputs.has_commits == 'true' }}
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
@@ -39,6 +56,7 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Build PR metadata
+        if: ${{ steps.commits-check.outputs.has_commits == 'true' }}
         id: meta
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -112,6 +130,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Upsert promotion PR
+        if: ${{ steps.commits-check.outputs.has_commits == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PROMOTION_PR_TITLE: ${{ steps.meta.outputs.title }}

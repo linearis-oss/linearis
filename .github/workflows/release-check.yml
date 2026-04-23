@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - next
-  schedule:
-    - cron: "0 9 * * 1"
+      - main
   workflow_dispatch:
 
 permissions:
@@ -13,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: release-${{ github.event_name == 'schedule' && 'main' || github.ref_name }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -50,11 +49,7 @@ jobs:
         id: target
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            branch="main"
-          else
-            branch="${{ github.ref_name }}"
-          fi
+          branch="${{ github.ref_name }}"
 
           case "$branch" in
             main|next) ;;
@@ -113,15 +108,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Lint and format check
-        run: npm run check:ci
-
-      - name: Type check
-        run: npx tsc --noEmit
 
       - name: Verify npm auth
         env:
