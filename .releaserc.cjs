@@ -10,6 +10,8 @@ module.exports = {
       {
         preset: "conventionalcommits",
         releaseRules: [
+          // Calver plugin controls final version string.
+          // major/minor/patch here only control releasability/prioritization.
           { breaking: true, release: "major" },
           { revert: true, release: "patch" },
           { type: "feat", release: "minor" },

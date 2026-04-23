@@ -70,10 +70,58 @@ jobs:
 
           mapfile -t commit_shas < <(git rev-list --no-merges origin/main..origin/next)
 
+          classify_commit() {
+            local subject="$1"
+            local body="$2"
+
+            local type=""
+            local scope=""
+            local bang=""
+
+            if [[ "$subject" =~ ^([a-z]+)(\(([^)]+)\))?(!)?:[[:space:]] ]]; then
+              type="${BASH_REMATCH[1]}"
+              scope="${BASH_REMATCH[3]:-}"
+              bang="${BASH_REMATCH[4]:-}"
+            fi
+
+            if [ "$bang" = "!" ] || grep -q "BREAKING CHANGE:" <<<"$body"; then
+              echo "releasable"
+              return
+            fi
+
+            case "$type" in
+              feat|fix|perf|revert)
+                ;;
+              *)
+                echo "maintenance"
+                return
+                ;;
+            esac
+
+            case "$scope" in
+              ci|release|workflow)
+                echo "maintenance"
+                ;;
+              *)
+                echo "releasable"
+                ;;
+            esac
+          }
+
           declare -A seen_prs=()
-          included_prs=""
+          declare -A pr_releasable=()
+          declare -A pr_titles=()
+          declare -A pr_urls=()
+          declare -A pr_authors=()
+
+          releasable_commits_no_pr=""
+          maintenance_commits_no_pr=""
 
           for sha in "${commit_shas[@]}"; do
+            subject=$(git show -s --format=%s "$sha")
+            body=$(git show -s --format=%B "$sha")
+            class=$(classify_commit "$subject" "$body")
+
             response=$(gh api graphql \
               -f owner="$owner" \
               -f repo="$repo" \
@@ -81,27 +129,64 @@ jobs:
               -f query='query($owner: String!, $repo: String!, $oid: GitObjectID!) { repository(owner: $owner, name: $repo) { object(oid: $oid) { ... on Commit { associatedPullRequests(first: 10) { nodes { number title url author { login } } } } } } }' \
               2>/dev/null || true)
 
-            if [ -z "$response" ]; then
-              continue
+            has_pr=false
+            if [ -n "$response" ]; then
+              while IFS=$'\t' read -r number pr_title pr_url pr_author; do
+                if [ -z "$number" ]; then
+                  continue
+                fi
+
+                has_pr=true
+                seen_prs[$number]=1
+
+                if [ -z "$pr_author" ] || [ "$pr_author" = "null" ]; then
+                  pr_author="unknown"
+                fi
+
+                pr_titles[$number]="$pr_title"
+                pr_urls[$number]="$pr_url"
+                pr_authors[$number]="$pr_author"
+
+                if [ "$class" = "releasable" ]; then
+                  pr_releasable[$number]=1
+                fi
+              done < <(printf '%s' "$response" | jq -r '.data.repository.object.associatedPullRequests.nodes[]? | [.number, .title, .url, .author.login] | @tsv')
             fi
 
-            while IFS=$'\t' read -r number pr_title pr_url pr_author; do
-              if [ -z "$number" ] || [ -n "${seen_prs[$number]:-}" ]; then
-                continue
+            if [ "$has_pr" = false ]; then
+              if [ "$class" = "releasable" ]; then
+                releasable_commits_no_pr+="- ${subject} (${sha:0:7})\n"
+              else
+                maintenance_commits_no_pr+="- ${subject} (${sha:0:7})\n"
               fi
-
-              seen_prs[$number]=1
-
-              if [ -z "$pr_author" ] || [ "$pr_author" = "null" ]; then
-                pr_author="unknown"
-              fi
-
-              included_prs+="- [#${number}](${pr_url}) ${pr_title} by @${pr_author} — thanks @${pr_author}!\n"
-            done < <(printf '%s' "$response" | jq -r '.data.repository.object.associatedPullRequests.nodes[]? | [.number, .title, .url, .author.login] | @tsv')
+            fi
           done
 
-          if [ -z "$included_prs" ]; then
-            included_prs="- (no included pull requests found; branches may be aligned)"
+          releasable_prs=""
+          maintenance_prs=""
+
+          if [ ${#seen_prs[@]} -gt 0 ]; then
+            while IFS= read -r number; do
+              pr_title="${pr_titles[$number]}"
+              pr_url="${pr_urls[$number]}"
+              pr_author="${pr_authors[$number]}"
+
+              line="- [#${number}](${pr_url}) ${pr_title} by @${pr_author}"
+
+              if [ "${pr_releasable[$number]:-0}" = "1" ]; then
+                releasable_prs+="${line}\n"
+              else
+                maintenance_prs+="${line}\n"
+              fi
+            done < <(printf '%s\n' "${!seen_prs[@]}" | sort -n)
+          fi
+
+          if [ -z "$releasable_prs" ] && [ -z "$releasable_commits_no_pr" ]; then
+            releasable_prs="- None"
+          fi
+
+          if [ -z "$maintenance_prs" ] && [ -z "$maintenance_commits_no_pr" ]; then
+            maintenance_prs="- None"
           fi
 
           {
@@ -115,15 +200,29 @@ jobs:
             echo "## Target stable version"
             echo "\`$version\`"
             echo
-            echo "## Included pull requests (next ahead of main)"
-            printf '%b\n' "$included_prs"
+            echo "## Ships in stable (releasable changes)"
+            printf '%b\n' "$releasable_prs"
+            if [ -n "$releasable_commits_no_pr" ]; then
+              echo
+              echo "### Releasable commits without associated PR"
+              printf '%b\n' "$releasable_commits_no_pr"
+            fi
+            echo
+            echo "## Also included (no version impact)"
+            printf '%b\n' "$maintenance_prs"
+            if [ -n "$maintenance_commits_no_pr" ]; then
+              echo
+              echo "### Maintenance commits without associated PR"
+              printf '%b\n' "$maintenance_commits_no_pr"
+            fi
             echo
             echo "## Compare"
             echo "$compare_url"
             echo
             echo "## Notes"
-            echo "- This PR is auto-maintained on every push to \`next\`."
+            echo "- This PR is auto-maintained when a prerelease is published from \`next\`."
             echo "- Merge this PR to promote current prerelease train to stable."
+            echo "- Releasable classification mirrors semantic-release policy (feat/fix/perf/revert plus breaking changes, excluding ci/release/workflow scopes)."
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
