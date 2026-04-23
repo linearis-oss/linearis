@@ -24,14 +24,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Create GitHub App token
+      - name: Create linearis-bot app token
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - name: Resolve GitHub App bot identity
+      - name: Resolve linearis-bot app bot identity
         id: app-bot
         shell: bash
         env:
@@ -43,7 +43,7 @@ jobs:
           echo "name=${slug}[bot]" >> "$GITHUB_OUTPUT"
           echo "email=${id}+${slug}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
 
-      - name: Configure git
+      - name: Configure git (linearis-bot app identity)
         env:
           GH_APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
