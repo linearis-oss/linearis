@@ -1,10 +1,14 @@
 // tests/unit/services/project-service.test.ts
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { ArchiveProjectDocument } from "../../../src/gql/graphql.js";
 import {
+  archiveProject,
   createProject,
+  deleteProject,
   getProject,
   listProjects,
+  unarchiveProject,
   updateProject,
 } from "../../../src/services/project-service.js";
 
@@ -285,5 +289,103 @@ describe("updateProject", () => {
     await expect(
       updateProject(client, "proj-1", { name: "Fail" }),
     ).rejects.toThrow('Failed to update project "proj-1"');
+  });
+});
+
+describe("archiveProject", () => {
+  it("returns archived project on success", async () => {
+    const client = mockGqlClient({
+      projectArchive: {
+        success: true,
+        entity: { id: "proj-1", name: "Archived Project" },
+      },
+    });
+
+    await expect(archiveProject(client, "proj-1")).resolves.toEqual({
+      id: "proj-1",
+      name: "Archived Project",
+    });
+
+    expect(client.request).toHaveBeenCalledWith(ArchiveProjectDocument, {
+      id: "proj-1",
+    });
+  });
+
+  it("throws on failure", async () => {
+    const client = mockGqlClient({
+      projectArchive: { success: false, entity: null },
+    });
+
+    await expect(archiveProject(client, "proj-1")).rejects.toThrow(
+      'Failed to archive project "proj-1"',
+    );
+  });
+});
+
+describe("unarchiveProject", () => {
+  it("returns unarchived project on success", async () => {
+    const client = mockGqlClient({
+      projectUnarchive: {
+        success: true,
+        entity: { id: "proj-1", name: "Active Project" },
+      },
+    });
+
+    await expect(unarchiveProject(client, "proj-1")).resolves.toEqual({
+      id: "proj-1",
+      name: "Active Project",
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+    });
+  });
+
+  it("throws on failure", async () => {
+    const client = mockGqlClient({
+      projectUnarchive: { success: false, entity: null },
+    });
+
+    await expect(unarchiveProject(client, "proj-1")).rejects.toThrow(
+      'Failed to unarchive project "proj-1"',
+    );
+  });
+});
+
+describe("deleteProject", () => {
+  it("returns delete payload on success", async () => {
+    const client = mockGqlClient({
+      projectDelete: { success: true, entity: { id: "proj-1" } },
+    });
+
+    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+      id: "proj-1",
+      success: true,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+    });
+  });
+
+  it("returns the requested id when delete succeeds with null entity", async () => {
+    const client = mockGqlClient({
+      projectDelete: { success: true, entity: null },
+    });
+
+    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+      id: "proj-1",
+      success: true,
+    });
+  });
+
+  it("throws on failure", async () => {
+    const client = mockGqlClient({
+      projectDelete: { success: false, entity: null },
+    });
+
+    await expect(deleteProject(client, "proj-1")).rejects.toThrow(
+      'Failed to delete project "proj-1"',
+    );
   });
 });
