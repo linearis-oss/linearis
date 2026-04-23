@@ -1,7 +1,9 @@
-// tests/unit/services/label-service.test.ts
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import { listLabels } from "../../../src/services/label-service.js";
+import {
+  listLabels,
+  listProjectLabels,
+} from "../../../src/services/label-service.js";
 
 function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
   return {
@@ -10,7 +12,7 @@ function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
 }
 
 describe("listLabels", () => {
-  it("returns labels", async () => {
+  it("returns issue labels with type", async () => {
     const client = mockGqlClient({
       issueLabels: {
         nodes: [
@@ -19,11 +21,18 @@ describe("listLabels", () => {
         pageInfo: { hasNextPage: false, endCursor: "c1" },
       },
     });
+
     const result = await listLabels(client);
-    expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("lbl-1");
-    expect(result.nodes[0].name).toBe("Bug");
-    expect(result.nodes[0].color).toBe("#ff0000");
+
+    expect(result.nodes).toEqual([
+      {
+        id: "lbl-1",
+        name: "Bug",
+        color: "#ff0000",
+        description: "A bug",
+        type: "issue",
+      },
+    ]);
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: "c1" });
   });
 
@@ -34,7 +43,9 @@ describe("listLabels", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
+
     const result = await listLabels(client);
+
     expect(result.nodes).toEqual([]);
     expect(result.pageInfo.hasNextPage).toBe(false);
   });
@@ -46,7 +57,9 @@ describe("listLabels", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
+
     await listLabels(client, undefined, { after: "cur1" });
+
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: "cur1",
@@ -61,7 +74,9 @@ describe("listLabels", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
+
     await listLabels(client);
+
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: undefined,
@@ -76,7 +91,9 @@ describe("listLabels", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
+
     await listLabels(client, "team-1");
+
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: undefined,
@@ -93,7 +110,94 @@ describe("listLabels", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
+
     const result = await listLabels(client);
+
     expect(result.nodes[0].description).toBeUndefined();
+    expect(result.nodes[0].type).toBe("issue");
+  });
+});
+
+describe("listProjectLabels", () => {
+  it("returns project labels with type", async () => {
+    const client = mockGqlClient({
+      projectLabels: {
+        nodes: [
+          {
+            id: "plbl-1",
+            name: "Customer",
+            color: "#0000ff",
+            description: "Customer-facing",
+          },
+        ],
+        pageInfo: { hasNextPage: false, endCursor: "p1" },
+      },
+    });
+
+    const result = await listProjectLabels(client);
+
+    expect(result.nodes).toEqual([
+      {
+        id: "plbl-1",
+        name: "Customer",
+        color: "#0000ff",
+        description: "Customer-facing",
+        type: "project",
+      },
+    ]);
+    expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: "p1" });
+  });
+
+  it("uses default limit of 50", async () => {
+    const client = mockGqlClient({
+      projectLabels: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await listProjectLabels(client);
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 50,
+      after: undefined,
+    });
+  });
+
+  it("passes pagination without filter", async () => {
+    const client = mockGqlClient({
+      projectLabels: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await listProjectLabels(client, { limit: 25, after: "cur2" });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 25,
+      after: "cur2",
+    });
+  });
+
+  it("converts null description to undefined", async () => {
+    const client = mockGqlClient({
+      projectLabels: {
+        nodes: [
+          {
+            id: "plbl-2",
+            name: "Internal",
+            color: "#123456",
+            description: null,
+          },
+        ],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    const result = await listProjectLabels(client);
+
+    expect(result.nodes[0].description).toBeUndefined();
+    expect(result.nodes[0].type).toBe("project");
   });
 });
