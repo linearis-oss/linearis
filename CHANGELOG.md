@@ -1,3 +1,9 @@
+## [2026.4.8-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.5...v2026.4.8-next.6) (2026-04-23)
+
+### Bug Fixes
+
+* **ci:** restore release trigger fallback for promotion PR ([0b358b1](https://github.com/linearis-oss/linearis/commit/0b358b17331bb2d7a047332d81a9f97bea9aadd0))
+
 ## [2026.4.8-next.5](https://github.com/linearis-oss/linearis/compare/v2026.4.8-next.4...v2026.4.8-next.5) (2026-04-23)
 
 ### Bug Fixes
