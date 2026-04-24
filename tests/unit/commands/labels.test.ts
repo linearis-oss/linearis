@@ -71,6 +71,7 @@ describe("labels list", () => {
     expect(listLabels).toHaveBeenCalledWith(expect.anything(), undefined, {
       limit: 50,
       after: undefined,
+      scope: undefined,
     });
     expect(listProjectLabels).not.toHaveBeenCalled();
     expect(resolveTeamId).not.toHaveBeenCalled();
@@ -103,6 +104,55 @@ describe("labels list", () => {
       {
         limit: 10,
         after: "cur1",
+        scope: undefined,
+      },
+    );
+    expect(listProjectLabels).not.toHaveBeenCalled();
+  });
+
+  it("passes workspace scope without team resolution", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "list",
+      "--scope",
+      "workspace",
+    ]);
+
+    expect(listLabels).toHaveBeenCalledWith(expect.anything(), undefined, {
+      limit: 50,
+      after: undefined,
+      scope: "workspace",
+    });
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(listProjectLabels).not.toHaveBeenCalled();
+  });
+
+  it("resolves team for explicit team scope", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "list",
+      "--scope",
+      "team",
+      "--team",
+      "ENG",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "ENG");
+    expect(listLabels).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-team-uuid",
+      {
+        limit: 50,
+        after: undefined,
+        scope: "team",
       },
     );
     expect(listProjectLabels).not.toHaveBeenCalled();
@@ -123,6 +173,7 @@ describe("labels list", () => {
     expect(listLabels).toHaveBeenCalledWith(expect.anything(), undefined, {
       limit: 50,
       after: undefined,
+      scope: undefined,
     });
     expect(listProjectLabels).not.toHaveBeenCalled();
     expect(resolveTeamId).not.toHaveBeenCalled();
@@ -189,6 +240,80 @@ describe("labels list validation", () => {
     expect(resolveTeamId).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported scope values", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "list",
+      "--scope",
+      "org",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      'Invalid --scope: must be one of "workspace" or "team"',
+    );
+    expect(listLabels).not.toHaveBeenCalled();
+    expect(listProjectLabels).not.toHaveBeenCalled();
+    expect(resolveTeamId).not.toHaveBeenCalled();
+  });
+
+  it("rejects team scope without a team filter", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "list",
+      "--scope",
+      "team",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid --scope: team scope requires --team",
+    );
+    expect(listLabels).not.toHaveBeenCalled();
+    expect(listProjectLabels).not.toHaveBeenCalled();
+    expect(resolveTeamId).not.toHaveBeenCalled();
+  });
+
+  it("rejects team filters for workspace scope", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "list",
+      "--scope",
+      "workspace",
+      "--team",
+      "ENG",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid --team: cannot be used with --scope workspace",
+    );
+    expect(listLabels).not.toHaveBeenCalled();
+    expect(listProjectLabels).not.toHaveBeenCalled();
+    expect(resolveTeamId).not.toHaveBeenCalled();
+  });
+
   it("rejects team filters for project labels", async () => {
     const program = createProgram();
 
@@ -209,6 +334,32 @@ describe("labels list validation", () => {
 
     expect(errorOutput.error).toBe(
       "Invalid --team: cannot be used with --type project because project labels are workspace-scoped",
+    );
+    expect(listLabels).not.toHaveBeenCalled();
+    expect(listProjectLabels).not.toHaveBeenCalled();
+    expect(resolveTeamId).not.toHaveBeenCalled();
+  });
+
+  it("rejects scope filters for project labels", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "list",
+      "--type",
+      "project",
+      "--scope",
+      "workspace",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid --scope: cannot be used with --type project because project labels are always workspace-scoped",
     );
     expect(listLabels).not.toHaveBeenCalled();
     expect(listProjectLabels).not.toHaveBeenCalled();

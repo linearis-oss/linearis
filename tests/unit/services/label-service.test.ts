@@ -101,6 +101,40 @@ describe("listLabels", () => {
     });
   });
 
+  it("filters workspace issue labels by null team", async () => {
+    const client = mockGqlClient({
+      issueLabels: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await listLabels(client, undefined, { scope: "workspace" });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 50,
+      after: undefined,
+      filter: { team: { null: true } },
+    });
+  });
+
+  it("keeps team scope on the resolved team filter", async () => {
+    const client = mockGqlClient({
+      issueLabels: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await listLabels(client, "team-1", { scope: "team" });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 50,
+      after: undefined,
+      filter: { team: { id: { eq: "team-1" }, null: false } },
+    });
+  });
+
   it("converts null description to undefined", async () => {
     const client = mockGqlClient({
       issueLabels: {

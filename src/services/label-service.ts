@@ -5,9 +5,11 @@ import {
   type GetLabelsQuery,
   GetProjectLabelsDocument,
   type GetProjectLabelsQuery,
+  type IssueLabelFilter,
 } from "../gql/graphql.js";
 
 export type LabelType = "issue" | "project";
+export type LabelScope = "workspace" | "team";
 
 export interface Label {
   id: string;
@@ -17,13 +19,36 @@ export interface Label {
   type: LabelType;
 }
 
+export interface ListLabelOptions extends PaginationOptions {
+  scope?: LabelScope;
+}
+
+function buildIssueLabelFilter(
+  teamId?: string,
+  scope?: LabelScope,
+): IssueLabelFilter | undefined {
+  if (scope === "workspace") {
+    return { team: { null: true } };
+  }
+
+  if (scope === "team" && teamId) {
+    return { team: { id: { eq: teamId }, null: false } };
+  }
+
+  if (teamId) {
+    return { team: { id: { eq: teamId } } };
+  }
+
+  return undefined;
+}
+
 export async function listLabels(
   client: GraphQLClient,
   teamId?: string,
-  options: PaginationOptions = {},
+  options: ListLabelOptions = {},
 ): Promise<PaginatedResult<Label>> {
-  const { limit = 50, after } = options;
-  const filter = teamId ? { team: { id: { eq: teamId } } } : undefined;
+  const { limit = 50, after, scope } = options;
+  const filter = buildIssueLabelFilter(teamId, scope);
 
   const result = await client.request<GetLabelsQuery>(GetLabelsDocument, {
     first: limit,
