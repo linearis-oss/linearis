@@ -197,6 +197,30 @@ describe("listIssues", () => {
     });
   });
 
+  it("does not prepend the non-completed filter when an explicit state filter is provided", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [{ id: "1", title: "Done issue" }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    const filter = {
+      and: [
+        { team: { id: { eq: "team-uuid" } } },
+        { state: { id: { in: ["done-status-id"] } } },
+      ],
+    };
+
+    await listIssues(client, { limit: 10 }, filter);
+
+    expect(client.request).toHaveBeenCalledWith(FilteredSearchIssuesDocument, {
+      first: 10,
+      after: undefined,
+      filter,
+      orderBy: PaginationOrderBy.UpdatedAt,
+    });
+  });
+
   it("uses GetIssues query when no filter provided (no regression)", async () => {
     const client = mockGqlClient({
       issues: {
