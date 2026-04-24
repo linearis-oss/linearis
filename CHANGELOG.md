@@ -1,3 +1,9 @@
+## [2026.4.9-next.2](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.1...v2026.4.9-next.2) (2026-04-24)
+
+### Features
+
+* **labels:** add issue label scope filters ([0c1874a](https://github.com/linearis-oss/linearis/commit/0c1874aad8cbadf6e4d729ad0940f1f3bcdd4106)), closes [#116](https://github.com/linearis-oss/linearis/issues/116)
+
 ## [2026.4.9-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.8...v2026.4.9-next.1) (2026-04-24)
 
 ### Bug Fixes
