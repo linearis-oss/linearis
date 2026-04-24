@@ -5,6 +5,7 @@ import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import {
+  type LabelScope,
   type LabelType,
   listLabels,
   listProjectLabels,
@@ -13,6 +14,7 @@ import {
 interface ListLabelsOptions extends CommandOptions {
   team?: string;
   type?: string;
+  scope?: string;
   limit: string;
   after?: string;
 }
@@ -23,6 +25,17 @@ function parseLabelType(value?: string): LabelType {
   }
 
   throw invalidParameterError("--type", 'must be one of "issue" or "project"');
+}
+
+function parseLabelScope(value?: string): LabelScope | undefined {
+  if (value === undefined || value === "workspace" || value === "team") {
+    return value;
+  }
+
+  throw invalidParameterError(
+    "--scope",
+    'must be one of "workspace" or "team"',
+  );
 }
 
 export const LABELS_META: DomainMeta = {
@@ -51,6 +64,7 @@ export function setupLabelsCommands(program: Command): void {
     .command("list")
     .description("list available labels")
     .option("--type <type>", "label type: issue (default) or project", "issue")
+    .option("--scope <scope>", "issue label scope: workspace or team")
     .option("--team <team>", "filter by team (key, name, or UUID)")
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
@@ -59,9 +73,11 @@ export function setupLabelsCommands(program: Command): void {
         const [options, command] = args as [ListLabelsOptions, Command];
         const ctx = createContext(command.parent!.parent!.opts());
         const type = parseLabelType(options.type);
+        const scope = parseLabelScope(options.scope);
         const pagination = {
           limit: parseLimit(options.limit),
           after: options.after,
+          scope,
         };
 
         if (type === "project") {
@@ -72,8 +88,26 @@ export function setupLabelsCommands(program: Command): void {
             );
           }
 
+          if (scope) {
+            throw invalidParameterError(
+              "--scope",
+              "cannot be used with --type project because project labels are always workspace-scoped",
+            );
+          }
+
           outputSuccess(await listProjectLabels(ctx.gql, pagination));
           return;
+        }
+
+        if (scope === "team" && !options.team) {
+          throw invalidParameterError("--scope", "team scope requires --team");
+        }
+
+        if (scope === "workspace" && options.team) {
+          throw invalidParameterError(
+            "--team",
+            "cannot be used with --scope workspace",
+          );
         }
 
         const teamId = options.team
