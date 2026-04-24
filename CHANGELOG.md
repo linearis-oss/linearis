@@ -1,3 +1,9 @@
+## [2026.4.9-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.8...v2026.4.9-next.1) (2026-04-24)
+
+### Bug Fixes
+
+* **issues:** honor explicit completed status filters ([607c954](https://github.com/linearis-oss/linearis/commit/607c954bb861519c9be5b5499c07844262b2b8de)), closes [#179](https://github.com/linearis-oss/linearis/issues/179)
+
 ## [2026.4.8](https://github.com/linearis-oss/linearis/compare/v2026.4.7...v2026.4.8) (2026-04-23)
 
 ### Features
