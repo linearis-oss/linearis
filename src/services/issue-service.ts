@@ -57,7 +57,23 @@ const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
 };
 
+function hasExplicitStateFilter(filter: IssueFilter): boolean {
+  if (filter.state) {
+    return true;
+  }
+
+  if (filter.and?.some(hasExplicitStateFilter)) {
+    return true;
+  }
+
+  return filter.or?.some(hasExplicitStateFilter) ?? false;
+}
+
 function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
+  if (hasExplicitStateFilter(filter)) {
+    return filter;
+  }
+
   return {
     and: [NON_COMPLETED_ISSUES_FILTER, filter],
   };
