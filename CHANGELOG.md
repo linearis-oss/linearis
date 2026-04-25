@@ -1,3 +1,9 @@
+## [2026.4.9-next.3](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.2...v2026.4.9-next.3) (2026-04-25)
+
+### Features
+
+* **issues:** batch-resolve search filter identifiers ([963af95](https://github.com/linearis-oss/linearis/commit/963af954dbc286f755f93b740b36fcca4626a2c4)), closes [#63](https://github.com/linearis-oss/linearis/issues/63)
+
 ## [2026.4.9-next.2](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.1...v2026.4.9-next.2) (2026-04-24)
 
 ### Features
