@@ -1,0 +1,62 @@
+fragment DiscussionMutationCommentFields on Comment {
+  id
+  body
+  createdAt
+  editedAt
+  parentId
+  resolvedAt
+  resolvingComment {
+    id
+  }
+  resolvingUser {
+    id
+    displayName
+  }
+  user {
+    id
+    displayName
+  }
+}
+
+mutation StartDiscussion($input: CommentCreateInput!) {
+  commentCreate(input: $input) {
+    success
+    comment {
+      ...DiscussionMutationCommentFields
+    }
+  }
+}
+
+mutation EditDiscussionReply($id: String!, $input: CommentUpdateInput!) {
+  commentUpdate(id: $id, input: $input) {
+    success
+    comment {
+      ...DiscussionMutationCommentFields
+    }
+  }
+}
+
+mutation DeleteDiscussionReply($id: String!) {
+  commentDelete(id: $id) {
+    success
+    entityId
+  }
+}
+
+mutation ResolveDiscussion($id: String!, $resolvingCommentId: String) {
+  commentResolve(id: $id, resolvingCommentId: $resolvingCommentId) {
+    success
+    comment {
+      ...DiscussionMutationCommentFields
+    }
+  }
+}
+
+mutation UnresolveDiscussion($id: String!) {
+  commentUnresolve(id: $id) {
+    success
+    comment {
+      ...DiscussionMutationCommentFields
+    }
+  }
+}
