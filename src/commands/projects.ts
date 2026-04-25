@@ -12,6 +12,18 @@ import { resolveProjectStatusId } from "../resolvers/project-status-resolver.js"
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
 import {
+  deleteDiscussionComment,
+  deleteDiscussionReply,
+  editDiscussionComment,
+  editDiscussionReply,
+  listDiscussionReplies,
+  listDiscussionsForProject,
+  replyToDiscussion,
+  resolveDiscussion,
+  startProjectDiscussion,
+  unresolveDiscussion,
+} from "../services/discussion-service.js";
+import {
   archiveProject,
   createProject,
   deleteProject,
@@ -24,6 +36,19 @@ import {
 interface ListOptions {
   limit: string;
   after?: string;
+}
+
+interface DiscussionsOptions {
+  limit?: string;
+  after?: string;
+}
+
+interface DiscussionBodyOptions {
+  body?: string;
+}
+
+interface ResolveDiscussionOptions {
+  withComment?: string;
 }
 
 interface CreateOptions {
@@ -115,6 +140,245 @@ export function setupProjectsCommands(program: Command): void {
         const ctx = createContext(command.parent!.parent!.opts());
         const projectId = await resolveProjectId(ctx.sdk, project);
         const result = await getProject(ctx.gql, projectId);
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("discuss <project>")
+    .description("start a discussion thread on a project")
+    .option("--body <text>", "discussion body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [project, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const projectId = await resolveProjectId(ctx.sdk, project);
+        const result = await startProjectDiscussion(ctx.gql, {
+          projectId,
+          body: options.body,
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("discussions <project>")
+    .description("list root discussion threads on a project")
+    .option("-l, --limit <n>", "max results", "25")
+    .option("--after <cursor>", "cursor for next page")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [project, options, command] = args as [
+          string,
+          DiscussionsOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const projectId = await resolveProjectId(ctx.sdk, project);
+        const result = await listDiscussionsForProject(ctx.gql, projectId, {
+          limit: parseLimit(options.limit || "25"),
+          after: options.after,
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("replies <thread>")
+    .description("list replies in a root discussion thread")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, options, command] = args as [
+          string,
+          DiscussionsOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await listDiscussionReplies(
+          ctx.gql,
+          thread,
+          {
+            limit: parseLimit(options.limit || "50"),
+            after: options.after,
+          },
+          "project",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("reply <thread>")
+    .description("reply to a root discussion thread")
+    .addHelpText(
+      "after",
+      "\nImportant: `<thread>` must be a root discussion thread ID.",
+    )
+    .option("--body <text>", "reply body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const result = await replyToDiscussion(ctx.gql, {
+          threadId: thread,
+          body: options.body,
+          entityKind: "project",
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("edit <comment>")
+    .description("edit a root discussion or reply comment")
+    .option("--body <text>", "new comment body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const result = await editDiscussionComment(
+          ctx.gql,
+          comment,
+          {
+            body: options.body,
+          },
+          "project",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("edit-reply <reply>")
+    .description("edit a discussion reply")
+    .option("--body <text>", "new reply body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [reply, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const result = await editDiscussionReply(
+          ctx.gql,
+          reply,
+          {
+            body: options.body,
+          },
+          "project",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("delete-comment <comment>")
+    .description("delete a root discussion or reply comment")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await deleteDiscussionComment(
+          ctx.gql,
+          comment,
+          "project",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("delete-reply <reply>")
+    .description("delete a discussion reply")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [reply, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await deleteDiscussionReply(ctx.gql, reply, "project");
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("resolve <thread>")
+    .description("resolve a discussion thread")
+    .option("--with-comment <comment>", "comment to mark as resolving comment")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, options, command] = args as [
+          string,
+          ResolveDiscussionOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await resolveDiscussion(ctx.gql, {
+          threadId: thread,
+          resolvingCommentId: options.withComment,
+          entityKind: "project",
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  projects
+    .command("unresolve <thread>")
+    .description("unresolve a discussion thread")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await unresolveDiscussion(ctx.gql, thread, "project");
+
         outputSuccess(result);
       }),
     );
