@@ -112,6 +112,43 @@ vi.mock("../../../src/services/issue-relation-service.js", () => ({
   findIssueRelation: vi.fn(),
 }));
 
+vi.mock("../../../src/services/discussion-service.js", () => ({
+  startIssueDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  listDiscussionsForIssue: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionReplies: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  replyToDiscussion: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
+  editDiscussionReply: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
+  deleteDiscussionReply: vi.fn().mockResolvedValue({
+    id: "discussion-reply-1",
+    success: true,
+  }),
+  editDiscussionComment: vi
+    .fn()
+    .mockResolvedValue({ id: "discussion-comment-1" }),
+  deleteDiscussionComment: vi.fn().mockResolvedValue({
+    id: "discussion-comment-1",
+    success: true,
+  }),
+  resolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  unresolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+}));
+
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
 import {
   resolveIssueEstimateContext,
@@ -122,6 +159,18 @@ import {
   resolveTeamId,
 } from "../../../src/resolvers/team-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
+import {
+  deleteDiscussionComment,
+  deleteDiscussionReply,
+  editDiscussionComment,
+  editDiscussionReply,
+  listDiscussionReplies,
+  listDiscussionsForIssue,
+  replyToDiscussion,
+  resolveDiscussion,
+  startIssueDiscussion,
+  unresolveDiscussion,
+} from "../../../src/services/discussion-service.js";
 import {
   archiveIssue,
   createIssue,
@@ -1141,6 +1190,313 @@ describe("issues lifecycle commands", () => {
     expect(deleteIssue).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-issue-uuid",
+    );
+  });
+});
+
+describe("issues discussion commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("issues discuss resolves issue and starts thread", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "discuss",
+      "ENG-42",
+      "--body",
+      "Need decision",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(startIssueDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      issueId: "resolved-issue-uuid",
+      body: "Need decision",
+    });
+  });
+
+  it("issues discuss requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "discuss", "ENG-42"]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(startIssueDiscussion).not.toHaveBeenCalled();
+  });
+
+  it("issues discussions resolves issue and forwards pagination", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "discussions",
+      "ENG-42",
+      "--limit",
+      "10",
+      "--after",
+      "cursor-1",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(listDiscussionsForIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      { limit: 10, after: "cursor-1" },
+    );
+  });
+
+  it("issues replies forwards pagination", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "replies",
+      "thread-1",
+      "--limit",
+      "15",
+      "--after",
+      "cursor-2",
+    ]);
+
+    expect(listDiscussionReplies).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      {
+        limit: 15,
+        after: "cursor-2",
+      },
+      "issue",
+    );
+  });
+
+  it("issues reply requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "reply", "thread-1"]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(replyToDiscussion).not.toHaveBeenCalled();
+  });
+
+  it("issues reply delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "reply",
+      "thread-1",
+      "--body",
+      "Nested reply",
+    ]);
+
+    expect(replyToDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      body: "Nested reply",
+      entityKind: "issue",
+    });
+  });
+
+  it("issues delete-comment deletes root or reply discussion comments", async () => {
+    const program = createProgram();
+    const commentId = "11111111-1111-4111-8111-111111111111";
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "delete-comment",
+      commentId,
+    ]);
+
+    expect(deleteDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      commentId,
+      "issue",
+    );
+    expect(deleteIssue).not.toHaveBeenCalled();
+  });
+
+  it("issues generic edit/delete help documents root or reply IDs while strict reply commands stay reply-only", () => {
+    const program = createProgram();
+    const issues = program.commands.find(
+      (command) => command.name() === "issues",
+    );
+
+    const edit = issues?.commands.find((command) => command.name() === "edit");
+    const del = issues?.commands.find(
+      (command) => command.name() === "delete-comment",
+    );
+    const editReply = issues?.commands.find(
+      (command) => command.name() === "edit-reply",
+    );
+    const deleteReply = issues?.commands.find(
+      (command) => command.name() === "delete-reply",
+    );
+
+    expect(edit?.description()).toContain("root discussion or reply");
+    expect(del?.description()).toContain("root discussion or reply");
+    expect(editReply?.description()).toBe("edit a discussion reply");
+    expect(deleteReply?.description()).toBe("delete a discussion reply");
+  });
+
+  it("issues edit delegates to generic discussion comment service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "edit",
+      "11111111-1111-4111-8111-111111111111",
+      "--body",
+      "Edited",
+    ]);
+
+    expect(editDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      "11111111-1111-4111-8111-111111111111",
+      { body: "Edited" },
+      "issue",
+    );
+  });
+
+  it("issues edit-reply delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "edit-reply",
+      "reply-1",
+      "--body",
+      "Edited",
+    ]);
+
+    expect(editDiscussionReply).toHaveBeenCalledWith(
+      expect.anything(),
+      "reply-1",
+      { body: "Edited" },
+      "issue",
+    );
+  });
+
+  it("issues edit-reply requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "edit-reply",
+      "reply-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(editDiscussionReply).not.toHaveBeenCalled();
+  });
+
+  it("issues delete-comment delegates to generic discussion comment service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "delete-comment",
+      "11111111-1111-4111-8111-111111111111",
+    ]);
+
+    expect(deleteDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      "11111111-1111-4111-8111-111111111111",
+      "issue",
+    );
+  });
+
+  it("issues delete-reply delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "delete-reply",
+      "reply-1",
+    ]);
+
+    expect(deleteDiscussionReply).toHaveBeenCalledWith(
+      expect.anything(),
+      "reply-1",
+      "issue",
+    );
+  });
+
+  it("issues resolve delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "resolve", "thread-1"]);
+
+    expect(resolveDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      entityKind: "issue",
+    });
+  });
+
+  it("issues resolve forwards --with-comment as resolvingCommentId", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "resolve",
+      "thread-1",
+      "--with-comment",
+      "comment-123",
+    ]);
+
+    expect(resolveDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      resolvingCommentId: "comment-123",
+      entityKind: "issue",
+    });
+  });
+
+  it("issues unresolve delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "unresolve",
+      "thread-1",
+    ]);
+
+    expect(unresolveDiscussion).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      "issue",
     );
   });
 });

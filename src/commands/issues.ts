@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
+import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
 import {
   isUuid,
@@ -34,6 +35,18 @@ import {
   resolveTeamId,
 } from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
+import {
+  deleteDiscussionComment,
+  deleteDiscussionReply,
+  editDiscussionComment,
+  editDiscussionReply,
+  listDiscussionReplies,
+  listDiscussionsForIssue,
+  replyToDiscussion,
+  resolveDiscussion,
+  startIssueDiscussion,
+  unresolveDiscussion,
+} from "../services/discussion-service.js";
 import { buildIssueFilter } from "../services/issue-filter.js";
 import {
   createIssueRelation,
@@ -114,6 +127,19 @@ interface ReadOptions {
   withAttachments?: boolean;
   withComments?: boolean;
   withCommentThreads?: boolean;
+}
+
+interface DiscussionsOptions {
+  limit?: string;
+  after?: string;
+}
+
+interface DiscussionBodyOptions {
+  body?: string;
+}
+
+interface ResolveDiscussionOptions {
+  withComment?: string;
 }
 
 export const ISSUES_META: DomainMeta = {
@@ -463,6 +489,249 @@ export function setupIssuesCommands(program: Command): void {
           );
           outputSuccess(result);
         }
+      }),
+    );
+
+  issues
+    .command("discuss <issue>")
+    .description("start a discussion thread on an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("--body <text>", "discussion body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await startIssueDiscussion(ctx.gql, {
+          issueId,
+          body: options.body,
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("discussions <issue>")
+    .description("list root discussion threads on an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("-l, --limit <n>", "max results", "25")
+    .option("--after <cursor>", "cursor for next page")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, options, command] = args as [
+          string,
+          DiscussionsOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await listDiscussionsForIssue(ctx.gql, issueId, {
+          limit: parseLimit(options.limit || "25"),
+          after: options.after,
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("replies <thread>")
+    .description("list replies in a root discussion thread")
+    .option("-l, --limit <n>", "max results", "50")
+    .option("--after <cursor>", "cursor for next page")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, options, command] = args as [
+          string,
+          DiscussionsOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await listDiscussionReplies(
+          ctx.gql,
+          thread,
+          {
+            limit: parseLimit(options.limit || "50"),
+            after: options.after,
+          },
+          "issue",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("reply <thread>")
+    .description("reply to a root discussion thread")
+    .addHelpText(
+      "after",
+      "\nImportant: `<thread>` must be a root discussion thread ID.",
+    )
+    .option("--body <text>", "reply body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const result = await replyToDiscussion(ctx.gql, {
+          threadId: thread,
+          body: options.body,
+          entityKind: "issue",
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("edit <comment>")
+    .description("edit a root discussion or reply comment")
+    .option("--body <text>", "new comment body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const result = await editDiscussionComment(
+          ctx.gql,
+          comment,
+          {
+            body: options.body,
+          },
+          "issue",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("edit-reply <reply>")
+    .description("edit a discussion reply")
+    .option("--body <text>", "new reply body (required, markdown supported)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [reply, options, command] = args as [
+          string,
+          DiscussionBodyOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        if (!options.body) {
+          throw invalidParameterError("--body", "is required");
+        }
+
+        const result = await editDiscussionReply(
+          ctx.gql,
+          reply,
+          {
+            body: options.body,
+          },
+          "issue",
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("delete-comment <comment>")
+    .description("delete a root discussion or reply comment")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await deleteDiscussionComment(ctx.gql, comment, "issue");
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("delete-reply <reply>")
+    .description("delete a discussion reply")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [reply, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await deleteDiscussionReply(ctx.gql, reply, "issue");
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("resolve <thread>")
+    .description("resolve a discussion thread")
+    .option("--with-comment <comment>", "comment to mark as resolving comment")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, options, command] = args as [
+          string,
+          ResolveDiscussionOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await resolveDiscussion(ctx.gql, {
+          threadId: thread,
+          resolvingCommentId: options.withComment,
+          entityKind: "issue",
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("unresolve <thread>")
+    .description("unresolve a discussion thread")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [thread, , command] = args as [string, unknown, Command];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await unresolveDiscussion(ctx.gql, thread, "issue");
+
+        outputSuccess(result);
       }),
     );
 
