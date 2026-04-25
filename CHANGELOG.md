@@ -1,3 +1,13 @@
+## [2026.4.9-next.4](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.3...v2026.4.9-next.4) (2026-04-25)
+
+### Features
+
+* **comments:** deprecate compatibility facade ([d097eee](https://github.com/linearis-oss/linearis/commit/d097eeee62dfa5446c866644ded70a779346b7e4))
+* **discussions:** add GraphQL and service layer ([1ae10e1](https://github.com/linearis-oss/linearis/commit/1ae10e1313722c58102c8269cc97886ed8891d8d))
+* **initiatives:** add discussion commands ([81bcd17](https://github.com/linearis-oss/linearis/commit/81bcd173f7caec48911e39738d6b4dd60672d7fc))
+* **issues:** add discussion commands ([6b3861c](https://github.com/linearis-oss/linearis/commit/6b3861cbfbdb6324270cda1a7977547e9253ff2e))
+* **projects:** add discussion commands ([ff64f2e](https://github.com/linearis-oss/linearis/commit/ff64f2edd7ceb5cdbc34de405b984582c86687d9))
+
 ## [2026.4.9-next.3](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.2...v2026.4.9-next.3) (2026-04-25)
 
 ### Features
