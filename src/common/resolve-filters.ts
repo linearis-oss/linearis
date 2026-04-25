@@ -1,11 +1,5 @@
-import { resolveCycleId } from "../resolvers/cycle-resolver.js";
-import { resolveIssueId } from "../resolvers/issue-resolver.js";
-import { resolveLabelIds } from "../resolvers/label-resolver.js";
+import { resolveSearchFilterIds } from "../resolvers/issue-filter-resolver.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
-import { resolveProjectId } from "../resolvers/project-resolver.js";
-import { resolveStatusId } from "../resolvers/status-resolver.js";
-import { resolveTeamId } from "../resolvers/team-resolver.js";
-import { resolveUserId } from "../resolvers/user-resolver.js";
 import type { CommandContext } from "./context.js";
 import { invalidParameterError } from "./errors.js";
 import { parseDueDate } from "./identifier.js";
@@ -101,62 +95,49 @@ export async function resolveFilterOptions(
   validateDateRange(opts.updatedAfter, opts.updatedBefore, "updated date");
 
   // 4. ID resolution
-  const resolved: IssueFilterOptions = {};
+  const hasResolvableFilters =
+    opts.team !== undefined ||
+    opts.assignee !== undefined ||
+    opts.creator !== undefined ||
+    opts.project !== undefined ||
+    parsedStatusNames !== undefined ||
+    parsedLabelNames !== undefined ||
+    opts.cycle !== undefined ||
+    opts.parent !== undefined;
 
-  if (opts.team) {
-    resolved.teamId = await resolveTeamId(ctx.sdk, opts.team);
-  }
-  if (opts.assignee) {
-    resolved.assigneeId = await resolveUserId(ctx.sdk, opts.assignee);
-  }
-  if (opts.creator) {
-    resolved.creatorId = await resolveUserId(ctx.sdk, opts.creator);
-  }
-  if (opts.project) {
-    resolved.projectId = await resolveProjectId(ctx.sdk, opts.project);
-  }
-  if (parsedStatusNames) {
-    const statusIds = await Promise.all(
-      parsedStatusNames.map((s) =>
-        resolveStatusId(ctx.sdk, s, resolved.teamId),
-      ),
-    );
-    resolved.stateIds = statusIds;
-  }
-  if (parsedLabelNames) {
-    resolved.labelIds = await resolveLabelIds(ctx.sdk, parsedLabelNames);
-  }
-  if (opts.cycle) {
-    resolved.cycleId = await resolveCycleId(
-      ctx.sdk,
-      opts.cycle,
-      resolved.teamId,
-    );
-  }
-  if (opts.parent) {
-    resolved.parentId = await resolveIssueId(ctx.sdk, opts.parent);
-  }
-  if (opts.milestone) {
-    resolved.milestoneId = await resolveMilestoneId(
-      ctx.gql,
-      ctx.sdk,
-      opts.milestone,
-      resolved.projectId,
-    );
-  }
+  const batchResolved = hasResolvableFilters
+    ? await resolveSearchFilterIds(ctx.sdk, {
+        team: opts.team,
+        assignee: opts.assignee,
+        creator: opts.creator,
+        project: opts.project,
+        statusNames: parsedStatusNames,
+        labelNames: parsedLabelNames,
+        cycle: opts.cycle,
+        parent: opts.parent,
+      })
+    : {};
 
-  resolved.priority = parsedPriority;
-  resolved.estimate = parsedEstimate;
-  resolved.dueBefore = opts.dueBefore;
-  resolved.dueAfter = opts.dueAfter;
-  resolved.createdAfter = opts.createdAfter;
-  resolved.createdBefore = opts.createdBefore;
-  resolved.completedAfter = opts.completedAfter;
-  resolved.completedBefore = opts.completedBefore;
-  resolved.updatedAfter = opts.updatedAfter;
-  resolved.updatedBefore = opts.updatedBefore;
-  resolved.hasBlockers = opts.hasBlockers;
-  resolved.isBlocking = opts.isBlocking;
+  const milestoneId = opts.milestone
+    ? await resolveMilestoneId(ctx.gql, ctx.sdk, opts.milestone, opts.project)
+    : undefined;
+
+  const resolved: IssueFilterOptions = {
+    ...batchResolved,
+    milestoneId,
+    priority: parsedPriority,
+    estimate: parsedEstimate,
+    dueBefore: opts.dueBefore,
+    dueAfter: opts.dueAfter,
+    createdAfter: opts.createdAfter,
+    createdBefore: opts.createdBefore,
+    completedAfter: opts.completedAfter,
+    completedBefore: opts.completedBefore,
+    updatedAfter: opts.updatedAfter,
+    updatedBefore: opts.updatedBefore,
+    hasBlockers: opts.hasBlockers,
+    isBlocking: opts.isBlocking,
+  };
 
   return resolved;
 }

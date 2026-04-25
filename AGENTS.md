@@ -61,9 +61,10 @@ CLI Input → Command → Resolver → Service → JSON Output
    - Resolvers must not import services (or vice versa).
    - Commands must not import `GraphQLClient` directly.
 3. **Client-layer contract:**
-   - Resolvers → `LinearSdkClient` only.
+   - Resolvers → `LinearSdkClient` by default.
    - Services → `GraphQLClient` only.
    - Commands → both, via `createContext()`.
+   - **Narrow exceptions allowed only when SDK lacks required capability**, with explicit `ARCHITECTURAL EXCEPTION` docstring in code (current examples: milestone/project-status lookups, initiative relation/link ID lookup helpers).
 4. **ID resolution happens once**, in resolvers only. Services accept UUIDs.
 5. **All commands** use `handleCommand()` wrapper and `outputSuccess()` for output.
 6. **Explicit return types** on all exported functions.
@@ -83,8 +84,9 @@ Need a new GraphQL operation?
 
 Need to resolve a human-friendly ID?
   → Add/edit src/resolvers/*-resolver.ts
-  → Use LinearSdkClient, return UUID string
+  → Prefer LinearSdkClient, return UUID string
   → Pattern: UUID passthrough → SDK lookup → notFoundError()
+  → If SDK cannot express lookup, use GraphQL as documented ARCHITECTURAL EXCEPTION (include rationale in resolver docstring)
 
 Need business logic / CRUD?
   → Add/edit src/services/*-service.ts
