@@ -86,6 +86,8 @@ type(scope): description
 | `test`     | Adding or fixing tests                |
 | `build`    | Build system, dependencies            |
 | `chore`    | Maintenance, tooling                  |
+| `ci`       | CI workflow and automation changes    |
+| `revert`   | Revert a previous commit              |
 
 **Examples:**
 
@@ -96,6 +98,12 @@ docs: update README with new commands
 ```
 
 Use imperative mood ("add" not "added"). Scope is optional.
+
+Additional validation rules enforced locally and in CI:
+- scopes must be lower-case (`feat(api): ...`, not `feat(API): ...`)
+- subjects must be at least 10 characters long
+- commit bodies and footers must be separated from the subject by a blank line when present
+- PR commit ranges are validated in CI with commitlint, not only via the local hook
 
 ## Linearis is opinionated, because its maintainer is
 
