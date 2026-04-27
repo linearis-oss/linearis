@@ -1,3 +1,9 @@
+## [2026.4.9-next.5](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.4...v2026.4.9-next.5) (2026-04-27)
+
+### Bug Fixes
+
+* **deps:** update dependency @linear/sdk to v82 ([7e62fda](https://github.com/linearis-oss/linearis/commit/7e62fdacb56b9e14963303bb76dbd67a7056f554))
+
 ## [2026.4.9-next.4](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.3...v2026.4.9-next.4) (2026-04-25)
 
 ### Features
