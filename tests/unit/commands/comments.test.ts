@@ -22,6 +22,15 @@ vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
 }));
 
 vi.mock("../../../src/services/discussion-service.js", () => ({
+  createIssueDiscussionCommentReaction: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1" }),
+  deleteIssueDiscussionCommentReactionByEmoji: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+  deleteIssueDiscussionCommentReactionById: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
   listDiscussionsForIssue: vi.fn().mockResolvedValue({
     nodes: [],
     pageInfo: {
@@ -44,7 +53,10 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
 import { setupCommentsCommands } from "../../../src/commands/comments.js";
 import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
 import {
+  createIssueDiscussionCommentReaction,
   deleteDiscussionComment,
+  deleteIssueDiscussionCommentReactionByEmoji,
+  deleteIssueDiscussionCommentReactionById,
   editDiscussionComment,
   listDiscussionsForIssue,
   replyToDiscussion,
@@ -80,7 +92,9 @@ describe("comments compatibility delegation", () => {
       "Deprecated compatibility facade for issue discussions",
     );
     expect(commentsHelp).toMatch(/Prefer the `issues`\s+discussion commands/i);
-    expect(commentsHelp).toMatch(/migrate to `issues discussions\s+<issue>`/i);
+    expect(commentsHelp).toMatch(
+      /migrate to `issues\s+discussions\s+<issue>`/i,
+    );
     expect(commentsHelp).toMatch(
       /nested-reply\s+targets are not\s+supported in compatibility mode/i,
     );
@@ -269,6 +283,131 @@ describe("comments compatibility delegation", () => {
     expect(deleteDiscussionComment).toHaveBeenCalledWith(
       expect.anything(),
       "root-1",
+    );
+  });
+
+  it("comments react help points users to domain-native issue reaction commands", () => {
+    const program = createProgram();
+    const comments = program.commands.find(
+      (command) => command.name() === "comments",
+    );
+    const react = comments!.commands.find(
+      (command) => command.name() === "react",
+    );
+
+    expect(react).toBeDefined();
+    expect(react!.helpInformation()).toMatch(
+      /DEPRECATED compatibility command/i,
+    );
+    expect(react!.helpInformation()).toMatch(
+      /Prefer: `issues threads react <thread>`|`issues replies react <reply>`/,
+    );
+  });
+
+  it("comments react delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "comments",
+      "react",
+      "comment-1",
+      "👍",
+    ]);
+
+    expect(createIssueDiscussionCommentReaction).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "comment-1",
+        emoji: "👍",
+      },
+    );
+  });
+
+  it("comments react supports shortcode emoji input", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "comments",
+      "react",
+      "comment-1",
+      "--shortcode",
+      "thumbs_up",
+    ]);
+
+    expect(createIssueDiscussionCommentReaction).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "comment-1",
+        emoji: "👍",
+      },
+    );
+  });
+
+  it("comments unreact delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "comments",
+      "unreact",
+      "comment-1",
+      "👍",
+    ]);
+
+    expect(deleteIssueDiscussionCommentReactionByEmoji).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "comment-1",
+        emoji: "👍",
+      },
+    );
+  });
+
+  it("comments unreact supports shortcode emoji input", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "comments",
+      "unreact",
+      "comment-1",
+      "--shortcode",
+      "thumbs_up",
+    ]);
+
+    expect(deleteIssueDiscussionCommentReactionByEmoji).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "comment-1",
+        emoji: "👍",
+      },
+    );
+  });
+
+  it("comments unreact-id delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "comments",
+      "unreact-id",
+      "comment-1",
+      "reaction-1",
+    ]);
+
+    expect(deleteIssueDiscussionCommentReactionById).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "comment-1",
+        reactionId: "reaction-1",
+      },
     );
   });
 });

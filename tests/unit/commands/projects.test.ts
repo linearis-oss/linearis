@@ -66,6 +66,24 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
       endCursor: null,
     },
   }),
+  listDiscussionsForProjectWithReactions: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionRepliesWithReactions: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
   replyToDiscussion: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
   editDiscussionReply: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
   deleteDiscussionReply: vi.fn().mockResolvedValue({
@@ -81,18 +99,32 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
   }),
   resolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
   unresolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  createDiscussionCommentReaction: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1" }),
+  deleteDiscussionCommentReactionByEmoji: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+  deleteDiscussionCommentReactionById: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
 }));
 
 import { setupProjectsCommands } from "../../../src/commands/projects.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
 import {
+  createDiscussionCommentReaction,
   deleteDiscussionComment,
+  deleteDiscussionCommentReactionByEmoji,
+  deleteDiscussionCommentReactionById,
   deleteDiscussionReply,
   editDiscussionComment,
   editDiscussionReply,
   listDiscussionReplies,
+  listDiscussionRepliesWithReactions,
   listDiscussionsForProject,
+  listDiscussionsForProjectWithReactions,
   replyToDiscussion,
   resolveDiscussion,
   startProjectDiscussion,
@@ -400,6 +432,26 @@ describe("projects discussion commands", () => {
     });
   });
 
+  it("projects discussions --with-reactions routes to reaction-aware service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "discussions",
+      "My Project",
+      "--with-reactions",
+    ]);
+
+    expect(listDiscussionsForProjectWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      { limit: 25, after: undefined },
+    );
+    expect(listDiscussionsForProject).not.toHaveBeenCalled();
+  });
+
   it("projects replies forwards pagination", async () => {
     const program = createProgram();
 
@@ -433,6 +485,27 @@ describe("projects discussion commands", () => {
         endCursor: null,
       },
     });
+  });
+
+  it("projects replies --with-reactions routes to reaction-aware service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "replies",
+      "thread-1",
+      "--with-reactions",
+    ]);
+
+    expect(listDiscussionRepliesWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      { limit: 50, after: undefined },
+      "project",
+    );
+    expect(listDiscussionReplies).not.toHaveBeenCalled();
   });
 
   it("projects reply delegates to discussion service", async () => {
@@ -655,6 +728,79 @@ describe("projects discussion commands", () => {
       "project",
     );
     expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-root-1" });
+  });
+
+  it("projects threads react delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "threads",
+      "react",
+      "thread-1",
+      "🎉",
+    ]);
+
+    expect(createDiscussionCommentReaction).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "thread-1",
+        target: "thread",
+        expectedEntityKind: "project",
+        emoji: "🎉",
+      },
+    );
+  });
+
+  it("projects threads unreact supports --shortcode", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "threads",
+      "unreact",
+      "thread-1",
+      "--shortcode",
+      "thumbs_up",
+    ]);
+
+    expect(deleteDiscussionCommentReactionByEmoji).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "thread-1",
+        target: "thread",
+        expectedEntityKind: "project",
+        emoji: "👍",
+      },
+    );
+  });
+
+  it("projects replies unreact-id delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "replies",
+      "unreact-id",
+      "reply-1",
+      "reaction-123",
+    ]);
+
+    expect(deleteDiscussionCommentReactionById).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "reply-1",
+        target: "reply",
+        expectedEntityKind: "project",
+        reactionId: "reaction-123",
+      },
+    );
   });
 });
 

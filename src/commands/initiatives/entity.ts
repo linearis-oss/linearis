@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { LinearSdkClient } from "../../client/linear-client.js";
 import { createContext } from "../../common/context.js";
+import { resolveReactionEmojiInput } from "../../common/emoji.js";
 import { invalidParameterError } from "../../common/errors.js";
 import {
   handleCommand,
@@ -21,12 +22,17 @@ import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import { resolveTeamId } from "../../resolvers/team-resolver.js";
 import { resolveUserId } from "../../resolvers/user-resolver.js";
 import {
+  createDiscussionCommentReaction,
   deleteDiscussionComment,
+  deleteDiscussionCommentReactionByEmoji,
+  deleteDiscussionCommentReactionById,
   deleteDiscussionReply,
   editDiscussionComment,
   editDiscussionReply,
   listDiscussionReplies,
+  listDiscussionRepliesWithReactions,
   listDiscussionsForInitiative,
+  listDiscussionsForInitiativeWithReactions,
   replyToDiscussion,
   resolveDiscussion,
   startInitiativeDiscussion,
@@ -86,6 +92,7 @@ interface InitiativeReadOptions extends InitiativeExpandOptions {}
 interface DiscussionsOptions {
   limit?: string;
   after?: string;
+  withReactions?: boolean;
 }
 
 interface DiscussionBodyOptions {
@@ -94,6 +101,85 @@ interface DiscussionBodyOptions {
 
 interface ResolveDiscussionOptions {
   withComment?: string;
+}
+
+interface ReactionOptions {
+  shortcode?: string;
+}
+
+function addCommentReactionCommands(
+  parent: ReturnType<Command["command"]>,
+  noun: "thread" | "reply",
+): void {
+  parent
+    .command(`react <${noun}> [emoji]`)
+    .description(`add a reaction to a discussion ${noun}`)
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [commentId, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(rootOptions(command));
+        const result = await createDiscussionCommentReaction(ctx.gql, {
+          commentId,
+          target: noun,
+          expectedEntityKind: "initiative",
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+        outputSuccess(result);
+      }),
+    );
+
+  parent
+    .command(`unreact <${noun}> [emoji]`)
+    .description(`remove your reaction from a discussion ${noun} by emoji`)
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [commentId, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(rootOptions(command));
+        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+          commentId,
+          target: noun,
+          expectedEntityKind: "initiative",
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+        outputSuccess(result);
+      }),
+    );
+
+  parent
+    .command(`unreact-id <${noun}> <reactionId>`)
+    .description(
+      `remove your reaction from a discussion ${noun} by reaction ID`,
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [commentId, reactionId, , command] = args as [
+          string,
+          string,
+          unknown,
+          Command,
+        ];
+        const ctx = createContext(rootOptions(command));
+        const result = await deleteDiscussionCommentReactionById(ctx.gql, {
+          commentId,
+          target: noun,
+          expectedEntityKind: "initiative",
+          reactionId,
+        });
+        outputSuccess(result);
+      }),
+    );
 }
 
 interface InitiativeCreateOptions {
@@ -519,6 +605,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .description("list root discussion threads on an initiative")
     .option("-l, --limit <n>", "max results", "25")
     .option("--after <cursor>", "cursor for next page")
+    .option("--with-reactions", "include normalized discussion reactions")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [initiative, options, command] = args as [
@@ -529,24 +616,37 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         const ctx = createContext(rootOptions(command));
 
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const result = await listDiscussionsForInitiative(
-          ctx.gql,
-          initiativeId,
-          {
-            limit: parseLimit(options.limit || "25"),
-            after: options.after,
-          },
-        );
+        const paginationOptions = {
+          limit: parseLimit(options.limit || "25"),
+          after: options.after,
+        };
+        const result = options.withReactions
+          ? await listDiscussionsForInitiativeWithReactions(
+              ctx.gql,
+              initiativeId,
+              paginationOptions,
+            )
+          : await listDiscussionsForInitiative(
+              ctx.gql,
+              initiativeId,
+              paginationOptions,
+            );
 
         outputSuccess(result);
       }),
     );
 
-  initiatives
+  const initiativeThreads = initiatives
+    .command("threads")
+    .description("discussion thread reaction operations");
+  addCommentReactionCommands(initiativeThreads, "thread");
+
+  const initiativeReplies = initiatives
     .command("replies <thread>")
     .description("list replies in a root discussion thread")
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
+    .option("--with-reactions", "include normalized discussion reactions")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [thread, options, command] = args as [
@@ -556,19 +656,28 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         ];
         const ctx = createContext(rootOptions(command));
 
-        const result = await listDiscussionReplies(
-          ctx.gql,
-          thread,
-          {
-            limit: parseLimit(options.limit || "50"),
-            after: options.after,
-          },
-          "initiative",
-        );
+        const paginationOptions = {
+          limit: parseLimit(options.limit || "50"),
+          after: options.after,
+        };
+        const result = options.withReactions
+          ? await listDiscussionRepliesWithReactions(
+              ctx.gql,
+              thread,
+              paginationOptions,
+              "initiative",
+            )
+          : await listDiscussionReplies(
+              ctx.gql,
+              thread,
+              paginationOptions,
+              "initiative",
+            );
 
         outputSuccess(result);
       }),
     );
+  addCommentReactionCommands(initiativeReplies, "reply");
 
   initiatives
     .command("reply <thread>")

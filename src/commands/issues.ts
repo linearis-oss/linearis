@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext } from "../common/context.js";
+import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
 import {
@@ -36,12 +37,17 @@ import {
 } from "../resolvers/team-resolver.js";
 import { resolveUserId } from "../resolvers/user-resolver.js";
 import {
+  createDiscussionCommentReaction,
   deleteDiscussionComment,
+  deleteDiscussionCommentReactionByEmoji,
+  deleteDiscussionCommentReactionById,
   deleteDiscussionReply,
   editDiscussionComment,
   editDiscussionReply,
   listDiscussionReplies,
+  listDiscussionRepliesWithReactions,
   listDiscussionsForIssue,
+  listDiscussionsForIssueWithReactions,
   replyToDiscussion,
   resolveDiscussion,
   startIssueDiscussion,
@@ -62,14 +68,21 @@ import {
   getIssueByIdentifierWithAttachments,
   getIssueByIdentifierWithComments,
   getIssueByIdentifierWithCommentThreads,
+  getIssueByIdentifierWithReactions,
   getIssueWithAttachments,
   getIssueWithComments,
   getIssueWithCommentThreads,
+  getIssueWithReactions,
   listIssues,
   searchIssues,
   unarchiveIssue,
   updateIssue,
 } from "../services/issue-service.js";
+import {
+  createReactionForIssue,
+  deleteOwnReactionByEmoji,
+  deleteOwnReactionById,
+} from "../services/reaction-service.js";
 
 interface FilterOptions extends RawFilterFlags {
   limit: string;
@@ -127,11 +140,31 @@ interface ReadOptions {
   withAttachments?: boolean;
   withComments?: boolean;
   withCommentThreads?: boolean;
+  withReactions?: boolean;
+}
+
+function validateReadOptions(options: ReadOptions): void {
+  if (
+    options.withReactions &&
+    (options.withAttachments ||
+      options.withComments ||
+      options.withCommentThreads)
+  ) {
+    throw invalidParameterError(
+      "--with-reactions",
+      "cannot be combined with --with-attachments, --with-comments, or --with-comment-threads",
+    );
+  }
+}
+
+interface ReactionOptions {
+  shortcode?: string;
 }
 
 interface DiscussionsOptions {
   limit?: string;
   after?: string;
+  withReactions?: boolean;
 }
 
 interface DiscussionBodyOptions {
@@ -140,6 +173,92 @@ interface DiscussionBodyOptions {
 
 interface ResolveDiscussionOptions {
   withComment?: string;
+}
+
+function rootOptions(command: Command): Record<string, unknown> {
+  let current: Command = command;
+  while (current.parent) {
+    current = current.parent;
+  }
+  return current.opts();
+}
+
+function addCommentReactionCommands(
+  parent: ReturnType<Command["command"]>,
+  noun: "thread" | "reply",
+): void {
+  parent
+    .command(`react <${noun}> [emoji]`)
+    .description(`add a reaction to a discussion ${noun}`)
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [commentId, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(rootOptions(command));
+        const result = await createDiscussionCommentReaction(ctx.gql, {
+          commentId,
+          target: noun,
+          expectedEntityKind: "issue",
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  parent
+    .command(`unreact <${noun}> [emoji]`)
+    .description(`remove your reaction from a discussion ${noun} by emoji`)
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [commentId, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(rootOptions(command));
+        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+          commentId,
+          target: noun,
+          expectedEntityKind: "issue",
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  parent
+    .command(`unreact-id <${noun}> <reactionId>`)
+    .description(
+      `remove your reaction from a discussion ${noun} by reaction ID`,
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [commentId, reactionId, , command] = args as [
+          string,
+          string,
+          unknown,
+          Command,
+        ];
+        const ctx = createContext(rootOptions(command));
+        const result = await deleteDiscussionCommentReactionById(ctx.gql, {
+          commentId,
+          target: noun,
+          expectedEntityKind: "issue",
+          reactionId,
+        });
+
+        outputSuccess(result);
+      }),
+    );
 }
 
 export const ISSUES_META: DomainMeta = {
@@ -416,6 +535,7 @@ export function setupIssuesCommands(program: Command): void {
       "--with-comment-threads",
       "group issue comments into root comments with replies",
     )
+    .option("--with-reactions", "include normalized root issue reactions")
     .addHelpText(
       "after",
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
@@ -427,6 +547,7 @@ export function setupIssuesCommands(program: Command): void {
           ReadOptions,
           Command,
         ];
+        validateReadOptions(options);
         const ctx = createContext(command.parent!.parent!.opts());
 
         if (options.withAttachments) {
@@ -477,6 +598,22 @@ export function setupIssuesCommands(program: Command): void {
           return;
         }
 
+        if (options.withReactions) {
+          if (isUuid(issue)) {
+            const result = await getIssueWithReactions(ctx.gql, issue);
+            outputSuccess(result);
+          } else {
+            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+            const result = await getIssueByIdentifierWithReactions(
+              ctx.gql,
+              teamKey,
+              issueNumber,
+            );
+            outputSuccess(result);
+          }
+          return;
+        }
+
         if (isUuid(issue)) {
           const result = await getIssue(ctx.gql, issue);
           outputSuccess(result);
@@ -489,6 +626,88 @@ export function setupIssuesCommands(program: Command): void {
           );
           outputSuccess(result);
         }
+      }),
+    );
+
+  issues
+    .command("react <issue> [emoji]")
+    .description("add a root reaction to an issue")
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await createReactionForIssue(ctx.gql, {
+          issueId,
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("unreact <issue> [emoji]")
+    .description("remove your root reaction from an issue by emoji")
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await deleteOwnReactionByEmoji(ctx.gql, {
+          kind: "issue",
+          id: issueId,
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  issues
+    .command("unreact-id <issue> <reactionId>")
+    .description("remove your root reaction from an issue by reaction ID")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, reactionId, , command] = args as [
+          string,
+          string,
+          unknown,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await deleteOwnReactionById(ctx.gql, {
+          kind: "issue",
+          id: issueId,
+          reactionId,
+        });
+
+        outputSuccess(result);
       }),
     );
 
@@ -532,6 +751,7 @@ export function setupIssuesCommands(program: Command): void {
     )
     .option("-l, --limit <n>", "max results", "25")
     .option("--after <cursor>", "cursor for next page")
+    .option("--with-reactions", "include normalized discussion reactions")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, options, command] = args as [
@@ -542,20 +762,33 @@ export function setupIssuesCommands(program: Command): void {
         const ctx = createContext(command.parent!.parent!.opts());
 
         const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await listDiscussionsForIssue(ctx.gql, issueId, {
+        const paginationOptions = {
           limit: parseLimit(options.limit || "25"),
           after: options.after,
-        });
+        };
+        const result = options.withReactions
+          ? await listDiscussionsForIssueWithReactions(
+              ctx.gql,
+              issueId,
+              paginationOptions,
+            )
+          : await listDiscussionsForIssue(ctx.gql, issueId, paginationOptions);
 
         outputSuccess(result);
       }),
     );
 
-  issues
+  const issueThreads = issues
+    .command("threads")
+    .description("discussion thread reaction operations");
+  addCommentReactionCommands(issueThreads, "thread");
+
+  const issueReplies = issues
     .command("replies <thread>")
     .description("list replies in a root discussion thread")
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
+    .option("--with-reactions", "include normalized discussion reactions")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [thread, options, command] = args as [
@@ -565,19 +798,28 @@ export function setupIssuesCommands(program: Command): void {
         ];
         const ctx = createContext(command.parent!.parent!.opts());
 
-        const result = await listDiscussionReplies(
-          ctx.gql,
-          thread,
-          {
-            limit: parseLimit(options.limit || "50"),
-            after: options.after,
-          },
-          "issue",
-        );
+        const paginationOptions = {
+          limit: parseLimit(options.limit || "50"),
+          after: options.after,
+        };
+        const result = options.withReactions
+          ? await listDiscussionRepliesWithReactions(
+              ctx.gql,
+              thread,
+              paginationOptions,
+              "issue",
+            )
+          : await listDiscussionReplies(
+              ctx.gql,
+              thread,
+              paginationOptions,
+              "issue",
+            );
 
         outputSuccess(result);
       }),
     );
+  addCommentReactionCommands(issueReplies, "reply");
 
   issues
     .command("reply <thread>")

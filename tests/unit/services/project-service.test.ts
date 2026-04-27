@@ -1,7 +1,12 @@
 // tests/unit/services/project-service.test.ts
+import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import { ArchiveProjectDocument } from "../../../src/gql/graphql.js";
+import {
+  ArchiveProjectDocument,
+  GetProjectDocument,
+  GetProjectWithReactionsDocument,
+} from "../../../src/gql/graphql.js";
 import {
   archiveProject,
   createProject,
@@ -17,6 +22,96 @@ function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
     request: vi.fn().mockResolvedValue(response),
   } as unknown as GraphQLClient;
 }
+
+function getFragment(
+  document: DocumentNode,
+  name: string,
+): FragmentDefinitionNode {
+  const fragment = document.definitions.find(
+    (definition): definition is FragmentDefinitionNode =>
+      definition.kind === Kind.FRAGMENT_DEFINITION &&
+      definition.name.value === name,
+  );
+
+  if (!fragment) {
+    throw new Error(`Fragment ${name} not found`);
+  }
+
+  return fragment;
+}
+
+describe("project reaction-aware read documents", () => {
+  it("adds only paginated root discussion comments with reactions to the opt-in project read", () => {
+    const baseFragment = getFragment(GetProjectDocument, "ProjectDetailFields");
+    const reactionFragment = getFragment(
+      GetProjectWithReactionsDocument,
+      "ProjectDetailFieldsWithReactions",
+    );
+
+    const reactionSelections = reactionFragment.selectionSet.selections.filter(
+      (selection) =>
+        selection.kind === Kind.FRAGMENT_SPREAD ||
+        selection.kind === Kind.FIELD,
+    );
+
+    expect(
+      reactionSelections.map((selection) =>
+        selection.kind === Kind.FRAGMENT_SPREAD
+          ? `...${selection.name.value}`
+          : selection.name.value,
+      ),
+    ).toEqual(["...ProjectDetailFields", "comments"]);
+
+    const commentsField = reactionSelections.find(
+      (selection) =>
+        selection.kind === Kind.FIELD && selection.name.value === "comments",
+    );
+
+    expect(commentsField).toBeDefined();
+    if (!commentsField || commentsField.kind !== Kind.FIELD) {
+      throw new Error("comments field not found");
+    }
+
+    expect(
+      commentsField.arguments?.map((argument) => argument.name.value),
+    ).toEqual(["first", "after", "filter"]);
+
+    const filterArgument = commentsField.arguments?.find(
+      (argument) => argument.name.value === "filter",
+    );
+    expect(filterArgument).toBeDefined();
+
+    const commentsSelections = commentsField.selectionSet?.selections.filter(
+      (selection) => selection.kind === Kind.FIELD,
+    );
+    expect(
+      commentsSelections?.map((selection) => selection.name.value),
+    ).toEqual(["nodes", "pageInfo"]);
+
+    const nodesField = commentsSelections?.find(
+      (selection) => selection.name.value === "nodes",
+    );
+    expect(nodesField?.selectionSet?.selections).toHaveLength(1);
+    expect(nodesField?.selectionSet?.selections[0]).toMatchObject({
+      kind: Kind.FRAGMENT_SPREAD,
+      name: { value: "DiscussionCommentFieldsWithReactions" },
+    });
+
+    const pageInfoField = commentsSelections?.find(
+      (selection) => selection.name.value === "pageInfo",
+    );
+    expect(
+      pageInfoField?.selectionSet?.selections
+        .filter((selection) => selection.kind === Kind.FIELD)
+        .map((selection) => selection.name.value),
+    ).toEqual(["hasNextPage", "endCursor"]);
+
+    const baseFieldNames = baseFragment.selectionSet.selections
+      .filter((selection) => selection.kind === Kind.FIELD)
+      .map((selection) => selection.name.value);
+    expect(baseFieldNames).not.toContain("comments");
+  });
+});
 
 describe("listProjects", () => {
   it("returns projects", async () => {

@@ -136,6 +136,14 @@ fragment CompleteIssueWithCommentsFields on Issue {
   }
 }
 
+# Complete issue fragment with all relationships, default comments, and reactions
+fragment CompleteIssueWithReactionsFields on Issue {
+  ...CompleteIssueWithDefaultCommentsFields
+  reactions {
+    ...ReactionReadFields
+  }
+}
+
 # Complete issue search fragment with all relationships
 #
 # Combines all issue fragments into a comprehensive field selection.
@@ -281,6 +289,25 @@ query GetIssueByIdentifierWithComments($teamKey: String!, $number: Float!) {
   ) {
     nodes {
       ...CompleteIssueWithCommentsFields
+    }
+  }
+}
+
+# Get single issue by UUID with root reactions
+query GetIssueByIdWithReactions($id: String!) {
+  issue(id: $id) {
+    ...CompleteIssueWithReactionsFields
+  }
+}
+
+# Get issue by identifier with root reactions
+query GetIssueByIdentifierWithReactions($teamKey: String!, $number: Float!) {
+  issues(
+    filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
+    first: 1
+  ) {
+    nodes {
+      ...CompleteIssueWithReactionsFields
     }
   }
 }
