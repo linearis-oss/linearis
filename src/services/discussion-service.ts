@@ -6,22 +6,35 @@ import {
   DeleteDiscussionReplyDocument,
   type DeleteDiscussionReplyMutation,
   type DiscussionCommentFieldsFragment,
+  type DiscussionCommentFieldsWithReactionsFragment,
   EditDiscussionReplyDocument,
   type EditDiscussionReplyMutation,
   GetDiscussionCommentContextDocument,
   type GetDiscussionCommentContextQuery,
   ListInitiativeDiscussionReplyCandidatesDocument,
   type ListInitiativeDiscussionReplyCandidatesQuery,
+  ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
+  type ListInitiativeDiscussionReplyCandidatesWithReactionsQuery,
   ListInitiativeDiscussionRootsDocument,
   type ListInitiativeDiscussionRootsQuery,
+  ListInitiativeDiscussionRootsWithReactionsDocument,
+  type ListInitiativeDiscussionRootsWithReactionsQuery,
   ListIssueDiscussionReplyCandidatesDocument,
   type ListIssueDiscussionReplyCandidatesQuery,
+  ListIssueDiscussionReplyCandidatesWithReactionsDocument,
+  type ListIssueDiscussionReplyCandidatesWithReactionsQuery,
   ListIssueDiscussionRootsDocument,
   type ListIssueDiscussionRootsQuery,
+  ListIssueDiscussionRootsWithReactionsDocument,
+  type ListIssueDiscussionRootsWithReactionsQuery,
   ListProjectDiscussionReplyCandidatesDocument,
   type ListProjectDiscussionReplyCandidatesQuery,
+  ListProjectDiscussionReplyCandidatesWithReactionsDocument,
+  type ListProjectDiscussionReplyCandidatesWithReactionsQuery,
   ListProjectDiscussionRootsDocument,
   type ListProjectDiscussionRootsQuery,
+  ListProjectDiscussionRootsWithReactionsDocument,
+  type ListProjectDiscussionRootsWithReactionsQuery,
   ResolveDiscussionDocument,
   type ResolveDiscussionMutation,
   StartDiscussionDocument,
@@ -29,8 +42,18 @@ import {
   UnresolveDiscussionDocument,
   type UnresolveDiscussionMutation,
 } from "../gql/graphql.js";
+import {
+  createReactionForComment,
+  deleteOwnReactionByEmoji,
+  deleteOwnReactionById,
+  normalizeReactions,
+} from "./reaction-service.js";
 
 export type DiscussionThread = DiscussionCommentFieldsFragment;
+export type DiscussionThreadWithReactions = Omit<
+  DiscussionCommentFieldsWithReactionsFragment,
+  "reactions"
+> & { reactions: ReturnType<typeof normalizeReactions> };
 export type DiscussionEntityKind = "issue" | "project" | "initiative";
 
 const DEFAULT_ROOT_LIMIT = 25;
@@ -47,6 +70,62 @@ type DiscussionReplyCandidateQuery =
   | ListIssueDiscussionReplyCandidatesQuery
   | ListProjectDiscussionReplyCandidatesQuery
   | ListInitiativeDiscussionReplyCandidatesQuery;
+
+type DiscussionReplyCandidateWithReactionsQuery =
+  | ListIssueDiscussionReplyCandidatesWithReactionsQuery
+  | ListProjectDiscussionReplyCandidatesWithReactionsQuery
+  | ListInitiativeDiscussionReplyCandidatesWithReactionsQuery;
+
+type DiscussionReactionTarget = "thread" | "reply";
+type CreateDiscussionReactionResult = Awaited<
+  ReturnType<typeof createReactionForComment>
+>;
+type DeleteDiscussionReactionResult = Awaited<
+  ReturnType<typeof deleteOwnReactionByEmoji>
+>;
+
+interface DiscussionReactionTargetInput {
+  commentId: string;
+  target: DiscussionReactionTarget;
+  expectedEntityKind?: DiscussionEntityKind;
+}
+
+interface CreateDiscussionReactionInput extends DiscussionReactionTargetInput {
+  emoji: string;
+}
+
+interface DeleteDiscussionReactionByEmojiInput
+  extends DiscussionReactionTargetInput {
+  emoji: string;
+}
+
+interface DeleteDiscussionReactionByIdInput
+  extends DiscussionReactionTargetInput {
+  reactionId: string;
+}
+
+function normalizeDiscussionCommentReactions<
+  T extends { reactions: Parameters<typeof normalizeReactions>[0] },
+>(
+  comment: T,
+): Omit<T, "reactions"> & {
+  reactions: ReturnType<typeof normalizeReactions>;
+} {
+  return {
+    ...comment,
+    reactions: normalizeReactions(comment.reactions),
+  };
+}
+
+function normalizeDiscussionCommentsReactions<
+  T extends { reactions: Parameters<typeof normalizeReactions>[0] },
+>(
+  comments: readonly T[],
+): Array<
+  Omit<T, "reactions"> & { reactions: ReturnType<typeof normalizeReactions> }
+> {
+  return comments.map(normalizeDiscussionCommentReactions);
+}
 
 function getDiscussionEntityKind(
   comment: Pick<
@@ -157,6 +236,22 @@ async function assertReplyComment(
   return comment;
 }
 
+async function assertDiscussionReactionTarget(
+  client: GraphQLClient,
+  input: DiscussionReactionTargetInput,
+): Promise<void> {
+  if (input.target === "thread") {
+    await assertRootDiscussionThread(
+      client,
+      input.commentId,
+      input.expectedEntityKind,
+    );
+    return;
+  }
+
+  await assertReplyComment(client, input.commentId, input.expectedEntityKind);
+}
+
 function compareDiscussionCommentsChronologically(
   a: Pick<DiscussionCommentFieldsFragment, "createdAt" | "editedAt" | "id">,
   b: Pick<DiscussionCommentFieldsFragment, "createdAt" | "editedAt" | "id">,
@@ -255,14 +350,71 @@ async function listDiscussionReplyCandidates(
   return nodes.sort(compareDiscussionCommentsChronologically);
 }
 
-function filterThreadReplies(
-  comments: readonly DiscussionCommentFieldsFragment[],
+async function listDiscussionReplyCandidatesWithReactions(
+  client: GraphQLClient,
+  thread: DiscussionThreadContext,
+): Promise<DiscussionThreadWithReactions[]> {
+  const entity = getDiscussionThreadEntity(thread);
+  const nodes: DiscussionCommentFieldsWithReactionsFragment[] = [];
+  let after: string | undefined;
+
+  while (true) {
+    let result: DiscussionReplyCandidateWithReactionsQuery;
+
+    if (entity.kind === "issue") {
+      result =
+        await client.request<ListIssueDiscussionReplyCandidatesWithReactionsQuery>(
+          ListIssueDiscussionReplyCandidatesWithReactionsDocument,
+          {
+            issueId: entity.id,
+            first: DISCUSSION_REPLY_FETCH_LIMIT,
+            after,
+          },
+        );
+    } else if (entity.kind === "project") {
+      result =
+        await client.request<ListProjectDiscussionReplyCandidatesWithReactionsQuery>(
+          ListProjectDiscussionReplyCandidatesWithReactionsDocument,
+          {
+            projectId: entity.id,
+            first: DISCUSSION_REPLY_FETCH_LIMIT,
+            after,
+          },
+        );
+    } else {
+      result =
+        await client.request<ListInitiativeDiscussionReplyCandidatesWithReactionsQuery>(
+          ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
+          {
+            initiativeId: entity.id,
+            first: DISCUSSION_REPLY_FETCH_LIMIT,
+            after,
+          },
+        );
+    }
+
+    nodes.push(...result.comments.nodes);
+
+    if (
+      !result.comments.pageInfo.hasNextPage ||
+      !result.comments.pageInfo.endCursor
+    ) {
+      break;
+    }
+
+    after = result.comments.pageInfo.endCursor;
+  }
+
+  return normalizeDiscussionCommentsReactions(
+    nodes.sort(compareDiscussionCommentsChronologically),
+  );
+}
+
+function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
+  comments: readonly T[],
   threadId: string,
-): DiscussionCommentFieldsFragment[] {
-  const childrenByParentId = new Map<
-    string,
-    DiscussionCommentFieldsFragment[]
-  >();
+): T[] {
+  const childrenByParentId = new Map<string, T[]>();
 
   for (const comment of comments) {
     if (!comment.parentId) {
@@ -275,7 +427,7 @@ function filterThreadReplies(
     childrenByParentId.set(comment.parentId, siblings);
   }
 
-  const replies: DiscussionCommentFieldsFragment[] = [];
+  const replies: T[] = [];
   const stack = [...(childrenByParentId.get(threadId) ?? [])].reverse();
 
   while (stack.length > 0) {
@@ -301,11 +453,11 @@ function filterThreadReplies(
   return replies;
 }
 
-function paginateDiscussionReplies(
-  replies: readonly DiscussionCommentFieldsFragment[],
+function paginateDiscussionReplies<T extends DiscussionCommentFieldsFragment>(
+  replies: readonly T[],
   limit: number,
   after?: string,
-): PaginatedResult<DiscussionCommentFieldsFragment> {
+): PaginatedResult<T> {
   const startIndex =
     after === undefined
       ? 0
@@ -342,6 +494,82 @@ async function startDiscussion(
   return result.commentCreate.comment;
 }
 
+export async function createDiscussionCommentReaction(
+  client: GraphQLClient,
+  input: CreateDiscussionReactionInput,
+): Promise<CreateDiscussionReactionResult> {
+  await assertDiscussionReactionTarget(client, input);
+
+  return createReactionForComment(client, {
+    commentId: input.commentId,
+    emoji: input.emoji,
+  });
+}
+
+export async function createIssueDiscussionCommentReaction(
+  client: GraphQLClient,
+  input: { commentId: string; emoji: string },
+): Promise<CreateDiscussionReactionResult> {
+  await assertDiscussionCommentExists(client, input.commentId, "issue");
+
+  return createReactionForComment(client, {
+    commentId: input.commentId,
+    emoji: input.emoji,
+  });
+}
+
+export async function deleteDiscussionCommentReactionByEmoji(
+  client: GraphQLClient,
+  input: DeleteDiscussionReactionByEmojiInput,
+): Promise<DeleteDiscussionReactionResult> {
+  await assertDiscussionReactionTarget(client, input);
+
+  return deleteOwnReactionByEmoji(client, {
+    kind: "comment",
+    id: input.commentId,
+    emoji: input.emoji,
+  });
+}
+
+export async function deleteIssueDiscussionCommentReactionByEmoji(
+  client: GraphQLClient,
+  input: { commentId: string; emoji: string },
+): Promise<DeleteDiscussionReactionResult> {
+  await assertDiscussionCommentExists(client, input.commentId, "issue");
+
+  return deleteOwnReactionByEmoji(client, {
+    kind: "comment",
+    id: input.commentId,
+    emoji: input.emoji,
+  });
+}
+
+export async function deleteDiscussionCommentReactionById(
+  client: GraphQLClient,
+  input: DeleteDiscussionReactionByIdInput,
+): Promise<DeleteDiscussionReactionResult> {
+  await assertDiscussionReactionTarget(client, input);
+
+  return deleteOwnReactionById(client, {
+    kind: "comment",
+    id: input.commentId,
+    reactionId: input.reactionId,
+  });
+}
+
+export async function deleteIssueDiscussionCommentReactionById(
+  client: GraphQLClient,
+  input: { commentId: string; reactionId: string },
+): Promise<DeleteDiscussionReactionResult> {
+  await assertDiscussionCommentExists(client, input.commentId, "issue");
+
+  return deleteOwnReactionById(client, {
+    kind: "comment",
+    id: input.commentId,
+    reactionId: input.reactionId,
+  });
+}
+
 export async function listDiscussionsForIssue(
   client: GraphQLClient,
   issueId: string,
@@ -367,6 +595,32 @@ export async function listDiscussionsForIssue(
   };
 }
 
+export async function listDiscussionsForIssueWithReactions(
+  client: GraphQLClient,
+  issueId: string,
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
+  const { limit = DEFAULT_ROOT_LIMIT, after } = options;
+  const result =
+    await client.request<ListIssueDiscussionRootsWithReactionsQuery>(
+      ListIssueDiscussionRootsWithReactionsDocument,
+      {
+        issueId,
+        first: limit,
+        after,
+      },
+    );
+
+  if (!result.issue) {
+    throw new Error(`Issue with ID "${issueId}" not found`);
+  }
+
+  return {
+    nodes: normalizeDiscussionCommentsReactions(result.issue.comments.nodes),
+    pageInfo: result.issue.comments.pageInfo,
+  };
+}
+
 export async function listDiscussionsForProject(
   client: GraphQLClient,
   projectId: string,
@@ -388,6 +642,32 @@ export async function listDiscussionsForProject(
 
   return {
     nodes: result.project.comments.nodes,
+    pageInfo: result.project.comments.pageInfo,
+  };
+}
+
+export async function listDiscussionsForProjectWithReactions(
+  client: GraphQLClient,
+  projectId: string,
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
+  const { limit = DEFAULT_ROOT_LIMIT, after } = options;
+  const result =
+    await client.request<ListProjectDiscussionRootsWithReactionsQuery>(
+      ListProjectDiscussionRootsWithReactionsDocument,
+      {
+        projectId,
+        first: limit,
+        after,
+      },
+    );
+
+  if (!result.project) {
+    throw new Error(`Project with ID "${projectId}" not found`);
+  }
+
+  return {
+    nodes: normalizeDiscussionCommentsReactions(result.project.comments.nodes),
     pageInfo: result.project.comments.pageInfo,
   };
 }
@@ -418,6 +698,33 @@ export async function listDiscussionsForInitiative(
   };
 }
 
+export async function listDiscussionsForInitiativeWithReactions(
+  client: GraphQLClient,
+  initiativeId: string,
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
+  const { limit = DEFAULT_ROOT_LIMIT, after } = options;
+  const result =
+    await client.request<ListInitiativeDiscussionRootsWithReactionsQuery>(
+      ListInitiativeDiscussionRootsWithReactionsDocument,
+      {
+        initiativeId,
+        initiativeLookupId: initiativeId,
+        first: limit,
+        after,
+      },
+    );
+
+  if (!result.initiative) {
+    throw new Error(`Initiative with ID "${initiativeId}" not found`);
+  }
+
+  return {
+    nodes: normalizeDiscussionCommentsReactions(result.comments.nodes),
+    pageInfo: result.comments.pageInfo,
+  };
+}
+
 export async function listDiscussionReplies(
   client: GraphQLClient,
   threadId: string,
@@ -430,6 +737,27 @@ export async function listDiscussionReplies(
     expectedEntityKind,
   );
   const candidates = await listDiscussionReplyCandidates(client, thread);
+  const replies = filterThreadReplies(candidates, threadId);
+  const { limit = DEFAULT_REPLY_LIMIT, after } = options;
+
+  return paginateDiscussionReplies(replies, limit, after);
+}
+
+export async function listDiscussionRepliesWithReactions(
+  client: GraphQLClient,
+  threadId: string,
+  options: PaginationOptions = {},
+  expectedEntityKind?: DiscussionEntityKind,
+): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
+  const thread = await assertRootDiscussionThread(
+    client,
+    threadId,
+    expectedEntityKind,
+  );
+  const candidates = await listDiscussionReplyCandidatesWithReactions(
+    client,
+    thread,
+  );
   const replies = filterThreadReplies(candidates, threadId);
   const { limit = DEFAULT_REPLY_LIMIT, after } = options;
 

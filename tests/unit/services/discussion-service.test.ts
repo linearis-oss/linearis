@@ -1,18 +1,46 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   GetDiscussionCommentContextDocument,
   type ListIssueDiscussionRootsQuery,
 } from "../../../src/gql/graphql.js";
+
+vi.mock("../../../src/services/reaction-service.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/services/reaction-service.js")
+    >();
+  return {
+    ...actual,
+    createReactionForComment: vi.fn().mockResolvedValue({ id: "reaction-1" }),
+    deleteOwnReactionByEmoji: vi
+      .fn()
+      .mockResolvedValue({ id: "reaction-1", success: true }),
+    deleteOwnReactionById: vi
+      .fn()
+      .mockResolvedValue({ id: "reaction-1", success: true }),
+  };
+});
+
 import {
+  createDiscussionCommentReaction,
+  createIssueDiscussionCommentReaction,
   deleteDiscussionComment,
+  deleteDiscussionCommentReactionByEmoji,
+  deleteDiscussionCommentReactionById,
   deleteDiscussionReply,
+  deleteIssueDiscussionCommentReactionByEmoji,
+  deleteIssueDiscussionCommentReactionById,
   editDiscussionComment,
   editDiscussionReply,
   listDiscussionReplies,
+  listDiscussionRepliesWithReactions,
   listDiscussionsForInitiative,
+  listDiscussionsForInitiativeWithReactions,
   listDiscussionsForIssue,
+  listDiscussionsForIssueWithReactions,
   listDiscussionsForProject,
+  listDiscussionsForProjectWithReactions,
   replyToDiscussion,
   resolveDiscussion,
   startInitiativeDiscussion,
@@ -20,6 +48,11 @@ import {
   startProjectDiscussion,
   unresolveDiscussion,
 } from "../../../src/services/discussion-service.js";
+import {
+  createReactionForComment,
+  deleteOwnReactionByEmoji,
+  deleteOwnReactionById,
+} from "../../../src/services/reaction-service.js";
 
 function createClientMock(): GraphQLClient {
   return {
@@ -28,6 +61,7 @@ function createClientMock(): GraphQLClient {
 }
 
 const MOCK_USER = { id: "user-1", displayName: "Test User" };
+const REACTION_USER = { id: "user-1", displayName: "Ada" };
 
 function comment(id: string, parentId: string | null = null) {
   return {
@@ -42,6 +76,219 @@ function comment(id: string, parentId: string | null = null) {
     user: MOCK_USER,
   };
 }
+
+function commentWithReaction(id: string, parentId: string | null = null) {
+  return {
+    ...comment(id, parentId),
+    reactions: [
+      {
+        id: "r-1",
+        emoji: "👍",
+        user: REACTION_USER,
+        externalUser: null,
+      },
+    ],
+  };
+}
+
+describe("discussion comment reactions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates thread reaction after validating root comment and entity kind", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("thread-1"),
+        issueId: "issue-1",
+        projectId: null,
+        initiativeId: null,
+      },
+    });
+
+    await expect(
+      createDiscussionCommentReaction(client, {
+        commentId: "thread-1",
+        target: "thread",
+        expectedEntityKind: "issue",
+        emoji: "👍",
+      }),
+    ).resolves.toEqual({ id: "reaction-1" });
+
+    expect(client.request).toHaveBeenCalledWith(
+      GetDiscussionCommentContextDocument,
+      { id: "thread-1" },
+    );
+    expect(createReactionForComment).toHaveBeenCalledWith(expect.anything(), {
+      commentId: "thread-1",
+      emoji: "👍",
+    });
+  });
+
+  it("rejects thread reaction when comment is a reply", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("reply-1", "thread-1"),
+        issueId: "issue-1",
+        projectId: null,
+        initiativeId: null,
+      },
+    });
+
+    await expect(
+      createDiscussionCommentReaction(client, {
+        commentId: "reply-1",
+        target: "thread",
+        expectedEntityKind: "issue",
+        emoji: "👍",
+      }),
+    ).rejects.toThrow(
+      'Discussion thread ID "reply-1" must reference a root comment',
+    );
+
+    expect(createReactionForComment).not.toHaveBeenCalled();
+  });
+
+  it("rejects reply reaction when entity kind does not match", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("reply-1", "thread-1"),
+        issueId: null,
+        projectId: "project-1",
+        initiativeId: null,
+      },
+    });
+
+    await expect(
+      deleteDiscussionCommentReactionByEmoji(client, {
+        commentId: "reply-1",
+        target: "reply",
+        expectedEntityKind: "issue",
+        emoji: "👍",
+      }),
+    ).rejects.toThrow(
+      'Discussion reply ID "reply-1" belongs to project, not issue',
+    );
+
+    expect(deleteOwnReactionByEmoji).not.toHaveBeenCalled();
+  });
+
+  it("deletes reply reaction by id after validation", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("reply-1", "thread-1"),
+        issueId: null,
+        projectId: null,
+        initiativeId: "initiative-1",
+      },
+    });
+
+    await expect(
+      deleteDiscussionCommentReactionById(client, {
+        commentId: "reply-1",
+        target: "reply",
+        expectedEntityKind: "initiative",
+        reactionId: "reaction-1",
+      }),
+    ).resolves.toEqual({ id: "reaction-1", success: true });
+
+    expect(deleteOwnReactionById).toHaveBeenCalledWith(expect.anything(), {
+      kind: "comment",
+      id: "reply-1",
+      reactionId: "reaction-1",
+    });
+  });
+
+  it("creates deprecated issue comment reaction after validating issue ownership", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("comment-1"),
+        issueId: "issue-1",
+        projectId: null,
+        initiativeId: null,
+      },
+    });
+
+    await expect(
+      createIssueDiscussionCommentReaction(client, {
+        commentId: "comment-1",
+        emoji: "👍",
+      }),
+    ).resolves.toEqual({ id: "reaction-1" });
+
+    expect(createReactionForComment).toHaveBeenCalledWith(expect.anything(), {
+      commentId: "comment-1",
+      emoji: "👍",
+    });
+  });
+
+  it("rejects deprecated issue comment reaction for non-issue comment", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("comment-1"),
+        issueId: null,
+        projectId: "project-1",
+        initiativeId: null,
+      },
+    });
+
+    await expect(
+      createIssueDiscussionCommentReaction(client, {
+        commentId: "comment-1",
+        emoji: "👍",
+      }),
+    ).rejects.toThrow(
+      'Discussion comment ID "comment-1" belongs to project, not issue',
+    );
+
+    expect(createReactionForComment).not.toHaveBeenCalled();
+  });
+
+  it("rejects deprecated issue comment unreact by emoji for missing comment", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({ comment: null });
+
+    await expect(
+      deleteIssueDiscussionCommentReactionByEmoji(client, {
+        commentId: "comment-1",
+        emoji: "👍",
+      }),
+    ).rejects.toThrow('Discussion comment ID "comment-1" not found');
+
+    expect(deleteOwnReactionByEmoji).not.toHaveBeenCalled();
+  });
+
+  it("deletes deprecated issue comment reaction by id after validation", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      comment: {
+        ...comment("comment-1"),
+        issueId: "issue-1",
+        projectId: null,
+        initiativeId: null,
+      },
+    });
+
+    await expect(
+      deleteIssueDiscussionCommentReactionById(client, {
+        commentId: "comment-1",
+        reactionId: "reaction-1",
+      }),
+    ).resolves.toEqual({ id: "reaction-1", success: true });
+
+    expect(deleteOwnReactionById).toHaveBeenCalledWith(expect.anything(), {
+      kind: "comment",
+      id: "comment-1",
+      reactionId: "reaction-1",
+    });
+  });
+});
 
 describe("listDiscussionsForIssue", () => {
   it("returns root threads only", async () => {
@@ -80,6 +327,33 @@ describe("listDiscussionsForIssue", () => {
       listDiscussionsForIssue(client, "issue-missing"),
     ).rejects.toThrow('Issue with ID "issue-missing" not found');
   });
+
+  it("listDiscussionsForIssueWithReactions normalizes thread reactions", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      issue: {
+        comments: {
+          nodes: [commentWithReaction("root-1")],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    });
+
+    const result = await listDiscussionsForIssueWithReactions(
+      client,
+      "issue-1",
+      { limit: 10 },
+    );
+
+    expect(result.nodes[0].reactions).toEqual([
+      {
+        emoji: "👍",
+        count: 1,
+        users: [{ id: "user-1", displayName: "Ada", type: "user" }],
+        reactionIds: ["r-1"],
+      },
+    ]);
+  });
 });
 
 describe("listDiscussionsForProject", () => {
@@ -116,6 +390,33 @@ describe("listDiscussionsForProject", () => {
       listDiscussionsForProject(client, "project-missing"),
     ).rejects.toThrow('Project with ID "project-missing" not found');
   });
+
+  it("listDiscussionsForProjectWithReactions normalizes thread reactions", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      project: {
+        comments: {
+          nodes: [commentWithReaction("root-1")],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    });
+
+    const result = await listDiscussionsForProjectWithReactions(
+      client,
+      "project-1",
+      { limit: 10 },
+    );
+
+    expect(result.nodes[0].reactions).toEqual([
+      {
+        emoji: "👍",
+        count: 1,
+        users: [{ id: "user-1", displayName: "Ada", type: "user" }],
+        reactionIds: ["r-1"],
+      },
+    ]);
+  });
 });
 
 describe("listDiscussionsForInitiative", () => {
@@ -147,6 +448,32 @@ describe("listDiscussionsForInitiative", () => {
     await expect(
       listDiscussionsForInitiative(client, "initiative-missing"),
     ).rejects.toThrow('Initiative with ID "initiative-missing" not found');
+  });
+
+  it("listDiscussionsForInitiativeWithReactions normalizes thread reactions", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request).mockResolvedValue({
+      initiative: { id: "initiative-1" },
+      comments: {
+        nodes: [commentWithReaction("root-1")],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    const result = await listDiscussionsForInitiativeWithReactions(
+      client,
+      "initiative-1",
+      { limit: 10 },
+    );
+
+    expect(result.nodes[0].reactions).toEqual([
+      {
+        emoji: "👍",
+        count: 1,
+        users: [{ id: "user-1", displayName: "Ada", type: "user" }],
+        reactionIds: ["r-1"],
+      },
+    ]);
   });
 });
 
@@ -280,6 +607,41 @@ describe("listDiscussionReplies", () => {
     await expect(listDiscussionReplies(client, "reply-1")).rejects.toThrow(
       'Discussion thread ID "reply-1" must reference a root comment',
     );
+  });
+
+  it("listDiscussionRepliesWithReactions normalizes reply reactions", async () => {
+    const client = createClientMock();
+    vi.mocked(client.request)
+      .mockResolvedValueOnce({
+        comment: {
+          ...comment("root-1"),
+          issueId: "issue-1",
+          projectId: null,
+          initiativeId: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        comments: {
+          nodes: [commentWithReaction("reply-1", "root-1")],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+
+    const result = await listDiscussionRepliesWithReactions(
+      client,
+      "root-1",
+      { limit: 10 },
+      "issue",
+    );
+
+    expect(result.nodes[0].reactions).toEqual([
+      {
+        emoji: "👍",
+        count: 1,
+        users: [{ id: "user-1", displayName: "Ada", type: "user" }],
+        reactionIds: ["r-1"],
+      },
+    ]);
   });
 });
 

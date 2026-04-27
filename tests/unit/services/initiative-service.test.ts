@@ -1,5 +1,7 @@
+import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { GetInitiativeDocument } from "../../../src/gql/graphql.js";
 import {
   archiveInitiative,
   createInitiative,
@@ -15,6 +17,46 @@ function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
     request: vi.fn().mockResolvedValue(response),
   } as unknown as GraphQLClient;
 }
+
+function getFragment(
+  document: DocumentNode,
+  name: string,
+): FragmentDefinitionNode {
+  const fragment = document.definitions.find(
+    (definition): definition is FragmentDefinitionNode =>
+      definition.kind === Kind.FRAGMENT_DEFINITION &&
+      definition.name.value === name,
+  );
+
+  if (!fragment) {
+    throw new Error(`Fragment ${name} not found`);
+  }
+
+  return fragment;
+}
+
+describe("initiative reaction-aware read documents", () => {
+  it("keeps initiative detail reads free of out-of-scope reaction fragments", () => {
+    const baseFragment = getFragment(
+      GetInitiativeDocument,
+      "InitiativeExpandedFields",
+    );
+
+    expect(
+      baseFragment.selectionSet.selections
+        .filter((selection) => selection.kind === Kind.FIELD)
+        .map((selection) => selection.name.value),
+    ).toContain("initiativeUpdates");
+
+    expect(() =>
+      getFragment(GetInitiativeDocument, "InitiativeUpdateFieldsWithReactions"),
+    ).toThrow("Fragment InitiativeUpdateFieldsWithReactions not found");
+
+    expect(() =>
+      getFragment(GetInitiativeDocument, "InitiativeFieldsWithReactions"),
+    ).toThrow("Fragment InitiativeFieldsWithReactions not found");
+  });
+});
 
 describe("listInitiatives", () => {
   it("forwards pagination, includeArchived, filter, and orderBy", async () => {

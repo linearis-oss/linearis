@@ -1,11 +1,15 @@
 import type { Command } from "commander";
 import { type CommandOptions, createContext } from "../common/context.js";
+import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
+  createIssueDiscussionCommentReaction,
   deleteDiscussionComment,
+  deleteIssueDiscussionCommentReactionByEmoji,
+  deleteIssueDiscussionCommentReactionById,
   editDiscussionComment,
   listDiscussionsForIssue,
   replyToDiscussion,
@@ -27,6 +31,10 @@ interface ReplyCommentOptions extends CommandOptions {
 
 interface EditCommentOptions extends CommandOptions {
   body?: string;
+}
+
+interface ReactionOptions extends CommandOptions {
+  shortcode?: string;
 }
 
 export const COMMENTS_META: DomainMeta = {
@@ -205,6 +213,95 @@ export function setupCommentsCommands(program: Command): void {
         const ctx = createContext(command.parent!.parent!.opts());
 
         const result = await deleteDiscussionComment(ctx.gql, comment);
+
+        outputSuccess(result);
+      }),
+    );
+
+  comments
+    .command("react <comment> [emoji]")
+    .description(
+      "DEPRECATED compatibility command. Prefer: `issues threads react <thread>` or `issues replies react <reply>`.",
+    )
+    .addHelpText(
+      "after",
+      "\nDEPRECATED compatibility command. Prefer: `issues threads react <thread>` or `issues replies react <reply>`.",
+    )
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await createIssueDiscussionCommentReaction(ctx.gql, {
+          commentId: comment,
+          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+        });
+
+        outputSuccess(result);
+      }),
+    );
+
+  comments
+    .command("unreact <comment> [emoji]")
+    .description(
+      "DEPRECATED compatibility command. Prefer: `issues threads unreact <thread>` or `issues replies unreact <reply>`.",
+    )
+    .addHelpText(
+      "after",
+      "\nDEPRECATED compatibility command. Prefer: `issues threads unreact <thread>` or `issues replies unreact <reply>`.",
+    )
+    .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, emoji, options, command] = args as [
+          string,
+          string | undefined,
+          ReactionOptions,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await deleteIssueDiscussionCommentReactionByEmoji(
+          ctx.gql,
+          {
+            commentId: comment,
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          },
+        );
+
+        outputSuccess(result);
+      }),
+    );
+
+  comments
+    .command("unreact-id <comment> <reactionId>")
+    .description(
+      "DEPRECATED compatibility command. Prefer: `issues threads unreact-id <thread> <reactionId>` or `issues replies unreact-id <reply> <reactionId>`.",
+    )
+    .addHelpText(
+      "after",
+      "\nDEPRECATED compatibility command. Prefer: `issues threads unreact-id <thread> <reactionId>` or `issues replies unreact-id <reply> <reactionId>`.",
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [comment, reactionId, , command] = args as [
+          string,
+          string,
+          unknown,
+          Command,
+        ];
+        const ctx = createContext(command.parent!.parent!.opts());
+
+        const result = await deleteIssueDiscussionCommentReactionById(ctx.gql, {
+          commentId: comment,
+          reactionId,
+        });
 
         outputSuccess(result);
       }),
