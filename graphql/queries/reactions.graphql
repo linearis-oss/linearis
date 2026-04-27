@@ -1,0 +1,35 @@
+# Root project and initiative reactions are intentionally omitted.
+# Current generated schema exposes ReactionCreateInput.issueId and commentId,
+# but not projectId or initiativeId for root entity reactions.
+
+fragment ReactionReadFields on Reaction {
+  id
+  emoji
+  user {
+    id
+    displayName
+  }
+  externalUser {
+    id
+    name
+  }
+}
+
+query GetIssueReactions($id: String!) {
+  issue(id: $id) {
+    id
+    reactions {
+      ...ReactionReadFields
+    }
+  }
+}
+
+query GetCommentReactions($id: String!) {
+  comment(id: $id) {
+    id
+    parentId
+    reactions {
+      ...ReactionReadFields
+    }
+  }
+}

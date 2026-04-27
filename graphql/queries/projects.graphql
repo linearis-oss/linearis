@@ -110,6 +110,26 @@ query GetProjects($first: Int = 50, $after: String) {
   }
 }
 
+# Project detail fields for opt-in reaction-aware reads
+#
+# Root project reactions are intentionally unsupported by the current schema.
+# Keep the opt-in variant explicit for callers without changing the core
+# project contract. Only paginated root discussion comments are included here
+# with reactions and pageInfo. Replies are intentionally excluded and must be
+# fetched via the dedicated project discussion queries.
+fragment ProjectDetailFieldsWithReactions on Project {
+  ...ProjectDetailFields
+  comments(first: $first, after: $after, filter: { parent: { null: true } }) {
+    nodes {
+      ...DiscussionCommentFieldsWithReactions
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
 # Get a single project by ID
 #
 # Fetches complete project details including content, members,
@@ -120,6 +140,16 @@ query GetProjects($first: Int = 50, $after: String) {
 query GetProject($id: String!) {
   project(id: $id) {
     ...ProjectDetailFields
+  }
+}
+
+# Get a single project by ID for opt-in reaction-aware reads
+#
+# Includes only paginated root discussion comments with reactions. Replies are
+# intentionally excluded here and must come from dedicated discussion queries.
+query GetProjectWithReactions($id: String!, $first: Int, $after: String) {
+  project(id: $id) {
+    ...ProjectDetailFieldsWithReactions
   }
 }
 

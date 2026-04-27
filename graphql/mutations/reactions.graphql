@@ -1,0 +1,35 @@
+fragment ReactionMutationFields on Reaction {
+  id
+  emoji
+  user {
+    id
+    displayName
+  }
+  externalUser {
+    id
+    name
+  }
+}
+
+mutation CreateReaction($input: ReactionCreateInput!) {
+  reactionCreate(input: $input) {
+    success
+    reaction {
+      ...ReactionMutationFields
+      issue {
+        id
+      }
+      comment {
+        id
+        parentId
+      }
+    }
+  }
+}
+
+mutation DeleteReaction($id: String!) {
+  reactionDelete(id: $id) {
+    success
+    entityId
+  }
+}
