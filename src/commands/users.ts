@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { type CommandOptions, createContext } from "../common/context.js";
+import {
+  type CommandOptions,
+  createContext,
+  getRootOpts,
+} from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { listUsers } from "../services/user-service.js";
@@ -35,7 +39,7 @@ export function setupUsersCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListUsersOptions, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const result = await listUsers(ctx.gql, options.active || false, {
           limit: parseLimit(options.limit),
           after: options.after,

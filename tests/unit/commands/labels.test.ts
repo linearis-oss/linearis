@@ -6,6 +6,7 @@ vi.mock("../../../src/common/context.js", () => ({
     gql: { request: vi.fn() },
     sdk: { sdk: {} },
   })),
+  getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
 
 vi.mock("../../../src/common/output.js", async (importOriginal) => {

@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { createContext } from "../../common/context.js";
+import { createContext, getRootOpts } from "../../common/context.js";
 import { handleCommand, outputSuccess } from "../../common/output.js";
 import {
   resolveInitiativeId,
@@ -10,14 +10,6 @@ import {
   createInitiativeProjectLink,
   deleteInitiativeProjectLink,
 } from "../../services/initiative-project-service.js";
-
-function rootOptions(command: Command): Record<string, unknown> {
-  let current: Command = command;
-  while (current.parent) {
-    current = current.parent;
-  }
-  return current.opts();
-}
 
 export function setupInitiativeProjectCommands(initiatives: Command): void {
   initiatives
@@ -31,7 +23,7 @@ export function setupInitiativeProjectCommands(initiatives: Command): void {
           unknown,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
         const projectId = await resolveProjectId(ctx.sdk, project);
@@ -56,7 +48,7 @@ export function setupInitiativeProjectCommands(initiatives: Command): void {
           unknown,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
         const projectId = await resolveProjectId(ctx.sdk, project);

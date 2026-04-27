@@ -1,3 +1,4 @@
+import type { Command } from "commander";
 import { GraphQLClient } from "../client/graphql-client.js";
 import { LinearSdkClient } from "../client/linear-client.js";
 import { type CommandOptions, getApiToken } from "./auth.js";
@@ -19,4 +20,14 @@ export function createContext(options: CommandOptions): CommandContext {
 
 export function createGraphQLClient(token: string): GraphQLClient {
   return new GraphQLClient(token);
+}
+
+export function getRootOpts(command: Command): CommandOptions {
+  let current: Command = command;
+
+  while (current.parent) {
+    current = current.parent;
+  }
+
+  return current.opts() as CommandOptions;
 }

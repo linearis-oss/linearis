@@ -6,6 +6,7 @@ vi.mock("../../../src/common/context.js", () => ({
     gql: { request: vi.fn() },
     sdk: { sdk: {} },
   })),
+  getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
 
 vi.mock("../../../src/common/output.js", async (importOriginal) => {
@@ -167,6 +168,7 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
 }));
 
 import { setupInitiativesCommands } from "../../../src/commands/initiatives/index.js";
+import { getRootOpts } from "../../../src/common/context.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveInitiativeId } from "../../../src/resolvers/initiative-resolver.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
@@ -892,6 +894,24 @@ describe("initiative discussion commands", () => {
       "initiative",
     );
     expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-root-1" });
+  });
+
+  it("initiatives threads react reads options from the root command", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "--api-token",
+      "root-token",
+      "initiatives",
+      "threads",
+      "react",
+      "thread-1",
+      "👍",
+    ]);
+
+    expect(getRootOpts).toHaveBeenCalledWith(expect.any(Command));
   });
 
   it("initiatives threads react delegates to comment reaction service", async () => {

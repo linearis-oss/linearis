@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { createContext } from "../common/context.js";
+import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
@@ -32,7 +32,7 @@ export function setupTeamsCommands(program: Command): void {
           { limit: string; after?: string },
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const result = await listTeams(ctx.gql, {
           limit: parseLimit(options.limit),
           after: options.after,
@@ -48,7 +48,7 @@ export function setupTeamsCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const team = args[0] as string;
         const command = args.at(-1) as Command;
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const teamId = await resolveTeamId(ctx.sdk, team);
         const result = await getTeam(ctx.gql, { id: teamId });
         outputSuccess(result);
