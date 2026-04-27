@@ -1,3 +1,12 @@
+## [2026.4.9-next.7](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.6...v2026.4.9-next.7) (2026-04-27)
+
+### Features
+
+* **cli:** add reaction workflows ([4d6a00c](https://github.com/linearis-oss/linearis/commit/4d6a00cbd9a2c9abe407d5071f3ccd5bbb81e01e)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+* **emoji:** add reaction input normalization ([bc82bc6](https://github.com/linearis-oss/linearis/commit/bc82bc6fa3e7c6ee64f6581b80206ec85bf8e9a8)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+* **graphql:** add reaction operations ([bd0ffac](https://github.com/linearis-oss/linearis/commit/bd0ffaccdba8659fedb6ae4074dc737e102b63b8)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+* **reactions:** add shared service ([0a29bb1](https://github.com/linearis-oss/linearis/commit/0a29bb1f6208a2ddb093f458a7d12d70a645ac91)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+
 ## [2026.4.9-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.5...v2026.4.9-next.6) (2026-04-27)
 
 ### Bug Fixes
