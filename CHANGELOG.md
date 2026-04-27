@@ -1,3 +1,10 @@
+## [2026.4.9-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.5...v2026.4.9-next.6) (2026-04-27)
+
+### Bug Fixes
+
+* **ci:** rerun validation when PR base changes ([e92b7ca](https://github.com/linearis-oss/linearis/commit/e92b7cad13e667f25d2f2bc02901e50f94646a66))
+* resolve issue estimate team context via team resolver ([9c94ff9](https://github.com/linearis-oss/linearis/commit/9c94ff9fc5677e15380e94500933888a76f08e1d))
+
 ## [2026.4.9-next.5](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.4...v2026.4.9-next.5) (2026-04-27)
 
 ### Bug Fixes
