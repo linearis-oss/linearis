@@ -258,6 +258,23 @@ describe("GraphQLClient", () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
+    it("retries native fetch rejected network failures and succeeds on next attempt", async () => {
+      vi.useFakeTimers();
+      fetchMock
+        .mockRejectedValueOnce(new TypeError("fetch failed"))
+        .mockResolvedValueOnce(jsonResponse({ data: { ok: true } }));
+
+      const client = new GraphQLClient("good-token");
+      const promise = client.request(fakeDocument());
+      const expectation = expect(promise).resolves.toEqual({ ok: true });
+      void expectation.catch(() => undefined);
+
+      await vi.runAllTimersAsync();
+      await expectation;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     it("clears timeout timers across retry attempts", async () => {
       vi.useFakeTimers();
       fetchMock

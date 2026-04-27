@@ -16,14 +16,6 @@ interface GraphQLResponseBody {
   message?: string;
 }
 
-interface GraphQLErrorResponse {
-  response?: {
-    status?: number;
-    errors?: GraphQLResponseError[];
-  };
-  message?: string;
-}
-
 class GraphQLTransportError extends Error {
   readonly response: {
     status?: number;
@@ -101,6 +93,20 @@ function isAbortAfterTimeout(signal: AbortSignal, error: unknown): boolean {
   return error.name === "AbortError" || message.includes("aborted");
 }
 
+function normalizeFetchRejection(signal: AbortSignal, error: unknown): never {
+  if (signal.aborted) throw error;
+  if (error instanceof Error) {
+    throw new Error(`Network error: ${error.message}`);
+  }
+  throw new Error(`Network error: ${String(error)}`);
+}
+
+function graphQLErrorMessage(error: unknown): string {
+  if (!isRecord(error) || !isRecord(error.response)) return "";
+
+  return toGraphQLErrors(error.response.errors)?.[0]?.message ?? "";
+}
+
 export class GraphQLClient {
   private readonly apiToken: string;
 
@@ -130,7 +136,9 @@ export class GraphQLClient {
             },
             body: JSON.stringify({ query: print(document), variables }),
             signal: timeoutController.signal,
-          });
+          }).catch((error: unknown) =>
+            normalizeFetchRejection(timeoutController.signal, error),
+          );
 
           const body = await parseResponseBody(fetchResponse);
 
@@ -164,8 +172,7 @@ export class GraphQLClient {
       });
       return response.data as TResult;
     } catch (error: unknown) {
-      const gqlError = error as GraphQLErrorResponse;
-      const errorMessage = gqlError.response?.errors?.[0]?.message ?? "";
+      const errorMessage = graphQLErrorMessage(error);
 
       if (isAuthError(new Error(errorMessage))) {
         throw new AuthenticationError(errorMessage || undefined);
