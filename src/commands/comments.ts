@@ -167,6 +167,7 @@ export function setupCommentsCommands(program: Command): void {
         const result = await replyToDiscussion(ctx.gql, {
           threadId: thread,
           body: options.body,
+          entityKind: "issue",
         });
 
         outputSuccess(result);
