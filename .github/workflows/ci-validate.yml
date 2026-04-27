@@ -10,6 +10,7 @@ on:
       - synchronize
       - ready_for_review
       - reopened
+      - edited
 
 permissions:
   contents: read
