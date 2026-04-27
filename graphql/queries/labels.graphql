@@ -61,3 +61,11 @@ query GetProjectLabels($first: Int = 50, $after: String) {
     }
   }
 }
+
+query FindProjectLabelsByName($name: String!) {
+  projectLabels(filter: { name: { eqIgnoreCase: $name } }, first: 1) {
+    nodes {
+      ...ProjectLabelFields
+    }
+  }
+}

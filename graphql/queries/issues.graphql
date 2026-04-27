@@ -144,6 +144,23 @@ fragment CompleteIssueWithReactionsFields on Issue {
   }
 }
 
+fragment WorkflowStateLookupFields on WorkflowState {
+  id
+  name
+  team {
+    id
+    key
+    name
+  }
+}
+
+fragment IssueEstimateContextFields on Issue {
+  id
+  team {
+    ...TeamEstimateLookupFields
+  }
+}
+
 # Complete issue search fragment with all relationships
 #
 # Combines all issue fragments into a comprehensive field selection.
@@ -319,6 +336,31 @@ query GetIssueTeam($issueId: String!) {
   issue(id: $issueId) {
     team {
       id
+    }
+  }
+}
+
+query FindWorkflowStates($filter: WorkflowStateFilter!) {
+  workflowStates(filter: $filter, first: 10) {
+    nodes {
+      ...WorkflowStateLookupFields
+    }
+  }
+}
+
+query GetIssueEstimateContextById($id: String!) {
+  issue(id: $id) {
+    ...IssueEstimateContextFields
+  }
+}
+
+query GetIssueEstimateContextByIdentifier($teamKey: String!, $number: Float!) {
+  issues(
+    filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
+    first: 1
+  ) {
+    nodes {
+      ...IssueEstimateContextFields
     }
   }
 }

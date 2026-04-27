@@ -21,10 +21,17 @@ fragment TeamFields on Team {
   name
 }
 
-fragment TeamDetailFields on Team {
+fragment TeamEstimateLookupFields on Team {
   id
   key
   name
+  issueEstimationType
+  issueEstimationExtended
+  issueEstimationAllowZero
+}
+
+fragment TeamDetailFields on Team {
+  ...TeamEstimateLookupFields
   description
   private
   timezone
@@ -36,9 +43,6 @@ fragment TeamDetailFields on Team {
     key
     name
   }
-  issueEstimationType
-  issueEstimationExtended
-  issueEstimationAllowZero
   defaultIssueEstimate
   inheritIssueEstimation
   cyclesEnabled
@@ -76,5 +80,29 @@ query GetTeams($first: Int = 50, $after: String) {
 query GetTeamById($id: String!) {
   team(id: $id) {
     ...TeamDetailFields
+  }
+}
+
+query FindTeamEstimateContextById($id: ID!) {
+  teams(filter: { id: { eq: $id } }, first: 1) {
+    nodes {
+      ...TeamEstimateLookupFields
+    }
+  }
+}
+
+query FindTeamEstimateContextByKey($key: String!) {
+  teams(filter: { key: { eq: $key } }, first: 1) {
+    nodes {
+      ...TeamEstimateLookupFields
+    }
+  }
+}
+
+query FindTeamEstimateContextByName($name: String!) {
+  teams(filter: { name: { eq: $name } }, first: 1) {
+    nodes {
+      ...TeamEstimateLookupFields
+    }
   }
 }

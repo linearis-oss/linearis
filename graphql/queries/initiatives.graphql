@@ -165,17 +165,8 @@ query GetInitiativeUpdate($id: String!) {
   }
 }
 
-query FindInitiativesByName($name: String!, $teamId: ID, $ownerId: ID) {
-  initiatives(
-    first: 20
-    filter: {
-      and: [
-        { name: { eqIgnoreCase: $name } }
-        { teams: { some: { id: { eq: $teamId } } } }
-        { owner: { id: { eq: $ownerId } } }
-      ]
-    }
-  ) {
+query FindInitiativesByName($filter: InitiativeFilter!) {
+  initiatives(first: 20, filter: $filter) {
     nodes {
       ...InitiativeNameLookupFields
     }

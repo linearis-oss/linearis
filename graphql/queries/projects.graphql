@@ -90,6 +90,11 @@ fragment ProjectDetailFields on Project {
   }
 }
 
+fragment ProjectLookupFields on Project {
+  id
+  name
+}
+
 # List all projects in the workspace
 #
 # Fetches a paginated list of projects across all teams with enriched
@@ -163,6 +168,18 @@ query GetProjectStatuses {
     nodes {
       id
       name
+    }
+  }
+}
+
+query FindProjectsByName($name: String!, $includeArchived: Boolean = false) {
+  projects(
+    filter: { name: { eqIgnoreCase: $name } }
+    first: 2
+    includeArchived: $includeArchived
+  ) {
+    nodes {
+      ...ProjectLookupFields
     }
   }
 }
