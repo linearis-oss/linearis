@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { LinearSdkClient } from "../../client/linear-client.js";
-import { createContext } from "../../common/context.js";
+import { createContext, getRootOpts } from "../../common/context.js";
 import { resolveReactionEmojiInput } from "../../common/emoji.js";
 import { invalidParameterError } from "../../common/errors.js";
 import {
@@ -123,7 +123,7 @@ function addCommentReactionCommands(
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await createDiscussionCommentReaction(ctx.gql, {
           commentId,
           target: noun,
@@ -146,7 +146,7 @@ function addCommentReactionCommands(
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
           commentId,
           target: noun,
@@ -170,7 +170,7 @@ function addCommentReactionCommands(
           unknown,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await deleteDiscussionCommentReactionById(ctx.gql, {
           commentId,
           target: noun,
@@ -210,14 +210,6 @@ type InitiativeSortBy =
   | "healthUpdatedAt"
   | "manual"
   | "owner";
-
-function rootOptions(command: Command): Record<string, unknown> {
-  let current: Command = command;
-  while (current.parent) {
-    current = current.parent;
-  }
-  return current.opts();
-}
 
 function parseSortOrder(value?: string): "asc" | "desc" | undefined {
   if (!value) return undefined;
@@ -500,7 +492,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [InitiativeListOptions, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const sortOrder = parseSortOrder(options.sortOrder);
         const sortBy = parseSortBy(options.sortBy);
@@ -561,7 +553,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           InitiativeReadOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
 
         // Read query already returns expanded fields. Keep flags accepted for
@@ -584,7 +576,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -613,7 +605,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           DiscussionsOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
         const paginationOptions = {
@@ -654,7 +646,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           DiscussionsOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const paginationOptions = {
           limit: parseLimit(options.limit || "50"),
@@ -694,7 +686,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -721,7 +713,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -751,7 +743,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -776,7 +768,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [comment, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteDiscussionComment(
           ctx.gql,
@@ -794,7 +786,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [reply, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteDiscussionReply(
           ctx.gql,
@@ -817,7 +809,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           ResolveDiscussionOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const result = await resolveDiscussion(ctx.gql, {
           threadId: thread,
@@ -835,7 +827,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [thread, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const result = await unresolveDiscussion(ctx.gql, thread, "initiative");
 
@@ -859,7 +851,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           InitiativeCreateOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const input: InitiativeCreateInput = { name };
 
@@ -911,7 +903,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           InitiativeUpdateOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
 
         const input: InitiativeUpdateInput = {};
@@ -964,7 +956,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [initiative, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
         const result = await archiveInitiative(ctx.gql, initiativeId);
         outputSuccess(result);
@@ -977,7 +969,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [initiative, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
         const result = await unarchiveInitiative(ctx.gql, initiativeId);
         outputSuccess(result);
@@ -990,7 +982,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [initiative, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
         const result = await deleteInitiative(ctx.gql, initiativeId);
         outputSuccess(result);

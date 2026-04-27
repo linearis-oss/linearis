@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { type CommandOptions, createContext } from "../common/context.js";
+import {
+  type CommandOptions,
+  createContext,
+  getRootOpts,
+} from "../common/context.js";
 import {
   invalidParameterError,
   notFoundError,
@@ -63,7 +67,7 @@ export function setupCyclesCommands(program: Command): void {
           );
         }
 
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         // Resolve team filter if provided
         const teamId = options.team
@@ -123,7 +127,7 @@ export function setupCyclesCommands(program: Command): void {
           CycleReadOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const cycleId = await resolveCycleId(ctx.sdk, cycle, options.team);
 

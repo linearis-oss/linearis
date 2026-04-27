@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
-import { createContext } from "../common/context.js";
+import { createContext, getRootOpts } from "../common/context.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
@@ -175,14 +175,6 @@ interface ResolveDiscussionOptions {
   withComment?: string;
 }
 
-function rootOptions(command: Command): Record<string, unknown> {
-  let current: Command = command;
-  while (current.parent) {
-    current = current.parent;
-  }
-  return current.opts();
-}
-
 function addCommentReactionCommands(
   parent: ReturnType<Command["command"]>,
   noun: "thread" | "reply",
@@ -199,7 +191,7 @@ function addCommentReactionCommands(
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await createDiscussionCommentReaction(ctx.gql, {
           commentId,
           target: noun,
@@ -223,7 +215,7 @@ function addCommentReactionCommands(
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
           commentId,
           target: noun,
@@ -248,7 +240,7 @@ function addCommentReactionCommands(
           unknown,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await deleteDiscussionCommentReactionById(ctx.gql, {
           commentId,
           target: noun,
@@ -468,7 +460,7 @@ export function setupIssuesCommands(program: Command): void {
   ).action(
     handleCommand(async (...args: unknown[]) => {
       const [options, command] = args as [FilterOptions, Command];
-      const ctx = createContext(command.parent!.parent!.opts());
+      const ctx = createContext(getRootOpts(command));
 
       const paginationOptions = {
         limit: parseLimit(options.limit),
@@ -507,7 +499,7 @@ export function setupIssuesCommands(program: Command): void {
         FilterOptions,
         Command,
       ];
-      const ctx = createContext(command.parent!.parent!.opts());
+      const ctx = createContext(getRootOpts(command));
 
       const paginationOptions = {
         limit: parseLimit(options.limit),
@@ -548,7 +540,7 @@ export function setupIssuesCommands(program: Command): void {
           Command,
         ];
         validateReadOptions(options);
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (options.withAttachments) {
           if (isUuid(issue)) {
@@ -645,7 +637,7 @@ export function setupIssuesCommands(program: Command): void {
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await createReactionForIssue(ctx.gql, {
           issueId,
@@ -672,7 +664,7 @@ export function setupIssuesCommands(program: Command): void {
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await deleteOwnReactionByEmoji(ctx.gql, {
           kind: "issue",
@@ -699,7 +691,7 @@ export function setupIssuesCommands(program: Command): void {
           unknown,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await deleteOwnReactionById(ctx.gql, {
           kind: "issue",
@@ -726,7 +718,7 @@ export function setupIssuesCommands(program: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -759,7 +751,7 @@ export function setupIssuesCommands(program: Command): void {
           DiscussionsOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const paginationOptions = {
@@ -796,7 +788,7 @@ export function setupIssuesCommands(program: Command): void {
           DiscussionsOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const paginationOptions = {
           limit: parseLimit(options.limit || "50"),
@@ -836,7 +828,7 @@ export function setupIssuesCommands(program: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -863,7 +855,7 @@ export function setupIssuesCommands(program: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -893,7 +885,7 @@ export function setupIssuesCommands(program: Command): void {
           DiscussionBodyOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -918,7 +910,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [comment, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteDiscussionComment(ctx.gql, comment, "issue");
 
@@ -932,7 +924,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [reply, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteDiscussionReply(ctx.gql, reply, "issue");
 
@@ -951,7 +943,7 @@ export function setupIssuesCommands(program: Command): void {
           ResolveDiscussionOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await resolveDiscussion(ctx.gql, {
           threadId: thread,
@@ -969,7 +961,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [thread, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await unresolveDiscussion(ctx.gql, thread, "issue");
 
@@ -1003,7 +995,7 @@ export function setupIssuesCommands(program: Command): void {
           CreateOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const relationActions = parseRelationFlags(options);
 
@@ -1214,7 +1206,7 @@ export function setupIssuesCommands(program: Command): void {
 
         const relationActions = parseRelationFlags(options);
 
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const issueEstimateContext =
           parsedEstimate !== undefined
@@ -1359,7 +1351,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await archiveIssue(ctx.gql, issueId);
         outputSuccess(result);
@@ -1372,7 +1364,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await unarchiveIssue(ctx.gql, issueId);
         outputSuccess(result);
@@ -1385,7 +1377,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await deleteIssue(ctx.gql, issueId);
         outputSuccess(result);

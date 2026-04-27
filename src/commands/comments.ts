@@ -1,5 +1,9 @@
 import type { Command } from "commander";
-import { type CommandOptions, createContext } from "../common/context.js";
+import {
+  type CommandOptions,
+  createContext,
+  getRootOpts,
+} from "../common/context.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
@@ -89,7 +93,7 @@ export function setupCommentsCommands(program: Command): void {
           ListCommentOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const limit = parseLimit(options.limit || "25");
         const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
@@ -120,7 +124,7 @@ export function setupCommentsCommands(program: Command): void {
           CreateCommentOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -158,7 +162,7 @@ export function setupCommentsCommands(program: Command): void {
           ReplyCommentOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -188,7 +192,7 @@ export function setupCommentsCommands(program: Command): void {
           EditCommentOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         if (!options.body) {
           throw invalidParameterError("--body", "is required");
@@ -211,7 +215,7 @@ export function setupCommentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [comment, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteDiscussionComment(ctx.gql, comment);
 
@@ -237,7 +241,7 @@ export function setupCommentsCommands(program: Command): void {
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await createIssueDiscussionCommentReaction(ctx.gql, {
           commentId: comment,
@@ -266,7 +270,7 @@ export function setupCommentsCommands(program: Command): void {
           ReactionOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteIssueDiscussionCommentReactionByEmoji(
           ctx.gql,
@@ -297,7 +301,7 @@ export function setupCommentsCommands(program: Command): void {
           unknown,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
 
         const result = await deleteIssueDiscussionCommentReactionById(ctx.gql, {
           commentId: comment,
