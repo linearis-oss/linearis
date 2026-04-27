@@ -14,10 +14,10 @@ type IssueNode = {
         id?: string;
         key?: string;
       }
-    | (() => Promise<{
+    | Promise<{
         id?: string;
         key?: string;
-      }>);
+      }>;
 };
 
 type TeamNode = {
@@ -176,7 +176,7 @@ describe("resolveIssueEstimateContext", () => {
       [
         {
           id: "issue-uuid",
-          team: vi.fn().mockResolvedValue({ id: teamId, key: "ENG" }),
+          team: Promise.resolve({ id: teamId, key: "ENG" }),
         },
       ],
       [exponentialTeam],
@@ -203,7 +203,7 @@ describe("resolveIssueEstimateContext", () => {
       [
         {
           id: "issue-uuid",
-          team: vi.fn().mockResolvedValue({ key: "ENG" }),
+          team: Promise.resolve({ key: "ENG" }),
         },
       ],
       [exponentialTeam],
