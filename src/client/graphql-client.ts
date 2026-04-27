@@ -1,16 +1,104 @@
-import { LinearClient } from "@linear/sdk";
 import { type DocumentNode, print } from "graphql";
 import { AuthenticationError, isAuthError } from "../common/errors.js";
 import { withRetry } from "../common/retry.js";
 
 /** Default timeout for GraphQL API requests (30 seconds) */
 const REQUEST_TIMEOUT_MS = 30_000;
+const LINEAR_GRAPHQL_ENDPOINT = "https://api.linear.app/graphql";
+
+interface GraphQLResponseError {
+  message: string;
+}
+
+interface GraphQLResponseBody {
+  data?: unknown;
+  errors?: GraphQLResponseError[];
+  message?: string;
+}
 
 interface GraphQLErrorResponse {
   response?: {
-    errors?: Array<{ message: string }>;
+    status?: number;
+    errors?: GraphQLResponseError[];
   };
   message?: string;
+}
+
+class GraphQLTransportError extends Error {
+  readonly response: {
+    status?: number;
+    errors?: GraphQLResponseError[];
+  };
+
+  constructor(
+    message: string,
+    response: { status?: number; errors?: GraphQLResponseError[] },
+  ) {
+    super(message);
+    this.name = "GraphQLTransportError";
+    this.response = response;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toGraphQLErrors(value: unknown): GraphQLResponseError[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const errors = value.flatMap((entry): GraphQLResponseError[] => {
+    if (!isRecord(entry) || typeof entry.message !== "string") return [];
+    return [{ message: entry.message }];
+  });
+
+  return errors.length > 0 ? errors : undefined;
+}
+
+async function parseJsonResponse(
+  response: Response,
+): Promise<GraphQLResponseBody | undefined> {
+  const text = await response.text();
+  if (text.trim() === "") return undefined;
+
+  const parsed: unknown = JSON.parse(text);
+  if (!isRecord(parsed)) return undefined;
+
+  return {
+    data: parsed.data,
+    errors: toGraphQLErrors(parsed.errors),
+    message: typeof parsed.message === "string" ? parsed.message : undefined,
+  };
+}
+
+async function parseResponseBody(
+  response: Response,
+): Promise<GraphQLResponseBody | undefined> {
+  try {
+    return await parseJsonResponse(response);
+  } catch (_error: unknown) {
+    if (response.ok) throw new Error("Invalid JSON response");
+    return undefined;
+  }
+}
+
+function httpErrorMessage(
+  response: Response,
+  body: GraphQLResponseBody | undefined,
+): string {
+  return (
+    body?.errors?.[0]?.message ??
+    body?.message ??
+    `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`
+  );
+}
+
+function isAbortAfterTimeout(signal: AbortSignal, error: unknown): boolean {
+  if (!signal.aborted) return false;
+  if (!(error instanceof Error)) return true;
+
+  const message = error.message.toLowerCase();
+  return error.name === "AbortError" || message.includes("aborted");
 }
 
 export class GraphQLClient {
@@ -18,20 +106,6 @@ export class GraphQLClient {
 
   constructor(apiToken: string) {
     this.apiToken = apiToken;
-  }
-
-  private createRawClient(
-    signal?: AbortSignal,
-  ): InstanceType<typeof LinearClient>["client"] {
-    const linearClient = new LinearClient({
-      apiKey: this.apiToken,
-      signal,
-      headers: {
-        // Request 1-hour signed URLs for file downloads (see file-service.ts)
-        "public-file-urls-expire-in": "3600",
-      },
-    });
-    return linearClient.client;
   }
 
   async request<TResult>(
@@ -46,15 +120,41 @@ export class GraphQLClient {
         }, REQUEST_TIMEOUT_MS);
 
         try {
-          return await this.createRawClient(
-            timeoutController.signal,
-          ).rawRequest(print(document), variables);
+          const fetchResponse = await fetch(LINEAR_GRAPHQL_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: this.apiToken,
+              // Request 1-hour signed URLs for file downloads (see file-service.ts)
+              "public-file-urls-expire-in": "3600",
+            },
+            body: JSON.stringify({ query: print(document), variables }),
+            signal: timeoutController.signal,
+          });
+
+          const body = await parseResponseBody(fetchResponse);
+
+          if (!fetchResponse.ok) {
+            throw new GraphQLTransportError(
+              httpErrorMessage(fetchResponse, body),
+              {
+                status: fetchResponse.status,
+                errors: body?.errors,
+              },
+            );
+          }
+
+          if (body?.errors?.[0]) {
+            throw new GraphQLTransportError(body.errors[0].message, {
+              errors: body.errors,
+            });
+          }
+
+          if (!body) throw new Error("Invalid JSON response");
+
+          return { data: body.data };
         } catch (error: unknown) {
-          if (
-            timeoutController.signal.aborted &&
-            error instanceof Error &&
-            error.message.toLowerCase().includes("aborted")
-          ) {
+          if (isAbortAfterTimeout(timeoutController.signal, error)) {
             throw new Error("Request timed out");
           }
           throw error;
