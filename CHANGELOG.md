@@ -1,3 +1,9 @@
+## [2026.4.9-next.8](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.7...v2026.4.9-next.8) (2026-04-27)
+
+### Bug Fixes
+
+* **comments:** constrain compatibility replies ([85a1d3a](https://github.com/linearis-oss/linearis/commit/85a1d3a1e2e1ecf46138632d637f00b046a1c12c))
+
 ## [2026.4.9-next.7](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.6...v2026.4.9-next.7) (2026-04-27)
 
 ### Features
