@@ -183,7 +183,7 @@ describe("comments compatibility delegation", () => {
     expect(startIssueDiscussion).not.toHaveBeenCalled();
   });
 
-  it("comments reply delegates to replyToDiscussion", async () => {
+  it("comments reply constrains replies to issue discussion threads", async () => {
     const program = createProgram();
 
     await program.parseAsync([
@@ -199,6 +199,7 @@ describe("comments compatibility delegation", () => {
     expect(replyToDiscussion).toHaveBeenCalledWith(expect.anything(), {
       threadId: "thread-1",
       body: "Reply body",
+      entityKind: "issue",
     });
   });
 
