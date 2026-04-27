@@ -1,6 +1,6 @@
 {
   "name": "linearis",
-  "version": "2026.4.8",
+  "version": "2026.4.9-next.8",
   "description": "CLI tool for Linear.app with JSON output, smart ID resolution, and optimized GraphQL queries. Designed for LLM agents and humans who prefer structured data.",
   "main": "dist/main.js",
   "type": "module",
@@ -67,8 +67,9 @@
   },
   "homepage": "https://github.com/linearis-oss/linearis#readme",
   "dependencies": {
-    "@linear/sdk": "81.0.0",
-    "commander": "14.0.3"
+    "@linear/sdk": "82.1.0",
+    "commander": "14.0.3",
+    "node-emoji": "2.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",
@@ -90,8 +91,8 @@
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^11.0.1",
-    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/github": "^12.0.0",
+    "@semantic-release/npm": "^13.0.0",
     "@semantic-release/release-notes-generator": "^14.1.0",
     "semantic-release": "^25.0.1"
   },

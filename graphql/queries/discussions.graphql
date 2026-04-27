@@ -1,0 +1,295 @@
+fragment DiscussionCommentFields on Comment {
+  id
+  body
+  createdAt
+  editedAt
+  parentId
+  resolvedAt
+  resolvingComment {
+    id
+  }
+  resolvingUser {
+    id
+    displayName
+  }
+  user {
+    id
+    displayName
+  }
+}
+
+fragment DiscussionCommentFieldsWithReactions on Comment {
+  ...DiscussionCommentFields
+  reactions {
+    ...ReactionReadFields
+  }
+}
+
+query GetDiscussionCommentContext($id: String!) {
+  comment(id: $id) {
+    ...DiscussionCommentFields
+    issueId
+    projectId
+    initiativeId
+  }
+}
+
+query ListIssueDiscussionRoots($issueId: String!, $first: Int, $after: String) {
+  issue(id: $issueId) {
+    comments(first: $first, after: $after, filter: { parent: { null: true } }) {
+      nodes {
+        ...DiscussionCommentFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+
+query ListIssueDiscussionRootsWithReactions(
+  $issueId: String!
+  $first: Int
+  $after: String
+) {
+  issue(id: $issueId) {
+    comments(first: $first, after: $after, filter: { parent: { null: true } }) {
+      nodes {
+        ...DiscussionCommentFieldsWithReactions
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+
+query ListProjectDiscussionRoots(
+  $projectId: String!
+  $first: Int
+  $after: String
+) {
+  project(id: $projectId) {
+    comments(first: $first, after: $after, filter: { parent: { null: true } }) {
+      nodes {
+        ...DiscussionCommentFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+
+query ListProjectDiscussionRootsWithReactions(
+  $projectId: String!
+  $first: Int
+  $after: String
+) {
+  project(id: $projectId) {
+    comments(first: $first, after: $after, filter: { parent: { null: true } }) {
+      nodes {
+        ...DiscussionCommentFieldsWithReactions
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+
+query ListInitiativeDiscussionRoots(
+  $initiativeId: ID!
+  $initiativeLookupId: String!
+  $first: Int
+  $after: String
+) {
+  initiative: initiative(id: $initiativeLookupId) {
+    id
+  }
+  comments(
+    first: $first
+    after: $after
+    filter: {
+      initiative: { id: { eq: $initiativeId } }
+      parent: { null: true }
+    }
+  ) {
+    nodes {
+      ...DiscussionCommentFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListInitiativeDiscussionRootsWithReactions(
+  $initiativeId: ID!
+  $initiativeLookupId: String!
+  $first: Int
+  $after: String
+) {
+  initiative: initiative(id: $initiativeLookupId) {
+    id
+  }
+  comments(
+    first: $first
+    after: $after
+    filter: {
+      initiative: { id: { eq: $initiativeId } }
+      parent: { null: true }
+    }
+  ) {
+    nodes {
+      ...DiscussionCommentFieldsWithReactions
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListIssueDiscussionReplyCandidates(
+  $issueId: ID!
+  $first: Int
+  $after: String
+) {
+  comments(
+    first: $first
+    after: $after
+    orderBy: createdAt
+    filter: { issue: { id: { eq: $issueId } }, parent: { null: false } }
+  ) {
+    nodes {
+      ...DiscussionCommentFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListIssueDiscussionReplyCandidatesWithReactions(
+  $issueId: ID!
+  $first: Int
+  $after: String
+) {
+  comments(
+    first: $first
+    after: $after
+    orderBy: createdAt
+    filter: { issue: { id: { eq: $issueId } }, parent: { null: false } }
+  ) {
+    nodes {
+      ...DiscussionCommentFieldsWithReactions
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListProjectDiscussionReplyCandidates(
+  $projectId: ID!
+  $first: Int
+  $after: String
+) {
+  comments(
+    first: $first
+    after: $after
+    orderBy: createdAt
+    filter: { project: { id: { eq: $projectId } }, parent: { null: false } }
+  ) {
+    nodes {
+      ...DiscussionCommentFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListProjectDiscussionReplyCandidatesWithReactions(
+  $projectId: ID!
+  $first: Int
+  $after: String
+) {
+  comments(
+    first: $first
+    after: $after
+    orderBy: createdAt
+    filter: { project: { id: { eq: $projectId } }, parent: { null: false } }
+  ) {
+    nodes {
+      ...DiscussionCommentFieldsWithReactions
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListInitiativeDiscussionReplyCandidates(
+  $initiativeId: ID!
+  $first: Int
+  $after: String
+) {
+  comments(
+    first: $first
+    after: $after
+    orderBy: createdAt
+    filter: {
+      initiative: { id: { eq: $initiativeId } }
+      parent: { null: false }
+    }
+  ) {
+    nodes {
+      ...DiscussionCommentFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query ListInitiativeDiscussionReplyCandidatesWithReactions(
+  $initiativeId: ID!
+  $first: Int
+  $after: String
+) {
+  comments(
+    first: $first
+    after: $after
+    orderBy: createdAt
+    filter: {
+      initiative: { id: { eq: $initiativeId } }
+      parent: { null: false }
+    }
+  ) {
+    nodes {
+      ...DiscussionCommentFieldsWithReactions
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query GetDiscussionComment($id: String!) {
+  comment(id: $id) {
+    ...DiscussionCommentFields
+  }
+}

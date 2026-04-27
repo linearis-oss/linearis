@@ -33,11 +33,15 @@ import {
   type GetIssueByIdentifierWithAttachmentsQuery,
   GetIssueByIdentifierWithCommentsDocument,
   type GetIssueByIdentifierWithCommentsQuery,
+  GetIssueByIdentifierWithReactionsDocument,
+  type GetIssueByIdentifierWithReactionsQuery,
   type GetIssueByIdQuery,
   GetIssueByIdWithAttachmentsDocument,
   type GetIssueByIdWithAttachmentsQuery,
   GetIssueByIdWithCommentsDocument,
   type GetIssueByIdWithCommentsQuery,
+  GetIssueByIdWithReactionsDocument,
+  type GetIssueByIdWithReactionsQuery,
   GetIssuesDocument,
   type GetIssuesQuery,
   type IssueCreateInput,
@@ -52,12 +56,29 @@ import {
   UpdateIssueDocument,
   type UpdateIssueMutation,
 } from "../gql/graphql.js";
+import { normalizeReactions } from "./reaction-service.js";
 
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
 };
 
+function hasExplicitStateFilter(filter: IssueFilter): boolean {
+  if (filter.state) {
+    return true;
+  }
+
+  if (filter.and?.some(hasExplicitStateFilter)) {
+    return true;
+  }
+
+  return filter.or?.some(hasExplicitStateFilter) ?? false;
+}
+
 function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
+  if (hasExplicitStateFilter(filter)) {
+    return filter;
+  }
+
   return {
     and: [NON_COMPLETED_ISSUES_FILTER, filter],
   };
@@ -144,6 +165,31 @@ function threadIssueComments(
     comments: {
       nodes: groupCommentsIntoThreads(issue.comments?.nodes ?? []),
     },
+  };
+}
+
+type NormalizedIssueReactions = ReturnType<typeof normalizeReactions>;
+
+type IssueDetailWithReactions = Omit<
+  NonNullable<GetIssueByIdWithReactionsQuery["issue"]>,
+  "reactions"
+> & {
+  reactions: NormalizedIssueReactions;
+};
+
+type IssueByIdentifierWithReactions = Omit<
+  GetIssueByIdentifierWithReactionsQuery["issues"]["nodes"][0],
+  "reactions"
+> & {
+  reactions: NormalizedIssueReactions;
+};
+
+function normalizeIssueReactions<
+  T extends { reactions: Parameters<typeof normalizeReactions>[0] },
+>(issue: T): Omit<T, "reactions"> & { reactions: NormalizedIssueReactions } {
+  return {
+    ...issue,
+    reactions: normalizeReactions(issue.reactions),
   };
 }
 
@@ -261,6 +307,37 @@ export async function getIssueByIdentifierWithCommentThreads(
     issueNumber,
   );
   return threadIssueComments(issue);
+}
+
+export async function getIssueWithReactions(
+  client: GraphQLClient,
+  id: string,
+): Promise<IssueDetailWithReactions> {
+  const result = await client.request<GetIssueByIdWithReactionsQuery>(
+    GetIssueByIdWithReactionsDocument,
+    { id },
+  );
+  if (!result.issue) {
+    throw new Error(`Issue with ID "${id}" not found`);
+  }
+  return normalizeIssueReactions(result.issue);
+}
+
+export async function getIssueByIdentifierWithReactions(
+  client: GraphQLClient,
+  teamKey: string,
+  issueNumber: number,
+): Promise<IssueByIdentifierWithReactions> {
+  const result = await client.request<GetIssueByIdentifierWithReactionsQuery>(
+    GetIssueByIdentifierWithReactionsDocument,
+    { teamKey, number: issueNumber },
+  );
+  if (!result.issues.nodes.length) {
+    throw new Error(
+      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+    );
+  }
+  return normalizeIssueReactions(result.issues.nodes[0]);
 }
 
 export async function getIssueWithAttachments(

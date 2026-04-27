@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { createContext } from "../../common/context.js";
+import { createContext, getRootOpts } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
 import {
   handleCommand,
@@ -39,14 +39,6 @@ interface InitiativeUpdatesUpdateOptions {
   health?: string;
 }
 
-function rootOptions(command: Command): Record<string, unknown> {
-  let current: Command = command;
-  while (current.parent) {
-    current = current.parent;
-  }
-  return current.opts();
-}
-
 function parseHealth(value?: string): InitiativeUpdateHealthType | undefined {
   if (!value) return undefined;
 
@@ -81,7 +73,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           InitiativeUpdatesListOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(
           ctx.sdk,
@@ -105,7 +97,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await getInitiativeUpdate(ctx.gql, updateId);
         outputSuccess(result);
       }),
@@ -123,7 +115,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           InitiativeUpdatesCreateOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(
           ctx.sdk,
@@ -158,7 +150,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           InitiativeUpdatesUpdateOptions,
           Command,
         ];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
 
         const input: InitiativeUpdateUpdateInput = {};
 
@@ -189,7 +181,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await archiveInitiativeUpdate(ctx.gql, updateId);
         outputSuccess(result);
       }),
@@ -201,7 +193,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
-        const ctx = createContext(rootOptions(command));
+        const ctx = createContext(getRootOpts(command));
         const result = await unarchiveInitiativeUpdate(ctx.gql, updateId);
         outputSuccess(result);
       }),

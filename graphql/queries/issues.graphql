@@ -136,6 +136,14 @@ fragment CompleteIssueWithCommentsFields on Issue {
   }
 }
 
+# Complete issue fragment with all relationships, default comments, and reactions
+fragment CompleteIssueWithReactionsFields on Issue {
+  ...CompleteIssueWithDefaultCommentsFields
+  reactions {
+    ...ReactionReadFields
+  }
+}
+
 # Complete issue search fragment with all relationships
 #
 # Combines all issue fragments into a comprehensive field selection.
@@ -285,6 +293,25 @@ query GetIssueByIdentifierWithComments($teamKey: String!, $number: Float!) {
   }
 }
 
+# Get single issue by UUID with root reactions
+query GetIssueByIdWithReactions($id: String!) {
+  issue(id: $id) {
+    ...CompleteIssueWithReactionsFields
+  }
+}
+
+# Get issue by identifier with root reactions
+query GetIssueByIdentifierWithReactions($teamKey: String!, $number: Float!) {
+  issues(
+    filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
+    first: 1
+  ) {
+    nodes {
+      ...CompleteIssueWithReactionsFields
+    }
+  }
+}
+
 # Get issue team by issue ID
 #
 # Fetches the team associated with an issue by its ID.
@@ -353,156 +380,118 @@ query FilteredSearchIssues(
 # Comprehensive batch resolve for update operations
 #
 # Resolves all necessary entity references in a single batch query
-# before issue update. Includes labels, projects, teams, and parent issues.
-# This prevents N+1 queries during update operations.
+# before issue update.
 query BatchResolveForUpdate(
-  $labelNames: [String!]
+  $assigneeQuery: String
   $projectName: String
+  $projectId: ID
+  $labelNames: [String!]
+  $statusName: String
+  $cycleName: String
   $teamKey: String
-  $issueNumber: Float
+  $teamId: ID
   $milestoneName: String
-) {
-  # Resolve labels if provided
-  labels: issueLabels(filter: { name: { in: $labelNames } }) {
-    nodes {
-      id
-      name
-      isGroup
-      parent {
-        id
-        name
-      }
-      children {
-        nodes {
-          id
-          name
-        }
-      }
-    }
-  }
-
-  # Resolve project if provided (case-insensitive to be user-friendly)
-  projects(filter: { name: { eqIgnoreCase: $projectName } }, first: 1) {
-    nodes {
-      id
-      name
-      projectMilestones {
-        nodes {
-          id
-          name
-        }
-      }
-    }
-  }
-
-  # Resolve milestone if provided (standalone query in case no project context)
-  milestones: projectMilestones(
-    filter: { name: { eq: $milestoneName } }
-    first: 1
-  ) {
-    nodes {
-      id
-      name
-    }
-  }
-
-  # Resolve issue identifier if provided
-  issues(
-    filter: {
-      and: [
-        { team: { key: { eq: $teamKey } } }
-        { number: { eq: $issueNumber } }
-      ]
-    }
-    first: 1
-  ) {
-    nodes {
-      id
-      identifier
-      labels {
-        nodes {
-          id
-          name
-        }
-      }
-      team {
-        id
-        key
-        name
-      }
-      project {
-        id
-        projectMilestones {
-          nodes {
-            id
-            name
-          }
-        }
-      }
-    }
-  }
-}
-
-# Comprehensive batch resolve for create operations
-#
-# Resolves all entity references needed for issue creation in a single
-# batch query. Prevents N+1 queries during issue creation by
-# pre-resolving teams, projects, labels, and parent issues.
-query BatchResolveForCreate(
-  $teamKey: String
-  $teamName: String
-  $projectName: String
-  $labelNames: [String!]
   $parentTeamKey: String
   $parentIssueNumber: Float
 ) {
-  # Resolve team if provided
-  teams(
-    filter: { or: [{ key: { eq: $teamKey } }, { name: { eq: $teamName } }] }
-    first: 1
+  assignees: users(
+    filter: {
+      or: [
+        { displayName: { eqIgnoreCase: $assigneeQuery } }
+        { email: { eqIgnoreCase: $assigneeQuery } }
+      ]
+    }
+    first: 10
   ) {
     nodes {
       id
-      key
       name
+      email
+      displayName
     }
   }
 
-  # Resolve project if provided (case-insensitive to be user-friendly)
-  projects(filter: { name: { eqIgnoreCase: $projectName } }, first: 1) {
+  projects(
+    filter: {
+      or: [{ name: { eqIgnoreCase: $projectName } }, { id: { eq: $projectId } }]
+    }
+    first: 10
+  ) {
     nodes {
       id
       name
-      projectMilestones {
+      projectMilestones(
+        filter: { name: { eqIgnoreCase: $milestoneName } }
+        first: 10
+      ) {
         nodes {
           id
           name
         }
       }
-      # Projects don't own cycles directly, but include teams for context if needed
     }
   }
 
-  # Resolve labels if provided
   labels: issueLabels(filter: { name: { in: $labelNames } }) {
     nodes {
       id
       name
-      isGroup
-      parent {
-        id
-        name
-      }
-      children {
-        nodes {
-          id
-          name
+    }
+  }
+
+  statuses: workflowStates(
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $statusName } }
+        {
+          or: [
+            { team: { key: { eq: $teamKey } } }
+            { team: { id: { eq: $teamId } } }
+          ]
         }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      team {
+        id
+        key
       }
     }
   }
 
-  # Resolve parent issue if provided
+  cycles(
+    filter: {
+      and: [
+        { name: { eq: $cycleName } }
+        {
+          or: [
+            { team: { key: { eq: $teamKey } } }
+            { team: { id: { eq: $teamId } } }
+          ]
+        }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      isActive
+      isNext
+      isPrevious
+      number
+      startsAt
+      team {
+        id
+        key
+      }
+    }
+  }
+
   parentIssues: issues(
     filter: {
       and: [
@@ -517,8 +506,333 @@ query BatchResolveForCreate(
       identifier
     }
   }
+}
 
-  # Resolve cycles by name (team-scoped lookup is preferred but we also provide global fallback)
+# Comprehensive batch resolve for create operations
+#
+# Resolves all entity references needed for issue creation in a single
+# batch query.
+query BatchResolveForCreate(
+  $teamKey: String
+  $teamName: String
+  $teamId: ID
+  $assigneeQuery: String
+  $projectName: String
+  $projectId: ID
+  $labelNames: [String!]
+  $statusName: String
+  $cycleName: String
+  $milestoneName: String
+  $parentTeamKey: String
+  $parentIssueNumber: Float
+) {
+  teams(
+    filter: { or: [{ key: { eq: $teamKey } }, { name: { eq: $teamName } }] }
+    first: 10
+  ) {
+    nodes {
+      id
+      key
+      name
+    }
+  }
+
+  assignees: users(
+    filter: {
+      or: [
+        { displayName: { eqIgnoreCase: $assigneeQuery } }
+        { email: { eqIgnoreCase: $assigneeQuery } }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      email
+      displayName
+    }
+  }
+
+  projects(
+    filter: {
+      or: [{ name: { eqIgnoreCase: $projectName } }, { id: { eq: $projectId } }]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      projectMilestones(
+        filter: { name: { eqIgnoreCase: $milestoneName } }
+        first: 10
+      ) {
+        nodes {
+          id
+          name
+        }
+      }
+    }
+  }
+
+  labels: issueLabels(filter: { name: { in: $labelNames } }) {
+    nodes {
+      id
+      name
+    }
+  }
+
+  statuses: workflowStates(
+    filter: {
+      and: [
+        { name: { eqIgnoreCase: $statusName } }
+        {
+          or: [
+            { team: { key: { eq: $teamKey } } }
+            { team: { name: { eq: $teamName } } }
+            { team: { id: { eq: $teamId } } }
+          ]
+        }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      team {
+        id
+        key
+      }
+    }
+  }
+
+  cycles(
+    filter: {
+      and: [
+        { name: { eq: $cycleName } }
+        {
+          or: [
+            { team: { key: { eq: $teamKey } } }
+            { team: { name: { eq: $teamName } } }
+            { team: { id: { eq: $teamId } } }
+          ]
+        }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      isActive
+      isNext
+      isPrevious
+      number
+      startsAt
+      team {
+        id
+        key
+      }
+    }
+  }
+
+  parentIssues: issues(
+    filter: {
+      and: [
+        { team: { key: { eq: $parentTeamKey } } }
+        { number: { eq: $parentIssueNumber } }
+      ]
+    }
+    first: 1
+  ) {
+    nodes {
+      id
+      identifier
+    }
+  }
+}
+
+query BatchResolveForSearch(
+  $teamKey: String
+  $teamName: String
+  $teamId: ID
+  $assigneeQuery: String
+  $creatorQuery: String
+  $projectName: String
+  $projectId: ID
+  $labelNames: [String!]
+  $cycleName: String
+  $parentTeamKey: String
+  $parentIssueNumber: Float
+  $milestoneName: String
+) {
+  teams(
+    filter: { or: [{ key: { eq: $teamKey } }, { name: { eq: $teamName } }] }
+    first: 10
+  ) {
+    nodes {
+      id
+      key
+      name
+    }
+  }
+
+  assignees: users(
+    filter: {
+      or: [
+        { displayName: { eqIgnoreCase: $assigneeQuery } }
+        { email: { eqIgnoreCase: $assigneeQuery } }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      email
+      displayName
+    }
+  }
+
+  creators: users(
+    filter: {
+      or: [
+        { displayName: { eqIgnoreCase: $creatorQuery } }
+        { email: { eqIgnoreCase: $creatorQuery } }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      email
+      displayName
+    }
+  }
+
+  projects(
+    filter: {
+      or: [{ name: { eqIgnoreCase: $projectName } }, { id: { eq: $projectId } }]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      projectMilestones(
+        filter: { name: { eqIgnoreCase: $milestoneName } }
+        first: 10
+      ) {
+        nodes {
+          id
+          name
+        }
+      }
+    }
+  }
+
+  labels: issueLabels(filter: { name: { in: $labelNames } }) {
+    nodes {
+      id
+      name
+    }
+  }
+
+  statuses: workflowStates(
+    filter: {
+      or: [
+        { team: { key: { eq: $teamKey } } }
+        { team: { name: { eq: $teamName } } }
+        { team: { id: { eq: $teamId } } }
+      ]
+    }
+    first: 50
+  ) {
+    nodes {
+      id
+      name
+      team {
+        id
+        key
+      }
+    }
+  }
+
+  cycles(
+    filter: {
+      and: [
+        { name: { eq: $cycleName } }
+        {
+          or: [
+            { team: { key: { eq: $teamKey } } }
+            { team: { name: { eq: $teamName } } }
+            { team: { id: { eq: $teamId } } }
+          ]
+        }
+      ]
+    }
+    first: 10
+  ) {
+    nodes {
+      id
+      name
+      isActive
+      isNext
+      isPrevious
+      number
+      startsAt
+      team {
+        id
+        key
+      }
+    }
+  }
+
+  parentIssues: issues(
+    filter: {
+      and: [
+        { team: { key: { eq: $parentTeamKey } } }
+        { number: { eq: $parentIssueNumber } }
+      ]
+    }
+    first: 1
+  ) {
+    nodes {
+      id
+      identifier
+    }
+  }
+}
+
+query BatchResolveIssueLabelsPage($first: Int!, $after: String) {
+  issueLabels(first: $first, after: $after) {
+    nodes {
+      id
+      name
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query BatchResolveWorkflowStatesPage($first: Int!, $after: String) {
+  workflowStates(first: $first, after: $after) {
+    nodes {
+      id
+      name
+      team {
+        id
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
 }
 
 # Complete issue fragment with attachments

@@ -6,9 +6,7 @@ CLI tool for [Linear.app](https://linear.app) optimized for AI agents. JSON outp
 
 The official Linear MCP works fine, but it eats up ~13k tokens just by being connected -- before the agent does anything. Linearis takes a different approach: instead of exposing the full API surface upfront, agents discover what they need through a two-tier usage system. `linearis usage` gives an overview in ~200 tokens, then `linearis <domain> usage` provides the full reference for one area in ~300-500 tokens. A typical agent interaction costs ~500-700 tokens of context, not ~13k.
 
-The trade-off is coverage. An MCP exposes the entire Linear API; Linearis covers the operations that matter for day-to-day work with issues, comments, cycles, documents, and files. If you need to manage custom workflows, integrations, or workspace settings, the MCP is the better choice.
-
-**This project scratches my own itches,** and satisfies my own usage patterns of working with Linear: I **do** work with tickets/issues and comments on the command line; I **do not** manage projects or workspaces etc. there. YMMV.
+The trade-off is coverage. An MCP exposes the entire Linear API; Linearis covers the operations that matter for day-to-day work with issues, discussions, cycles, documents, and files. If you need to manage custom workflows, integrations, or workspace settings, the MCP is the better choice.
 
 ## Installation
 
@@ -68,8 +66,17 @@ linearis issues search "authentication bug"
 # Create an issue
 linearis issues create "Fix login flow" --team Platform --priority 2
 
-# Add a comment
-linearis comments create ENG-42 --body "Investigating this now"
+# Start a discussion thread on an issue
+linearis issues discuss ENG-42 --body "Investigating this now"
+
+# List root discussion threads for an issue
+linearis issues discussions ENG-42
+
+# List replies in one root thread
+linearis issues replies 6f4f28cd-4f53-4d76-ae95-80f1b6f6b87e
+
+# Reply to a thread (use a root discussion thread ID)
+linearis issues reply 6f4f28cd-4f53-4d76-ae95-80f1b6f6b87e --body "I found the root cause"
 ```
 
 For the full reference of every command and flag, run:
@@ -77,6 +84,24 @@ For the full reference of every command and flag, run:
 ```bash
 linearis <domain> usage
 ```
+
+### Migration: `comments` → issue discussion commands
+
+The `comments` domain remains available as a **deprecated compatibility facade**. For new automation and agent prompts, migrate to issue discussion commands in the `issues` domain:
+
+| Deprecated | Preferred |
+|---|---|
+| `linearis comments create <issue> --body <text>` | `linearis issues discuss <issue> --body <text>` |
+| `linearis comments list <issue>` | `linearis issues discussions <issue>` |
+| `linearis comments reply <thread> --body <text>` | `linearis issues reply <thread> --body <text>` |
+| `linearis comments edit <reply> --body <text>` | `linearis issues edit-reply <reply> --body <text>` |
+| `linearis comments delete <reply>` | `linearis issues delete-reply <reply>` |
+
+Notes:
+- `issues discussions <issue>` lists **root** threads.
+- Use `issues replies <thread>` to fetch replies in one thread, including nested replies.
+- Replying requires a **root discussion thread ID** (not a reply ID).
+- Compatibility `comments edit/delete` accepts root thread IDs and reply IDs.
 
 ## AI Agent Integration
 
@@ -95,7 +120,7 @@ This means the agent never loads the full API surface into context. It pays for 
 | | Linearis | Linear MCP |
 |---|---|---|
 | Context cost | ~500-700 tokens per interaction | ~13k tokens on connect |
-| Coverage | Common operations (issues, comments, cycles, docs, files) | Full Linear API |
+| Coverage | Common operations (issues, discussions, cycles, docs, files) | Full Linear API |
 | Output | JSON via stdout | Tool call responses |
 | Setup | `npm install -g linearis` + bash tool | MCP server connection |
 
@@ -116,9 +141,9 @@ Workflow rules:
 - When creating a ticket, ask the user which project to assign it to if unclear.
 - For subtasks, inherit the parent ticket's project by default.
 - When a task in a ticket description changes status, update the description.
-- For progress beyond simple checkbox changes, add a comment instead of editing the description.
+- For progress beyond simple checkbox changes, start or reply in a discussion thread instead of editing the description.
 
-File handling: `issues read` returns an `embeds` array with signed download URLs and expiration timestamps. Use `files download` to retrieve them. Use `files upload` to attach new files, then reference the returned URL in comments or descriptions.
+File handling: `issues read` returns an `embeds` array with signed download URLs and expiration timestamps. Use `files download` to retrieve them. Use `files upload` to attach new files, then reference the returned URL in discussions or descriptions.
 ```
 
 Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.md` so every agent session has it in context automatically.

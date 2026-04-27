@@ -24,6 +24,7 @@ vi.mock("../../../src/services/auth-service.js", () => ({
 
 vi.mock("../../../src/common/context.js", () => ({
   createGraphQLClient: vi.fn(() => ({})),
+  getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
 
 vi.mock("../../../src/common/auth.js", async (importOriginal) => {

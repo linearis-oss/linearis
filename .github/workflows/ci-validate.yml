@@ -10,6 +10,7 @@ on:
       - synchronize
       - ready_for_review
       - reopened
+      - edited
 
 permissions:
   contents: read
@@ -76,6 +77,32 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
+  commitlint:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup node v22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Validate PR commit range
+        run: |
+          npx commitlint \
+            --from "${{ github.event.pull_request.base.sha }}" \
+            --to "${{ github.event.pull_request.head.sha }}" \
+            --verbose
+
   smoke-test:
     name: Run Package Install Smoke Test
     runs-on: ubuntu-latest
@@ -88,7 +115,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: "npm"
 
       - name: Install deps

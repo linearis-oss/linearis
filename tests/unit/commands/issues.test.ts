@@ -8,6 +8,7 @@ vi.mock("../../../src/common/context.js", () => ({
     gql: { request: vi.fn() },
     sdk: { sdk: {} },
   })),
+  getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
 
 vi.mock("../../../src/common/output.js", async (importOriginal) => {
@@ -102,6 +103,14 @@ vi.mock("../../../src/services/issue-service.js", () => ({
     attachments: { nodes: [{ id: "att-1", title: "PR #42" }] },
   }),
   getIssueByIdentifierWithAttachments: vi.fn(),
+  getIssueWithReactions: vi.fn().mockResolvedValue({
+    id: "resolved-issue-uuid",
+    reactions: [{ emoji: "👍", count: 1, users: [], reactionIds: ["r-1"] }],
+  }),
+  getIssueByIdentifierWithReactions: vi.fn().mockResolvedValue({
+    id: "resolved-issue-uuid",
+    reactions: [{ emoji: "👍", count: 1, users: [], reactionIds: ["r-1"] }],
+  }),
   listIssues: vi.fn().mockResolvedValue([]),
   searchIssues: vi.fn().mockResolvedValue([]),
 }));
@@ -110,6 +119,81 @@ vi.mock("../../../src/services/issue-relation-service.js", () => ({
   createIssueRelation: vi.fn(),
   deleteIssueRelation: vi.fn(),
   findIssueRelation: vi.fn(),
+}));
+
+vi.mock("../../../src/services/reaction-service.js", () => ({
+  createReactionForIssue: vi.fn().mockResolvedValue({ id: "reaction-1" }),
+  createReactionForComment: vi.fn().mockResolvedValue({ id: "reaction-1" }),
+  deleteOwnReactionByEmoji: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+  deleteOwnReactionById: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+}));
+
+vi.mock("../../../src/services/discussion-service.js", () => ({
+  startIssueDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  listDiscussionsForIssue: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionReplies: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionsForIssueWithReactions: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionRepliesWithReactions: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  replyToDiscussion: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
+  editDiscussionReply: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
+  deleteDiscussionReply: vi.fn().mockResolvedValue({
+    id: "discussion-reply-1",
+    success: true,
+  }),
+  editDiscussionComment: vi
+    .fn()
+    .mockResolvedValue({ id: "discussion-comment-1" }),
+  deleteDiscussionComment: vi.fn().mockResolvedValue({
+    id: "discussion-comment-1",
+    success: true,
+  }),
+  resolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  unresolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  createDiscussionCommentReaction: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1" }),
+  deleteDiscussionCommentReactionByEmoji: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+  deleteDiscussionCommentReactionById: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
 }));
 
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
@@ -123,6 +207,22 @@ import {
 } from "../../../src/resolvers/team-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
+  createDiscussionCommentReaction,
+  deleteDiscussionComment,
+  deleteDiscussionCommentReactionById,
+  deleteDiscussionReply,
+  editDiscussionComment,
+  editDiscussionReply,
+  listDiscussionReplies,
+  listDiscussionRepliesWithReactions,
+  listDiscussionsForIssue,
+  listDiscussionsForIssueWithReactions,
+  replyToDiscussion,
+  resolveDiscussion,
+  startIssueDiscussion,
+  unresolveDiscussion,
+} from "../../../src/services/discussion-service.js";
+import {
   archiveIssue,
   createIssue,
   deleteIssue,
@@ -131,14 +231,21 @@ import {
   getIssueByIdentifierWithAttachments,
   getIssueByIdentifierWithComments,
   getIssueByIdentifierWithCommentThreads,
+  getIssueByIdentifierWithReactions,
   getIssueWithAttachments,
   getIssueWithComments,
   getIssueWithCommentThreads,
+  getIssueWithReactions,
   listIssues,
   searchIssues,
   unarchiveIssue,
   updateIssue,
 } from "../../../src/services/issue-service.js";
+import {
+  createReactionForIssue,
+  deleteOwnReactionByEmoji,
+  deleteOwnReactionById,
+} from "../../../src/services/reaction-service.js";
 
 function createProgram(): Command {
   const program = new Command();
@@ -1064,6 +1171,78 @@ describe("issues read", () => {
     expect(getIssueWithComments).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["--with-attachments"],
+    ["--with-comments"],
+    ["--with-comment-threads"],
+  ])("rejects issues read %s with --with-reactions", async (flag) => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+      flag,
+      "--with-reactions",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          error:
+            "Invalid --with-reactions: cannot be combined with --with-attachments, --with-comments, or --with-comment-threads",
+        },
+        null,
+        2,
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(getIssueWithAttachments).not.toHaveBeenCalled();
+    expect(getIssueWithComments).not.toHaveBeenCalled();
+    expect(getIssueWithCommentThreads).not.toHaveBeenCalled();
+    expect(getIssueWithReactions).not.toHaveBeenCalled();
+  });
+
+  it("issues read --with-reactions routes to reaction-aware issue read for UUIDs", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "550e8400-e29b-41d4-a716-446655440000",
+      "--with-reactions",
+    ]);
+
+    expect(getIssueWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
+    expect(getIssueWithComments).not.toHaveBeenCalled();
+    expect(getIssueWithAttachments).not.toHaveBeenCalled();
+  });
+
+  it("issues read --with-reactions routes to reaction-aware issue read for identifiers", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "read",
+      "ENG-42",
+      "--with-reactions",
+    ]);
+
+    expect(getIssueByIdentifierWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "ENG",
+      42,
+    );
+    expect(getIssueByIdentifierWithComments).not.toHaveBeenCalled();
+    expect(getIssueByIdentifierWithAttachments).not.toHaveBeenCalled();
+  });
+
   it("calls getIssueWithAttachments when flag is set with UUID", async () => {
     const program = createProgram();
     await program.parseAsync([
@@ -1097,6 +1276,91 @@ describe("issues read", () => {
       "ENG",
       42,
     );
+  });
+});
+
+describe("issues reaction commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("issues react resolves issue and delegates to reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "react",
+      "ENG-42",
+      "👍",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(createReactionForIssue).toHaveBeenCalledWith(expect.anything(), {
+      issueId: "resolved-issue-uuid",
+      emoji: "👍",
+    });
+  });
+
+  it("issues react supports --shortcode", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "react",
+      "ENG-42",
+      "--shortcode",
+      "thumbs_up",
+    ]);
+
+    expect(createReactionForIssue).toHaveBeenCalledWith(expect.anything(), {
+      issueId: "resolved-issue-uuid",
+      emoji: "👍",
+    });
+  });
+
+  it("issues unreact resolves issue and deletes viewer reaction by emoji", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "unreact",
+      "ENG-42",
+      "👍",
+    ]);
+
+    expect(deleteOwnReactionByEmoji).toHaveBeenCalledWith(expect.anything(), {
+      kind: "issue",
+      id: "resolved-issue-uuid",
+      emoji: "👍",
+    });
+  });
+
+  it("issues unreact-id resolves issue and deletes viewer reaction by id", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "unreact-id",
+      "ENG-42",
+      "reaction-123",
+    ]);
+
+    expect(deleteOwnReactionById).toHaveBeenCalledWith(expect.anything(), {
+      kind: "issue",
+      id: "resolved-issue-uuid",
+      reactionId: "reaction-123",
+    });
   });
 });
 
@@ -1141,6 +1405,402 @@ describe("issues lifecycle commands", () => {
     expect(deleteIssue).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-issue-uuid",
+    );
+  });
+});
+
+describe("issues discussion commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("issues discuss resolves issue and starts thread", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "discuss",
+      "ENG-42",
+      "--body",
+      "Need decision",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(startIssueDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      issueId: "resolved-issue-uuid",
+      body: "Need decision",
+    });
+  });
+
+  it("issues discuss requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "discuss", "ENG-42"]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(startIssueDiscussion).not.toHaveBeenCalled();
+  });
+
+  it("issues discussions resolves issue and forwards pagination", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "discussions",
+      "ENG-42",
+      "--limit",
+      "10",
+      "--after",
+      "cursor-1",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(listDiscussionsForIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      { limit: 10, after: "cursor-1" },
+    );
+  });
+
+  it("issues discussions --with-reactions routes to reaction-aware service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "discussions",
+      "ENG-42",
+      "--with-reactions",
+    ]);
+
+    expect(listDiscussionsForIssueWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      { limit: 25, after: undefined },
+    );
+    expect(listDiscussionsForIssue).not.toHaveBeenCalled();
+  });
+
+  it("issues replies forwards pagination", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "replies",
+      "thread-1",
+      "--limit",
+      "15",
+      "--after",
+      "cursor-2",
+    ]);
+
+    expect(listDiscussionReplies).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      {
+        limit: 15,
+        after: "cursor-2",
+      },
+      "issue",
+    );
+  });
+
+  it("issues replies --with-reactions routes to reaction-aware service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "replies",
+      "thread-1",
+      "--with-reactions",
+    ]);
+
+    expect(listDiscussionRepliesWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      { limit: 50, after: undefined },
+      "issue",
+    );
+    expect(listDiscussionReplies).not.toHaveBeenCalled();
+  });
+
+  it("issues reply requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "reply", "thread-1"]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(replyToDiscussion).not.toHaveBeenCalled();
+  });
+
+  it("issues reply delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "reply",
+      "thread-1",
+      "--body",
+      "Nested reply",
+    ]);
+
+    expect(replyToDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      body: "Nested reply",
+      entityKind: "issue",
+    });
+  });
+
+  it("issues delete-comment deletes root or reply discussion comments", async () => {
+    const program = createProgram();
+    const commentId = "11111111-1111-4111-8111-111111111111";
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "delete-comment",
+      commentId,
+    ]);
+
+    expect(deleteDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      commentId,
+      "issue",
+    );
+    expect(deleteIssue).not.toHaveBeenCalled();
+  });
+
+  it("issues generic edit/delete help documents root or reply IDs while strict reply commands stay reply-only", () => {
+    const program = createProgram();
+    const issues = program.commands.find(
+      (command) => command.name() === "issues",
+    );
+
+    const edit = issues?.commands.find((command) => command.name() === "edit");
+    const del = issues?.commands.find(
+      (command) => command.name() === "delete-comment",
+    );
+    const editReply = issues?.commands.find(
+      (command) => command.name() === "edit-reply",
+    );
+    const deleteReply = issues?.commands.find(
+      (command) => command.name() === "delete-reply",
+    );
+
+    expect(edit?.description()).toContain("root discussion or reply");
+    expect(del?.description()).toContain("root discussion or reply");
+    expect(editReply?.description()).toBe("edit a discussion reply");
+    expect(deleteReply?.description()).toBe("delete a discussion reply");
+  });
+
+  it("issues edit delegates to generic discussion comment service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "edit",
+      "11111111-1111-4111-8111-111111111111",
+      "--body",
+      "Edited",
+    ]);
+
+    expect(editDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      "11111111-1111-4111-8111-111111111111",
+      { body: "Edited" },
+      "issue",
+    );
+  });
+
+  it("issues edit-reply delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "edit-reply",
+      "reply-1",
+      "--body",
+      "Edited",
+    ]);
+
+    expect(editDiscussionReply).toHaveBeenCalledWith(
+      expect.anything(),
+      "reply-1",
+      { body: "Edited" },
+      "issue",
+    );
+  });
+
+  it("issues edit-reply requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "edit-reply",
+      "reply-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(editDiscussionReply).not.toHaveBeenCalled();
+  });
+
+  it("issues delete-comment delegates to generic discussion comment service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "delete-comment",
+      "11111111-1111-4111-8111-111111111111",
+    ]);
+
+    expect(deleteDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      "11111111-1111-4111-8111-111111111111",
+      "issue",
+    );
+  });
+
+  it("issues delete-reply delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "delete-reply",
+      "reply-1",
+    ]);
+
+    expect(deleteDiscussionReply).toHaveBeenCalledWith(
+      expect.anything(),
+      "reply-1",
+      "issue",
+    );
+  });
+
+  it("issues resolve delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "issues", "resolve", "thread-1"]);
+
+    expect(resolveDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      entityKind: "issue",
+    });
+  });
+
+  it("issues resolve forwards --with-comment as resolvingCommentId", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "resolve",
+      "thread-1",
+      "--with-comment",
+      "comment-123",
+    ]);
+
+    expect(resolveDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      resolvingCommentId: "comment-123",
+      entityKind: "issue",
+    });
+  });
+
+  it("issues unresolve delegates to discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "unresolve",
+      "thread-1",
+    ]);
+
+    expect(unresolveDiscussion).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      "issue",
+    );
+  });
+
+  it("issues threads react delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "threads",
+      "react",
+      "thread-1",
+      "🎉",
+    ]);
+
+    expect(createDiscussionCommentReaction).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "thread-1",
+        target: "thread",
+        expectedEntityKind: "issue",
+        emoji: "🎉",
+      },
+    );
+  });
+
+  it("issues replies unreact-id delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "replies",
+      "unreact-id",
+      "reply-1",
+      "reaction-123",
+    ]);
+
+    expect(deleteDiscussionCommentReactionById).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "reply-1",
+        target: "reply",
+        expectedEntityKind: "issue",
+        reactionId: "reaction-123",
+      },
     );
   });
 });

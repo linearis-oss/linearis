@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { createContext } from "../common/context.js";
+import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { AttachmentFilter } from "../gql/graphql.js";
@@ -87,7 +87,7 @@ export function setupAttachmentsCommands(program: Command): void {
           ListOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const filter = buildAttachmentFilter(options);
         const result = await listAttachments(ctx.gql, issueId, filter);
@@ -108,7 +108,7 @@ export function setupAttachmentsCommands(program: Command): void {
           CreateOptions,
           Command,
         ];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issue);
         const result = await createAttachment(ctx.gql, {
           issueId,
@@ -126,7 +126,7 @@ export function setupAttachmentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [id, , command] = args as [string, unknown, Command];
-        const ctx = createContext(command.parent!.parent!.opts());
+        const ctx = createContext(getRootOpts(command));
         const result = await deleteAttachment(ctx.gql, id);
         outputSuccess(result);
       }),

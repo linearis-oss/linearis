@@ -6,6 +6,7 @@ vi.mock("../../../src/common/context.js", () => ({
     gql: { request: vi.fn() },
     sdk: { sdk: {} },
   })),
+  getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
 
 vi.mock("../../../src/common/output.js", async (importOriginal) => {
@@ -102,11 +103,93 @@ vi.mock("../../../src/services/initiative-update-service.js", () => ({
     .mockResolvedValue({ id: "resolved-update-uuid" }),
 }));
 
+vi.mock("../../../src/services/discussion-service.js", () => ({
+  startInitiativeDiscussion: vi
+    .fn()
+    .mockResolvedValue({ id: "discussion-root-1" }),
+  listDiscussionsForInitiative: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionReplies: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionsForInitiativeWithReactions: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  listDiscussionRepliesWithReactions: vi.fn().mockResolvedValue({
+    nodes: [],
+    pageInfo: {
+      hasNextPage: false,
+      hasPreviousPage: false,
+      startCursor: null,
+      endCursor: null,
+    },
+  }),
+  replyToDiscussion: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
+  editDiscussionReply: vi.fn().mockResolvedValue({ id: "discussion-reply-1" }),
+  deleteDiscussionReply: vi
+    .fn()
+    .mockResolvedValue({ id: "discussion-reply-1", success: true }),
+  editDiscussionComment: vi
+    .fn()
+    .mockResolvedValue({ id: "discussion-comment-1" }),
+  deleteDiscussionComment: vi
+    .fn()
+    .mockResolvedValue({ id: "discussion-comment-1", success: true }),
+  resolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  unresolveDiscussion: vi.fn().mockResolvedValue({ id: "discussion-root-1" }),
+  createDiscussionCommentReaction: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1" }),
+  deleteDiscussionCommentReactionByEmoji: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+  deleteDiscussionCommentReactionById: vi
+    .fn()
+    .mockResolvedValue({ id: "reaction-1", success: true }),
+}));
+
 import { setupInitiativesCommands } from "../../../src/commands/initiatives/index.js";
+import { getRootOpts } from "../../../src/common/context.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveInitiativeId } from "../../../src/resolvers/initiative-resolver.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
 import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
+import {
+  createDiscussionCommentReaction,
+  deleteDiscussionComment,
+  deleteDiscussionCommentReactionByEmoji,
+  deleteDiscussionCommentReactionById,
+  deleteDiscussionReply,
+  editDiscussionComment,
+  editDiscussionReply,
+  listDiscussionReplies,
+  listDiscussionRepliesWithReactions,
+  listDiscussionsForInitiative,
+  listDiscussionsForInitiativeWithReactions,
+  replyToDiscussion,
+  resolveDiscussion,
+  startInitiativeDiscussion,
+  unresolveDiscussion,
+} from "../../../src/services/discussion-service.js";
 import {
   createInitiativeProjectLink,
   deleteInitiativeProjectLink,
@@ -439,6 +522,468 @@ describe("initiative updates wiring", () => {
         initiativeId: "resolved-initiative-uuid",
         body: "Steady progress",
       }),
+    );
+  });
+});
+
+describe("initiative discussion commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("wires discuss with initiative resolver and discussion service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "discuss",
+      "Growth",
+      "--body",
+      "Kickoff thread",
+    ]);
+
+    expect(resolveInitiativeId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Growth",
+    );
+    expect(startInitiativeDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      initiativeId: "resolved-initiative-uuid",
+      body: "Kickoff thread",
+    });
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-root-1" });
+  });
+
+  it("validates discuss requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "discuss",
+      "Growth",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(startInitiativeDiscussion).not.toHaveBeenCalled();
+  });
+
+  it("wires discussions with pagination", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "discussions",
+      "Growth",
+      "--limit",
+      "10",
+      "--after",
+      "cursor-1",
+    ]);
+
+    expect(resolveInitiativeId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Growth",
+    );
+    expect(listDiscussionsForInitiative).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-initiative-uuid",
+      { limit: 10, after: "cursor-1" },
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      nodes: [],
+      pageInfo: {
+        hasNextPage: false,
+        hasPreviousPage: false,
+        startCursor: null,
+        endCursor: null,
+      },
+    });
+  });
+
+  it("wires discussions --with-reactions to reaction-aware service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "discussions",
+      "Growth",
+      "--with-reactions",
+    ]);
+
+    expect(listDiscussionsForInitiativeWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-initiative-uuid",
+      { limit: 25, after: undefined },
+    );
+    expect(listDiscussionsForInitiative).not.toHaveBeenCalled();
+  });
+
+  it("wires replies with pagination", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "replies",
+      "thread-1",
+      "--limit",
+      "15",
+      "--after",
+      "cursor-2",
+    ]);
+
+    expect(listDiscussionReplies).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      {
+        limit: 15,
+        after: "cursor-2",
+      },
+      "initiative",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      nodes: [],
+      pageInfo: {
+        hasNextPage: false,
+        hasPreviousPage: false,
+        startCursor: null,
+        endCursor: null,
+      },
+    });
+  });
+
+  it("wires replies --with-reactions to reaction-aware service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "replies",
+      "thread-1",
+      "--with-reactions",
+    ]);
+
+    expect(listDiscussionRepliesWithReactions).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      { limit: 50, after: undefined },
+      "initiative",
+    );
+    expect(listDiscussionReplies).not.toHaveBeenCalled();
+  });
+
+  it("wires reply", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "reply",
+      "thread-1",
+      "--body",
+      "Nested reply",
+    ]);
+
+    expect(replyToDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      body: "Nested reply",
+      entityKind: "initiative",
+    });
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-reply-1" });
+  });
+
+  it("validates reply requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "reply",
+      "thread-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(replyToDiscussion).not.toHaveBeenCalled();
+  });
+
+  it("documents generic edit/delete as root-or-reply while strict reply commands stay reply-only", () => {
+    const program = createProgram();
+    const initiatives = program.commands.find(
+      (command) => command.name() === "initiatives",
+    );
+
+    const edit = initiatives?.commands.find(
+      (command) => command.name() === "edit",
+    );
+    const del = initiatives?.commands.find(
+      (command) => command.name() === "delete-comment",
+    );
+    const editReply = initiatives?.commands.find(
+      (command) => command.name() === "edit-reply",
+    );
+    const deleteReply = initiatives?.commands.find(
+      (command) => command.name() === "delete-reply",
+    );
+
+    expect(edit?.description()).toContain("root discussion or reply");
+    expect(del?.description()).toContain("root discussion or reply");
+    expect(editReply?.description()).toBe("edit a discussion reply");
+    expect(deleteReply?.description()).toBe("delete a discussion reply");
+  });
+
+  it("wires generic edit to discussion comment service", async () => {
+    const program = createProgram();
+    const commentId = "11111111-1111-4111-8111-111111111111";
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "edit",
+      commentId,
+      "--body",
+      "Edited",
+    ]);
+
+    expect(editDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      commentId,
+      { body: "Edited" },
+      "initiative",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-comment-1" });
+  });
+
+  it("wires edit-reply", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "edit-reply",
+      "reply-1",
+      "--body",
+      "Edited",
+    ]);
+
+    expect(editDiscussionReply).toHaveBeenCalledWith(
+      expect.anything(),
+      "reply-1",
+      { body: "Edited" },
+      "initiative",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-reply-1" });
+  });
+
+  it("validates edit-reply requires --body", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "edit-reply",
+      "reply-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --body: is required"),
+    );
+    expect(editDiscussionReply).not.toHaveBeenCalled();
+  });
+
+  it("wires generic delete-comment to discussion comment service", async () => {
+    const program = createProgram();
+    const commentId = "11111111-1111-4111-8111-111111111111";
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "delete-comment",
+      commentId,
+    ]);
+
+    expect(deleteDiscussionComment).toHaveBeenCalledWith(
+      expect.anything(),
+      commentId,
+      "initiative",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "discussion-comment-1",
+      success: true,
+    });
+  });
+
+  it("wires delete-reply", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "delete-reply",
+      "reply-1",
+    ]);
+
+    expect(deleteDiscussionReply).toHaveBeenCalledWith(
+      expect.anything(),
+      "reply-1",
+      "initiative",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "discussion-reply-1",
+      success: true,
+    });
+  });
+
+  it("wires resolve and forwards --with-comment", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "resolve",
+      "thread-1",
+      "--with-comment",
+      "comment-123",
+    ]);
+
+    expect(resolveDiscussion).toHaveBeenCalledWith(expect.anything(), {
+      threadId: "thread-1",
+      resolvingCommentId: "comment-123",
+      entityKind: "initiative",
+    });
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-root-1" });
+  });
+
+  it("wires unresolve", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "unresolve",
+      "thread-1",
+    ]);
+
+    expect(unresolveDiscussion).toHaveBeenCalledWith(
+      expect.anything(),
+      "thread-1",
+      "initiative",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "discussion-root-1" });
+  });
+
+  it("initiatives threads react reads options from the root command", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "--api-token",
+      "root-token",
+      "initiatives",
+      "threads",
+      "react",
+      "thread-1",
+      "👍",
+    ]);
+
+    expect(getRootOpts).toHaveBeenCalledWith(expect.any(Command));
+  });
+
+  it("initiatives threads react delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "threads",
+      "react",
+      "thread-1",
+      "🎉",
+    ]);
+
+    expect(createDiscussionCommentReaction).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "thread-1",
+        target: "thread",
+        expectedEntityKind: "initiative",
+        emoji: "🎉",
+      },
+    );
+  });
+
+  it("initiatives replies unreact supports --shortcode", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "replies",
+      "unreact",
+      "reply-1",
+      "--shortcode",
+      "thumbs_up",
+    ]);
+
+    expect(deleteDiscussionCommentReactionByEmoji).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "reply-1",
+        target: "reply",
+        expectedEntityKind: "initiative",
+        emoji: "👍",
+      },
+    );
+  });
+
+  it("initiatives replies unreact-id delegates to comment reaction service", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "replies",
+      "unreact-id",
+      "reply-1",
+      "reaction-123",
+    ]);
+
+    expect(deleteDiscussionCommentReactionById).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        commentId: "reply-1",
+        target: "reply",
+        expectedEntityKind: "initiative",
+        reactionId: "reaction-123",
+      },
     );
   });
 });

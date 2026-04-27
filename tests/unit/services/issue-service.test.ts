@@ -9,8 +9,10 @@ import {
   GetIssueByIdentifierDocument,
   GetIssueByIdentifierWithAttachmentsDocument,
   GetIssueByIdentifierWithCommentsDocument,
+  GetIssueByIdentifierWithReactionsDocument,
   GetIssueByIdWithAttachmentsDocument,
   GetIssueByIdWithCommentsDocument,
+  GetIssueByIdWithReactionsDocument,
   GetIssuesDocument,
   PaginationOrderBy,
   SearchIssuesDocument,
@@ -25,9 +27,11 @@ import {
   getIssueByIdentifierWithAttachments,
   getIssueByIdentifierWithComments,
   getIssueByIdentifierWithCommentThreads,
+  getIssueByIdentifierWithReactions,
   getIssueWithAttachments,
   getIssueWithComments,
   getIssueWithCommentThreads,
+  getIssueWithReactions,
   listIssues,
   searchIssues,
   unarchiveIssue,
@@ -193,6 +197,30 @@ describe("listIssues", () => {
           { team: { id: { eq: "team-uuid" } } },
         ],
       },
+      orderBy: PaginationOrderBy.UpdatedAt,
+    });
+  });
+
+  it("does not prepend the non-completed filter when an explicit state filter is provided", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [{ id: "1", title: "Done issue" }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    const filter = {
+      and: [
+        { team: { id: { eq: "team-uuid" } } },
+        { state: { id: { in: ["done-status-id"] } } },
+      ],
+    };
+
+    await listIssues(client, { limit: 10 }, filter);
+
+    expect(client.request).toHaveBeenCalledWith(FilteredSearchIssuesDocument, {
+      first: 10,
+      after: undefined,
+      filter,
       orderBy: PaginationOrderBy.UpdatedAt,
     });
   });
@@ -541,6 +569,129 @@ describe("updateIssue", () => {
     await expect(
       updateIssue(client, "issue-id", { title: "Fail" }),
     ).rejects.toThrow("Failed to update issue");
+  });
+});
+
+describe("getIssueWithReactions", () => {
+  it("returns issue by UUID with normalized grouped reactions", async () => {
+    const client = mockGqlClient({
+      issue: {
+        id: "issue-1",
+        title: "Found",
+        comments: { nodes: [{ id: "comment-1", body: "First" }] },
+        reactions: [
+          {
+            id: "r-2",
+            emoji: "👍",
+            user: { id: "user-2", displayName: "Bob" },
+            externalUser: null,
+          },
+          {
+            id: "r-1",
+            emoji: "👍",
+            user: { id: "user-1", displayName: "Ada" },
+            externalUser: null,
+          },
+          {
+            id: "r-3",
+            emoji: "🎉",
+            user: null,
+            externalUser: { id: "ext-1", name: "Zed" },
+          },
+        ],
+      },
+    });
+
+    const result = await getIssueWithReactions(client, "issue-1");
+
+    expect(result.reactions).toEqual([
+      {
+        emoji: "👍",
+        count: 2,
+        users: [
+          { id: "user-1", displayName: "Ada", type: "user" },
+          { id: "user-2", displayName: "Bob", type: "user" },
+        ],
+        reactionIds: ["r-1", "r-2"],
+      },
+      {
+        emoji: "🎉",
+        count: 1,
+        users: [{ id: "ext-1", displayName: "Zed", type: "external" }],
+        reactionIds: ["r-3"],
+      },
+    ]);
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdWithReactionsDocument,
+      { id: "issue-1" },
+    );
+  });
+
+  it("throws when issue not found by UUID", async () => {
+    const client = mockGqlClient({ issue: null });
+
+    await expect(getIssueWithReactions(client, "missing")).rejects.toThrow(
+      'Issue with ID "missing" not found',
+    );
+  });
+});
+
+describe("getIssueByIdentifierWithReactions", () => {
+  it("returns issue by identifier with normalized grouped reactions", async () => {
+    const client = mockGqlClient({
+      issues: {
+        nodes: [
+          {
+            id: "issue-1",
+            title: "Found",
+            comments: { nodes: [{ id: "comment-1", body: "First" }] },
+            reactions: [
+              {
+                id: "r-2",
+                emoji: "👍",
+                user: { id: "user-2", displayName: "Bob" },
+                externalUser: null,
+              },
+              {
+                id: "r-1",
+                emoji: "👍",
+                user: { id: "user-1", displayName: "Ada" },
+                externalUser: null,
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const result = await getIssueByIdentifierWithReactions(client, "ENG", 42);
+
+    expect(result.reactions).toEqual([
+      {
+        emoji: "👍",
+        count: 2,
+        users: [
+          { id: "user-1", displayName: "Ada", type: "user" },
+          { id: "user-2", displayName: "Bob", type: "user" },
+        ],
+        reactionIds: ["r-1", "r-2"],
+      },
+    ]);
+    expect(client.request).toHaveBeenCalledWith(
+      GetIssueByIdentifierWithReactionsDocument,
+      {
+        teamKey: "ENG",
+        number: 42,
+      },
+    );
+  });
+
+  it("throws when issue not found by identifier", async () => {
+    const client = mockGqlClient({ issues: { nodes: [] } });
+
+    await expect(
+      getIssueByIdentifierWithReactions(client, "ENG", 999),
+    ).rejects.toThrow('Issue with identifier "ENG-999" not found');
   });
 });
 

@@ -1,3 +1,59 @@
+## [2026.4.9-next.8](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.7...v2026.4.9-next.8) (2026-04-27)
+
+### Bug Fixes
+
+* **comments:** constrain compatibility replies ([85a1d3a](https://github.com/linearis-oss/linearis/commit/85a1d3a1e2e1ecf46138632d637f00b046a1c12c))
+
+## [2026.4.9-next.7](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.6...v2026.4.9-next.7) (2026-04-27)
+
+### Features
+
+* **cli:** add reaction workflows ([4d6a00c](https://github.com/linearis-oss/linearis/commit/4d6a00cbd9a2c9abe407d5071f3ccd5bbb81e01e)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+* **emoji:** add reaction input normalization ([bc82bc6](https://github.com/linearis-oss/linearis/commit/bc82bc6fa3e7c6ee64f6581b80206ec85bf8e9a8)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+* **graphql:** add reaction operations ([bd0ffac](https://github.com/linearis-oss/linearis/commit/bd0ffaccdba8659fedb6ae4074dc737e102b63b8)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+* **reactions:** add shared service ([0a29bb1](https://github.com/linearis-oss/linearis/commit/0a29bb1f6208a2ddb093f458a7d12d70a645ac91)), closes [#83](https://github.com/linearis-oss/linearis/issues/83)
+
+## [2026.4.9-next.6](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.5...v2026.4.9-next.6) (2026-04-27)
+
+### Bug Fixes
+
+* **ci:** rerun validation when PR base changes ([e92b7ca](https://github.com/linearis-oss/linearis/commit/e92b7cad13e667f25d2f2bc02901e50f94646a66))
+* resolve issue estimate team context via team resolver ([9c94ff9](https://github.com/linearis-oss/linearis/commit/9c94ff9fc5677e15380e94500933888a76f08e1d))
+
+## [2026.4.9-next.5](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.4...v2026.4.9-next.5) (2026-04-27)
+
+### Bug Fixes
+
+* **deps:** update dependency @linear/sdk to v82 ([7e62fda](https://github.com/linearis-oss/linearis/commit/7e62fdacb56b9e14963303bb76dbd67a7056f554))
+
+## [2026.4.9-next.4](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.3...v2026.4.9-next.4) (2026-04-25)
+
+### Features
+
+* **comments:** deprecate compatibility facade ([d097eee](https://github.com/linearis-oss/linearis/commit/d097eeee62dfa5446c866644ded70a779346b7e4))
+* **discussions:** add GraphQL and service layer ([1ae10e1](https://github.com/linearis-oss/linearis/commit/1ae10e1313722c58102c8269cc97886ed8891d8d))
+* **initiatives:** add discussion commands ([81bcd17](https://github.com/linearis-oss/linearis/commit/81bcd173f7caec48911e39738d6b4dd60672d7fc))
+* **issues:** add discussion commands ([6b3861c](https://github.com/linearis-oss/linearis/commit/6b3861cbfbdb6324270cda1a7977547e9253ff2e))
+* **projects:** add discussion commands ([ff64f2e](https://github.com/linearis-oss/linearis/commit/ff64f2edd7ceb5cdbc34de405b984582c86687d9))
+
+## [2026.4.9-next.3](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.2...v2026.4.9-next.3) (2026-04-25)
+
+### Features
+
+* **issues:** batch-resolve search filter identifiers ([963af95](https://github.com/linearis-oss/linearis/commit/963af954dbc286f755f93b740b36fcca4626a2c4)), closes [#63](https://github.com/linearis-oss/linearis/issues/63)
+
+## [2026.4.9-next.2](https://github.com/linearis-oss/linearis/compare/v2026.4.9-next.1...v2026.4.9-next.2) (2026-04-24)
+
+### Features
+
+* **labels:** add issue label scope filters ([0c1874a](https://github.com/linearis-oss/linearis/commit/0c1874aad8cbadf6e4d729ad0940f1f3bcdd4106)), closes [#116](https://github.com/linearis-oss/linearis/issues/116)
+
+## [2026.4.9-next.1](https://github.com/linearis-oss/linearis/compare/v2026.4.8...v2026.4.9-next.1) (2026-04-24)
+
+### Bug Fixes
+
+* **issues:** honor explicit completed status filters ([607c954](https://github.com/linearis-oss/linearis/commit/607c954bb861519c9be5b5499c07844262b2b8de)), closes [#179](https://github.com/linearis-oss/linearis/issues/179)
+
 ## [2026.4.8](https://github.com/linearis-oss/linearis/compare/v2026.4.7...v2026.4.8) (2026-04-23)
 
 ### Features
