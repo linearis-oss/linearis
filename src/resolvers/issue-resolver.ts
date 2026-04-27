@@ -6,8 +6,15 @@ import {
   type TeamEstimateContext,
 } from "./team-resolver.js";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+interface IssueTeamRelationProjection {
+  id?: unknown;
+  key?: unknown;
+}
+
+interface IssueEstimateProjection {
+  id?: unknown;
+  teamId?: unknown;
+  team?: unknown;
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
@@ -22,17 +29,38 @@ async function resolveRelationValue(value: unknown): Promise<unknown> {
   return isPromiseLike(value) ? await value : value;
 }
 
-function getTeamLookupFromRelation(team: unknown): string | undefined {
-  if (!isRecord(team)) return undefined;
+function readIssueEstimateProjection(
+  value: unknown,
+): IssueEstimateProjection | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
 
-  if (typeof team.id === "string") return team.id;
-  if (typeof team.key === "string") return team.key;
+  return value as IssueEstimateProjection;
+}
+
+function readIssueTeamRelationProjection(
+  value: unknown,
+): IssueTeamRelationProjection | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  return value as IssueTeamRelationProjection;
+}
+
+function getTeamLookupFromRelation(team: unknown): string | undefined {
+  const relation = readIssueTeamRelationProjection(team);
+  if (!relation) return undefined;
+
+  if (typeof relation.id === "string") return relation.id;
+  if (typeof relation.key === "string") return relation.key;
 
   return undefined;
 }
 
 async function getIssueTeamLookup(
-  node: Record<string, unknown>,
+  node: IssueEstimateProjection,
 ): Promise<string | undefined> {
   if (typeof node.teamId === "string") return node.teamId;
 
@@ -104,8 +132,8 @@ export async function resolveIssueEstimateContext(
     throw notFoundError("Issue", issueIdOrIdentifier);
   }
 
-  const issueNode = issues.nodes[0];
-  if (!isRecord(issueNode) || typeof issueNode.id !== "string") {
+  const issueNode = readIssueEstimateProjection(issues.nodes[0]);
+  if (!issueNode || typeof issueNode.id !== "string") {
     throw new Error(
       `Issue "${issueIdOrIdentifier}" is missing required team context`,
     );

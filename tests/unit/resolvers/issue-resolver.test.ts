@@ -7,7 +7,7 @@ import {
 } from "../../../src/resolvers/issue-resolver.js";
 
 type IssueNode = {
-  id: string;
+  id?: string;
   teamId?: string;
   team?:
     | {
@@ -227,6 +227,14 @@ describe("resolveIssueEstimateContext", () => {
 
   it("throws when issue team context is missing", async () => {
     const client = mockSdkClient([{ id: "issue-uuid" }]);
+
+    await expect(resolveIssueEstimateContext(client, "ENG-42")).rejects.toThrow(
+      'Issue "ENG-42" is missing required team context',
+    );
+  });
+
+  it("preserves team-context error when issue projection is missing id", async () => {
+    const client = mockSdkClient([{ teamId }]);
 
     await expect(resolveIssueEstimateContext(client, "ENG-42")).rejects.toThrow(
       'Issue "ENG-42" is missing required team context',

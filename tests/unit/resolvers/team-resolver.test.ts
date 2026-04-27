@@ -174,4 +174,22 @@ describe("resolveTeamEstimateContext", () => {
       'Team "NOPE" not found',
     );
   });
+
+  it("preserves estimation-context error when required projection fields are missing", async () => {
+    const client = mockSdkClient({
+      nodes: [
+        {
+          id: "uuid-3",
+          key: "ENG",
+          name: "Engineering",
+          issueEstimationType: "linear",
+          issueEstimationExtended: false,
+        },
+      ],
+    });
+
+    await expect(resolveTeamEstimateContext(client, "ENG")).rejects.toThrow(
+      'Team "ENG" is missing required estimation context',
+    );
+  });
 });

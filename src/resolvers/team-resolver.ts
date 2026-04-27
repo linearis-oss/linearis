@@ -27,8 +27,36 @@ type TeamEstimateNode = {
   issueEstimationAllowZero: boolean;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+interface TeamEstimateProjection {
+  id: unknown;
+  key: unknown;
+  name: unknown;
+  issueEstimationType: unknown;
+  issueEstimationExtended: unknown;
+  issueEstimationAllowZero: unknown;
+}
+
+function readTeamEstimateProjection(
+  value: unknown,
+): TeamEstimateProjection | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  if (
+    !(
+      "id" in value &&
+      "key" in value &&
+      "name" in value &&
+      "issueEstimationType" in value &&
+      "issueEstimationExtended" in value &&
+      "issueEstimationAllowZero" in value
+    )
+  ) {
+    return undefined;
+  }
+
+  return value as TeamEstimateProjection;
 }
 
 function isTeamEstimationType(value: unknown): value is TeamEstimationType {
@@ -45,18 +73,19 @@ function toTeamEstimateNode(
   node: unknown,
   keyOrNameOrId: string,
 ): TeamEstimateNode {
-  if (!isRecord(node)) {
+  const projection = readTeamEstimateProjection(node);
+  if (!projection) {
     throw new Error(
       `Team "${keyOrNameOrId}" is missing required estimation context`,
     );
   }
 
-  const id = node.id;
-  const key = node.key;
-  const name = node.name;
-  const issueEstimationType = node.issueEstimationType;
-  const issueEstimationExtended = node.issueEstimationExtended;
-  const issueEstimationAllowZero = node.issueEstimationAllowZero;
+  const id = projection.id;
+  const key = projection.key;
+  const name = projection.name;
+  const issueEstimationType = projection.issueEstimationType;
+  const issueEstimationExtended = projection.issueEstimationExtended;
+  const issueEstimationAllowZero = projection.issueEstimationAllowZero;
 
   if (
     typeof id !== "string" ||
