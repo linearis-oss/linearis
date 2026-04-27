@@ -282,27 +282,71 @@ describe("GraphQLClient", () => {
     });
 
     it("uses a useful HTTP error for non-2xx invalid JSON", async () => {
-      fetchMock.mockResolvedValueOnce(
-        new Response("not-json", { status: 502, statusText: "Bad Gateway" }),
-      );
+      vi.useFakeTimers();
+      fetchMock
+        .mockResolvedValueOnce(
+          new Response("not-json", {
+            status: 502,
+            statusText: "Bad Gateway",
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response("not-json", {
+            status: 502,
+            statusText: "Bad Gateway",
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response("not-json", {
+            status: 502,
+            statusText: "Bad Gateway",
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response("not-json", {
+            status: 502,
+            statusText: "Bad Gateway",
+          }),
+        );
 
       const client = new GraphQLClient("good-token");
-
-      await expect(client.request(fakeDocument())).rejects.toThrow(
+      const promise = client.request(fakeDocument());
+      const expectation = expect(promise).rejects.toThrow(
         "GraphQL request failed: HTTP 502 Bad Gateway",
       );
+      void expectation.catch(() => undefined);
+
+      await vi.runAllTimersAsync();
+      await expectation;
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it("uses a useful HTTP error for non-2xx empty JSON", async () => {
-      fetchMock.mockResolvedValueOnce(
-        new Response("", { status: 502, statusText: "Bad Gateway" }),
-      );
+      vi.useFakeTimers();
+      fetchMock
+        .mockResolvedValueOnce(
+          new Response("", { status: 502, statusText: "Bad Gateway" }),
+        )
+        .mockResolvedValueOnce(
+          new Response("", { status: 502, statusText: "Bad Gateway" }),
+        )
+        .mockResolvedValueOnce(
+          new Response("", { status: 502, statusText: "Bad Gateway" }),
+        )
+        .mockResolvedValueOnce(
+          new Response("", { status: 502, statusText: "Bad Gateway" }),
+        );
 
       const client = new GraphQLClient("good-token");
-
-      await expect(client.request(fakeDocument())).rejects.toThrow(
+      const promise = client.request(fakeDocument());
+      const expectation = expect(promise).rejects.toThrow(
         "GraphQL request failed: HTTP 502 Bad Gateway",
       );
+      void expectation.catch(() => undefined);
+
+      await vi.runAllTimersAsync();
+      await expectation;
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it("wraps 2xx invalid JSON as a GraphQL request failure", async () => {
