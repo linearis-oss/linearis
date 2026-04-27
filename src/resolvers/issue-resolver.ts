@@ -1,107 +1,42 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { notFoundError } from "../common/errors.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
-import type { TeamEstimateContext } from "./team-resolver.js";
-
-type TeamEstimationType =
-  | "notUsed"
-  | "exponential"
-  | "fibonacci"
-  | "linear"
-  | "tShirt";
-
-type IssueEstimateNode = {
-  id: string;
-  team: {
-    id: string;
-    key: string;
-    name: string;
-    issueEstimationType: TeamEstimationType;
-    issueEstimationExtended: boolean;
-    issueEstimationAllowZero: boolean;
-  };
-};
+import {
+  resolveTeamEstimateContext,
+  type TeamEstimateContext,
+} from "./team-resolver.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isTeamEstimationType(value: unknown): value is TeamEstimationType {
-  return (
-    value === "notUsed" ||
-    value === "exponential" ||
-    value === "fibonacci" ||
-    value === "linear" ||
-    value === "tShirt"
-  );
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  if ((typeof value !== "object" && typeof value !== "function") || !value) {
+    return false;
+  }
+
+  return typeof (value as { then?: unknown }).then === "function";
 }
 
-function toIssueEstimateNode(
-  node: unknown,
-  issueIdOrIdentifier: string,
-): IssueEstimateNode {
-  if (!isRecord(node)) {
-    throw new Error(
-      `Issue "${issueIdOrIdentifier}" is missing required team estimation context`,
-    );
-  }
-
-  const issueId = node.id;
-  const team = node.team;
-
-  if (typeof issueId !== "string" || !isRecord(team)) {
-    throw new Error(
-      `Issue "${issueIdOrIdentifier}" is missing required team estimation context`,
-    );
-  }
-
-  const teamId = team.id;
-  const teamKey = team.key;
-  const teamName = team.name;
-  const issueEstimationType = team.issueEstimationType;
-  const issueEstimationExtended = team.issueEstimationExtended;
-  const issueEstimationAllowZero = team.issueEstimationAllowZero;
-
-  if (
-    typeof teamId !== "string" ||
-    typeof teamKey !== "string" ||
-    typeof teamName !== "string" ||
-    !isTeamEstimationType(issueEstimationType) ||
-    typeof issueEstimationExtended !== "boolean" ||
-    typeof issueEstimationAllowZero !== "boolean"
-  ) {
-    throw new Error(
-      `Issue "${issueIdOrIdentifier}" is missing required team estimation context`,
-    );
-  }
-
-  return {
-    id: issueId,
-    team: {
-      id: teamId,
-      key: teamKey,
-      name: teamName,
-      issueEstimationType,
-      issueEstimationExtended,
-      issueEstimationAllowZero,
-    },
-  };
+async function resolveRelationValue(value: unknown): Promise<unknown> {
+  return isPromiseLike(value) ? await value : value;
 }
 
-function mapIssueNodeToEstimateContext(
-  node: IssueEstimateNode,
-): IssueEstimateContext {
-  return {
-    issueId: node.id,
-    team: {
-      teamId: node.team.id,
-      teamKey: node.team.key,
-      teamName: node.team.name,
-      issueEstimationType: node.team.issueEstimationType,
-      issueEstimationExtended: node.team.issueEstimationExtended,
-      issueEstimationAllowZero: node.team.issueEstimationAllowZero,
-    },
-  };
+function getTeamLookupFromRelation(team: unknown): string | undefined {
+  if (!isRecord(team)) return undefined;
+
+  if (typeof team.id === "string") return team.id;
+  if (typeof team.key === "string") return team.key;
+
+  return undefined;
+}
+
+async function getIssueTeamLookup(
+  node: Record<string, unknown>,
+): Promise<string | undefined> {
+  if (typeof node.teamId === "string") return node.teamId;
+
+  return getTeamLookupFromRelation(await resolveRelationValue(node.team));
 }
 
 export interface IssueEstimateContext {
@@ -146,28 +81,45 @@ export async function resolveIssueEstimateContext(
   client: LinearSdkClient,
   issueIdOrIdentifier: string,
 ): Promise<IssueEstimateContext> {
-  const issues = isUuid(issueIdOrIdentifier)
-    ? await client.sdk.issues({
+  const issueIsUuid = isUuid(issueIdOrIdentifier);
+  const issues = await (issueIsUuid
+    ? client.sdk.issues({
         filter: { id: { eq: issueIdOrIdentifier } },
         first: 1,
       })
-    : await client.sdk.issues({
-        filter: {
-          number: {
-            eq: parseIssueIdentifier(issueIdOrIdentifier).issueNumber,
+    : (() => {
+        const { teamKey, issueNumber } =
+          parseIssueIdentifier(issueIdOrIdentifier);
+
+        return client.sdk.issues({
+          filter: {
+            number: { eq: issueNumber },
+            team: { key: { eq: teamKey } },
           },
-          team: {
-            key: { eq: parseIssueIdentifier(issueIdOrIdentifier).teamKey },
-          },
-        },
-        first: 1,
-      });
+          first: 1,
+        });
+      })());
 
   if (issues.nodes.length === 0) {
     throw notFoundError("Issue", issueIdOrIdentifier);
   }
 
-  return mapIssueNodeToEstimateContext(
-    toIssueEstimateNode(issues.nodes[0], issueIdOrIdentifier),
-  );
+  const issueNode = issues.nodes[0];
+  if (!isRecord(issueNode) || typeof issueNode.id !== "string") {
+    throw new Error(
+      `Issue "${issueIdOrIdentifier}" is missing required team context`,
+    );
+  }
+
+  const teamLookup = await getIssueTeamLookup(issueNode);
+  if (!teamLookup) {
+    throw new Error(
+      `Issue "${issueIdOrIdentifier}" is missing required team context`,
+    );
+  }
+
+  return {
+    issueId: issueNode.id,
+    team: await resolveTeamEstimateContext(client, teamLookup),
+  };
 }
