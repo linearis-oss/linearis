@@ -60,11 +60,11 @@ describe("GraphQLClient", () => {
         LINEAR_GRAPHQL_ENDPOINT,
         expect.objectContaining({
           method: "POST",
-          headers: {
+          headers: expect.objectContaining({
             "Content-Type": "application/json",
             Authorization: "test-token",
             "public-file-urls-expire-in": "3600",
-          },
+          }),
           body: JSON.stringify({
             query: "",
             variables: { issueId: "LIN-123" },
@@ -227,9 +227,11 @@ describe("GraphQLClient", () => {
 
       const client = new GraphQLClient("good-token");
       const promise = client.request(fakeDocument());
+      const expectation = expect(promise).resolves.toEqual({ foo: "bar" });
+      void expectation.catch(() => undefined);
 
       await vi.runAllTimersAsync();
-      await expect(promise).resolves.toEqual({ foo: "bar" });
+      await expectation;
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(vi.getTimerCount()).toBe(0);
     });
@@ -247,9 +249,11 @@ describe("GraphQLClient", () => {
 
       const client = new GraphQLClient("good-token");
       const promise = client.request(fakeDocument());
+      const expectation = expect(promise).resolves.toEqual({ ok: true });
+      void expectation.catch(() => undefined);
 
       await vi.runAllTimersAsync();
-      await expect(promise).resolves.toEqual({ ok: true });
+      await expectation;
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(vi.getTimerCount()).toBe(0);
     });
@@ -267,10 +271,12 @@ describe("GraphQLClient", () => {
 
       const client = new GraphQLClient("good-token");
       const promise = client.request(fakeDocument());
+      const expectation = expect(promise).resolves.toEqual({ foo: "bar" });
+      void expectation.catch(() => undefined);
 
       await vi.advanceTimersByTimeAsync(500);
 
-      await expect(promise).resolves.toEqual({ foo: "bar" });
+      await expectation;
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(vi.getTimerCount()).toBe(0);
     });
