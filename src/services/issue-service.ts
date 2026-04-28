@@ -58,6 +58,37 @@ import {
 } from "../gql/graphql.js";
 import { normalizeReactions } from "./reaction-service.js";
 
+export interface CreateIssueInput {
+  title: string;
+  teamId: string;
+  description?: string;
+  assigneeId?: string;
+  priority?: number;
+  estimate?: number;
+  projectId?: string;
+  labelIds?: string[];
+  projectMilestoneId?: string;
+  cycleId?: string;
+  stateId?: string;
+  parentId?: string;
+  dueDate?: string;
+}
+
+export interface UpdateIssueInput {
+  title?: string;
+  description?: string;
+  stateId?: string;
+  priority?: number;
+  estimate?: number | null;
+  assigneeId?: string;
+  projectId?: string;
+  labelIds?: string[];
+  parentId?: string | null;
+  projectMilestoneId?: string | null;
+  cycleId?: string | null;
+  dueDate?: string | null;
+}
+
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
 };
@@ -396,11 +427,12 @@ export async function searchIssues(
 
 export async function createIssue(
   client: GraphQLClient,
-  input: IssueCreateInput,
+  input: CreateIssueInput,
 ): Promise<CreatedIssue> {
+  const graphqlInput: IssueCreateInput = { ...input };
   const result = await client.request<CreateIssueMutation>(
     CreateIssueDocument,
-    { input },
+    { input: graphqlInput },
   );
   if (!result.issueCreate.success || !result.issueCreate.issue) {
     throw new Error("Failed to create issue");
@@ -411,11 +443,12 @@ export async function createIssue(
 export async function updateIssue(
   client: GraphQLClient,
   id: string,
-  input: IssueUpdateInput,
+  input: UpdateIssueInput,
 ): Promise<UpdatedIssue> {
+  const graphqlInput: IssueUpdateInput = { ...input };
   const result = await client.request<UpdateIssueMutation>(
     UpdateIssueDocument,
-    { id, input },
+    { id, input: graphqlInput },
   );
   if (!result.issueUpdate.success || !result.issueUpdate.issue) {
     throw new Error("Failed to update issue");

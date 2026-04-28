@@ -17,11 +17,7 @@ import {
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import {
-  type IssueCreateInput,
-  IssueRelationType,
-  type IssueUpdateInput,
-} from "../gql/graphql.js";
+import { IssueRelationType } from "../gql/graphql.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import {
   resolveIssueEstimateContext,
@@ -61,6 +57,7 @@ import {
 } from "../services/issue-relation-service.js";
 import {
   archiveIssue,
+  type CreateIssueInput,
   createIssue,
   deleteIssue,
   getIssue,
@@ -75,6 +72,7 @@ import {
   getIssueWithReactions,
   listIssues,
   searchIssues,
+  type UpdateIssueInput,
   unarchiveIssue,
   updateIssue,
 } from "../services/issue-service.js";
@@ -1032,7 +1030,7 @@ export function setupIssuesCommands(program: Command): void {
           });
         }
 
-        const input: IssueCreateInput = {
+        const input: CreateIssueInput = {
           title,
           teamId,
         };
@@ -1237,7 +1235,7 @@ export function setupIssuesCommands(program: Command): void {
           ? await getIssue(ctx.gql, resolvedIssueId)
           : undefined;
 
-        const input: IssueUpdateInput = {};
+        const input: UpdateIssueInput = {};
 
         if (options.title) {
           input.title = options.title;

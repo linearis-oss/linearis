@@ -29,6 +29,34 @@ import {
   type UpdateProjectMutation,
 } from "../gql/graphql.js";
 
+export interface CreateProjectInput {
+  name: string;
+  teamIds: string[];
+  description?: string;
+  content?: string;
+  leadId?: string;
+  memberIds?: string[];
+  priority?: number;
+  statusId?: string;
+  startDate?: string;
+  targetDate?: string;
+  labelIds?: string[];
+}
+
+export interface UpdateProjectInput {
+  name?: string;
+  description?: string;
+  content?: string;
+  leadId?: string;
+  memberIds?: string[];
+  priority?: number;
+  statusId?: string;
+  startDate?: string;
+  targetDate?: string;
+  teamIds?: string[];
+  labelIds?: string[];
+}
+
 export async function listProjects(
   client: GraphQLClient,
   options: PaginationOptions = {},
@@ -62,11 +90,12 @@ export async function getProject(
 
 export async function createProject(
   client: GraphQLClient,
-  input: ProjectCreateInput,
+  input: CreateProjectInput,
 ): Promise<CreatedProject> {
+  const graphqlInput: ProjectCreateInput = { ...input };
   const result = await client.request<CreateProjectMutation>(
     CreateProjectDocument,
-    { input },
+    { input: graphqlInput },
   );
 
   if (!result.projectCreate.success || !result.projectCreate.project) {
@@ -79,11 +108,12 @@ export async function createProject(
 export async function updateProject(
   client: GraphQLClient,
   id: string,
-  input: ProjectUpdateInput,
+  input: UpdateProjectInput,
 ): Promise<UpdatedProject> {
+  const graphqlInput: ProjectUpdateInput = { ...input };
   const result = await client.request<UpdateProjectMutation>(
     UpdateProjectDocument,
-    { id, input },
+    { id, input: graphqlInput },
   );
 
   if (!result.projectUpdate.success || !result.projectUpdate.project) {

@@ -9,10 +9,8 @@ import {
   parseLimit,
 } from "../../common/output.js";
 import {
-  type InitiativeCreateInput,
   type InitiativeSortInput,
   InitiativeStatus,
-  type InitiativeUpdateInput,
   type ListInitiativesQueryVariables,
   PaginationNulls,
   PaginationOrderBy,
@@ -40,10 +38,12 @@ import {
 } from "../../services/discussion-service.js";
 import {
   archiveInitiative,
+  type CreateInitiativeInput,
   createInitiative,
   deleteInitiative,
   getInitiative,
   listInitiatives,
+  type UpdateInitiativeInput,
   unarchiveInitiative,
   updateInitiative,
 } from "../../services/initiative-service.js";
@@ -853,7 +853,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const input: InitiativeCreateInput = { name };
+        const input: CreateInitiativeInput = { name };
 
         if (options.description !== undefined) {
           input.description = options.description;
@@ -906,7 +906,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         const ctx = createContext(getRootOpts(command));
         const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
 
-        const input: InitiativeUpdateInput = {};
+        const input: UpdateInitiativeInput = {};
 
         if (options.name !== undefined) {
           input.name = options.name;

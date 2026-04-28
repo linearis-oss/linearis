@@ -4,7 +4,6 @@ import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { ProjectCreateInput, ProjectUpdateInput } from "../gql/graphql.js";
 import {
   resolveProjectId,
   resolveProjectLabelIds,
@@ -31,10 +30,12 @@ import {
 } from "../services/discussion-service.js";
 import {
   archiveProject,
+  type CreateProjectInput,
   createProject,
   deleteProject,
   getProject,
   listProjects,
+  type UpdateProjectInput,
   unarchiveProject,
   updateProject,
 } from "../services/project-service.js";
@@ -526,7 +527,7 @@ export function setupProjectsCommands(program: Command): void {
           teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
         );
 
-        const input: ProjectCreateInput = {
+        const input: CreateProjectInput = {
           name,
           teamIds,
         };
@@ -610,7 +611,7 @@ export function setupProjectsCommands(program: Command): void {
 
         const projectId = await resolveProjectId(ctx.sdk, project);
 
-        const input: ProjectUpdateInput = {};
+        const input: UpdateProjectInput = {};
 
         if (options.name) {
           input.name = options.name;

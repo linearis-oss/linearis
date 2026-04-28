@@ -30,6 +30,26 @@ import {
   type UpdateInitiativeMutation,
 } from "../gql/graphql.js";
 
+export interface CreateInitiativeInput {
+  name: string;
+  description?: string;
+  content?: string;
+  ownerId?: string;
+  status?: InitiativeCreateInput["status"];
+  targetDate?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateInitiativeInput {
+  name?: string;
+  description?: string;
+  content?: string;
+  ownerId?: string;
+  status?: InitiativeUpdateInput["status"];
+  targetDate?: string;
+  sortOrder?: number;
+}
+
 export interface InitiativeListOptions {
   limit?: number;
   after?: string;
@@ -90,12 +110,13 @@ export async function getInitiative(
 
 export async function createInitiative(
   client: GraphQLClient,
-  input: InitiativeCreateInput,
+  input: CreateInitiativeInput,
 ): Promise<CreatedInitiative> {
+  const graphqlInput: InitiativeCreateInput = { ...input };
   const result = await client.request<CreateInitiativeMutation>(
     CreateInitiativeDocument,
     {
-      input,
+      input: graphqlInput,
     },
   );
 
@@ -109,7 +130,7 @@ export async function createInitiative(
 export async function updateInitiative(
   client: GraphQLClient,
   id: string,
-  input: InitiativeUpdateInput,
+  input: UpdateInitiativeInput,
 ): Promise<UpdatedInitiative> {
   const hasAtLeastOneField = Object.values(input).some(
     (value) => value !== undefined,
@@ -122,11 +143,12 @@ export async function updateInitiative(
     );
   }
 
+  const graphqlInput: InitiativeUpdateInput = { ...input };
   const result = await client.request<UpdateInitiativeMutation>(
     UpdateInitiativeDocument,
     {
       id,
-      input,
+      input: graphqlInput,
     },
   );
 
