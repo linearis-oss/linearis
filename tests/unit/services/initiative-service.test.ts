@@ -1,7 +1,10 @@
 import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import { GetInitiativeDocument } from "../../../src/gql/graphql.js";
+import {
+  GetInitiativeDocument,
+  PaginationOrderBy,
+} from "../../../src/gql/graphql.js";
 import {
   archiveInitiative,
   createInitiative,
@@ -72,7 +75,7 @@ describe("listInitiatives", () => {
       after: "cursor-1",
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
-      orderBy: { createdAt: "Asc" },
+      orderBy: PaginationOrderBy.CreatedAt,
     });
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
@@ -80,7 +83,7 @@ describe("listInitiatives", () => {
       after: "cursor-1",
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
-      orderBy: { createdAt: "Asc" },
+      orderBy: PaginationOrderBy.CreatedAt,
       sort: undefined,
     });
   });

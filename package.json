@@ -19,6 +19,7 @@
     "clean": "rm -rf dist/",
     "start": "tsx src/main.ts",
     "test": "vitest run",
+    "test:typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
