@@ -3,6 +3,7 @@ import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   GetDiscussionCommentContextDocument,
   type ListIssueDiscussionRootsQuery,
+  StartDiscussionDocument,
 } from "../../../src/gql/graphql.js";
 
 vi.mock("../../../src/services/reaction-service.js", async (importOriginal) => {
@@ -703,10 +704,17 @@ describe("replyToDiscussion", () => {
     );
   });
 
-  it("creates a reply for root thread", async () => {
+  it("creates a reply for root thread and forwards the parent entity id", async () => {
     const client = createClientMock();
     vi.mocked(client.request)
-      .mockResolvedValueOnce({ comment: comment("root-1") })
+      .mockResolvedValueOnce({
+        comment: {
+          ...comment("root-1"),
+          issueId: "issue-1",
+          projectId: null,
+          initiativeId: null,
+        },
+      })
       .mockResolvedValueOnce({
         commentCreate: {
           success: true,
@@ -721,6 +729,13 @@ describe("replyToDiscussion", () => {
 
     expect(result.id).toBe("reply-1");
     expect(result.parentId).toBe("root-1");
+    expect(client.request).toHaveBeenNthCalledWith(2, StartDiscussionDocument, {
+      input: {
+        parentId: "root-1",
+        issueId: "issue-1",
+        body: "hello",
+      },
+    });
   });
 });
 
