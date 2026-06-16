@@ -795,13 +795,25 @@ export async function replyToDiscussion(
   client: GraphQLClient,
   input: { threadId: string; body: string; entityKind?: DiscussionEntityKind },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
-  await assertRootDiscussionThread(client, input.threadId, input.entityKind);
+  const thread = await assertRootDiscussionThread(
+    client,
+    input.threadId,
+    input.entityKind,
+  );
+  const entity = getDiscussionThreadEntity(thread);
+  const entityField =
+    entity.kind === "issue"
+      ? { issueId: entity.id }
+      : entity.kind === "project"
+        ? { projectId: entity.id }
+        : { initiativeId: entity.id };
 
   const result = await client.request<StartDiscussionMutation>(
     StartDiscussionDocument,
     {
       input: {
         parentId: input.threadId,
+        ...entityField,
         body: input.body,
       },
     },
