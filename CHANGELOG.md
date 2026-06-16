@@ -1,3 +1,9 @@
+## [2026.6.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.5.0...v2026.6.0-next.1) (2026-06-16)
+
+### Bug Fixes
+
+* **discussions:** forward parent entity id when replying to a thread ([745ca56](https://github.com/linearis-oss/linearis/commit/745ca56465e51f2981740a1153eedc01a40e0431)), closes [#226](https://github.com/linearis-oss/linearis/issues/226)
+
 ## [2026.5.0](https://github.com/linearis-oss/linearis/compare/v2026.4.9...v2026.5.0) (2026-06-16)
 
 ### Bug Fixes
