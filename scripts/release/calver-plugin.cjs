@@ -48,6 +48,12 @@ async function analyzeCommits(pluginConfig, context) {
   return mappedReleaseType;
 }
 
+const VERSION_TOKEN = `$${"{version}"}`;
+
+function formatGitTag(tagFormat, version) {
+  return (tagFormat ?? `v${VERSION_TOKEN}`).replaceAll(VERSION_TOKEN, version);
+}
+
 async function verifyRelease(_, context) {
   const lastVersion = context.lastRelease?.version ?? "1970.1.0";
   const branchName = context.branch?.name ?? "main";
@@ -64,9 +70,17 @@ async function verifyRelease(_, context) {
   });
 
   if (semanticVersion !== expectedVersion) {
-    throw new Error(
-      `calver-plugin: semantic-release computed ${semanticVersion} but calver requires ${expectedVersion}`,
+    context.nextRelease.version = expectedVersion;
+    context.nextRelease.gitTag = formatGitTag(
+      context.options?.tagFormat,
+      expectedVersion,
     );
+    context.nextRelease.name = context.nextRelease.gitTag;
+
+    context.logger.log(
+      `calver-plugin: corrected semantic-release version ${semanticVersion} -> ${expectedVersion}`,
+    );
+    return;
   }
 
   context.logger.log(
@@ -76,6 +90,7 @@ async function verifyRelease(_, context) {
 
 module.exports = {
   analyzeCommits,
+  formatGitTag,
   mapCalverReleaseType,
   verifyRelease,
 };

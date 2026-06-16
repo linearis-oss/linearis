@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   analyzeCommits,
+  formatGitTag,
   mapCalverReleaseType,
   verifyRelease,
 } from "../../../scripts/release/calver-plugin.cjs";
@@ -58,6 +59,9 @@ describe("calver plugin", () => {
   });
 
   it("delegates commit analysis and normalizes to patch cadence", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-20T10:00:00.000Z"));
+
     const pluginConfig = {
       preset: "conventionalcommits",
       releaseRules: [{ type: "chore", release: false }],
@@ -74,6 +78,8 @@ describe("calver plugin", () => {
     };
 
     await expect(analyzeCommits(pluginConfig, context)).resolves.toBe("patch");
+
+    vi.useRealTimers();
   });
 
   it("rolls over to minor on month change during analyzeCommits", async () => {
@@ -100,19 +106,31 @@ describe("calver plugin", () => {
     vi.useRealTimers();
   });
 
-  it("fails when semantic-release next version diverges from calver", async () => {
+  it("corrects semantic-release versions that diverge from calver", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-20T10:00:00.000Z"));
+    vi.setSystemTime(new Date("2026-06-16T10:00:00.000Z"));
 
+    const versionToken = `$${"{version}"}`;
     const context = {
-      lastRelease: { version: "2026.4.8-next.6" },
-      branch: { name: "next" },
+      lastRelease: { version: "2026.4.9" },
+      branch: { name: "main" },
       logger: { log: vi.fn<(message: string) => void>() },
-      nextRelease: { version: "2026.5.0-next.1" },
+      options: { tagFormat: `v${versionToken}` },
+      nextRelease: {
+        version: "2026.5.0",
+        gitTag: "v2026.5.0",
+        name: "v2026.5.0",
+      },
     };
 
-    await expect(verifyRelease({}, context)).rejects.toThrow(
-      "semantic-release computed 2026.5.0-next.1 but calver requires 2026.4.8-next.7",
+    await expect(verifyRelease({}, context)).resolves.toBeUndefined();
+    expect(context.nextRelease).toMatchObject({
+      version: "2026.6.0",
+      gitTag: "v2026.6.0",
+      name: "v2026.6.0",
+    });
+    expect(context.logger.log).toHaveBeenCalledWith(
+      "calver-plugin: corrected semantic-release version 2026.5.0 -> 2026.6.0",
     );
 
     vi.useRealTimers();
@@ -132,6 +150,15 @@ describe("calver plugin", () => {
     await expect(verifyRelease({}, context)).resolves.toBeUndefined();
 
     vi.useRealTimers();
+  });
+
+  it("formats semantic-release git tags", () => {
+    const versionToken = `$${"{version}"}`;
+
+    expect(formatGitTag(`release-${versionToken}`, "2026.6.0")).toBe(
+      "release-2026.6.0",
+    );
+    expect(formatGitTag(undefined, "2026.6.0")).toBe("v2026.6.0");
   });
 
   it("passes when semantic-release next version matches calver", async () => {
