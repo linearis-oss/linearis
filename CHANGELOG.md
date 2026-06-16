@@ -1,3 +1,10 @@
+## [2026.5.0](https://github.com/linearis-oss/linearis/compare/v2026.4.9...v2026.5.0) (2026-06-16)
+
+### Bug Fixes
+
+* **milestones:** pass flat variables to create/update mutations ([66e1a3f](https://github.com/linearis-oss/linearis/commit/66e1a3fcae438957cd6fd5c586bae4ad178e43d4)), closes [#228](https://github.com/linearis-oss/linearis/issues/228)
+* **release:** correct calver version during verification ([c393780](https://github.com/linearis-oss/linearis/commit/c393780f1efdb25269ff0d2ef181b8a0ed82fe2e))
+
 ## [2026.4.9](https://github.com/linearis-oss/linearis/compare/v2026.4.8...v2026.4.9) (2026-04-27)
 
 ### Features
