@@ -1,9 +1,19 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
+  CreateIssueLabelDocument,
+  type CreateIssueLabelMutation,
+  DeleteIssueLabelDocument,
+  type DeleteIssueLabelMutation,
+  GetIssueLabelDocument,
+  type GetIssueLabelQuery,
   GetLabelsDocument,
   GetProjectLabelsDocument,
+  type IssueLabelCreateInput,
   type IssueLabelFilter,
+  type IssueLabelUpdateInput,
+  UpdateIssueLabelDocument,
+  type UpdateIssueLabelMutation,
 } from "../gql/graphql.js";
 
 export type LabelType = "issue" | "project";
@@ -17,8 +27,98 @@ export interface Label {
   type: LabelType;
 }
 
+export interface DeleteLabelResult {
+  id: string;
+  success: true;
+}
+
 export interface ListLabelOptions extends PaginationOptions {
   scope?: LabelScope;
+}
+
+function mapIssueLabel(label: {
+  id: string;
+  name: string;
+  color: string;
+  description?: string | null;
+}): Label {
+  return {
+    id: label.id,
+    name: label.name,
+    color: label.color,
+    description: label.description ?? undefined,
+    type: "issue",
+  };
+}
+
+export async function getLabel(
+  client: GraphQLClient,
+  id: string,
+): Promise<Label> {
+  const result = await client.request<GetIssueLabelQuery>(
+    GetIssueLabelDocument,
+    {
+      id,
+    },
+  );
+
+  if (!result.issueLabel) {
+    throw new Error(`Label with ID "${id}" not found`);
+  }
+
+  return mapIssueLabel(result.issueLabel);
+}
+
+export async function createLabel(
+  client: GraphQLClient,
+  input: IssueLabelCreateInput,
+): Promise<Label> {
+  const result = await client.request<CreateIssueLabelMutation>(
+    CreateIssueLabelDocument,
+    { input },
+  );
+
+  if (!result.issueLabelCreate.success) {
+    throw new Error(`Failed to create label "${input.name}"`);
+  }
+
+  return mapIssueLabel(result.issueLabelCreate.issueLabel);
+}
+
+export async function updateLabel(
+  client: GraphQLClient,
+  id: string,
+  input: IssueLabelUpdateInput,
+): Promise<Label> {
+  const result = await client.request<UpdateIssueLabelMutation>(
+    UpdateIssueLabelDocument,
+    { id, input },
+  );
+
+  if (!result.issueLabelUpdate.success) {
+    throw new Error(`Failed to update label "${id}"`);
+  }
+
+  return mapIssueLabel(result.issueLabelUpdate.issueLabel);
+}
+
+export async function deleteLabel(
+  client: GraphQLClient,
+  id: string,
+): Promise<DeleteLabelResult> {
+  const result = await client.request<DeleteIssueLabelMutation>(
+    DeleteIssueLabelDocument,
+    { id },
+  );
+
+  if (!result.issueLabelDelete.success) {
+    throw new Error(`Failed to delete label "${id}"`);
+  }
+
+  return {
+    id: result.issueLabelDelete.entityId,
+    success: true,
+  };
 }
 
 function buildIssueLabelFilter(
@@ -55,13 +155,7 @@ export async function listLabels(
   });
 
   return {
-    nodes: result.issueLabels.nodes.map((label) => ({
-      id: label.id,
-      name: label.name,
-      color: label.color,
-      description: label.description ?? undefined,
-      type: "issue",
-    })),
+    nodes: result.issueLabels.nodes.map((label) => mapIssueLabel(label)),
     pageInfo: result.issueLabels.pageInfo,
   };
 }

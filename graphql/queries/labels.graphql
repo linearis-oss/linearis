@@ -29,6 +29,12 @@ fragment ProjectLabelFields on ProjectLabel {
   description
 }
 
+query GetIssueLabel($id: String!) {
+  issueLabel(id: $id) {
+    ...LabelFields
+  }
+}
+
 # List labels in the workspace
 #
 # Fetches a list of issue labels with optional team filtering.

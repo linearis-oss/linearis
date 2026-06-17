@@ -28,6 +28,55 @@ describe("resolveLabelId", () => {
     const client = mockSdkClient([{ id: "label-uuid" }]);
     const result = await resolveLabelId(client, "Bug");
     expect(result).toBe("label-uuid");
+    expect(client.sdk.issueLabels).toHaveBeenCalledWith({
+      filter: { name: { eqIgnoreCase: "Bug" } },
+      first: 1,
+    });
+  });
+
+  it("resolves workspace label by name", async () => {
+    const client = mockSdkClient([{ id: "label-uuid" }]);
+
+    await resolveLabelId(client, "Bug", { scope: "workspace" });
+
+    expect(client.sdk.issueLabels).toHaveBeenCalledWith({
+      filter: {
+        name: { eqIgnoreCase: "Bug" },
+        team: { null: true },
+      },
+      first: 1,
+    });
+  });
+
+  it("resolves team-scoped label by name", async () => {
+    const client = mockSdkClient([{ id: "label-uuid" }]);
+
+    await resolveLabelId(client, "Bug", {
+      teamId: "team-uuid",
+      scope: "team",
+    });
+
+    expect(client.sdk.issueLabels).toHaveBeenCalledWith({
+      filter: {
+        name: { eqIgnoreCase: "Bug" },
+        team: { id: { eq: "team-uuid" }, null: false },
+      },
+      first: 1,
+    });
+  });
+
+  it("filters by team when teamId is provided without explicit scope", async () => {
+    const client = mockSdkClient([{ id: "label-uuid" }]);
+
+    await resolveLabelId(client, "Bug", { teamId: "team-uuid" });
+
+    expect(client.sdk.issueLabels).toHaveBeenCalledWith({
+      filter: {
+        name: { eqIgnoreCase: "Bug" },
+        team: { id: { eq: "team-uuid" } },
+      },
+      first: 1,
+    });
   });
 
   it("throws when label not found", async () => {
