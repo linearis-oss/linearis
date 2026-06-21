@@ -1,7 +1,6 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
-import { parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
@@ -1278,7 +1277,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--assignee <user>", "new assignee")
     .option("--project <project>", "new project")
     .option("--labels <labels>", "labels to apply (comma-separated)")
-    .option("--label-mode <mode>", "add | overwrite")
+    .option("--label-mode <mode>", "add | remove | overwrite")
     .option("--clear-labels", "remove all labels")
     .option("--parent-ticket <issue>", "set parent issue")
     .option("--clear-parent-ticket", "clear parent")
@@ -1343,7 +1342,14 @@ export function setupIssuesCommands(program: Command): void {
           throw new Error("--clear-labels cannot be used with --label-mode");
         }
 
-        const labelMode = parseLabelMode(options.labelMode);
+        if (
+          options.labelMode &&
+          !["add", "remove", "overwrite"].includes(options.labelMode)
+        ) {
+          throw new Error(
+            "--label-mode must be one of 'add', 'remove', or 'overwrite'",
+          );
+        }
 
         const parsedPriority =
           options.priority !== undefined
@@ -1382,7 +1388,8 @@ export function setupIssuesCommands(program: Command): void {
           options.status ||
           options.projectMilestone ||
           options.cycle ||
-          (options.labels && labelMode === "add");
+          (options.labels &&
+            (options.labelMode === "add" || options.labelMode === "remove"));
         const issueContext = needsContext
           ? await getIssue(ctx.gql, resolvedIssueId)
           : undefined;
@@ -1433,7 +1440,7 @@ export function setupIssuesCommands(program: Command): void {
           const labelNames = options.labels.split(",").map((l) => l.trim());
           const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
 
-          if (labelMode === "add") {
+          if (options.labelMode === "add") {
             const currentLabels =
               issueContext &&
               "labels" in issueContext &&
@@ -1441,6 +1448,16 @@ export function setupIssuesCommands(program: Command): void {
                 ? issueContext.labels.nodes.map((l) => l.id)
                 : [];
             input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+          } else if (options.labelMode === "remove") {
+            const currentLabels =
+              issueContext &&
+              "labels" in issueContext &&
+              issueContext.labels?.nodes
+                ? issueContext.labels.nodes.map((l) => l.id)
+                : [];
+            input.labelIds = currentLabels.filter(
+              (id) => !labelIds.includes(id),
+            );
           } else {
             input.labelIds = labelIds;
           }

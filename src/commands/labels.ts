@@ -146,7 +146,8 @@ export const LABELS_META: DomainMeta = {
     "issue labels can exist at workspace level or be scoped to a specific",
     "team. project labels are workspace-level only. use labels list to",
     "inspect existing labels, labels create/read/update/delete for issue",
-    "labels, and issues/projects create/update --labels to apply them.",
+    "labels, and issues/projects create/update --labels plus update",
+    "--label-mode remove or --clear-labels to apply or remove them.",
   ].join("\n"),
   arguments: { name: "label name or UUID" },
   seeAlso: [
