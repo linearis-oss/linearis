@@ -58,6 +58,7 @@ import {
   createIssueRelation,
   deleteIssueRelation,
   findIssueRelation,
+  listIssueRelations,
 } from "../services/issue-relation-service.js";
 import {
   archiveIssue,
@@ -107,6 +108,7 @@ interface CreateOptions {
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
+  similarTo?: string;
 }
 
 interface UpdateOptions {
@@ -133,6 +135,7 @@ interface UpdateOptions {
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
+  similarTo?: string;
   removeRelation?: string;
 }
 
@@ -284,8 +287,21 @@ export const ISSUES_META: DomainMeta = {
 };
 
 interface RelationAction {
-  type: "blocks" | "blockedBy" | "relatesTo" | "duplicateOf" | "remove";
+  type:
+    | "blocks"
+    | "blockedBy"
+    | "relatesTo"
+    | "duplicateOf"
+    | "similarTo"
+    | "remove";
   targets: string[];
+}
+
+interface RelationAddOptions {
+  blocks?: string;
+  related?: string;
+  duplicate?: string;
+  similar?: string;
 }
 
 function parseRelationFlags(flags: {
@@ -293,6 +309,7 @@ function parseRelationFlags(flags: {
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
+  similarTo?: string;
   removeRelation?: string;
 }): RelationAction[] {
   const entries: Array<{
@@ -303,6 +320,7 @@ function parseRelationFlags(flags: {
     { type: "blockedBy", raw: flags.blockedBy },
     { type: "relatesTo", raw: flags.relatesTo },
     { type: "duplicateOf", raw: flags.duplicateOf },
+    { type: "similarTo", raw: flags.similarTo },
     { type: "remove", raw: flags.removeRelation },
   ];
 
@@ -327,7 +345,7 @@ function parseRelationFlags(flags: {
     ];
     if (targets.length === 0) {
       throw new Error(
-        `Relation flag --${type === "remove" ? "remove-relation" : type} must not be empty`,
+        `Relation flag ${relationFlagName(type)} must not be empty`,
       );
     }
     actions.push({ type, targets });
@@ -340,17 +358,88 @@ function parseRelationFlags(flags: {
       const prev = seen.get(target);
       if (prev) {
         throw new Error(
-          `${target} appears in multiple relation flags (${prev} and --${action.type === "remove" ? "remove-relation" : action.type})`,
+          `${target} appears in multiple relation flags (${prev} and ${relationFlagName(action.type)})`,
         );
       }
-      seen.set(
-        target,
-        `--${action.type === "remove" ? "remove-relation" : action.type}`,
-      );
+      seen.set(target, relationFlagName(action.type));
     }
   }
 
   return actions;
+}
+
+function relationFlagName(type: RelationAction["type"]): string {
+  switch (type) {
+    case "blocks":
+      return "--blocks";
+    case "blockedBy":
+      return "--blocked-by";
+    case "relatesTo":
+      return "--relates-to";
+    case "duplicateOf":
+      return "--duplicate-of";
+    case "similarTo":
+      return "--similar-to";
+    case "remove":
+      return "--remove-relation";
+  }
+}
+
+function relationTypeFromAddFlag(
+  type: "blocks" | "related" | "duplicate" | "similar",
+): IssueRelationType {
+  switch (type) {
+    case "blocks":
+      return IssueRelationType.Blocks;
+    case "related":
+      return IssueRelationType.Related;
+    case "duplicate":
+      return IssueRelationType.Duplicate;
+    case "similar":
+      return IssueRelationType.Similar;
+  }
+}
+
+function parseRelationAddOptions(options: RelationAddOptions): {
+  type: IssueRelationType;
+  targets: string[];
+} {
+  const typeFlags = [
+    options.blocks ? "blocks" : null,
+    options.related ? "related" : null,
+    options.duplicate ? "duplicate" : null,
+    options.similar ? "similar" : null,
+  ].filter((type): type is keyof RelationAddOptions => type !== null);
+
+  if (typeFlags.length === 0) {
+    throw new Error(
+      "Must specify one of --blocks, --related, --duplicate, or --similar",
+    );
+  }
+
+  if (typeFlags.length > 1) {
+    throw new Error("Cannot specify multiple relation types");
+  }
+
+  const type = typeFlags[0];
+  const rawTargets = options[type] ?? "";
+  const targets = [
+    ...new Set(
+      rawTargets
+        .split(",")
+        .map((target) => target.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (targets.length === 0) {
+    throw new Error("At least one related issue ID must be provided");
+  }
+
+  return {
+    type: relationTypeFromAddFlag(type),
+    targets,
+  };
 }
 
 async function resolveAndApplyRelations(
@@ -398,6 +487,13 @@ async function resolveAndApplyRelations(
             issueId,
             relatedIssueId: targetId,
             type: IssueRelationType.Duplicate,
+          });
+          break;
+        case "similarTo":
+          await createIssueRelation(ctx.gql, {
+            issueId,
+            relatedIssueId: targetId,
+            type: IssueRelationType.Similar,
           });
           break;
         case "remove": {
@@ -449,6 +545,77 @@ export function setupIssuesCommands(program: Command): void {
   const issues = program.command("issues").description("Issue operations");
 
   issues.action(() => issues.help());
+
+  const relations = issues
+    .command("relations")
+    .description("Issue relation operations");
+
+  relations.action(() => relations.help());
+
+  relations
+    .command("list <issue>")
+    .description("list relations for an issue")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, , command] = args as [string, unknown, Command];
+        const ctx = createContext(getRootOpts(command));
+        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const result = await listIssueRelations(ctx.gql, issueId);
+
+        outputSuccess(result);
+      }),
+    );
+
+  relations
+    .command("add <issue>")
+    .description("add relation(s) to an issue")
+    .option("--blocks <issues>", "issues this issue blocks (comma-separated)")
+    .option("--related <issues>", "related issues (comma-separated)")
+    .option(
+      "--duplicate <issues>",
+      "issues this is a duplicate of (comma-separated)",
+    )
+    .option("--similar <issues>", "similar issues (comma-separated)")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [issue, options, command] = args as [
+          string,
+          RelationAddOptions,
+          Command,
+        ];
+        const relation = parseRelationAddOptions(options);
+        const ctx = createContext(getRootOpts(command));
+        const sourceIssueId = await resolveIssueId(ctx.sdk, issue);
+        const targetIds = await Promise.all(
+          relation.targets.map((target) => resolveIssueId(ctx.sdk, target)),
+        );
+
+        const created = await Promise.all(
+          targetIds.map((targetId) =>
+            createIssueRelation(ctx.gql, {
+              issueId: sourceIssueId,
+              relatedIssueId: targetId,
+              type: relation.type,
+            }),
+          ),
+        );
+
+        outputSuccess(created);
+      }),
+    );
+
+  relations
+    .command("remove <relation>")
+    .description("remove a relation by UUID")
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [relation, , command] = args as [string, unknown, Command];
+        const ctx = createContext(getRootOpts(command));
+        const result = await deleteIssueRelation(ctx.gql, relation);
+
+        outputSuccess(result);
+      }),
+    );
 
   addFilterOptions(
     issues
@@ -988,6 +1155,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
     .option("--relates-to <issue>", "this issue relates to <issue>")
     .option("--duplicate-of <issue>", "this issue duplicates <issue>")
+    .option("--similar-to <issue>", "this issue is similar to <issue>")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [title, options, command] = args as [
@@ -1140,6 +1308,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--blocked-by <issue>", "add blocked-by relation")
     .option("--relates-to <issue>", "add relates-to relation")
     .option("--duplicate-of <issue>", "add duplicate relation")
+    .option("--similar-to <issue>", "add similar relation")
     .option("--remove-relation <issue>", "remove relation with <issue>")
     .action(
       handleCommand(async (...args: unknown[]) => {

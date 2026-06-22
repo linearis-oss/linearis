@@ -116,9 +116,17 @@ vi.mock("../../../src/services/issue-service.js", () => ({
 }));
 
 vi.mock("../../../src/services/issue-relation-service.js", () => ({
-  createIssueRelation: vi.fn(),
-  deleteIssueRelation: vi.fn(),
-  findIssueRelation: vi.fn(),
+  createIssueRelation: vi.fn().mockResolvedValue({ id: "relation-uuid" }),
+  deleteIssueRelation: vi.fn().mockResolvedValue({
+    id: "relation-uuid",
+    success: true,
+  }),
+  findIssueRelation: vi.fn().mockResolvedValue("relation-uuid"),
+  listIssueRelations: vi.fn().mockResolvedValue({
+    issueId: "resolved-issue-uuid",
+    identifier: "ENG-42",
+    relations: [],
+  }),
 }));
 
 vi.mock("../../../src/services/reaction-service.js", () => ({
@@ -1915,6 +1923,28 @@ describe("issues create relations", () => {
     );
     expect(createIssueRelation).toHaveBeenCalledTimes(1);
   });
+
+  it("creates similar relation", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--similar-to",
+      "DAT-103",
+    ]);
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "similar" }),
+    );
+  });
 });
 
 describe("issues update relations", () => {
@@ -1997,5 +2027,116 @@ describe("issues update relations", () => {
       expect.stringContaining("Cannot mix add and remove relation flags"),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("adds similar relation", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--similar-to",
+      "DAT-103",
+    ]);
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "similar" }),
+    );
+  });
+});
+
+describe("issues relations subcommands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("lists relations for an issue", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "relations",
+      "list",
+      "ENG-42",
+    ]);
+
+    const { listIssueRelations } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(listIssueRelations).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+    );
+  });
+
+  it("adds comma-separated relations", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "relations",
+      "add",
+      "ENG-42",
+      "--similar",
+      "DAT-103,DAT-104",
+    ]);
+
+    const { createIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(createIssueRelation).toHaveBeenCalledTimes(2);
+    expect(createIssueRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "similar" }),
+    );
+  });
+
+  it("rejects add without relation type", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "relations",
+      "add",
+      "ENG-42",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Must specify one of --blocks, --related, --duplicate, or --similar",
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("removes relation by UUID", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "relations",
+      "remove",
+      "relation-uuid",
+    ]);
+
+    const { deleteIssueRelation } = await import(
+      "../../../src/services/issue-relation-service.js"
+    );
+    expect(deleteIssueRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      "relation-uuid",
+    );
   });
 });

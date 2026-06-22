@@ -6,9 +6,16 @@
 fragment IssueRelationFields on IssueRelation {
   id
   type
+  createdAt
+  issue {
+    id
+    identifier
+    title
+  }
   relatedIssue {
     id
     identifier
+    title
   }
 }
 
@@ -16,9 +23,16 @@ fragment IssueRelationFields on IssueRelation {
 fragment InverseIssueRelationFields on IssueRelation {
   id
   type
+  createdAt
   issue {
     id
     identifier
+    title
+  }
+  relatedIssue {
+    id
+    identifier
+    title
   }
 }
 
@@ -44,6 +58,8 @@ mutation DeleteIssueRelation($id: String!) {
 # Used by --remove-relation to locate the relation ID before deletion
 query GetIssueRelations($issueId: String!) {
   issue(id: $issueId) {
+    id
+    identifier
     relations {
       nodes {
         ...IssueRelationFields

@@ -11,6 +11,8 @@ import {
   type IssueRelationType,
 } from "../gql/graphql.js";
 
+type IssueRelationsIssue = NonNullable<GetIssueRelationsQuery["issue"]>;
+
 export async function createIssueRelation(
   client: GraphQLClient,
   input: {
@@ -27,6 +29,36 @@ export async function createIssueRelation(
     throw new Error("Failed to create issue relation");
   }
   return result.issueRelationCreate.issueRelation;
+}
+
+export async function listIssueRelations(
+  client: GraphQLClient,
+  issueId: string,
+): Promise<{
+  issueId: string;
+  identifier: string;
+  relations: Array<
+    | IssueRelationsIssue["relations"]["nodes"][0]
+    | IssueRelationsIssue["inverseRelations"]["nodes"][0]
+  >;
+}> {
+  const result = await client.request<GetIssueRelationsQuery>(
+    GetIssueRelationsDocument,
+    { issueId },
+  );
+
+  if (!result.issue) {
+    throw notFoundError("Issue", issueId);
+  }
+
+  return {
+    issueId: result.issue.id,
+    identifier: result.issue.identifier,
+    relations: [
+      ...result.issue.relations.nodes,
+      ...result.issue.inverseRelations.nodes,
+    ],
+  };
 }
 
 export async function findIssueRelation(
