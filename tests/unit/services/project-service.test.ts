@@ -177,6 +177,7 @@ describe("listProjects", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: "cur1",
+      includeArchived: undefined,
     });
   });
 
@@ -191,6 +192,22 @@ describe("listProjects", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: undefined,
+      includeArchived: undefined,
+    });
+  });
+
+  it("passes includeArchived when requested", async () => {
+    const client = mockGqlClient({
+      projects: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    await listProjects(client, { includeArchived: true });
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 50,
+      after: undefined,
+      includeArchived: true,
     });
   });
 
@@ -267,6 +284,57 @@ describe("getProject", () => {
     expect(result.status.name).toBe("Started");
     expect(result.content).toBe("# Project Alpha\nDetailed content here.");
     expect(result.members.nodes).toHaveLength(1);
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      milestonesFirst: 25,
+      skipMilestones: false,
+      issuesFirst: 50,
+      skipIssues: false,
+    });
+  });
+
+  it("supports bounded detail expansion and zero skips", async () => {
+    const client = mockGqlClient({
+      project: {
+        id: "proj-1",
+        name: "Project Alpha",
+      },
+    });
+
+    await getProject(client, "proj-1", {
+      milestonesFirst: 0,
+      issuesFirst: 0,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      milestonesFirst: 1,
+      skipMilestones: true,
+      issuesFirst: 1,
+      skipIssues: true,
+    });
+  });
+
+  it("passes custom milestone and issue limits", async () => {
+    const client = mockGqlClient({
+      project: {
+        id: "proj-1",
+        name: "Project Alpha",
+      },
+    });
+
+    await getProject(client, "proj-1", {
+      milestonesFirst: 5,
+      issuesFirst: 10,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      milestonesFirst: 5,
+      skipMilestones: false,
+      issuesFirst: 10,
+      skipIssues: false,
+    });
   });
 
   it("throws when project not found", async () => {
