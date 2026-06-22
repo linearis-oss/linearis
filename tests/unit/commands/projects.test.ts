@@ -114,6 +114,7 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
 import { setupProjectsCommands } from "../../../src/commands/projects.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
+import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -136,6 +137,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  listProjects,
   unarchiveProject,
   updateProject,
 } from "../../../src/services/project-service.js";
@@ -146,6 +148,34 @@ function createProgram(): Command {
   setupProjectsCommands(program);
   return program;
 }
+
+describe("projects list", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes includeArchived to project listing", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "list",
+      "--include-archived",
+      "--limit",
+      "25",
+    ]);
+
+    expect(listProjects).toHaveBeenCalledWith(expect.anything(), {
+      limit: 25,
+      after: undefined,
+      includeArchived: true,
+    });
+  });
+});
 
 describe("projects read", () => {
   beforeEach(() => {
@@ -172,8 +202,48 @@ describe("projects read", () => {
     expect(getProject).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-project-uuid",
+      { milestonesFirst: 25, issuesFirst: 50 },
     );
     expect(outputSuccess).toHaveBeenCalledWith({ id: "proj-1" });
+  });
+
+  it("passes project detail expansion limits including zero", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "read",
+      "My Project",
+      "--milestones-first",
+      "0",
+      "--issues-first",
+      "10",
+    ]);
+
+    expect(getProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      { milestonesFirst: 0, issuesFirst: 10 },
+    );
+  });
+
+  it("rejects negative project detail expansion limits", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "read",
+      "My Project",
+      "--issues-first",
+      "-1",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --issues-first"),
+    );
+    expect(getProject).not.toHaveBeenCalled();
   });
 });
 
@@ -346,6 +416,141 @@ describe("projects create --priority", () => {
       expect.stringContaining("must be 0-4"),
     );
     expect(createProject).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects create compatibility options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("accepts singular --team and forwards icon and color", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "create",
+      "My Project",
+      "--team",
+      "ENG",
+      "--icon",
+      "rocket",
+      "--color",
+      "#ff0000",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "ENG");
+    expect(createProject).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        teamIds: ["resolved-team-uuid"],
+        icon: "rocket",
+        color: "#ff0000",
+      }),
+    );
+  });
+
+  it("rejects combining --team and --teams", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "create",
+      "My Project",
+      "--team",
+      "ENG",
+      "--teams",
+      "DES",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be combined with --teams"),
+    );
+    expect(createProject).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects update compatibility options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("clears lead and lifecycle dates", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--clear-lead",
+      "--clear-start-date",
+      "--clear-target-date",
+    ]);
+
+    expect(updateProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({
+        leadId: null,
+        startDate: null,
+        targetDate: null,
+      }),
+    );
+  });
+
+  it("updates icon, color, and singular team alias", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--icon",
+      "target",
+      "--color",
+      "#00ff00",
+      "--team",
+      "ENG",
+    ]);
+
+    expect(updateProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({
+        icon: "target",
+        color: "#00ff00",
+        teamIds: ["resolved-team-uuid"],
+      }),
+    );
+  });
+
+  it("rejects clear flags combined with replacement values", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--lead",
+      "Ada",
+      "--clear-lead",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be combined with --clear-lead"),
+    );
+    expect(updateProject).not.toHaveBeenCalled();
   });
 });
 

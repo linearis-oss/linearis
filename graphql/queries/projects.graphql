@@ -75,17 +75,21 @@ fragment ProjectDetailFields on Project {
       name
     }
   }
+  initiatives {
+    nodes {
+      id
+      name
+    }
+  }
+}
+
+fragment ProjectDetailWithDefaultConnectionsFields on Project {
+  ...ProjectDetailFields
   projectMilestones {
     nodes {
       id
       name
       targetDate
-    }
-  }
-  initiatives {
-    nodes {
-      id
-      name
     }
   }
 }
@@ -98,8 +102,9 @@ fragment ProjectDetailFields on Project {
 # Variables:
 #   $first: Maximum number of projects to return (default: 50)
 #   $after: Cursor for pagination
-query GetProjects($first: Int = 50, $after: String) {
-  projects(first: $first, after: $after) {
+#   $includeArchived: Include archived projects
+query GetProjects($first: Int = 50, $after: String, $includeArchived: Boolean) {
+  projects(first: $first, after: $after, includeArchived: $includeArchived) {
     nodes {
       ...ProjectListFields
     }
@@ -137,9 +142,33 @@ fragment ProjectDetailFieldsWithReactions on Project {
 #
 # Variables:
 #   $id: Project UUID
-query GetProject($id: String!) {
+#   $milestonesFirst: Maximum number of milestones to return
+#   $skipMilestones: Omit projectMilestones from the response
+#   $issuesFirst: Maximum number of issues to return
+#   $skipIssues: Omit issues from the response
+query GetProject(
+  $id: String!
+  $milestonesFirst: Int!
+  $skipMilestones: Boolean!
+  $issuesFirst: Int!
+  $skipIssues: Boolean!
+) {
   project(id: $id) {
     ...ProjectDetailFields
+    projectMilestones(first: $milestonesFirst) @skip(if: $skipMilestones) {
+      nodes {
+        id
+        name
+        description
+        targetDate
+        sortOrder
+      }
+    }
+    issues(first: $issuesFirst) @skip(if: $skipIssues) {
+      nodes {
+        ...CompleteIssueFields
+      }
+    }
   }
 }
 
