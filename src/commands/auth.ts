@@ -9,9 +9,8 @@ import {
 import { createGraphQLClient, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { clearToken, saveToken } from "../common/token-storage.js";
-import type { Viewer } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import { validateToken } from "../services/auth-service.js";
+import { type Viewer, validateToken } from "../services/auth-service.js";
 
 const LINEAR_API_KEY_URL =
   "https://linear.app/settings/account/security/api-keys/new";

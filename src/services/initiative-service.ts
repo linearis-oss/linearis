@@ -1,27 +1,46 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { invalidParameterError } from "../common/errors.js";
-import type {
-  ArchivedInitiative,
-  CreatedInitiative,
-  DeletedInitiative,
-  InitiativeDetail,
-  InitiativeListItem,
-  PaginatedResult,
-  UnarchivedInitiative,
-  UpdatedInitiative,
-} from "../common/types.js";
+import type { PaginatedResult } from "../common/types.js";
 import {
   ArchiveInitiativeDocument,
+  type ArchiveInitiativeMutation,
   CreateInitiativeDocument,
+  type CreateInitiativeMutation,
   DeleteInitiativeDocument,
+  type DeleteInitiativeMutation,
   GetInitiativeDocument,
+  type GetInitiativeQuery,
   type InitiativeCreateInput,
   type InitiativeUpdateInput,
   ListInitiativesDocument,
+  type ListInitiativesQuery,
   type ListInitiativesQueryVariables,
   UnarchiveInitiativeDocument,
+  type UnarchiveInitiativeMutation,
   UpdateInitiativeDocument,
+  type UpdateInitiativeMutation,
 } from "../gql/graphql.js";
+
+// Initiative projection types
+export type InitiativeListItem =
+  ListInitiativesQuery["initiatives"]["nodes"][0];
+export type InitiativeDetail = NonNullable<GetInitiativeQuery["initiative"]>;
+export type CreatedInitiative = NonNullable<
+  CreateInitiativeMutation["initiativeCreate"]["initiative"]
+>;
+export type UpdatedInitiative = NonNullable<
+  UpdateInitiativeMutation["initiativeUpdate"]["initiative"]
+>;
+export type ArchivedInitiative = NonNullable<
+  ArchiveInitiativeMutation["initiativeArchive"]["entity"]
+>;
+export type UnarchivedInitiative = NonNullable<
+  UnarchiveInitiativeMutation["initiativeUnarchive"]["entity"]
+>;
+export type DeletedInitiative = {
+  id: NonNullable<DeleteInitiativeMutation["initiativeDelete"]["entityId"]>;
+  success: true;
+};
 
 export interface InitiativeListOptions {
   limit?: number;

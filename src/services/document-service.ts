@@ -1,26 +1,32 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CreatedDocument,
-  Document,
-  DocumentListItem,
-  PaginatedResult,
-  UpdatedDocument,
-} from "../common/types.js";
+import type { PaginatedResult } from "../common/types.js";
 import {
   DocumentCreateDocument,
   type DocumentCreateInput,
+  type DocumentCreateMutation,
   DocumentDeleteDocument,
   type DocumentFilter,
   DocumentUpdateDocument,
   type DocumentUpdateInput,
+  type DocumentUpdateMutation,
   GetDocumentDocument,
+  type GetDocumentQuery,
   ListDocumentsDocument,
+  type ListDocumentsQuery,
 } from "../gql/graphql.js";
+
+// Document projection types
+export type DocumentDetail = NonNullable<GetDocumentQuery["document"]>;
+export type DocumentListItem = ListDocumentsQuery["documents"]["nodes"][0];
+export type CreatedDocument =
+  DocumentCreateMutation["documentCreate"]["document"];
+export type UpdatedDocument =
+  DocumentUpdateMutation["documentUpdate"]["document"];
 
 export async function getDocument(
   client: GraphQLClient,
   id: string,
-): Promise<Document> {
+): Promise<DocumentDetail> {
   const result = await client.request(GetDocumentDocument, {
     id,
   });

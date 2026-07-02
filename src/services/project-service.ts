@@ -1,26 +1,42 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  ArchivedProject,
-  CreatedProject,
-  DeletedProject,
-  PaginatedResult,
-  PaginationOptions,
-  ProjectDetail,
-  ProjectListItem,
-  UnarchivedProject,
-  UpdatedProject,
-} from "../common/types.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveProjectDocument,
+  type ArchiveProjectMutation,
   CreateProjectDocument,
+  type CreateProjectMutation,
   DeleteProjectDocument,
   GetProjectDocument,
+  type GetProjectQuery,
   GetProjectsDocument,
+  type GetProjectsQuery,
   type ProjectCreateInput,
   type ProjectUpdateInput,
   UnarchiveProjectDocument,
+  type UnarchiveProjectMutation,
   UpdateProjectDocument,
+  type UpdateProjectMutation,
 } from "../gql/graphql.js";
+
+// Project projection types
+export type ProjectListItem = GetProjectsQuery["projects"]["nodes"][0];
+export type ProjectDetail = NonNullable<GetProjectQuery["project"]>;
+export type CreatedProject = NonNullable<
+  CreateProjectMutation["projectCreate"]["project"]
+>;
+export type UpdatedProject = NonNullable<
+  UpdateProjectMutation["projectUpdate"]["project"]
+>;
+export type ArchivedProject = NonNullable<
+  ArchiveProjectMutation["projectArchive"]["entity"]
+>;
+export type UnarchivedProject = NonNullable<
+  UnarchiveProjectMutation["projectUnarchive"]["entity"]
+>;
+export type DeletedProject = {
+  id: string;
+  success: true;
+};
 
 export interface ProjectListOptions extends PaginationOptions {
   includeArchived?: boolean;

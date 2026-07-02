@@ -1,20 +1,30 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CreatedMilestone,
-  MilestoneDetail,
-  MilestoneListItem,
-  PaginatedResult,
-  PaginationOptions,
-  UpdatedMilestone,
-} from "../common/types.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   CreateProjectMilestoneDocument,
+  type CreateProjectMilestoneMutation,
   GetProjectMilestoneByIdDocument,
+  type GetProjectMilestoneByIdQuery,
   ListProjectMilestonesDocument,
+  type ListProjectMilestonesQuery,
   type ProjectMilestoneCreateInput,
   type ProjectMilestoneUpdateInput,
   UpdateProjectMilestoneDocument,
+  type UpdateProjectMilestoneMutation,
 } from "../gql/graphql.js";
+
+// Milestone projection types
+export type MilestoneDetail = NonNullable<
+  GetProjectMilestoneByIdQuery["projectMilestone"]
+>;
+export type MilestoneListItem =
+  ListProjectMilestonesQuery["project"]["projectMilestones"]["nodes"][0];
+export type CreatedMilestone = NonNullable<
+  CreateProjectMilestoneMutation["projectMilestoneCreate"]["projectMilestone"]
+>;
+export type UpdatedMilestone = NonNullable<
+  UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
+>;
 
 export async function listMilestones(
   client: GraphQLClient,

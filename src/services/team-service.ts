@@ -1,16 +1,23 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  PaginatedResult,
-  PaginationOptions,
-  TeamDetail,
-  TeamEstimateOption,
-  TeamEstimationSource,
-} from "../common/types.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   GetTeamByIdDocument,
   type GetTeamByIdQuery,
   GetTeamsDocument,
 } from "../gql/graphql.js";
+
+// Team projection types
+export type TeamEstimateOption = {
+  value: number;
+  label: string;
+};
+
+export type TeamEstimationSource = "self" | "parent" | "self_fallback";
+
+export type TeamDetail = NonNullable<GetTeamByIdQuery["team"]> & {
+  validEstimates: TeamEstimateOption[];
+  estimationSource: TeamEstimationSource;
+};
 
 export interface Team {
   id: string;

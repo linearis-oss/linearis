@@ -1,12 +1,13 @@
 // tests/unit/services/team-service.test.ts
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import type {
-  TeamDetail,
-  TeamEstimateOption,
-  TeamEstimationSource,
-} from "../../../src/common/types.js";
-import { getTeam, listTeams } from "../../../src/services/team-service.js";
+import {
+  getTeam,
+  listTeams,
+  type TeamDetail,
+  type TeamEstimateOption,
+  type TeamEstimationSource,
+} from "../../../src/services/team-service.js";
 
 const assertTeamDetailShape = (value: TeamDetail): TeamDetail => value;
 const assertEstimateOption = (value: TeamEstimateOption): TeamEstimateOption =>

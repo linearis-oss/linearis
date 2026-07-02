@@ -1,12 +1,21 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  DeletedInitiativeProjectLink,
-  InitiativeProjectLink,
-} from "../common/types.js";
 import {
   CreateInitiativeToProjectDocument,
+  type CreateInitiativeToProjectMutation,
   DeleteInitiativeToProjectDocument,
+  type DeleteInitiativeToProjectMutation,
 } from "../gql/graphql.js";
+
+// Initiative-project link projection types
+export type InitiativeProjectLink = NonNullable<
+  CreateInitiativeToProjectMutation["initiativeToProjectCreate"]["initiativeToProject"]
+>;
+export type DeletedInitiativeProjectLink = {
+  id: NonNullable<
+    DeleteInitiativeToProjectMutation["initiativeToProjectDelete"]["entityId"]
+  >;
+  success: true;
+};
 
 export async function createInitiativeProjectLink(
   client: GraphQLClient,

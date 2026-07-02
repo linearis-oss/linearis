@@ -1,12 +1,21 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  DeletedInitiativeRelation,
-  InitiativeRelation,
-} from "../common/types.js";
 import {
   CreateInitiativeRelationDocument,
+  type CreateInitiativeRelationMutation,
   DeleteInitiativeRelationDocument,
+  type DeleteInitiativeRelationMutation,
 } from "../gql/graphql.js";
+
+// Initiative relation projection types
+export type InitiativeRelation = NonNullable<
+  CreateInitiativeRelationMutation["initiativeRelationCreate"]["initiativeRelation"]
+>;
+export type DeletedInitiativeRelation = {
+  id: NonNullable<
+    DeleteInitiativeRelationMutation["initiativeRelationDelete"]["entityId"]
+  >;
+  success: true;
+};
 
 export async function createInitiativeRelation(
   client: GraphQLClient,

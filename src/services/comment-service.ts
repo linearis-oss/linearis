@@ -1,19 +1,26 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CommentListItem,
-  CreatedComment,
-  PaginatedResult,
-  PaginationOptions,
-  UpdatedComment,
-} from "../common/types.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   type CommentCreateInput,
   type CommentUpdateInput,
   CreateCommentDocument,
+  type CreateCommentMutation,
   DeleteCommentDocument,
   ListCommentsDocument,
+  type ListCommentsQuery,
   UpdateCommentDocument,
+  type UpdateCommentMutation,
 } from "../gql/graphql.js";
+
+// Comment projection types
+export type CreatedComment = NonNullable<
+  CreateCommentMutation["commentCreate"]["comment"]
+>;
+export type UpdatedComment = NonNullable<
+  UpdateCommentMutation["commentUpdate"]["comment"]
+>;
+export type CommentListItem =
+  ListCommentsQuery["issue"]["comments"]["nodes"][0];
 
 export async function createComment(
   client: GraphQLClient,
