@@ -1,3 +1,13 @@
+## [2026.6.0-next.4](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.3...v2026.6.0-next.4) (2026-07-02)
+
+### Features
+
+* **output:** add --compact and --fields flags for token-efficient output ([682bde9](https://github.com/linearis-oss/linearis/commit/682bde9489176b4dffa26f3e4fd40bdb633fe77c)), closes [#220](https://github.com/linearis-oss/linearis/issues/220)
+
+### Bug Fixes
+
+* **output:** harden pickFields against prototype-chain keys ([a624313](https://github.com/linearis-oss/linearis/commit/a624313e0d1cb74ed77ddbf1f87a24c3262cdc72)), closes [#220](https://github.com/linearis-oss/linearis/issues/220)
+
 ## [2026.6.0-next.3](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.2...v2026.6.0-next.3) (2026-07-02)
 
 ### Bug Fixes
