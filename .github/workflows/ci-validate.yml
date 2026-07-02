@@ -130,7 +130,9 @@ jobs:
           fi
 
       - name: Post / update PR comment
-        if: always()
+        # GITHUB_TOKEN is forced read-only for pull_request events from forks,
+        # so posting a comment would fail there regardless of permissions:.
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
         with:
           header: knip-dead-code
@@ -206,23 +208,29 @@ jobs:
           if [ -n "$plan_files" ]; then
             echo "::error::Found plan files in branch history"
 
-            printf '%s\n' \
-              '<!-- linearis:guard-plan-files -->' \
-              '' \
-              '> [!WARNING]' \
-              '> Found `docs/plans/*.md` files in this branch'"'"'s history.' \
-              '>' \
-              '> Plan files in `docs/plans/` are working artifacts created by AI agents during the design phase. Once the implementation they describe is complete and the PR is ready for review, these files serve no further purpose — they are not reference docs, not changelogs, and not part of the shipped project.' \
-              '>' \
-              '> Leaving them in the commit history would add noise and suggest unresolved or incomplete work.' \
-              '>' \
-              '> **Remove them by rebasing and dropping the commits that introduced them:**' \
-              '> ```bash' \
-              '> git rebase -i main' \
-              '> # drop the commits that added docs/plans/*.md, then force-push' \
-              '> git push --force-with-lease' \
-              '> ```' \
-            | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+            # GITHUB_TOKEN is forced read-only for pull_request events from
+            # forks, so posting a comment would fail there regardless of
+            # permissions:. The ::error:: above still surfaces in the checks
+            # UI, so skip the comment rather than fail this step on forks.
+            if [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
+              printf '%s\n' \
+                '<!-- linearis:guard-plan-files -->' \
+                '' \
+                '> [!WARNING]' \
+                '> Found `docs/plans/*.md` files in this branch'"'"'s history.' \
+                '>' \
+                '> Plan files in `docs/plans/` are working artifacts created by AI agents during the design phase. Once the implementation they describe is complete and the PR is ready for review, these files serve no further purpose — they are not reference docs, not changelogs, and not part of the shipped project.' \
+                '>' \
+                '> Leaving them in the commit history would add noise and suggest unresolved or incomplete work.' \
+                '>' \
+                '> **Remove them by rebasing and dropping the commits that introduced them:**' \
+                '> ```bash' \
+                '> git rebase -i main' \
+                '> # drop the commits that added docs/plans/*.md, then force-push' \
+                '> git push --force-with-lease' \
+                '> ```' \
+              | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+            fi
 
             exit 1
           fi
