@@ -134,6 +134,29 @@ describe("createMilestone", () => {
     expect(result.name).toBe("v2.0");
   });
 
+  it("passes input as a single GraphQL variable", async () => {
+    const client = mockGqlClient({
+      projectMilestoneCreate: {
+        success: true,
+        projectMilestone: {
+          id: "ms-new",
+          name: "v2.0",
+          description: null,
+          targetDate: null,
+          sortOrder: 0,
+        },
+      },
+    });
+    const input = {
+      projectId: "proj-1",
+      name: "v2.0",
+      description: "desc",
+      targetDate: "2025-12-01",
+    };
+    await createMilestone(client, input);
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), { input });
+  });
+
   it("throws on failure", async () => {
     const client = mockGqlClient({
       projectMilestoneCreate: {
@@ -164,6 +187,27 @@ describe("updateMilestone", () => {
     const result = await updateMilestone(client, "ms-1", { name: "v1.1" });
     expect(result.id).toBe("ms-1");
     expect(result.name).toBe("v1.1");
+  });
+
+  it("passes id and input as GraphQL variables", async () => {
+    const client = mockGqlClient({
+      projectMilestoneUpdate: {
+        success: true,
+        projectMilestone: {
+          id: "ms-1",
+          name: "v1.1",
+          description: null,
+          targetDate: null,
+          sortOrder: 0,
+        },
+      },
+    });
+    const input = { name: "v1.1", description: "updated" };
+    await updateMilestone(client, "ms-1", input);
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "ms-1",
+      input,
+    });
   });
 
   it("throws on failure", async () => {

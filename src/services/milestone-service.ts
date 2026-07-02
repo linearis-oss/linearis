@@ -63,7 +63,7 @@ export async function createMilestone(
 ): Promise<CreatedMilestone> {
   const result = await client.request<CreateProjectMilestoneMutation>(
     CreateProjectMilestoneDocument,
-    input,
+    { input },
   );
 
   if (
@@ -83,7 +83,7 @@ export async function updateMilestone(
 ): Promise<UpdatedMilestone> {
   const result = await client.request<UpdateProjectMilestoneMutation>(
     UpdateProjectMilestoneDocument,
-    { id, ...input },
+    { id, input },
   );
 
   if (
