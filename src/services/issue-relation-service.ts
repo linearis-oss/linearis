@@ -3,9 +3,7 @@ import { notFoundError } from "../common/errors.js";
 import type { CreatedIssueRelation } from "../common/types.js";
 import {
   CreateIssueRelationDocument,
-  type CreateIssueRelationMutation,
   DeleteIssueRelationDocument,
-  type DeleteIssueRelationMutation,
   GetIssueRelationsDocument,
   type GetIssueRelationsQuery,
   type IssueRelationType,
@@ -21,10 +19,7 @@ export async function createIssueRelation(
     type: IssueRelationType;
   },
 ): Promise<CreatedIssueRelation> {
-  const result = await client.request<CreateIssueRelationMutation>(
-    CreateIssueRelationDocument,
-    { input },
-  );
+  const result = await client.request(CreateIssueRelationDocument, { input });
   if (!result.issueRelationCreate.success) {
     throw new Error("Failed to create issue relation");
   }
@@ -42,10 +37,7 @@ export async function listIssueRelations(
     | IssueRelationsIssue["inverseRelations"]["nodes"][0]
   >;
 }> {
-  const result = await client.request<GetIssueRelationsQuery>(
-    GetIssueRelationsDocument,
-    { issueId },
-  );
+  const result = await client.request(GetIssueRelationsDocument, { issueId });
 
   if (!result.issue) {
     throw notFoundError("Issue", issueId);
@@ -66,10 +58,7 @@ export async function findIssueRelation(
   issueId: string,
   relatedIssueId: string,
 ): Promise<string> {
-  const result = await client.request<GetIssueRelationsQuery>(
-    GetIssueRelationsDocument,
-    { issueId },
-  );
+  const result = await client.request(GetIssueRelationsDocument, { issueId });
 
   if (!result.issue) {
     throw notFoundError("Issue", issueId);
@@ -94,10 +83,9 @@ export async function deleteIssueRelation(
   client: GraphQLClient,
   relationId: string,
 ): Promise<{ id: string; success: boolean }> {
-  const result = await client.request<DeleteIssueRelationMutation>(
-    DeleteIssueRelationDocument,
-    { id: relationId },
-  );
+  const result = await client.request(DeleteIssueRelationDocument, {
+    id: relationId,
+  });
   if (!result.issueRelationDelete.success) {
     throw new Error("Failed to delete issue relation");
   }

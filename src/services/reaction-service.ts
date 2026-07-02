@@ -4,13 +4,9 @@ import {
   CreateReactionDocument,
   type CreateReactionMutation,
   DeleteReactionDocument,
-  type DeleteReactionMutation,
   GetCommentReactionsDocument,
-  type GetCommentReactionsQuery,
   GetIssueReactionsDocument,
-  type GetIssueReactionsQuery,
   GetViewerDocument,
-  type GetViewerQuery,
   type ReactionCreateInput,
   type ReactionReadFieldsFragment,
 } from "../gql/graphql.js";
@@ -85,7 +81,7 @@ function normalizeReactionUser(
 }
 
 async function getViewerId(client: GraphQLClient): Promise<string> {
-  const result = await client.request<GetViewerQuery>(GetViewerDocument);
+  const result = await client.request(GetViewerDocument);
   return result.viewer.id;
 }
 
@@ -94,10 +90,9 @@ async function getTargetReactions(
   input: ReactionLookupInput,
 ): Promise<ReactionNode[]> {
   if (input.kind === "issue") {
-    const result = await client.request<GetIssueReactionsQuery>(
-      GetIssueReactionsDocument,
-      { id: input.id },
-    );
+    const result = await client.request(GetIssueReactionsDocument, {
+      id: input.id,
+    });
 
     if (!result.issue) {
       throw new Error(`Issue with ID "${input.id}" not found`);
@@ -106,10 +101,9 @@ async function getTargetReactions(
     return result.issue.reactions;
   }
 
-  const result = await client.request<GetCommentReactionsQuery>(
-    GetCommentReactionsDocument,
-    { id: input.id },
-  );
+  const result = await client.request(GetCommentReactionsDocument, {
+    id: input.id,
+  });
 
   if (!result.comment) {
     throw new Error(`Discussion comment ID "${input.id}" not found`);
@@ -137,10 +131,9 @@ async function createReaction(
     throw new Error(`Already reacted with emoji ${normalizedEmoji}`);
   }
 
-  const result = await client.request<CreateReactionMutation>(
-    CreateReactionDocument,
-    { input: normalizedInput },
-  );
+  const result = await client.request(CreateReactionDocument, {
+    input: normalizedInput,
+  });
 
   if (!result.reactionCreate.success) {
     throw new Error("Failed to create reaction");
@@ -153,10 +146,9 @@ async function deleteReaction(
   client: GraphQLClient,
   reactionId: string,
 ): Promise<{ id: string; success: boolean }> {
-  const result = await client.request<DeleteReactionMutation>(
-    DeleteReactionDocument,
-    { id: reactionId },
-  );
+  const result = await client.request(DeleteReactionDocument, {
+    id: reactionId,
+  });
 
   if (!result.reactionDelete.success) {
     throw new Error("Failed to delete reaction");

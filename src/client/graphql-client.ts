@@ -1,10 +1,21 @@
+import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { LinearClient } from "@linear/sdk";
-import { type DocumentNode, print } from "graphql";
+import { print } from "graphql";
 import { AuthenticationError, isAuthError } from "../common/errors.js";
 import { withRetry } from "../common/retry.js";
 
 /** Default timeout for GraphQL API requests (30 seconds) */
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Variable-less operations generate `Exact<{ [key: string]: never }>` for their
+ * variables type. Make the variables argument optional in exactly that case and
+ * required otherwise, so callers infer both types from the document alone.
+ */
+type RequestVariables<TVariables> =
+  TVariables extends Record<string, never>
+    ? [variables?: TVariables]
+    : [variables: TVariables];
 
 interface GraphQLErrorResponse {
   response?: {
@@ -34,9 +45,11 @@ export class GraphQLClient {
     return linearClient.client;
   }
 
-  async request<TResult>(
-    document: DocumentNode,
-    variables?: Record<string, unknown>,
+  async request<TResult, TVariables extends Record<string, unknown>>(
+    document: TypedDocumentNode<TResult, TVariables>,
+    // `NoInfer` pins `TVariables` to the document, so the variables argument is
+    // type-checked against it rather than widening the inferred type itself.
+    ...[variables]: RequestVariables<NoInfer<TVariables>>
   ): Promise<TResult> {
     try {
       const response = await withRetry(async () => {
@@ -46,6 +59,10 @@ export class GraphQLClient {
         }, REQUEST_TIMEOUT_MS);
 
         try {
+          // Constraining `TVariables extends Record<string, unknown>` lets
+          // `variables` satisfy rawRequest's own variables bound directly, so no
+          // cast is needed here. `data` stays untyped (`unknown`) and is checked
+          // and cast to `TResult` below.
           return await this.createRawClient(
             timeoutController.signal,
           ).rawRequest(print(document), variables);
@@ -62,6 +79,12 @@ export class GraphQLClient {
           clearTimeout(timeoutHandle);
         }
       });
+      // rawRequest resolves with `data: unknown | undefined`; guard the absent
+      // case instead of asserting it away, so a dataless response surfaces as a
+      // clear error rather than a `TResult`-typed `undefined`.
+      if (response.data == null) {
+        throw new Error("GraphQL response contained no data");
+      }
       return response.data as TResult;
     } catch (error: unknown) {
       const gqlError = error as GraphQLErrorResponse;

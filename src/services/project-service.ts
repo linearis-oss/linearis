@@ -12,21 +12,14 @@ import type {
 } from "../common/types.js";
 import {
   ArchiveProjectDocument,
-  type ArchiveProjectMutation,
   CreateProjectDocument,
-  type CreateProjectMutation,
   DeleteProjectDocument,
-  type DeleteProjectMutation,
   GetProjectDocument,
-  type GetProjectQuery,
   GetProjectsDocument,
-  type GetProjectsQuery,
   type ProjectCreateInput,
   type ProjectUpdateInput,
   UnarchiveProjectDocument,
-  type UnarchiveProjectMutation,
   UpdateProjectDocument,
-  type UpdateProjectMutation,
 } from "../gql/graphql.js";
 
 export interface ProjectListOptions extends PaginationOptions {
@@ -50,7 +43,7 @@ export async function listProjects(
   options: ProjectListOptions = {},
 ): Promise<PaginatedResult<ProjectListItem>> {
   const { limit = 50, after, includeArchived } = options;
-  const result = await client.request<GetProjectsQuery>(GetProjectsDocument, {
+  const result = await client.request(GetProjectsDocument, {
     first: limit,
     after,
     includeArchived,
@@ -71,7 +64,7 @@ export async function getProject(
     options.milestonesFirst ?? DEFAULT_PROJECT_MILESTONES_FIRST;
   const issuesFirst = options.issuesFirst ?? DEFAULT_PROJECT_ISSUES_FIRST;
 
-  const result = await client.request<GetProjectQuery>(GetProjectDocument, {
+  const result = await client.request(GetProjectDocument, {
     id,
     milestonesFirst: connectionFirstOrOneWhenSkipped(milestonesFirst),
     skipMilestones: milestonesFirst === 0,
@@ -90,10 +83,7 @@ export async function createProject(
   client: GraphQLClient,
   input: ProjectCreateInput,
 ): Promise<CreatedProject> {
-  const result = await client.request<CreateProjectMutation>(
-    CreateProjectDocument,
-    { input },
-  );
+  const result = await client.request(CreateProjectDocument, { input });
 
   if (!result.projectCreate.success || !result.projectCreate.project) {
     throw new Error(`Failed to create project "${input.name}"`);
@@ -107,10 +97,7 @@ export async function updateProject(
   id: string,
   input: ProjectUpdateInput,
 ): Promise<UpdatedProject> {
-  const result = await client.request<UpdateProjectMutation>(
-    UpdateProjectDocument,
-    { id, input },
-  );
+  const result = await client.request(UpdateProjectDocument, { id, input });
 
   if (!result.projectUpdate.success || !result.projectUpdate.project) {
     throw new Error(`Failed to update project "${id}"`);
@@ -123,10 +110,7 @@ export async function archiveProject(
   client: GraphQLClient,
   id: string,
 ): Promise<ArchivedProject> {
-  const result = await client.request<ArchiveProjectMutation>(
-    ArchiveProjectDocument,
-    { id },
-  );
+  const result = await client.request(ArchiveProjectDocument, { id });
 
   if (!result.projectArchive.success || !result.projectArchive.entity) {
     throw new Error(`Failed to archive project "${id}"`);
@@ -139,10 +123,7 @@ export async function unarchiveProject(
   client: GraphQLClient,
   id: string,
 ): Promise<UnarchivedProject> {
-  const result = await client.request<UnarchiveProjectMutation>(
-    UnarchiveProjectDocument,
-    { id },
-  );
+  const result = await client.request(UnarchiveProjectDocument, { id });
 
   if (!result.projectUnarchive.success || !result.projectUnarchive.entity) {
     throw new Error(`Failed to unarchive project "${id}"`);
@@ -155,10 +136,7 @@ export async function deleteProject(
   client: GraphQLClient,
   id: string,
 ): Promise<DeletedProject> {
-  const result = await client.request<DeleteProjectMutation>(
-    DeleteProjectDocument,
-    { id },
-  );
+  const result = await client.request(DeleteProjectDocument, { id });
 
   if (!result.projectDelete.success) {
     throw new Error(`Failed to delete project "${id}"`);

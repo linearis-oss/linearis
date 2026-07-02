@@ -2,9 +2,7 @@ import type { GraphQLClient } from "../client/graphql-client.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   GetLabelsDocument,
-  type GetLabelsQuery,
   GetProjectLabelsDocument,
-  type GetProjectLabelsQuery,
   type IssueLabelFilter,
 } from "../gql/graphql.js";
 
@@ -50,7 +48,7 @@ export async function listLabels(
   const { limit = 50, after, scope } = options;
   const filter = buildIssueLabelFilter(teamId, scope);
 
-  const result = await client.request<GetLabelsQuery>(GetLabelsDocument, {
+  const result = await client.request(GetLabelsDocument, {
     first: limit,
     after,
     filter,
@@ -74,13 +72,10 @@ export async function listProjectLabels(
 ): Promise<PaginatedResult<Label>> {
   const { limit = 50, after } = options;
 
-  const result = await client.request<GetProjectLabelsQuery>(
-    GetProjectLabelsDocument,
-    {
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(GetProjectLabelsDocument, {
+    first: limit,
+    after,
+  });
 
   return {
     nodes: result.projectLabels.nodes.map((label) => ({

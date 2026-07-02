@@ -9,24 +9,19 @@ import type {
 import {
   DocumentCreateDocument,
   type DocumentCreateInput,
-  type DocumentCreateMutation,
   DocumentDeleteDocument,
-  type DocumentDeleteMutation,
   type DocumentFilter,
   DocumentUpdateDocument,
   type DocumentUpdateInput,
-  type DocumentUpdateMutation,
   GetDocumentDocument,
-  type GetDocumentQuery,
   ListDocumentsDocument,
-  type ListDocumentsQuery,
 } from "../gql/graphql.js";
 
 export async function getDocument(
   client: GraphQLClient,
   id: string,
 ): Promise<Document> {
-  const result = await client.request<GetDocumentQuery>(GetDocumentDocument, {
+  const result = await client.request(GetDocumentDocument, {
     id,
   });
 
@@ -41,10 +36,7 @@ export async function createDocument(
   client: GraphQLClient,
   input: DocumentCreateInput,
 ): Promise<CreatedDocument> {
-  const result = await client.request<DocumentCreateMutation>(
-    DocumentCreateDocument,
-    { input },
-  );
+  const result = await client.request(DocumentCreateDocument, { input });
 
   if (!result.documentCreate.success || !result.documentCreate.document) {
     throw new Error("Failed to create document");
@@ -58,10 +50,7 @@ export async function updateDocument(
   id: string,
   input: DocumentUpdateInput,
 ): Promise<UpdatedDocument> {
-  const result = await client.request<DocumentUpdateMutation>(
-    DocumentUpdateDocument,
-    { id, input },
-  );
+  const result = await client.request(DocumentUpdateDocument, { id, input });
 
   if (!result.documentUpdate.success || !result.documentUpdate.document) {
     throw new Error("Failed to update document");
@@ -78,14 +67,11 @@ export async function listDocuments(
     filter?: DocumentFilter;
   },
 ): Promise<PaginatedResult<DocumentListItem>> {
-  const result = await client.request<ListDocumentsQuery>(
-    ListDocumentsDocument,
-    {
-      first: options?.limit ?? 25,
-      after: options?.after,
-      filter: options?.filter,
-    },
-  );
+  const result = await client.request(ListDocumentsDocument, {
+    first: options?.limit ?? 25,
+    after: options?.after,
+    filter: options?.filter,
+  });
 
   return {
     nodes: result.documents?.nodes ?? [],
@@ -100,10 +86,7 @@ export async function deleteDocument(
   client: GraphQLClient,
   id: string,
 ): Promise<{ id: string; success: boolean }> {
-  const result = await client.request<DocumentDeleteMutation>(
-    DocumentDeleteDocument,
-    { id },
-  );
+  const result = await client.request(DocumentDeleteDocument, { id });
 
   if (!result.documentDelete.success) {
     throw new Error("Failed to delete document");

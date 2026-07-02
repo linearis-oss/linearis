@@ -12,22 +12,15 @@ import type {
 } from "../common/types.js";
 import {
   ArchiveInitiativeDocument,
-  type ArchiveInitiativeMutation,
   CreateInitiativeDocument,
-  type CreateInitiativeMutation,
   DeleteInitiativeDocument,
-  type DeleteInitiativeMutation,
   GetInitiativeDocument,
-  type GetInitiativeQuery,
   type InitiativeCreateInput,
   type InitiativeUpdateInput,
   ListInitiativesDocument,
-  type ListInitiativesQuery,
   type ListInitiativesQueryVariables,
   UnarchiveInitiativeDocument,
-  type UnarchiveInitiativeMutation,
   UpdateInitiativeDocument,
-  type UpdateInitiativeMutation,
 } from "../gql/graphql.js";
 
 export interface InitiativeListOptions {
@@ -52,17 +45,14 @@ export async function listInitiatives(
     sort,
   } = options;
 
-  const result = await client.request<ListInitiativesQuery>(
-    ListInitiativesDocument,
-    {
-      first: limit,
-      after,
-      includeArchived,
-      filter,
-      orderBy,
-      sort,
-    },
-  );
+  const result = await client.request(ListInitiativesDocument, {
+    first: limit,
+    after,
+    includeArchived,
+    filter,
+    orderBy,
+    sort,
+  });
 
   return {
     nodes: result.initiatives.nodes,
@@ -74,12 +64,9 @@ export async function getInitiative(
   client: GraphQLClient,
   id: string,
 ): Promise<InitiativeDetail> {
-  const result = await client.request<GetInitiativeQuery>(
-    GetInitiativeDocument,
-    {
-      id,
-    },
-  );
+  const result = await client.request(GetInitiativeDocument, {
+    id,
+  });
 
   if (!result.initiative) {
     throw new Error(`Initiative with ID "${id}" not found`);
@@ -92,12 +79,9 @@ export async function createInitiative(
   client: GraphQLClient,
   input: InitiativeCreateInput,
 ): Promise<CreatedInitiative> {
-  const result = await client.request<CreateInitiativeMutation>(
-    CreateInitiativeDocument,
-    {
-      input,
-    },
-  );
+  const result = await client.request(CreateInitiativeDocument, {
+    input,
+  });
 
   if (!result.initiativeCreate.success || !result.initiativeCreate.initiative) {
     throw new Error(`Failed to create initiative "${input.name}"`);
@@ -122,13 +106,10 @@ export async function updateInitiative(
     );
   }
 
-  const result = await client.request<UpdateInitiativeMutation>(
-    UpdateInitiativeDocument,
-    {
-      id,
-      input,
-    },
-  );
+  const result = await client.request(UpdateInitiativeDocument, {
+    id,
+    input,
+  });
 
   if (!result.initiativeUpdate.success || !result.initiativeUpdate.initiative) {
     throw new Error(`Failed to update initiative "${id}"`);
@@ -141,10 +122,7 @@ export async function archiveInitiative(
   client: GraphQLClient,
   id: string,
 ): Promise<ArchivedInitiative> {
-  const result = await client.request<ArchiveInitiativeMutation>(
-    ArchiveInitiativeDocument,
-    { id },
-  );
+  const result = await client.request(ArchiveInitiativeDocument, { id });
 
   if (!result.initiativeArchive.success || !result.initiativeArchive.entity) {
     throw new Error(`Failed to archive initiative "${id}"`);
@@ -157,10 +135,7 @@ export async function unarchiveInitiative(
   client: GraphQLClient,
   id: string,
 ): Promise<UnarchivedInitiative> {
-  const result = await client.request<UnarchiveInitiativeMutation>(
-    UnarchiveInitiativeDocument,
-    { id },
-  );
+  const result = await client.request(UnarchiveInitiativeDocument, { id });
 
   if (
     !result.initiativeUnarchive.success ||
@@ -176,10 +151,7 @@ export async function deleteInitiative(
   client: GraphQLClient,
   id: string,
 ): Promise<DeletedInitiative> {
-  const result = await client.request<DeleteInitiativeMutation>(
-    DeleteInitiativeDocument,
-    { id },
-  );
+  const result = await client.request(DeleteInitiativeDocument, { id });
 
   if (!result.initiativeDelete.success || !result.initiativeDelete.entityId) {
     throw new Error(`Failed to delete initiative "${id}"`);

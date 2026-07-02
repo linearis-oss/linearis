@@ -4,9 +4,7 @@ import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
 import {
   FindProjectMilestoneGlobalDocument,
-  type FindProjectMilestoneGlobalQuery,
   FindProjectMilestoneScopedDocument,
-  type FindProjectMilestoneScopedQuery,
 } from "../gql/graphql.js";
 import { resolveProjectId } from "./project-resolver.js";
 
@@ -46,20 +44,19 @@ export async function resolveMilestoneId(
 
   if (projectNameOrId) {
     const projectId = await resolveProjectId(sdkClient, projectNameOrId);
-    const result = await gqlClient.request<FindProjectMilestoneScopedQuery>(
-      FindProjectMilestoneScopedDocument,
-      { name: nameOrId, projectId },
-    );
+    const result = await gqlClient.request(FindProjectMilestoneScopedDocument, {
+      name: nameOrId,
+      projectId,
+    });
     nodes = (result.project?.projectMilestones?.nodes as MilestoneNode[]) || [];
   }
 
   // Fall back to global search if no project scope or not found
   if (nodes.length === 0) {
-    const globalResult =
-      await gqlClient.request<FindProjectMilestoneGlobalQuery>(
-        FindProjectMilestoneGlobalDocument,
-        { name: nameOrId },
-      );
+    const globalResult = await gqlClient.request(
+      FindProjectMilestoneGlobalDocument,
+      { name: nameOrId },
+    );
     nodes = (globalResult.projectMilestones?.nodes as MilestoneNode[]) || [];
   }
 

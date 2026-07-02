@@ -5,24 +5,19 @@ import type {
 } from "../common/types.js";
 import {
   CreateInitiativeRelationDocument,
-  type CreateInitiativeRelationMutation,
   DeleteInitiativeRelationDocument,
-  type DeleteInitiativeRelationMutation,
 } from "../gql/graphql.js";
 
 export async function createInitiativeRelation(
   client: GraphQLClient,
   input: { parentId: string; childId: string },
 ): Promise<InitiativeRelation> {
-  const result = await client.request<CreateInitiativeRelationMutation>(
-    CreateInitiativeRelationDocument,
-    {
-      input: {
-        initiativeId: input.parentId,
-        relatedInitiativeId: input.childId,
-      },
+  const result = await client.request(CreateInitiativeRelationDocument, {
+    input: {
+      initiativeId: input.parentId,
+      relatedInitiativeId: input.childId,
     },
-  );
+  });
 
   if (
     !result.initiativeRelationCreate.success ||
@@ -40,10 +35,7 @@ export async function deleteInitiativeRelation(
   client: GraphQLClient,
   id: string,
 ): Promise<DeletedInitiativeRelation> {
-  const result = await client.request<DeleteInitiativeRelationMutation>(
-    DeleteInitiativeRelationDocument,
-    { id },
-  );
+  const result = await client.request(DeleteInitiativeRelationDocument, { id });
 
   if (
     !result.initiativeRelationDelete.success ||

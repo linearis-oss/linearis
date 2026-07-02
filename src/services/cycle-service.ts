@@ -3,9 +3,7 @@ import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   type CycleFilter,
   GetCycleByIdDocument,
-  type GetCycleByIdQuery,
   GetCyclesDocument,
-  type GetCyclesQuery,
 } from "../gql/graphql.js";
 
 export interface Cycle {
@@ -45,7 +43,7 @@ export async function listCycles(
     filter.isActive = { eq: true };
   }
 
-  const result = await client.request<GetCyclesQuery>(GetCyclesDocument, {
+  const result = await client.request(GetCyclesDocument, {
     first: limit,
     after,
     filter,
@@ -71,7 +69,7 @@ export async function getCycle(
   cycleId: string,
   issuesLimit: number = 50,
 ): Promise<CycleDetail> {
-  const result = await client.request<GetCycleByIdQuery>(GetCycleByIdDocument, {
+  const result = await client.request(GetCycleByIdDocument, {
     id: cycleId,
     first: issuesLimit,
   });
