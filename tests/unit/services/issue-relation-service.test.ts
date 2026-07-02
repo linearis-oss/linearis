@@ -5,6 +5,7 @@ import {
   createIssueRelation,
   deleteIssueRelation,
   findIssueRelation,
+  listIssueRelations,
 } from "../../../src/services/issue-relation-service.js";
 
 function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
@@ -109,6 +110,62 @@ describe("findIssueRelation", () => {
     await expect(
       findIssueRelation(client, "source-id", "target-id"),
     ).rejects.toThrow("not found");
+  });
+});
+
+describe("listIssueRelations", () => {
+  it("returns issue metadata with forward and inverse relations", async () => {
+    const client = mockGqlClient({
+      issue: {
+        id: "source-id",
+        identifier: "ENG-1",
+        relations: {
+          nodes: [
+            {
+              id: "rel-1",
+              type: IssueRelationType.Blocks,
+              relatedIssue: { id: "target-id", identifier: "ENG-2" },
+            },
+          ],
+        },
+        inverseRelations: {
+          nodes: [
+            {
+              id: "rel-2",
+              type: IssueRelationType.Related,
+              issue: { id: "other-id", identifier: "ENG-3" },
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await listIssueRelations(client, "source-id");
+
+    expect(result).toEqual({
+      issueId: "source-id",
+      identifier: "ENG-1",
+      relations: [
+        {
+          id: "rel-1",
+          type: IssueRelationType.Blocks,
+          relatedIssue: { id: "target-id", identifier: "ENG-2" },
+        },
+        {
+          id: "rel-2",
+          type: IssueRelationType.Related,
+          issue: { id: "other-id", identifier: "ENG-3" },
+        },
+      ],
+    });
+  });
+
+  it("throws when issue is not found", async () => {
+    const client = mockGqlClient({ issue: null });
+
+    await expect(listIssueRelations(client, "missing")).rejects.toThrow(
+      "not found",
+    );
   });
 });
 
