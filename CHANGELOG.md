@@ -1,3 +1,9 @@
+## [2026.6.0-next.5](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.4...v2026.6.0-next.5) (2026-07-02)
+
+### Features
+
+* restore document attachment compatibility ([f096add](https://github.com/linearis-oss/linearis/commit/f096adda7aa20c946a25c7c06fefec56d9684975))
+
 ## [2026.6.0-next.4](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.3...v2026.6.0-next.4) (2026-07-02)
 
 ### Features
