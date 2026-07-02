@@ -11,19 +11,13 @@ import type {
 } from "../common/types.js";
 import {
   ArchiveInitiativeUpdateDocument,
-  type ArchiveInitiativeUpdateMutation,
   CreateInitiativeUpdateDocument,
-  type CreateInitiativeUpdateMutation,
   GetInitiativeUpdateDocument,
-  type GetInitiativeUpdateQuery,
   type InitiativeUpdateCreateInput,
   type InitiativeUpdateUpdateInput,
   ListInitiativeUpdatesDocument,
-  type ListInitiativeUpdatesQuery,
   UnarchiveInitiativeUpdateDocument,
-  type UnarchiveInitiativeUpdateMutation,
   UpdateInitiativeUpdateDocument,
-  type UpdateInitiativeUpdateMutation,
 } from "../gql/graphql.js";
 
 export interface InitiativeUpdateListOptions {
@@ -39,15 +33,12 @@ export async function listInitiativeUpdates(
 ): Promise<PaginatedResult<InitiativeUpdateListItem>> {
   const { initiativeId, limit = 50, after, includeArchived = false } = options;
 
-  const result = await client.request<ListInitiativeUpdatesQuery>(
-    ListInitiativeUpdatesDocument,
-    {
-      initiativeId,
-      first: limit,
-      after,
-      includeArchived,
-    },
-  );
+  const result = await client.request(ListInitiativeUpdatesDocument, {
+    initiativeId,
+    first: limit,
+    after,
+    includeArchived,
+  });
 
   return {
     nodes: result.initiativeUpdates.nodes,
@@ -59,10 +50,7 @@ export async function getInitiativeUpdate(
   client: GraphQLClient,
   id: string,
 ): Promise<InitiativeUpdateDetail> {
-  const result = await client.request<GetInitiativeUpdateQuery>(
-    GetInitiativeUpdateDocument,
-    { id },
-  );
+  const result = await client.request(GetInitiativeUpdateDocument, { id });
 
   if (!result.initiativeUpdate) {
     throw new Error(`Initiative update with ID "${id}" not found`);
@@ -75,10 +63,9 @@ export async function createInitiativeUpdate(
   client: GraphQLClient,
   input: InitiativeUpdateCreateInput,
 ): Promise<CreatedInitiativeUpdate> {
-  const result = await client.request<CreateInitiativeUpdateMutation>(
-    CreateInitiativeUpdateDocument,
-    { input },
-  );
+  const result = await client.request(CreateInitiativeUpdateDocument, {
+    input,
+  });
 
   if (
     !result.initiativeUpdateCreate.success ||
@@ -106,10 +93,10 @@ export async function updateInitiativeUpdate(
     );
   }
 
-  const result = await client.request<UpdateInitiativeUpdateMutation>(
-    UpdateInitiativeUpdateDocument,
-    { id, input },
-  );
+  const result = await client.request(UpdateInitiativeUpdateDocument, {
+    id,
+    input,
+  });
 
   if (
     !result.initiativeUpdateUpdate.success ||
@@ -125,10 +112,7 @@ export async function archiveInitiativeUpdate(
   client: GraphQLClient,
   id: string,
 ): Promise<ArchivedInitiativeUpdate> {
-  const result = await client.request<ArchiveInitiativeUpdateMutation>(
-    ArchiveInitiativeUpdateDocument,
-    { id },
-  );
+  const result = await client.request(ArchiveInitiativeUpdateDocument, { id });
 
   if (
     !result.initiativeUpdateArchive.success ||
@@ -144,10 +128,9 @@ export async function unarchiveInitiativeUpdate(
   client: GraphQLClient,
   id: string,
 ): Promise<UnarchivedInitiativeUpdate> {
-  const result = await client.request<UnarchiveInitiativeUpdateMutation>(
-    UnarchiveInitiativeUpdateDocument,
-    { id },
-  );
+  const result = await client.request(UnarchiveInitiativeUpdateDocument, {
+    id,
+  });
 
   if (
     !result.initiativeUpdateUnarchive.success ||

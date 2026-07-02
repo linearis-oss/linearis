@@ -4,9 +4,7 @@ import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
 import {
   FindInitiativeProjectLinkByPairDocument,
-  type FindInitiativeProjectLinkByPairQuery,
   FindInitiativeRelationByPairDocument,
-  type FindInitiativeRelationByPairQuery,
 } from "../gql/graphql.js";
 
 export interface InitiativeResolveScope {
@@ -70,10 +68,11 @@ export async function resolveInitiativeRelationId(
   let after: string | undefined;
 
   while (true) {
-    const result = await client.request<FindInitiativeRelationByPairQuery>(
-      FindInitiativeRelationByPairDocument,
-      { parentId, childId, after },
-    );
+    const result = await client.request(FindInitiativeRelationByPairDocument, {
+      parentId,
+      childId,
+      after,
+    });
 
     const relation = result.initiativeRelations.nodes.find(
       (node) =>
@@ -106,7 +105,7 @@ export async function resolveInitiativeProjectLinkId(
   let after: string | undefined;
 
   while (true) {
-    const result = await client.request<FindInitiativeProjectLinkByPairQuery>(
+    const result = await client.request(
       FindInitiativeProjectLinkByPairDocument,
       { initiativeId, projectId, after },
     );

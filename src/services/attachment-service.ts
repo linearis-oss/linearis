@@ -3,22 +3,16 @@ import type { Attachment, CreatedAttachment } from "../common/types.js";
 import {
   AttachmentCreateDocument,
   type AttachmentCreateInput,
-  type AttachmentCreateMutation,
   AttachmentDeleteDocument,
-  type AttachmentDeleteMutation,
   type AttachmentFilter,
   ListAttachmentsDocument,
-  type ListAttachmentsQuery,
 } from "../gql/graphql.js";
 
 export async function createAttachment(
   client: GraphQLClient,
   input: AttachmentCreateInput,
 ): Promise<CreatedAttachment> {
-  const result = await client.request<AttachmentCreateMutation>(
-    AttachmentCreateDocument,
-    { input },
-  );
+  const result = await client.request(AttachmentCreateDocument, { input });
 
   if (!result.attachmentCreate.success || !result.attachmentCreate.attachment) {
     throw new Error("Failed to create attachment");
@@ -31,10 +25,7 @@ export async function deleteAttachment(
   client: GraphQLClient,
   id: string,
 ): Promise<{ id: string; success: boolean }> {
-  const result = await client.request<AttachmentDeleteMutation>(
-    AttachmentDeleteDocument,
-    { id },
-  );
+  const result = await client.request(AttachmentDeleteDocument, { id });
 
   if (!result.attachmentDelete.success) {
     throw new Error("Failed to delete attachment");
@@ -48,10 +39,10 @@ export async function listAttachments(
   issueId: string,
   filter?: AttachmentFilter,
 ): Promise<Attachment[]> {
-  const result = await client.request<ListAttachmentsQuery>(
-    ListAttachmentsDocument,
-    { issueId, ...(filter && { filter }) },
-  );
+  const result = await client.request(ListAttachmentsDocument, {
+    issueId,
+    ...(filter && { filter }),
+  });
 
   if (!result.issue) {
     throw new Error(`Issue with ID "${issueId}" not found`);

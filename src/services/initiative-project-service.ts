@@ -5,21 +5,16 @@ import type {
 } from "../common/types.js";
 import {
   CreateInitiativeToProjectDocument,
-  type CreateInitiativeToProjectMutation,
   DeleteInitiativeToProjectDocument,
-  type DeleteInitiativeToProjectMutation,
 } from "../gql/graphql.js";
 
 export async function createInitiativeProjectLink(
   client: GraphQLClient,
   input: { initiativeId: string; projectId: string },
 ): Promise<InitiativeProjectLink> {
-  const result = await client.request<CreateInitiativeToProjectMutation>(
-    CreateInitiativeToProjectDocument,
-    {
-      input,
-    },
-  );
+  const result = await client.request(CreateInitiativeToProjectDocument, {
+    input,
+  });
 
   if (
     !result.initiativeToProjectCreate.success ||
@@ -37,10 +32,9 @@ export async function deleteInitiativeProjectLink(
   client: GraphQLClient,
   id: string,
 ): Promise<DeletedInitiativeProjectLink> {
-  const result = await client.request<DeleteInitiativeToProjectMutation>(
-    DeleteInitiativeToProjectDocument,
-    { id },
-  );
+  const result = await client.request(DeleteInitiativeToProjectDocument, {
+    id,
+  });
 
   if (
     !result.initiativeToProjectDelete.success ||

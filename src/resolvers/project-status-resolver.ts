@@ -1,10 +1,7 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
-import {
-  GetProjectStatusesDocument,
-  type GetProjectStatusesQuery,
-} from "../gql/graphql.js";
+import { GetProjectStatusesDocument } from "../gql/graphql.js";
 
 /**
  * Resolves project status name to UUID.
@@ -29,9 +26,7 @@ export async function resolveProjectStatusId(
 ): Promise<string> {
   if (isUuid(nameOrId)) return nameOrId;
 
-  const result = await client.request<GetProjectStatusesQuery>(
-    GetProjectStatusesDocument,
-  );
+  const result = await client.request(GetProjectStatusesDocument);
   const match = result.projectStatuses.nodes.find(
     (s) => s.name.toLowerCase() === nameOrId.toLowerCase(),
   );

@@ -1,10 +1,21 @@
+import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { LinearClient } from "@linear/sdk";
-import { type DocumentNode, print } from "graphql";
+import { print } from "graphql";
 import { AuthenticationError, isAuthError } from "../common/errors.js";
 import { withRetry } from "../common/retry.js";
 
 /** Default timeout for GraphQL API requests (30 seconds) */
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Variable-less operations generate `Exact<{ [key: string]: never }>` for their
+ * variables type. Make the variables argument optional in exactly that case and
+ * required otherwise, so callers infer both types from the document alone.
+ */
+type RequestVariables<TVariables> =
+  TVariables extends Record<string, never>
+    ? [variables?: TVariables]
+    : [variables: TVariables];
 
 interface GraphQLErrorResponse {
   response?: {
@@ -34,9 +45,11 @@ export class GraphQLClient {
     return linearClient.client;
   }
 
-  async request<TResult>(
-    document: DocumentNode,
-    variables?: Record<string, unknown>,
+  async request<TResult, TVariables>(
+    document: TypedDocumentNode<TResult, TVariables>,
+    // `NoInfer` pins `TVariables` to the document, so the variables argument is
+    // type-checked against it rather than widening the inferred type itself.
+    ...[variables]: RequestVariables<NoInfer<TVariables>>
   ): Promise<TResult> {
     try {
       const response = await withRetry(async () => {
@@ -48,7 +61,12 @@ export class GraphQLClient {
         try {
           return await this.createRawClient(
             timeoutController.signal,
-          ).rawRequest(print(document), variables);
+            // The public signature stays strongly typed via TypedDocumentNode;
+            // rawRequest only accepts an untyped variables bag, so cast here.
+          ).rawRequest(
+            print(document),
+            variables as Record<string, unknown> | undefined,
+          );
         } catch (error: unknown) {
           if (
             timeoutController.signal.aborted &&

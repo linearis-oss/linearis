@@ -10,7 +10,6 @@ import {
   GetTeamByIdDocument,
   type GetTeamByIdQuery,
   GetTeamsDocument,
-  type GetTeamsQuery,
 } from "../gql/graphql.js";
 
 export interface Team {
@@ -95,12 +94,9 @@ async function resolveEffectiveEstimationConfig(
   }
 
   try {
-    const parentResult = await client.request<GetTeamByIdQuery>(
-      GetTeamByIdDocument,
-      {
-        id: team.parent.id,
-      },
-    );
+    const parentResult = await client.request(GetTeamByIdDocument, {
+      id: team.parent.id,
+    });
 
     if (!parentResult.team) {
       return { config: team, source: "self_fallback" };
@@ -117,7 +113,7 @@ export async function listTeams(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<Team>> {
   const { limit = 50, after } = options;
-  const result = await client.request<GetTeamsQuery>(GetTeamsDocument, {
+  const result = await client.request(GetTeamsDocument, {
     first: limit,
     after,
   });
@@ -131,7 +127,7 @@ export async function getTeam(
   client: GraphQLClient,
   input: GetTeamInput,
 ): Promise<TeamDetail> {
-  const result = await client.request<GetTeamByIdQuery>(GetTeamByIdDocument, {
+  const result = await client.request(GetTeamByIdDocument, {
     id: input.id,
   });
 

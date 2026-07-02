@@ -9,15 +9,11 @@ import type {
 } from "../common/types.js";
 import {
   CreateProjectMilestoneDocument,
-  type CreateProjectMilestoneMutation,
   GetProjectMilestoneByIdDocument,
-  type GetProjectMilestoneByIdQuery,
   ListProjectMilestonesDocument,
-  type ListProjectMilestonesQuery,
   type ProjectMilestoneCreateInput,
   type ProjectMilestoneUpdateInput,
   UpdateProjectMilestoneDocument,
-  type UpdateProjectMilestoneMutation,
 } from "../gql/graphql.js";
 
 export async function listMilestones(
@@ -26,10 +22,11 @@ export async function listMilestones(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<MilestoneListItem>> {
   const { limit = 50, after } = options;
-  const result = await client.request<ListProjectMilestonesQuery>(
-    ListProjectMilestonesDocument,
-    { projectId, first: limit, after },
-  );
+  const result = await client.request(ListProjectMilestonesDocument, {
+    projectId,
+    first: limit,
+    after,
+  });
 
   return {
     nodes: result.project?.projectMilestones?.nodes ?? [],
@@ -45,10 +42,10 @@ export async function getMilestone(
   id: string,
   issuesLimit?: number,
 ): Promise<MilestoneDetail> {
-  const result = await client.request<GetProjectMilestoneByIdQuery>(
-    GetProjectMilestoneByIdDocument,
-    { id, issuesFirst: issuesLimit },
-  );
+  const result = await client.request(GetProjectMilestoneByIdDocument, {
+    id,
+    issuesFirst: issuesLimit,
+  });
 
   if (!result.projectMilestone) {
     throw new Error(`Milestone with ID "${id}" not found`);
@@ -61,10 +58,9 @@ export async function createMilestone(
   client: GraphQLClient,
   input: ProjectMilestoneCreateInput,
 ): Promise<CreatedMilestone> {
-  const result = await client.request<CreateProjectMilestoneMutation>(
-    CreateProjectMilestoneDocument,
-    { input },
-  );
+  const result = await client.request(CreateProjectMilestoneDocument, {
+    input,
+  });
 
   if (
     !result.projectMilestoneCreate.success ||
@@ -81,10 +77,10 @@ export async function updateMilestone(
   id: string,
   input: ProjectMilestoneUpdateInput,
 ): Promise<UpdatedMilestone> {
-  const result = await client.request<UpdateProjectMilestoneMutation>(
-    UpdateProjectMilestoneDocument,
-    { id, input },
-  );
+  const result = await client.request(UpdateProjectMilestoneDocument, {
+    id,
+    input,
+  });
 
   if (
     !result.projectMilestoneUpdate.success ||

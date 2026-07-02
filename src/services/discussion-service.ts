@@ -4,7 +4,6 @@ import {
   type CommentCreateInput,
   type CommentUpdateInput,
   DeleteDiscussionReplyDocument,
-  type DeleteDiscussionReplyMutation,
   type DiscussionCommentFieldsFragment,
   type DiscussionCommentFieldsWithReactionsFragment,
   EditDiscussionReplyDocument,
@@ -16,25 +15,19 @@ import {
   ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
   type ListInitiativeDiscussionReplyCandidatesWithReactionsQuery,
   ListInitiativeDiscussionRootsDocument,
-  type ListInitiativeDiscussionRootsQuery,
   ListInitiativeDiscussionRootsWithReactionsDocument,
-  type ListInitiativeDiscussionRootsWithReactionsQuery,
   ListIssueDiscussionReplyCandidatesDocument,
   type ListIssueDiscussionReplyCandidatesQuery,
   ListIssueDiscussionReplyCandidatesWithReactionsDocument,
   type ListIssueDiscussionReplyCandidatesWithReactionsQuery,
   ListIssueDiscussionRootsDocument,
-  type ListIssueDiscussionRootsQuery,
   ListIssueDiscussionRootsWithReactionsDocument,
-  type ListIssueDiscussionRootsWithReactionsQuery,
   ListProjectDiscussionReplyCandidatesDocument,
   type ListProjectDiscussionReplyCandidatesQuery,
   ListProjectDiscussionReplyCandidatesWithReactionsDocument,
   type ListProjectDiscussionReplyCandidatesWithReactionsQuery,
   ListProjectDiscussionRootsDocument,
-  type ListProjectDiscussionRootsQuery,
   ListProjectDiscussionRootsWithReactionsDocument,
-  type ListProjectDiscussionRootsWithReactionsQuery,
   ResolveDiscussionDocument,
   type ResolveDiscussionMutation,
   StartDiscussionDocument,
@@ -172,10 +165,9 @@ async function assertDiscussionCommentExists(
   expectedEntityKind?: DiscussionEntityKind,
   label: "comment" | "reply" = "comment",
 ): Promise<DiscussionCommentContext> {
-  const result = await client.request<GetDiscussionCommentContextQuery>(
-    GetDiscussionCommentContextDocument,
-    { id },
-  );
+  const result = await client.request(GetDiscussionCommentContextDocument, {
+    id,
+  });
 
   if (!result.comment) {
     throw new Error(`Discussion comment ID "${id}" not found`);
@@ -191,10 +183,9 @@ async function assertRootDiscussionThread(
   threadId: string,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<DiscussionThreadContext> {
-  const result = await client.request<GetDiscussionCommentContextQuery>(
-    GetDiscussionCommentContextDocument,
-    { id: threadId },
-  );
+  const result = await client.request(GetDiscussionCommentContextDocument, {
+    id: threadId,
+  });
 
   if (!result.comment) {
     throw new Error(`Discussion thread ID "${threadId}" not found`);
@@ -306,7 +297,7 @@ async function listDiscussionReplyCandidates(
     let result: DiscussionReplyCandidateQuery;
 
     if (entity.kind === "issue") {
-      result = await client.request<ListIssueDiscussionReplyCandidatesQuery>(
+      result = await client.request(
         ListIssueDiscussionReplyCandidatesDocument,
         {
           issueId: entity.id,
@@ -315,7 +306,7 @@ async function listDiscussionReplyCandidates(
         },
       );
     } else if (entity.kind === "project") {
-      result = await client.request<ListProjectDiscussionReplyCandidatesQuery>(
+      result = await client.request(
         ListProjectDiscussionReplyCandidatesDocument,
         {
           projectId: entity.id,
@@ -324,15 +315,14 @@ async function listDiscussionReplyCandidates(
         },
       );
     } else {
-      result =
-        await client.request<ListInitiativeDiscussionReplyCandidatesQuery>(
-          ListInitiativeDiscussionReplyCandidatesDocument,
-          {
-            initiativeId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListInitiativeDiscussionReplyCandidatesDocument,
+        {
+          initiativeId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     }
 
     nodes.push(...result.comments.nodes);
@@ -362,35 +352,32 @@ async function listDiscussionReplyCandidatesWithReactions(
     let result: DiscussionReplyCandidateWithReactionsQuery;
 
     if (entity.kind === "issue") {
-      result =
-        await client.request<ListIssueDiscussionReplyCandidatesWithReactionsQuery>(
-          ListIssueDiscussionReplyCandidatesWithReactionsDocument,
-          {
-            issueId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListIssueDiscussionReplyCandidatesWithReactionsDocument,
+        {
+          issueId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     } else if (entity.kind === "project") {
-      result =
-        await client.request<ListProjectDiscussionReplyCandidatesWithReactionsQuery>(
-          ListProjectDiscussionReplyCandidatesWithReactionsDocument,
-          {
-            projectId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListProjectDiscussionReplyCandidatesWithReactionsDocument,
+        {
+          projectId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     } else {
-      result =
-        await client.request<ListInitiativeDiscussionReplyCandidatesWithReactionsQuery>(
-          ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
-          {
-            initiativeId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
+        {
+          initiativeId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     }
 
     nodes.push(...result.comments.nodes);
@@ -482,10 +469,7 @@ async function startDiscussion(
   client: GraphQLClient,
   input: CommentCreateInput,
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
-  const result = await client.request<StartDiscussionMutation>(
-    StartDiscussionDocument,
-    { input },
-  );
+  const result = await client.request(StartDiscussionDocument, { input });
 
   if (!result.commentCreate.success || !result.commentCreate.comment) {
     throw new Error("Failed to start discussion");
@@ -576,14 +560,11 @@ export async function listDiscussionsForIssue(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result = await client.request<ListIssueDiscussionRootsQuery>(
-    ListIssueDiscussionRootsDocument,
-    {
-      issueId,
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(ListIssueDiscussionRootsDocument, {
+    issueId,
+    first: limit,
+    after,
+  });
 
   if (!result.issue) {
     throw new Error(`Issue with ID "${issueId}" not found`);
@@ -601,15 +582,14 @@ export async function listDiscussionsForIssueWithReactions(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result =
-    await client.request<ListIssueDiscussionRootsWithReactionsQuery>(
-      ListIssueDiscussionRootsWithReactionsDocument,
-      {
-        issueId,
-        first: limit,
-        after,
-      },
-    );
+  const result = await client.request(
+    ListIssueDiscussionRootsWithReactionsDocument,
+    {
+      issueId,
+      first: limit,
+      after,
+    },
+  );
 
   if (!result.issue) {
     throw new Error(`Issue with ID "${issueId}" not found`);
@@ -627,14 +607,11 @@ export async function listDiscussionsForProject(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result = await client.request<ListProjectDiscussionRootsQuery>(
-    ListProjectDiscussionRootsDocument,
-    {
-      projectId,
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(ListProjectDiscussionRootsDocument, {
+    projectId,
+    first: limit,
+    after,
+  });
 
   if (!result.project) {
     throw new Error(`Project with ID "${projectId}" not found`);
@@ -652,15 +629,14 @@ export async function listDiscussionsForProjectWithReactions(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result =
-    await client.request<ListProjectDiscussionRootsWithReactionsQuery>(
-      ListProjectDiscussionRootsWithReactionsDocument,
-      {
-        projectId,
-        first: limit,
-        after,
-      },
-    );
+  const result = await client.request(
+    ListProjectDiscussionRootsWithReactionsDocument,
+    {
+      projectId,
+      first: limit,
+      after,
+    },
+  );
 
   if (!result.project) {
     throw new Error(`Project with ID "${projectId}" not found`);
@@ -678,15 +654,12 @@ export async function listDiscussionsForInitiative(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result = await client.request<ListInitiativeDiscussionRootsQuery>(
-    ListInitiativeDiscussionRootsDocument,
-    {
-      initiativeId,
-      initiativeLookupId: initiativeId,
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(ListInitiativeDiscussionRootsDocument, {
+    initiativeId,
+    initiativeLookupId: initiativeId,
+    first: limit,
+    after,
+  });
 
   if (!result.initiative) {
     throw new Error(`Initiative with ID "${initiativeId}" not found`);
@@ -704,16 +677,15 @@ export async function listDiscussionsForInitiativeWithReactions(
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result =
-    await client.request<ListInitiativeDiscussionRootsWithReactionsQuery>(
-      ListInitiativeDiscussionRootsWithReactionsDocument,
-      {
-        initiativeId,
-        initiativeLookupId: initiativeId,
-        first: limit,
-        after,
-      },
-    );
+  const result = await client.request(
+    ListInitiativeDiscussionRootsWithReactionsDocument,
+    {
+      initiativeId,
+      initiativeLookupId: initiativeId,
+      first: limit,
+      after,
+    },
+  );
 
   if (!result.initiative) {
     throw new Error(`Initiative with ID "${initiativeId}" not found`);
@@ -808,16 +780,13 @@ export async function replyToDiscussion(
         ? { projectId: entity.id }
         : { initiativeId: entity.id };
 
-  const result = await client.request<StartDiscussionMutation>(
-    StartDiscussionDocument,
-    {
-      input: {
-        parentId: input.threadId,
-        ...entityField,
-        body: input.body,
-      },
+  const result = await client.request(StartDiscussionDocument, {
+    input: {
+      parentId: input.threadId,
+      ...entityField,
+      body: input.body,
     },
-  );
+  });
 
   if (!result.commentCreate.success || !result.commentCreate.comment) {
     throw new Error("Failed to create discussion reply");
@@ -834,10 +803,10 @@ export async function editDiscussionReply(
 ): Promise<EditDiscussionReplyMutation["commentUpdate"]["comment"]> {
   await assertReplyComment(client, id, expectedEntityKind);
 
-  const result = await client.request<EditDiscussionReplyMutation>(
-    EditDiscussionReplyDocument,
-    { id, input },
-  );
+  const result = await client.request(EditDiscussionReplyDocument, {
+    id,
+    input,
+  });
 
   if (!result.commentUpdate.success || !result.commentUpdate.comment) {
     throw new Error("Failed to edit discussion reply");
@@ -853,10 +822,7 @@ export async function deleteDiscussionReply(
 ): Promise<{ id: string; success: true }> {
   await assertReplyComment(client, id, expectedEntityKind);
 
-  const result = await client.request<DeleteDiscussionReplyMutation>(
-    DeleteDiscussionReplyDocument,
-    { id },
-  );
+  const result = await client.request(DeleteDiscussionReplyDocument, { id });
 
   if (!result.commentDelete.success) {
     throw new Error("Failed to delete discussion reply");
@@ -876,10 +842,10 @@ export async function editDiscussionComment(
 ): Promise<EditDiscussionReplyMutation["commentUpdate"]["comment"]> {
   await assertDiscussionCommentExists(client, id, expectedEntityKind);
 
-  const result = await client.request<EditDiscussionReplyMutation>(
-    EditDiscussionReplyDocument,
-    { id, input },
-  );
+  const result = await client.request(EditDiscussionReplyDocument, {
+    id,
+    input,
+  });
 
   if (!result.commentUpdate.success || !result.commentUpdate.comment) {
     throw new Error("Failed to edit discussion comment");
@@ -895,10 +861,7 @@ export async function deleteDiscussionComment(
 ): Promise<{ id: string; success: true }> {
   await assertDiscussionCommentExists(client, id, expectedEntityKind);
 
-  const result = await client.request<DeleteDiscussionReplyMutation>(
-    DeleteDiscussionReplyDocument,
-    { id },
-  );
+  const result = await client.request(DeleteDiscussionReplyDocument, { id });
 
   if (!result.commentDelete.success) {
     throw new Error("Failed to delete discussion comment");
@@ -920,13 +883,10 @@ export async function resolveDiscussion(
 ): Promise<ResolveDiscussionMutation["commentResolve"]["comment"]> {
   await assertRootDiscussionThread(client, input.threadId, input.entityKind);
 
-  const result = await client.request<ResolveDiscussionMutation>(
-    ResolveDiscussionDocument,
-    {
-      id: input.threadId,
-      resolvingCommentId: input.resolvingCommentId,
-    },
-  );
+  const result = await client.request(ResolveDiscussionDocument, {
+    id: input.threadId,
+    resolvingCommentId: input.resolvingCommentId,
+  });
 
   if (!result.commentResolve.success || !result.commentResolve.comment) {
     throw new Error("Failed to resolve discussion");
@@ -942,10 +902,9 @@ export async function unresolveDiscussion(
 ): Promise<UnresolveDiscussionMutation["commentUnresolve"]["comment"]> {
   await assertRootDiscussionThread(client, threadId, expectedEntityKind);
 
-  const result = await client.request<UnresolveDiscussionMutation>(
-    UnresolveDiscussionDocument,
-    { id: threadId },
-  );
+  const result = await client.request(UnresolveDiscussionDocument, {
+    id: threadId,
+  });
 
   if (!result.commentUnresolve.success || !result.commentUnresolve.comment) {
     throw new Error("Failed to unresolve discussion");
