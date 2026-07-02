@@ -1,3 +1,9 @@
+## [2026.6.0-next.3](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.2...v2026.6.0-next.3) (2026-07-02)
+
+### Bug Fixes
+
+* **milestones:** use $input convention for milestone mutations ([309aaab](https://github.com/linearis-oss/linearis/commit/309aaab662ab0dc79731f2c288f97d7b75d74caf)), closes [#223](https://github.com/linearis-oss/linearis/issues/223)
+
 ## [2026.6.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.1...v2026.6.0-next.2) (2026-07-02)
 
 ### Features
