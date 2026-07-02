@@ -1,24 +1,41 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { invalidParameterError } from "../common/errors.js";
-import type {
-  ArchivedInitiativeUpdate,
-  CreatedInitiativeUpdate,
-  InitiativeUpdateDetail,
-  InitiativeUpdateListItem,
-  PaginatedResult,
-  UnarchivedInitiativeUpdate,
-  UpdatedInitiativeUpdate,
-} from "../common/types.js";
+import type { PaginatedResult } from "../common/types.js";
 import {
   ArchiveInitiativeUpdateDocument,
+  type ArchiveInitiativeUpdateMutation,
   CreateInitiativeUpdateDocument,
+  type CreateInitiativeUpdateMutation,
   GetInitiativeUpdateDocument,
+  type GetInitiativeUpdateQuery,
   type InitiativeUpdateCreateInput,
   type InitiativeUpdateUpdateInput,
   ListInitiativeUpdatesDocument,
+  type ListInitiativeUpdatesQuery,
   UnarchiveInitiativeUpdateDocument,
+  type UnarchiveInitiativeUpdateMutation,
   UpdateInitiativeUpdateDocument,
+  type UpdateInitiativeUpdateMutation,
 } from "../gql/graphql.js";
+
+// Initiative update projection types
+export type InitiativeUpdateListItem =
+  ListInitiativeUpdatesQuery["initiativeUpdates"]["nodes"][0];
+export type InitiativeUpdateDetail = NonNullable<
+  GetInitiativeUpdateQuery["initiativeUpdate"]
+>;
+export type CreatedInitiativeUpdate = NonNullable<
+  CreateInitiativeUpdateMutation["initiativeUpdateCreate"]["initiativeUpdate"]
+>;
+export type UpdatedInitiativeUpdate = NonNullable<
+  UpdateInitiativeUpdateMutation["initiativeUpdateUpdate"]["initiativeUpdate"]
+>;
+export type ArchivedInitiativeUpdate = NonNullable<
+  ArchiveInitiativeUpdateMutation["initiativeUpdateArchive"]["entity"]
+>;
+export type UnarchivedInitiativeUpdate = NonNullable<
+  UnarchiveInitiativeUpdateMutation["initiativeUpdateUnarchive"]["entity"]
+>;
 
 export interface InitiativeUpdateListOptions {
   initiativeId: string;

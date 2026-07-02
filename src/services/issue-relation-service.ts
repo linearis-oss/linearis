@@ -1,13 +1,17 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
-import type { CreatedIssueRelation } from "../common/types.js";
 import {
   CreateIssueRelationDocument,
+  type CreateIssueRelationMutation,
   DeleteIssueRelationDocument,
   GetIssueRelationsDocument,
   type GetIssueRelationsQuery,
   type IssueRelationType,
 } from "../gql/graphql.js";
+
+// Issue relation projection types
+export type CreatedIssueRelation =
+  CreateIssueRelationMutation["issueRelationCreate"]["issueRelation"];
 
 type IssueRelationsIssue = NonNullable<GetIssueRelationsQuery["issue"]>;
 

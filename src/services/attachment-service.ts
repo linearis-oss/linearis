@@ -1,12 +1,19 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { Attachment, CreatedAttachment } from "../common/types.js";
 import {
   AttachmentCreateDocument,
   type AttachmentCreateInput,
+  type AttachmentCreateMutation,
   AttachmentDeleteDocument,
   type AttachmentFilter,
   ListAttachmentsDocument,
+  type ListAttachmentsQuery,
 } from "../gql/graphql.js";
+
+// Attachment projection types
+export type AttachmentListItem =
+  ListAttachmentsQuery["issue"]["attachments"]["nodes"][0];
+export type CreatedAttachment =
+  AttachmentCreateMutation["attachmentCreate"]["attachment"];
 
 export async function createAttachment(
   client: GraphQLClient,
@@ -38,7 +45,7 @@ export async function listAttachments(
   client: GraphQLClient,
   issueId: string,
   filter?: AttachmentFilter,
-): Promise<Attachment[]> {
+): Promise<AttachmentListItem[]> {
   const result = await client.request(ListAttachmentsDocument, {
     issueId,
     ...(filter && { filter }),

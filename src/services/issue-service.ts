@@ -1,47 +1,80 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CreatedIssue,
-  Issue,
-  IssueByIdentifier,
-  IssueByIdentifierWithAttachments,
-  IssueByIdentifierWithComments,
-  IssueByIdentifierWithCommentThreads,
-  IssueComment,
-  IssueCommentThread,
-  IssueDetail,
-  IssueDetailWithAttachments,
-  IssueDetailWithComments,
-  IssueDetailWithCommentThreads,
-  IssueSearchResult,
-  PaginatedResult,
-  PaginationOptions,
-  UpdatedIssue,
-} from "../common/types.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveIssueDocument,
   CreateIssueDocument,
+  type CreateIssueMutation,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
+  type GetIssueByIdentifierQuery,
   GetIssueByIdentifierWithAttachmentsDocument,
+  type GetIssueByIdentifierWithAttachmentsQuery,
   GetIssueByIdentifierWithCommentsDocument,
+  type GetIssueByIdentifierWithCommentsQuery,
   GetIssueByIdentifierWithReactionsDocument,
   type GetIssueByIdentifierWithReactionsQuery,
+  type GetIssueByIdQuery,
   GetIssueByIdWithAttachmentsDocument,
+  type GetIssueByIdWithAttachmentsQuery,
   GetIssueByIdWithCommentsDocument,
+  type GetIssueByIdWithCommentsQuery,
   GetIssueByIdWithReactionsDocument,
   type GetIssueByIdWithReactionsQuery,
   GetIssuesDocument,
+  type GetIssuesQuery,
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
   SearchIssuesDocument,
+  type SearchIssuesQuery,
   type SearchIssuesQueryVariables,
   UnarchiveIssueDocument,
   UpdateIssueDocument,
+  type UpdateIssueMutation,
 } from "../gql/graphql.js";
 import { normalizeReactions } from "./reaction-service.js";
+
+// Issue projection types
+export type IssueListItem = GetIssuesQuery["issues"]["nodes"][0];
+export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
+export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
+export type IssueDetailWithComments = NonNullable<
+  GetIssueByIdWithCommentsQuery["issue"]
+>;
+export type IssueByIdentifierWithComments =
+  GetIssueByIdentifierWithCommentsQuery["issues"]["nodes"][0];
+type IssueComment = NonNullable<
+  NonNullable<IssueDetailWithComments["comments"]>["nodes"][0]
+>;
+type IssueCommentThread = IssueComment & {
+  replies: IssueCommentThread[];
+};
+export type IssueDetailWithCommentThreads = Omit<
+  IssueDetailWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
+export type IssueByIdentifierWithCommentThreads = Omit<
+  IssueByIdentifierWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
+export type IssueDetailWithAttachments = NonNullable<
+  GetIssueByIdWithAttachmentsQuery["issue"]
+>;
+export type IssueByIdentifierWithAttachments =
+  GetIssueByIdentifierWithAttachmentsQuery["issues"]["nodes"][0];
+export type IssueSearchResult = SearchIssuesQuery["searchIssues"]["nodes"][0];
+export type CreatedIssue = NonNullable<
+  CreateIssueMutation["issueCreate"]["issue"]
+>;
+export type UpdatedIssue = NonNullable<
+  UpdateIssueMutation["issueUpdate"]["issue"]
+>;
 
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
@@ -182,7 +215,7 @@ export async function listIssues(
   client: GraphQLClient,
   options: PaginationOptions = {},
   filter?: IssueFilter,
-): Promise<PaginatedResult<Issue>> {
+): Promise<PaginatedResult<IssueListItem>> {
   const { limit = 25, after } = options;
 
   if (filter) {
