@@ -1,11 +1,79 @@
+import type { CommandOptions } from "./auth.js";
 import {
   AUTH_ERROR_CODE,
   AuthenticationError,
   invalidParameterError,
 } from "./errors.js";
 
+// Derived from CommandOptions so the two can never drift; `fields` holds raw
+// dot-paths, e.g. ["identifier", "state.name"].
+type OutputOptions = Pick<CommandOptions, "compact" | "fields">;
+
+let currentOutputOptions: OutputOptions = {};
+
+/**
+ * Set once per process by the preAction hook in main.ts. Also used to reset
+ * state between unit tests.
+ */
+export function setOutputOptions(opts: OutputOptions): void {
+  currentOutputOptions = opts;
+}
+
+/** Commander option parser for `--fields`: "a, b ,, c" -> ["a","b","c"]. */
+export function parseFieldsList(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Recursively project `value` down to the given dot-path segments, preserving
+ * nested object shape and traversing arrays mid-path. Only own properties are
+ * matched (inherited members like `toString`/`constructor` are never picked),
+ * and results are written with `Object.defineProperty` so a user-supplied
+ * `--fields __proto__` cannot invoke the prototype setter. Missing keys are
+ * skipped silently; a path that stops at a subtree keeps that whole subtree.
+ */
+export function pickFields(value: unknown, paths: string[][]): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => pickFields(item, paths));
+  }
+  if (value === null || typeof value !== "object") {
+    return value; // path descends past a scalar; nothing to pick
+  }
+  const src = value as Record<string, unknown>;
+  const byHead = new Map<string, string[][]>();
+  for (const [head, ...tail] of paths) {
+    if (head === undefined) continue;
+    const tails = byHead.get(head) ?? [];
+    if (tail.length > 0) tails.push(tail);
+    byHead.set(head, tails);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [head, tails] of byHead) {
+    if (!Object.hasOwn(src, head)) continue;
+    const picked = tails.length > 0 ? pickFields(src[head], tails) : src[head];
+    Object.defineProperty(out, head, {
+      value: picked,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return out;
+}
+
 export function outputSuccess(data: unknown): void {
-  console.log(JSON.stringify(data, null, 2));
+  const { compact, fields } = currentOutputOptions;
+  const shaped =
+    fields && fields.length > 0
+      ? pickFields(
+          data,
+          fields.map((p) => p.split(".")),
+        )
+      : data;
+  console.log(JSON.stringify(shaped, null, compact ? undefined : 2));
 }
 
 export function outputError(error: Error): void {
