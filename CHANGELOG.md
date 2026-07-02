@@ -1,3 +1,9 @@
+## [2026.6.0-next.7](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.6...v2026.6.0-next.7) (2026-07-02)
+
+### Features
+
+* **cli:** add passive update notifier and version command ([6ca3952](https://github.com/linearis-oss/linearis/commit/6ca39522a0845cb84af0ed14cdfd5ba5de23677e))
+
 ## [2026.6.0-next.6](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.5...v2026.6.0-next.6) (2026-07-02)
 
 ### Features
