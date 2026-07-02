@@ -89,7 +89,7 @@
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.0",
     "@vitest/ui": "^4.0.0",
-    "clean-publish": "^6.0.5",
+    "clean-publish": "^7.0.0",
     "knip": "^6.24.0",
     "lefthook": "^2.1.0",
     "semantic-release": "^25.0.1",
