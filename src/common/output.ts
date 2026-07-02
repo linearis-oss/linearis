@@ -1,13 +1,13 @@
+import type { CommandOptions } from "./auth.js";
 import {
   AUTH_ERROR_CODE,
   AuthenticationError,
   invalidParameterError,
 } from "./errors.js";
 
-interface OutputOptions {
-  compact?: boolean;
-  fields?: string[]; // raw dot-paths, e.g. ["identifier", "state.name"]
-}
+// Derived from CommandOptions so the two can never drift; `fields` holds raw
+// dot-paths, e.g. ["identifier", "state.name"].
+type OutputOptions = Pick<CommandOptions, "compact" | "fields">;
 
 let currentOutputOptions: OutputOptions = {};
 
@@ -29,8 +29,11 @@ export function parseFieldsList(value: string): string[] {
 
 /**
  * Recursively project `value` down to the given dot-path segments, preserving
- * nested object shape and traversing arrays mid-path. Missing keys are skipped
- * silently; a path that stops at a subtree keeps that whole subtree.
+ * nested object shape and traversing arrays mid-path. Only own properties are
+ * matched (inherited members like `toString`/`constructor` are never picked),
+ * and results are written with `Object.defineProperty` so a user-supplied
+ * `--fields __proto__` cannot invoke the prototype setter. Missing keys are
+ * skipped silently; a path that stops at a subtree keeps that whole subtree.
  */
 export function pickFields(value: unknown, paths: string[][]): unknown {
   if (Array.isArray(value)) {
@@ -49,8 +52,14 @@ export function pickFields(value: unknown, paths: string[][]): unknown {
   }
   const out: Record<string, unknown> = {};
   for (const [head, tails] of byHead) {
-    if (!(head in src)) continue;
-    out[head] = tails.length > 0 ? pickFields(src[head], tails) : src[head];
+    if (!Object.hasOwn(src, head)) continue;
+    const picked = tails.length > 0 ? pickFields(src[head], tails) : src[head];
+    Object.defineProperty(out, head, {
+      value: picked,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return out;
 }

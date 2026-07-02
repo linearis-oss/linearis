@@ -141,6 +141,26 @@ describe("pickFields", () => {
     expect(pickFields({ a: 5 }, [["a", "deep"]])).toEqual({ a: 5 });
     expect(pickFields({ a: null }, [["a", "deep"]])).toEqual({ a: null });
   });
+
+  it("never matches inherited (non-own) properties", () => {
+    const result = pickFields({ a: 1 }, [["toString"], ["constructor"]]);
+    expect(result).toEqual({});
+    expect(Object.hasOwn(result as object, "toString")).toBe(false);
+  });
+
+  it("does not invoke the prototype setter for a __proto__ path", () => {
+    const result = pickFields({ a: 1 }, [["__proto__", "x"]]);
+    expect(result).toEqual({});
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  });
+
+  it("preserves a legitimate own __proto__ key without polluting the result", () => {
+    const input = JSON.parse('{"__proto__":{"x":9},"a":1}') as unknown;
+    const result = pickFields(input, [["__proto__", "x"], ["a"]]);
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect((result as { a: number }).a).toBe(1);
+    expect((result as Record<string, { x: number }>).__proto__.x).toBe(9);
+  });
 });
 
 describe("outputError", () => {
