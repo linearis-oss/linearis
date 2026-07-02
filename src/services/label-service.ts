@@ -2,18 +2,14 @@ import type { GraphQLClient } from "../client/graphql-client.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   CreateIssueLabelDocument,
-  type CreateIssueLabelMutation,
   DeleteIssueLabelDocument,
-  type DeleteIssueLabelMutation,
   GetIssueLabelDocument,
-  type GetIssueLabelQuery,
   GetLabelsDocument,
   GetProjectLabelsDocument,
   type IssueLabelCreateInput,
   type IssueLabelFilter,
   type IssueLabelUpdateInput,
   UpdateIssueLabelDocument,
-  type UpdateIssueLabelMutation,
 } from "../gql/graphql.js";
 
 export type LabelType = "issue" | "project";
@@ -55,12 +51,9 @@ export async function getLabel(
   client: GraphQLClient,
   id: string,
 ): Promise<Label> {
-  const result = await client.request<GetIssueLabelQuery>(
-    GetIssueLabelDocument,
-    {
-      id,
-    },
-  );
+  const result = await client.request(GetIssueLabelDocument, {
+    id,
+  });
 
   if (!result.issueLabel) {
     throw new Error(`Label with ID "${id}" not found`);
@@ -73,10 +66,7 @@ export async function createLabel(
   client: GraphQLClient,
   input: IssueLabelCreateInput,
 ): Promise<Label> {
-  const result = await client.request<CreateIssueLabelMutation>(
-    CreateIssueLabelDocument,
-    { input },
-  );
+  const result = await client.request(CreateIssueLabelDocument, { input });
 
   if (!result.issueLabelCreate.success) {
     throw new Error(`Failed to create label "${input.name}"`);
@@ -90,10 +80,7 @@ export async function updateLabel(
   id: string,
   input: IssueLabelUpdateInput,
 ): Promise<Label> {
-  const result = await client.request<UpdateIssueLabelMutation>(
-    UpdateIssueLabelDocument,
-    { id, input },
-  );
+  const result = await client.request(UpdateIssueLabelDocument, { id, input });
 
   if (!result.issueLabelUpdate.success) {
     throw new Error(`Failed to update label "${id}"`);
@@ -106,10 +93,7 @@ export async function deleteLabel(
   client: GraphQLClient,
   id: string,
 ): Promise<DeleteLabelResult> {
-  const result = await client.request<DeleteIssueLabelMutation>(
-    DeleteIssueLabelDocument,
-    { id },
-  );
+  const result = await client.request(DeleteIssueLabelDocument, { id });
 
   if (!result.issueLabelDelete.success) {
     throw new Error(`Failed to delete label "${id}"`);
