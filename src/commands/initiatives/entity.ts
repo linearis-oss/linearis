@@ -311,7 +311,7 @@ function parseSortOrderNumber(value?: string): number | undefined {
 }
 
 function applyNullableDateRange(
-  target: { gte?: string; lte?: string },
+  target: { gte?: string | null; lte?: string | null },
   after?: string,
   before?: string,
 ): void {
