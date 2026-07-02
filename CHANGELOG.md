@@ -1,3 +1,9 @@
+## [2026.6.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.1...v2026.6.0-next.2) (2026-07-02)
+
+### Features
+
+* **issues:** restore relation commands ([e0f880c](https://github.com/linearis-oss/linearis/commit/e0f880c8e700b889b0565cae787675c62b3c3eb8))
+
 ## [2026.6.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.5.0...v2026.6.0-next.1) (2026-06-16)
 
 ### Bug Fixes
