@@ -1,3 +1,14 @@
+## [2026.6.0-next.8](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.7...v2026.6.0-next.8) (2026-07-02)
+
+### Features
+
+* **labels:** add issue label CRUD commands ([5fca207](https://github.com/linearis-oss/linearis/commit/5fca207d96e597ef0e755bb0e1eb0135deeae47e))
+* **labels:** support label removal modes ([c6cfa62](https://github.com/linearis-oss/linearis/commit/c6cfa627972f825868b8868c50057d7c15e906a6))
+
+### Bug Fixes
+
+* **labels:** allow clearing label description with empty string ([9a28108](https://github.com/linearis-oss/linearis/commit/9a2810813753f5f3a3e836f5a02d0ceed2eee433))
+
 ## [2026.6.0-next.7](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.6...v2026.6.0-next.7) (2026-07-02)
 
 ### Features
