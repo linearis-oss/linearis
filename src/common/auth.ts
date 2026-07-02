@@ -5,6 +5,8 @@ import { getStoredToken } from "./token-storage.js";
 
 export interface CommandOptions {
   apiToken?: string;
+  compact?: boolean;
+  fields?: string[];
 }
 
 export type TokenSource = "flag" | "env" | "stored" | "legacy";

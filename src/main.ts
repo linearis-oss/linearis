@@ -27,6 +27,8 @@ import {
 import { PROJECTS_META, setupProjectsCommands } from "./commands/projects.js";
 import { setupTeamsCommands, TEAMS_META } from "./commands/teams.js";
 import { setupUsersCommands, USERS_META } from "./commands/users.js";
+import { getRootOpts } from "./common/context.js";
+import { parseFieldsList, setOutputOptions } from "./common/output.js";
 import {
   type DomainMeta,
   formatDomainUsage,
@@ -37,7 +39,17 @@ program
   .name("linearis")
   .description("CLI for Linear.app with JSON output")
   .version(pkg.version)
-  .option("--api-token <token>", "Linear API token");
+  .option("--api-token <token>", "Linear API token")
+  .option("--compact", "emit single-line JSON (no indentation)")
+  .option(
+    "--fields <list>",
+    "comma-separated dot-paths to include (e.g. identifier,title,state.name)",
+    parseFieldsList,
+  );
+
+program.hook("preAction", (_thisCommand, actionCommand) => {
+  setOutputOptions(getRootOpts(actionCommand));
+});
 
 const allMetas: DomainMeta[] = [
   AUTH_META,
