@@ -17,10 +17,10 @@ import {
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import {
-  type IssueCreateInput,
+import type {
+  IssueCreateInput,
   IssueRelationType,
-  type IssueUpdateInput,
+  IssueUpdateInput,
 } from "../gql/graphql.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import {
@@ -390,13 +390,13 @@ function relationTypeFromAddFlag(
 ): IssueRelationType {
   switch (type) {
     case "blocks":
-      return IssueRelationType.Blocks;
+      return "blocks";
     case "related":
-      return IssueRelationType.Related;
+      return "related";
     case "duplicate":
-      return IssueRelationType.Duplicate;
+      return "duplicate";
     case "similar":
-      return IssueRelationType.Similar;
+      return "similar";
   }
 }
 
@@ -465,35 +465,35 @@ async function resolveAndApplyRelations(
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Blocks,
+            type: "blocks",
           });
           break;
         case "blockedBy":
           await createIssueRelation(ctx.gql, {
             issueId: targetId,
             relatedIssueId: issueId,
-            type: IssueRelationType.Blocks,
+            type: "blocks",
           });
           break;
         case "relatesTo":
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Related,
+            type: "related",
           });
           break;
         case "duplicateOf":
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Duplicate,
+            type: "duplicate",
           });
           break;
         case "similarTo":
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Similar,
+            type: "similar",
           });
           break;
         case "remove": {
