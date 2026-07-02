@@ -97,6 +97,19 @@ describe("GraphQLClient", () => {
       }
     });
 
+    it("throws when the response contains no data", async () => {
+      mockRawRequest.mockResolvedValueOnce({ data: undefined });
+
+      const client = new GraphQLClient("good-token");
+      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
+        typeof client.request
+      >[0];
+
+      await expect(client.request(fakeDoc)).rejects.toThrow(
+        "GraphQL response contained no data",
+      );
+    });
+
     it("clears timeout timer when request succeeds before timeout", async () => {
       vi.useFakeTimers();
       try {

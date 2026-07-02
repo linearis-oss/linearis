@@ -45,7 +45,7 @@ export class GraphQLClient {
     return linearClient.client;
   }
 
-  async request<TResult, TVariables>(
+  async request<TResult, TVariables extends Record<string, unknown>>(
     document: TypedDocumentNode<TResult, TVariables>,
     // `NoInfer` pins `TVariables` to the document, so the variables argument is
     // type-checked against it rather than widening the inferred type itself.
@@ -59,14 +59,13 @@ export class GraphQLClient {
         }, REQUEST_TIMEOUT_MS);
 
         try {
+          // Constraining `TVariables extends Record<string, unknown>` lets
+          // `variables` satisfy rawRequest's own variables bound directly, so no
+          // cast is needed here. `data` stays untyped (`unknown`) and is checked
+          // and cast to `TResult` below.
           return await this.createRawClient(
             timeoutController.signal,
-            // The public signature stays strongly typed via TypedDocumentNode;
-            // rawRequest only accepts an untyped variables bag, so cast here.
-          ).rawRequest(
-            print(document),
-            variables as Record<string, unknown> | undefined,
-          );
+          ).rawRequest(print(document), variables);
         } catch (error: unknown) {
           if (
             timeoutController.signal.aborted &&
@@ -80,6 +79,12 @@ export class GraphQLClient {
           clearTimeout(timeoutHandle);
         }
       });
+      // rawRequest resolves with `data: unknown | undefined`; guard the absent
+      // case instead of asserting it away, so a dataless response surfaces as a
+      // clear error rather than a `TResult`-typed `undefined`.
+      if (response.data == null) {
+        throw new Error("GraphQL response contained no data");
+      }
       return response.data as TResult;
     } catch (error: unknown) {
       const gqlError = error as GraphQLErrorResponse;
