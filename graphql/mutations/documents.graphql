@@ -2,8 +2,7 @@
 # GraphQL mutations for Linear documents
 #
 # Documents are standalone entities that can be associated with projects,
-# initiatives, or teams. To link a document to an issue, use the
-# attachments API (see attachments.graphql).
+# initiatives, issues, or teams.
 # ------------------------------------------------------------
 
 # Create a new document mutation

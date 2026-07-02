@@ -1,21 +1,18 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
+import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { DocumentUpdateInput } from "../gql/graphql.js";
+import type { DocumentFilter, DocumentUpdateInput } from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
-import {
-  createAttachment,
-  listAttachments,
-} from "../services/attachment-service.js";
+import { listAttachments } from "../services/attachment-service.js";
 import {
   createDocument,
   deleteDocument,
   getDocument,
   listDocuments,
-  listDocumentsBySlugIds,
   updateDocument,
 } from "../services/document-service.js";
 
@@ -27,6 +24,7 @@ interface DocumentCreateOptions {
   icon?: string;
   color?: string;
   issue?: string;
+  attachTo?: string;
 }
 
 interface DocumentUpdateOptions {
@@ -66,9 +64,28 @@ export function extractDocumentIdFromUrl(url: string): string | null {
 
     return docSlug.substring(lastHyphenIndex + 1) || null;
   } catch {
-    // URL constructor throws on malformed input — treat as unresolvable
+    // URL constructor throws on malformed input — treat as unresolvable.
     return null;
   }
+}
+
+function buildIssueDocumentFilter(
+  issueId: string,
+  legacyDocumentSlugIds: string[],
+): DocumentFilter {
+  const issueFilter: DocumentFilter = { issue: { id: { eq: issueId } } };
+  if (legacyDocumentSlugIds.length === 0) {
+    return issueFilter;
+  }
+
+  return {
+    or: [
+      issueFilter,
+      ...legacyDocumentSlugIds.map((slugId) => ({
+        slugId: { eq: slugId },
+      })),
+    ],
+  };
 }
 
 export const DOCUMENTS_META: DomainMeta = {
@@ -115,48 +132,35 @@ export function setupDocumentsCommands(program: Command): void {
 
         const limit = parseLimit(options.limit || "50");
 
-        if (options.issue) {
-          const issueId = await resolveIssueId(ctx.sdk, options.issue);
-          const attachments = await listAttachments(ctx.gql, issueId);
+        let projectId: string | undefined;
+        if (options.project) {
+          projectId = await resolveProjectId(ctx.sdk, options.project);
+        }
 
-          const documentSlugIds = [
+        let issueId: string | undefined;
+        if (options.issue) {
+          issueId = await resolveIssueId(ctx.sdk, options.issue);
+        }
+
+        let filter: DocumentFilter | undefined;
+        if (projectId) {
+          filter = { project: { id: { eq: projectId } } };
+        } else if (issueId) {
+          const attachments = await listAttachments(ctx.gql, issueId);
+          const legacyDocumentSlugIds = [
             ...new Set(
               attachments
                 .map((att) => extractDocumentIdFromUrl(att.url))
                 .filter((id): id is string => id !== null),
             ),
           ];
-
-          if (documentSlugIds.length === 0) {
-            outputSuccess({
-              nodes: [],
-              pageInfo: { hasNextPage: false, endCursor: null },
-            });
-            return;
-          }
-
-          const documents = await listDocumentsBySlugIds(
-            ctx.gql,
-            documentSlugIds,
-          );
-          outputSuccess({
-            nodes: documents,
-            pageInfo: { hasNextPage: false, endCursor: null },
-          });
-          return;
-        }
-
-        let projectId: string | undefined;
-        if (options.project) {
-          projectId = await resolveProjectId(ctx.sdk, options.project);
+          filter = buildIssueDocumentFilter(issueId, legacyDocumentSlugIds);
         }
 
         const documents = await listDocuments(ctx.gql, {
           limit,
           after: options.after,
-          filter: projectId
-            ? { project: { id: { eq: projectId } } }
-            : undefined,
+          filter,
         });
 
         outputSuccess(documents);
@@ -187,9 +191,18 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--icon <icon>", "document icon")
     .option("--color <color>", "icon color")
     .option("--issue <issue>", "also attach document to issue (e.g., ABC-123)")
+    .option("--attach-to <issue>", "alias for --issue")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [DocumentCreateOptions, Command];
+        if (options.issue && options.attachTo) {
+          throw invalidParameterError(
+            "--attach-to",
+            "cannot be combined with --issue",
+          );
+        }
+
+        const issueIdentifier = options.issue ?? options.attachTo;
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
@@ -199,35 +212,19 @@ export function setupDocumentsCommands(program: Command): void {
         const teamId = options.team
           ? await resolveTeamId(ctx.sdk, options.team)
           : undefined;
+        const issueId = issueIdentifier
+          ? await resolveIssueId(ctx.sdk, issueIdentifier)
+          : undefined;
 
         const document = await createDocument(ctx.gql, {
           title: options.title,
           content: options.content,
           projectId,
           teamId,
+          issueId,
           icon: options.icon,
           color: options.color,
         });
-
-        if (options.issue) {
-          const issueId = await resolveIssueId(ctx.sdk, options.issue);
-
-          try {
-            await createAttachment(ctx.gql, {
-              issueId,
-              url: document.url,
-              title: document.title,
-            });
-          } catch (attachError) {
-            const errorMessage =
-              attachError instanceof Error
-                ? attachError.message
-                : String(attachError);
-            throw new Error(
-              `Document created (${document.id}) but failed to attach to issue "${options.issue}": ${errorMessage}.`,
-            );
-          }
-        }
 
         outputSuccess(document);
       }),

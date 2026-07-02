@@ -96,27 +96,6 @@ export async function listDocuments(
   };
 }
 
-export async function listDocumentsBySlugIds(
-  client: GraphQLClient,
-  slugIds: string[],
-): Promise<DocumentListItem[]> {
-  if (slugIds.length === 0) {
-    return [];
-  }
-
-  const result = await client.request<ListDocumentsQuery>(
-    ListDocumentsDocument,
-    {
-      first: slugIds.length,
-      filter: {
-        slugId: { in: slugIds },
-      },
-    },
-  );
-
-  return result.documents?.nodes ?? [];
-}
-
 export async function deleteDocument(
   client: GraphQLClient,
   id: string,
