@@ -77,6 +77,79 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
+  knip:
+    name: Detect Dead Code
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup node v22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      # Build runs codegen (prebuild) so src/gql exists and imports resolve.
+      - name: Build project
+        run: npm run build
+
+      - name: Run knip
+        id: knip
+        run: |
+          set +e
+          npm run --silent knip:ci > knip-report.md
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Compose PR comment
+        if: always()
+        run: |
+          if [ "${{ steps.knip.outputs.exit_code }}" = "0" ]; then
+            {
+              echo '## ✅ knip — no dead code'
+              echo
+              echo 'No unused files, exports, types, or dependencies detected.'
+            } > knip-comment.md
+          else
+            {
+              echo '## 🧹 knip found dead code'
+              echo
+              cat knip-report.md
+              echo
+              echo '### Fix it locally'
+              echo
+              echo '```bash'
+              echo 'npm run generate   # ensure generated GraphQL types exist'
+              echo 'npm run knip       # see the full report'
+              echo 'npx knip --fix --allow-remove-files   # auto-remove unused exports/files, then review the diff'
+              echo '```'
+              echo
+              echo 'If a finding is a false positive (dynamically-wired code knip cannot trace), add a narrow entry to `knip.json` explaining why.'
+            } > knip-comment.md
+          fi
+
+      - name: Post / update PR comment
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: knip-dead-code
+          path: knip-comment.md
+
+      - name: Fail if dead code found
+        if: steps.knip.outputs.exit_code != '0'
+        run: |
+          echo "::error::knip found dead code — see the PR comment for details"
+          exit 1
+
   commitlint:
     name: Validate Commit Messages
     runs-on: ubuntu-latest

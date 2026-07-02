@@ -51,7 +51,7 @@ import type {
 } from "../gql/graphql.js";
 
 // Pagination types
-export type PageInfo = GetIssuesQuery["issues"]["pageInfo"];
+type PageInfo = GetIssuesQuery["issues"]["pageInfo"];
 
 export interface PaginatedResult<T> {
   nodes: T[];

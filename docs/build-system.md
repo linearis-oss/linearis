@@ -144,8 +144,6 @@ npm run test:commands   # Run command coverage analysis
 |---|---|---|
 | `@graphql-codegen/cli` | ^6.1.1 | GraphQL code generation CLI |
 | `@graphql-codegen/client-preset` | ^5.2.2 | Typed document node generation |
-| `@graphql-codegen/introspection` | 5.0.0 | Schema introspection plugin |
-| `@graphql-codegen/schema-ast` | ^5.0.0 | Schema AST generation |
 | `@types/node` | ^22.0.0 | Node.js type definitions |
 | `@vitest/coverage-v8` | ^2.1.8 | V8-based code coverage |
 | `@vitest/ui` | ^2.1.8 | Browser-based test UI |

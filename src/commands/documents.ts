@@ -43,7 +43,7 @@ interface DocumentListOptions {
 }
 
 /** Extracts slug ID from a Linear document URL (e.g. /workspace/document/title-slug-abc123 -> abc123). */
-export function extractDocumentIdFromUrl(url: string): string | null {
+function extractDocumentIdFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (!parsed.hostname.includes("linear.app")) {

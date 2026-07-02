@@ -218,9 +218,16 @@ npm run check:ci       # biome lint + format check
 npx tsc --noEmit       # type check
 npm test               # unit tests
 npm run build          # full build (includes codegen + usage generation)
+npm run knip           # dead-code check (unused files/exports/types/deps)
 ```
 
-All four must pass. CI runs these on every push and PR.
+All five must pass. CI runs the first four on every push and PR; the `knip`
+check runs on PRs only, where it is required — it posts a self-updating comment
+listing any dead code, and `npx knip --fix --allow-remove-files` auto-removes
+most findings. Run
+`npm run generate` (or `npm run build`) first so generated GraphQL types exist.
+Genuine false positives (dynamically-wired code knip cannot trace) are suppressed
+in `knip.json`, not left unaddressed.
 
 ## Extended Documentation
 
