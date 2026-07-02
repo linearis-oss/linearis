@@ -8,15 +8,13 @@ import {
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
-import {
-  type InitiativeCreateInput,
-  type InitiativeSortInput,
+import type {
+  InitiativeCreateInput,
+  InitiativeSortInput,
   InitiativeStatus,
-  type InitiativeUpdateInput,
-  type ListInitiativesQueryVariables,
-  PaginationNulls,
+  InitiativeUpdateInput,
+  ListInitiativesQueryVariables,
   PaginationOrderBy,
-  PaginationSortOrder,
 } from "../../gql/graphql.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import { resolveTeamId } from "../../resolvers/team-resolver.js";
@@ -243,9 +241,7 @@ function parseSortBy(value?: string): InitiativeSortBy | undefined {
 function mapSortByToPaginationOrderBy(
   sortBy?: InitiativeSortBy,
 ): PaginationOrderBy | undefined {
-  if (sortBy === "createdAt") return PaginationOrderBy.CreatedAt;
-  if (sortBy === "updatedAt") return PaginationOrderBy.UpdatedAt;
-  return undefined;
+  return sortBy === "createdAt" || sortBy === "updatedAt" ? sortBy : undefined;
 }
 
 function mapSortByToInitiativeSort(
@@ -254,15 +250,10 @@ function mapSortByToInitiativeSort(
 ): ListInitiativesQueryVariables["sort"] | undefined {
   if (!sortBy) return undefined;
 
-  const order =
-    sortOrder === "desc"
-      ? PaginationSortOrder.Descending
-      : PaginationSortOrder.Ascending;
-
   const withNulls = {
-    order,
-    nulls: PaginationNulls.Last,
-  };
+    order: sortOrder === "desc" ? "Descending" : "Ascending",
+    nulls: "last",
+  } as const;
 
   const sortEntry: InitiativeSortInput =
     sortBy === "manual"
@@ -284,13 +275,16 @@ function mapSortByToInitiativeSort(
   return [sortEntry];
 }
 
+const INITIATIVE_STATUS_VALUES = ["Planned", "Active", "Completed"] as const;
+
 function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
   if (!value) return undefined;
 
   const normalized = value.toLowerCase();
-  if (normalized === "planned") return InitiativeStatus.Planned;
-  if (normalized === "active") return InitiativeStatus.Active;
-  if (normalized === "completed") return InitiativeStatus.Completed;
+  const match = INITIATIVE_STATUS_VALUES.find(
+    (status) => status.toLowerCase() === normalized,
+  );
+  if (match) return match;
 
   throw invalidParameterError(
     "--status",

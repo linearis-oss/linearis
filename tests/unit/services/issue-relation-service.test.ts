@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import { IssueRelationType } from "../../../src/gql/graphql.js";
 import {
   createIssueRelation,
   deleteIssueRelation,
@@ -18,7 +17,7 @@ describe("createIssueRelation", () => {
   it("creates a relation and returns it", async () => {
     const relation = {
       id: "rel-1",
-      type: IssueRelationType.Blocks,
+      type: "blocks",
       relatedIssue: { id: "issue-2", identifier: "ENG-2" },
     };
     const client = mockGqlClient({
@@ -28,7 +27,7 @@ describe("createIssueRelation", () => {
     const result = await createIssueRelation(client, {
       issueId: "issue-1",
       relatedIssueId: "issue-2",
-      type: IssueRelationType.Blocks,
+      type: "blocks",
     });
 
     expect(result).toEqual(relation);
@@ -44,7 +43,7 @@ describe("createIssueRelation", () => {
       createIssueRelation(client, {
         issueId: "issue-1",
         relatedIssueId: "issue-2",
-        type: IssueRelationType.Blocks,
+        type: "blocks",
       }),
     ).rejects.toThrow("Failed to create issue relation");
   });
@@ -58,7 +57,7 @@ describe("findIssueRelation", () => {
           nodes: [
             {
               id: "rel-1",
-              type: IssueRelationType.Blocks,
+              type: "blocks",
               relatedIssue: { id: "target-id", identifier: "ENG-2" },
             },
           ],
@@ -79,7 +78,7 @@ describe("findIssueRelation", () => {
           nodes: [
             {
               id: "rel-2",
-              type: IssueRelationType.Blocks,
+              type: "blocks",
               issue: { id: "target-id", identifier: "ENG-1" },
             },
           ],
@@ -123,7 +122,7 @@ describe("listIssueRelations", () => {
           nodes: [
             {
               id: "rel-1",
-              type: IssueRelationType.Blocks,
+              type: "blocks",
               relatedIssue: { id: "target-id", identifier: "ENG-2" },
             },
           ],
@@ -132,7 +131,7 @@ describe("listIssueRelations", () => {
           nodes: [
             {
               id: "rel-2",
-              type: IssueRelationType.Related,
+              type: "related",
               issue: { id: "other-id", identifier: "ENG-3" },
             },
           ],
@@ -148,12 +147,12 @@ describe("listIssueRelations", () => {
       relations: [
         {
           id: "rel-1",
-          type: IssueRelationType.Blocks,
+          type: "blocks",
           relatedIssue: { id: "target-id", identifier: "ENG-2" },
         },
         {
           id: "rel-2",
-          type: IssueRelationType.Related,
+          type: "related",
           issue: { id: "other-id", identifier: "ENG-3" },
         },
       ],

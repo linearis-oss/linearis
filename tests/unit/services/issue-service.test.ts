@@ -14,7 +14,6 @@ import {
   GetIssueByIdWithCommentsDocument,
   GetIssueByIdWithReactionsDocument,
   GetIssuesDocument,
-  PaginationOrderBy,
   SearchIssuesDocument,
   UnarchiveIssueDocument,
 } from "../../../src/gql/graphql.js";
@@ -145,7 +144,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 25,
       after: undefined,
-      orderBy: PaginationOrderBy.UpdatedAt,
+      orderBy: "updatedAt",
     });
   });
 
@@ -160,7 +159,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 5,
       after: "cursor1",
-      orderBy: PaginationOrderBy.UpdatedAt,
+      orderBy: "updatedAt",
     });
   });
 
@@ -197,7 +196,7 @@ describe("listIssues", () => {
           { team: { id: { eq: "team-uuid" } } },
         ],
       },
-      orderBy: PaginationOrderBy.UpdatedAt,
+      orderBy: "updatedAt",
     });
   });
 
@@ -221,7 +220,7 @@ describe("listIssues", () => {
       first: 10,
       after: undefined,
       filter,
-      orderBy: PaginationOrderBy.UpdatedAt,
+      orderBy: "updatedAt",
     });
   });
 
@@ -236,7 +235,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(GetIssuesDocument, {
       first: 25,
       after: undefined,
-      orderBy: PaginationOrderBy.UpdatedAt,
+      orderBy: "updatedAt",
     });
   });
 });

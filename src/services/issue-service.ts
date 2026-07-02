@@ -47,7 +47,6 @@ import {
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
-  PaginationOrderBy,
   SearchIssuesDocument,
   type SearchIssuesQuery,
   type SearchIssuesQueryVariables,
@@ -207,7 +206,7 @@ export async function listIssues(
         first: limit,
         after,
         filter: buildListIssuesFilter(filter),
-        orderBy: PaginationOrderBy.UpdatedAt,
+        orderBy: "updatedAt",
       },
     );
     return {
@@ -219,7 +218,7 @@ export async function listIssues(
   const result = await client.request<GetIssuesQuery>(GetIssuesDocument, {
     first: limit,
     after,
-    orderBy: PaginationOrderBy.UpdatedAt,
+    orderBy: "updatedAt",
   });
   return {
     nodes: result.issues?.nodes ?? [],
