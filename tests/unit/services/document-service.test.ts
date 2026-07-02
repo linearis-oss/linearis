@@ -6,7 +6,6 @@ import {
   deleteDocument,
   getDocument,
   listDocuments,
-  listDocumentsBySlugIds,
   updateDocument,
 } from "../../../src/services/document-service.js";
 
@@ -128,27 +127,6 @@ describe("listDocuments", () => {
       hasNextPage: true,
       endCursor: "nextCursor",
     });
-  });
-});
-
-describe("listDocumentsBySlugIds", () => {
-  it("returns empty array for empty input", async () => {
-    const client = mockGqlClient({});
-    const result = await listDocumentsBySlugIds(client, []);
-    expect(result).toEqual([]);
-  });
-
-  it("returns documents matching slugIds", async () => {
-    const client = mockGqlClient({
-      documents: {
-        nodes: [
-          { id: "1", slugId: "abc" },
-          { id: "2", slugId: "def" },
-        ],
-      },
-    });
-    const result = await listDocumentsBySlugIds(client, ["abc", "def"]);
-    expect(result).toHaveLength(2);
   });
 });
 
