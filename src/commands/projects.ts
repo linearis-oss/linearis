@@ -42,6 +42,12 @@ import {
 interface ListOptions {
   limit: string;
   after?: string;
+  includeArchived?: boolean;
+}
+
+interface ReadOptions {
+  milestonesFirst: string;
+  issuesFirst: string;
 }
 
 interface DiscussionsOptions {
@@ -138,9 +144,12 @@ function addCommentReactionCommands(
 }
 
 interface CreateOptions {
-  teams: string;
+  teams?: string;
+  team?: string;
   description?: string;
   content?: string;
+  icon?: string;
+  color?: string;
   lead?: string;
   members?: string;
   priority?: string;
@@ -154,13 +163,19 @@ interface UpdateOptions {
   name?: string;
   description?: string;
   content?: string;
+  icon?: string;
+  color?: string;
   lead?: string;
+  clearLead?: boolean;
   members?: string;
   priority?: string;
   status?: string;
   startDate?: string;
+  clearStartDate?: boolean;
   targetDate?: string;
+  clearTargetDate?: boolean;
   teams?: string;
+  team?: string;
   labels?: string;
 }
 
@@ -193,6 +208,52 @@ function parsePriority(value: string): number {
   return priority;
 }
 
+function parseNonNegativeIntegerOption(name: string, value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw invalidParameterError(name, `must be a non-negative integer`);
+  }
+  return Number.parseInt(value, 10);
+}
+
+function parseCommaSeparatedOption(name: string, value: string): string[] {
+  const values = value
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  if (values.length === 0) {
+    throw invalidParameterError(name, "must include at least one value");
+  }
+
+  return values;
+}
+
+function getCreateTeamNames(options: CreateOptions): string[] {
+  if (options.team && options.teams) {
+    throw invalidParameterError("--team", "cannot be combined with --teams");
+  }
+
+  const teams = options.teams ?? options.team;
+  if (!teams) {
+    throw invalidParameterError("--teams", "is required");
+  }
+
+  return parseCommaSeparatedOption(options.teams ? "--teams" : "--team", teams);
+}
+
+function getUpdateTeamNames(options: UpdateOptions): string[] | undefined {
+  if (options.team && options.teams) {
+    throw invalidParameterError("--team", "cannot be combined with --teams");
+  }
+
+  const teams = options.teams ?? options.team;
+  if (!teams) {
+    return undefined;
+  }
+
+  return parseCommaSeparatedOption(options.teams ? "--teams" : "--team", teams);
+}
+
 export function setupProjectsCommands(program: Command): void {
   const projects = program
     .command("projects")
@@ -205,6 +266,7 @@ export function setupProjectsCommands(program: Command): void {
     .description("list projects")
     .option("-l, --limit <n>", "max results", "100")
     .option("--after <cursor>", "cursor for next page")
+    .option("--include-archived", "include archived projects")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [ListOptions, Command];
@@ -212,6 +274,7 @@ export function setupProjectsCommands(program: Command): void {
         const result = await listProjects(ctx.gql, {
           limit: parseLimit(options.limit),
           after: options.after,
+          includeArchived: options.includeArchived,
         });
         outputSuccess(result);
       }),
@@ -220,12 +283,35 @@ export function setupProjectsCommands(program: Command): void {
   projects
     .command("read <project>")
     .description("get full project details")
+    .option(
+      "--milestones-first <n>",
+      "how many milestones to fetch; 0 omits milestones",
+      "25",
+    )
+    .option(
+      "--issues-first <n>",
+      "how many issues to fetch; 0 omits issues",
+      "50",
+    )
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [project, , command] = args as [string, unknown, Command];
+        const [project, options, command] = args as [
+          string,
+          ReadOptions,
+          Command,
+        ];
         const ctx = createContext(getRootOpts(command));
         const projectId = await resolveProjectId(ctx.sdk, project);
-        const result = await getProject(ctx.gql, projectId);
+        const result = await getProject(ctx.gql, projectId, {
+          milestonesFirst: parseNonNegativeIntegerOption(
+            "--milestones-first",
+            options.milestonesFirst,
+          ),
+          issuesFirst: parseNonNegativeIntegerOption(
+            "--issues-first",
+            options.issuesFirst,
+          ),
+        });
         outputSuccess(result);
       }),
     );
@@ -499,9 +585,12 @@ export function setupProjectsCommands(program: Command): void {
   projects
     .command("create <name>")
     .description("create a new project")
-    .requiredOption("--teams <teams>", "comma-separated team names or UUIDs")
+    .option("--teams <teams>", "comma-separated team names or UUIDs")
+    .option("--team <team>", "team name or UUID (alias for --teams)")
     .option("--description <text>", "project description")
     .option("--content <text>", "project content (markdown)")
+    .option("--icon <icon>", "project icon")
+    .option("--color <color>", "project color")
     .option("--lead <user>", "project lead (name, email, or UUID)")
     .option("--members <users>", "comma-separated member names or UUIDs")
     .option("--priority <0-4>", "0=none 1=urgent 2=high 3=medium 4=low")
@@ -518,10 +607,7 @@ export function setupProjectsCommands(program: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const teamNames = options.teams
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean);
+        const teamNames = getCreateTeamNames(options);
         const teamIds = await Promise.all(
           teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
         );
@@ -537,6 +623,14 @@ export function setupProjectsCommands(program: Command): void {
 
         if (options.content) {
           input.content = options.content;
+        }
+
+        if (options.icon !== undefined) {
+          input.icon = options.icon;
+        }
+
+        if (options.color !== undefined) {
+          input.color = options.color;
         }
 
         if (options.lead) {
@@ -591,13 +685,19 @@ export function setupProjectsCommands(program: Command): void {
     .option("--name <name>", "new name")
     .option("--description <text>", "new description")
     .option("--content <text>", "new content (markdown)")
+    .option("--icon <icon>", "new icon")
+    .option("--color <color>", "new color")
     .option("--lead <user>", "new lead (name, email, or UUID)")
+    .option("--clear-lead", "remove project lead")
     .option("--members <users>", "comma-separated member names or UUIDs")
     .option("--priority <0-4>", "new priority")
     .option("--status <status>", "new status name or UUID")
     .option("--start-date <date>", "new start date (YYYY-MM-DD)")
+    .option("--clear-start-date", "remove start date")
     .option("--target-date <date>", "new target date (YYYY-MM-DD)")
+    .option("--clear-target-date", "remove target date")
     .option("--teams <teams>", "comma-separated team names or UUIDs")
+    .option("--team <team>", "team name or UUID (alias for --teams)")
     .option("--labels <labels>", "comma-separated label names or UUIDs")
     .action(
       handleCommand(async (...args: unknown[]) => {
@@ -607,6 +707,27 @@ export function setupProjectsCommands(program: Command): void {
           Command,
         ];
         const ctx = createContext(getRootOpts(command));
+
+        if (options.lead && options.clearLead) {
+          throw invalidParameterError(
+            "--lead",
+            "cannot be combined with --clear-lead",
+          );
+        }
+
+        if (options.startDate && options.clearStartDate) {
+          throw invalidParameterError(
+            "--start-date",
+            "cannot be combined with --clear-start-date",
+          );
+        }
+
+        if (options.targetDate && options.clearTargetDate) {
+          throw invalidParameterError(
+            "--target-date",
+            "cannot be combined with --clear-target-date",
+          );
+        }
 
         const projectId = await resolveProjectId(ctx.sdk, project);
 
@@ -624,7 +745,17 @@ export function setupProjectsCommands(program: Command): void {
           input.content = options.content;
         }
 
-        if (options.lead) {
+        if (options.icon !== undefined) {
+          input.icon = options.icon;
+        }
+
+        if (options.color !== undefined) {
+          input.color = options.color;
+        }
+
+        if (options.clearLead) {
+          input.leadId = null;
+        } else if (options.lead) {
           input.leadId = await resolveUserId(ctx.sdk, options.lead);
         }
 
@@ -649,19 +780,20 @@ export function setupProjectsCommands(program: Command): void {
           );
         }
 
-        if (options.startDate) {
+        if (options.clearStartDate) {
+          input.startDate = null;
+        } else if (options.startDate) {
           input.startDate = options.startDate;
         }
 
-        if (options.targetDate) {
+        if (options.clearTargetDate) {
+          input.targetDate = null;
+        } else if (options.targetDate) {
           input.targetDate = options.targetDate;
         }
 
-        if (options.teams) {
-          const teamNames = options.teams
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean);
+        const teamNames = getUpdateTeamNames(options);
+        if (teamNames) {
           input.teamIds = await Promise.all(
             teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
           );
