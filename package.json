@@ -39,7 +39,7 @@
     "prestart": "npm run generate",
     "predev": "npm run generate",
     "prebuild": "npm run generate && npm run generate:usage",
-    "prepare": "npm run generate && lefthook install",
+    "prepare": "node scripts/prepare.mjs",
     "prepack": "npm run build",
     "prepublishOnly": "npm test",
     "release:dry-run": "semantic-release --dry-run --no-ci",

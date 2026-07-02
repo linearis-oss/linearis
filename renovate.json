@@ -23,16 +23,9 @@
       "groupName": "dev dependencies (non-major)"
     },
     {
-      "description": "Group GitHub Actions updates",
+      "description": "Group GitHub Actions updates (SHA-pinned actions + docker digests)",
       "matchManagers": ["github-actions"],
       "groupName": "github actions"
-    },
-    {
-      "description": "Pin release-publish workflow to minimum supported Node version",
-      "matchManagers": ["github-actions"],
-      "matchPackageNames": ["node"],
-      "matchFileNames": [".github/workflows/release-publish.yml"],
-      "enabled": false
     }
   ]
 }

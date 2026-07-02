@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Guard workflow_dispatch caller permissions
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -65,7 +65,7 @@ jobs:
           echo "Releasing from branch: $branch"
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           ref: ${{ steps.target.outputs.branch }}
@@ -73,7 +73,7 @@ jobs:
 
       - name: Create linearis-bot app token
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -97,18 +97,10 @@ jobs:
           git config user.name "${{ steps.app-bot.outputs.name }}"
           git config user.email "${{ steps.app-bot.outputs.email }}"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Setup, install and build
+        uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
           registry-url: https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
 
       - name: Verify npm auth
         env:
