@@ -1,3 +1,4 @@
+import type { Priority } from "./domain-values.js";
 import { invalidParameterError } from "./errors.js";
 
 function parseStrictNonNegativeInteger(raw: string): number | null {
@@ -8,7 +9,7 @@ function parseStrictNonNegativeInteger(raw: string): number | null {
   return Number.parseInt(raw, 10);
 }
 
-export function parsePriorityOption(raw: string): number {
+export function parsePriorityOption(raw: string): Priority {
   const value = parseStrictNonNegativeInteger(raw);
   if (value === null || value < 1 || value > 4) {
     throw invalidParameterError(
@@ -17,7 +18,7 @@ export function parsePriorityOption(raw: string): number {
     );
   }
 
-  return value;
+  return value as Priority;
 }
 
 export function parseEstimateOption(raw: string): number {

@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
+import { parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
@@ -1342,12 +1343,7 @@ export function setupIssuesCommands(program: Command): void {
           throw new Error("--clear-labels cannot be used with --label-mode");
         }
 
-        if (
-          options.labelMode &&
-          !["add", "overwrite"].includes(options.labelMode)
-        ) {
-          throw new Error("--label-mode must be either 'add' or 'overwrite'");
-        }
+        const labelMode = parseLabelMode(options.labelMode);
 
         const parsedPriority =
           options.priority !== undefined
@@ -1386,7 +1382,7 @@ export function setupIssuesCommands(program: Command): void {
           options.status ||
           options.projectMilestone ||
           options.cycle ||
-          (options.labels && options.labelMode === "add");
+          (options.labels && labelMode === "add");
         const issueContext = needsContext
           ? await getIssue(ctx.gql, resolvedIssueId)
           : undefined;
@@ -1437,7 +1433,7 @@ export function setupIssuesCommands(program: Command): void {
           const labelNames = options.labels.split(",").map((l) => l.trim());
           const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
 
-          if (options.labelMode === "add") {
+          if (labelMode === "add") {
             const currentLabels =
               issueContext &&
               "labels" in issueContext &&
