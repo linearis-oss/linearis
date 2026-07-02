@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
+import type { Priority } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
@@ -200,12 +201,12 @@ export const PROJECTS_META: DomainMeta = {
   ],
 };
 
-function parsePriority(value: string): number {
+function parsePriority(value: string): Priority {
   const priority = Number.parseInt(value, 10);
   if (Number.isNaN(priority) || priority < 0 || priority > 4) {
     throw invalidParameterError("priority", `must be 0-4, got "${value}"`);
   }
-  return priority;
+  return priority as Priority;
 }
 
 function parseNonNegativeIntegerOption(name: string, value: string): number {
