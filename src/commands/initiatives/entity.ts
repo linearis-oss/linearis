@@ -241,9 +241,7 @@ function parseSortBy(value?: string): InitiativeSortBy | undefined {
 function mapSortByToPaginationOrderBy(
   sortBy?: InitiativeSortBy,
 ): PaginationOrderBy | undefined {
-  if (sortBy === "createdAt") return "createdAt";
-  if (sortBy === "updatedAt") return "updatedAt";
-  return undefined;
+  return sortBy === "createdAt" || sortBy === "updatedAt" ? sortBy : undefined;
 }
 
 function mapSortByToInitiativeSort(
@@ -277,13 +275,16 @@ function mapSortByToInitiativeSort(
   return [sortEntry];
 }
 
+const INITIATIVE_STATUS_VALUES = ["Planned", "Active", "Completed"] as const;
+
 function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
   if (!value) return undefined;
 
   const normalized = value.toLowerCase();
-  if (normalized === "planned") return "Planned";
-  if (normalized === "active") return "Active";
-  if (normalized === "completed") return "Completed";
+  const match = INITIATIVE_STATUS_VALUES.find(
+    (status) => status.toLowerCase() === normalized,
+  );
+  if (match) return match;
 
   throw invalidParameterError(
     "--status",

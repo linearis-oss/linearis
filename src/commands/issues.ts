@@ -385,21 +385,6 @@ function relationFlagName(type: RelationAction["type"]): string {
   }
 }
 
-function relationTypeFromAddFlag(
-  type: "blocks" | "related" | "duplicate" | "similar",
-): IssueRelationType {
-  switch (type) {
-    case "blocks":
-      return "blocks";
-    case "related":
-      return "related";
-    case "duplicate":
-      return "duplicate";
-    case "similar":
-      return "similar";
-  }
-}
-
 function parseRelationAddOptions(options: RelationAddOptions): {
   type: IssueRelationType;
   targets: string[];
@@ -437,7 +422,7 @@ function parseRelationAddOptions(options: RelationAddOptions): {
   }
 
   return {
-    type: relationTypeFromAddFlag(type),
+    type,
     targets,
   };
 }
