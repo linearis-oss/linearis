@@ -8,11 +8,11 @@ import {
 import { assertVariablesMatchDocument } from "../helpers/assert-variables.js";
 
 /**
- * Regression guard for issue #228: the milestone mutations declare flat
- * variables (`$projectId`, `$name`, ...), so the service must pass flat
- * variables — not `{ input }` / `{ id, input }`. These tests capture the
- * variables object actually handed to `client.request` and assert every key
- * is a variable the document declares.
+ * Regression guard for the milestone mutation variable shapes (issues #223 /
+ * #228): the milestone mutations follow the `$input` convention used by every
+ * other mutation in the codebase, so the service must pass `{ input }` /
+ * `{ id, input }`. These tests capture the variables object actually handed to
+ * `client.request` and assert every key is a variable the document declares.
  */
 function mockGqlClient(response: Record<string, unknown>): {
   client: GraphQLClient;
@@ -32,7 +32,7 @@ function lastCallVariables(
   return [document, variables];
 }
 
-describe("milestone service variable shapes (issue #228)", () => {
+describe("milestone service variable shapes (issues #223 / #228)", () => {
   it("createMilestone passes only declared variables", async () => {
     const { client, request } = mockGqlClient({
       projectMilestoneCreate: {
@@ -50,7 +50,7 @@ describe("milestone service variable shapes (issue #228)", () => {
 
     const [document, variables] = lastCallVariables(request);
     assertVariablesMatchDocument(document, variables);
-    expect(variables).not.toHaveProperty("input");
+    expect(variables).toHaveProperty("input");
   });
 
   it("updateMilestone passes only declared variables", async () => {
@@ -70,6 +70,6 @@ describe("milestone service variable shapes (issue #228)", () => {
 
     const [document, variables] = lastCallVariables(request);
     assertVariablesMatchDocument(document, variables);
-    expect(variables).not.toHaveProperty("input");
+    expect(variables).toHaveProperty("input");
   });
 });

@@ -21,10 +21,11 @@ export function declaredVariableNames(doc: DocumentNode): Set<string> {
 /**
  * Assert that every top-level key of the variables object passed to
  * `client.request` corresponds to a variable actually declared by the
- * document. This catches the `{ input }`-vs-flat-variable class of bug
- * (see issue #228): passing `{ input: {...} }` against a mutation that
- * declares flat `$projectId`/`$name`/... variables would surface an
- * undeclared "input" key here.
+ * document. This catches the input-shape-vs-declared-variable class of bug
+ * (see issues #223 / #228): passing variables whose keys do not match the
+ * mutation's declared variables (e.g. flat `$projectId`/`$name`/... against a
+ * document declaring `$input`, or vice versa) would surface an undeclared key
+ * here.
  */
 export function assertVariablesMatchDocument(
   doc: DocumentNode,
