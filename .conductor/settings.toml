@@ -1,0 +1,23 @@
+#:schema https://conductor.build/schemas/settings.repo.schema.json
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+# `npm install` also runs the `prepare` hook: GraphQL codegen (src/gql/) + lefthook install.
+setup = "npm install"
+# Stateless JSON-output CLI — no shared port/db/stack — so workspaces can run side by side.
+run_mode = "concurrent"
+# Remove per-workspace build output on archive; leaves source untouched.
+archive = "npm run clean"
+
+[scripts.run.test]
+command = "npm test"
+default = true
+icon = "test-tube"
+
+[scripts.run.build]
+command = "npm run build"
+icon = "package"
+
+[scripts.run.check]
+command = "npm run check:ci"
+icon = "wrench"
