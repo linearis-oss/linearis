@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
-import type { Priority } from "../common/domain-values.js";
+import { type Priority, parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
@@ -755,20 +755,11 @@ export function setupProjectsCommands(program: Command): void {
           );
         }
 
-        if (
-          options.labelMode &&
-          !["add", "remove", "overwrite"].includes(options.labelMode)
-        ) {
-          throw invalidParameterError(
-            "--label-mode",
-            "must be one of 'add', 'remove', or 'overwrite'",
-          );
-        }
+        const labelMode = parseLabelMode(options.labelMode);
 
         const projectId = await resolveProjectId(ctx.sdk, project);
         const needsLabelContext =
-          options.labels &&
-          (options.labelMode === "add" || options.labelMode === "remove");
+          options.labels && (labelMode === "add" || labelMode === "remove");
         const projectContext = needsLabelContext
           ? await getProject(ctx.gql, projectId)
           : undefined;
@@ -850,12 +841,12 @@ export function setupProjectsCommands(program: Command): void {
             .filter(Boolean);
           const labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
 
-          if (options.labelMode === "add") {
+          if (labelMode === "add") {
             const currentLabels = projectContext?.labels?.nodes
               ? projectContext.labels.nodes.map((l) => l.id)
               : [];
             input.labelIds = [...new Set([...currentLabels, ...labelIds])];
-          } else if (options.labelMode === "remove") {
+          } else if (labelMode === "remove") {
             const currentLabels = projectContext?.labels?.nodes
               ? projectContext.labels.nodes.map((l) => l.id)
               : [];
