@@ -22,7 +22,33 @@ vi.mock("../../../src/resolvers/team-resolver.js", () => ({
   resolveTeamId: vi.fn().mockResolvedValue("resolved-team-uuid"),
 }));
 
+vi.mock("../../../src/resolvers/label-resolver.js", () => ({
+  resolveLabelId: vi.fn().mockResolvedValue("resolved-label-uuid"),
+}));
+
 vi.mock("../../../src/services/label-service.js", () => ({
+  createLabel: vi.fn().mockResolvedValue({
+    id: "lbl-new",
+    name: "branch:unmerged",
+    color: "#B45309",
+    type: "issue",
+  }),
+  getLabel: vi.fn().mockResolvedValue({
+    id: "resolved-label-uuid",
+    name: "branch:unmerged",
+    color: "#B45309",
+    type: "issue",
+  }),
+  updateLabel: vi.fn().mockResolvedValue({
+    id: "resolved-label-uuid",
+    name: "branch:merged",
+    color: "#1D4ED8",
+    type: "issue",
+  }),
+  deleteLabel: vi.fn().mockResolvedValue({
+    id: "resolved-label-uuid",
+    success: true,
+  }),
   listLabels: vi.fn().mockResolvedValue({
     nodes: [{ id: "lbl-1", name: "Bug", color: "#ff0000", type: "issue" }],
     pageInfo: { hasNextPage: false, endCursor: null },
@@ -42,10 +68,15 @@ vi.mock("../../../src/services/label-service.js", () => ({
 
 import { setupLabelsCommands } from "../../../src/commands/labels.js";
 import { outputSuccess } from "../../../src/common/output.js";
+import { resolveLabelId } from "../../../src/resolvers/label-resolver.js";
 import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import {
+  createLabel,
+  deleteLabel,
+  getLabel,
   listLabels,
   listProjectLabels,
+  updateLabel,
 } from "../../../src/services/label-service.js";
 
 function createProgram(): Command {
@@ -216,7 +247,184 @@ describe("labels list", () => {
   });
 });
 
-describe("labels list validation", () => {
+describe("labels create", () => {
+  it("creates a workspace issue label by default", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "create",
+      "branch:unmerged",
+    ]);
+
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(createLabel).toHaveBeenCalledWith(expect.anything(), {
+      name: "branch:unmerged",
+    });
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "lbl-new",
+      name: "branch:unmerged",
+      color: "#B45309",
+      type: "issue",
+    });
+  });
+
+  it("creates a team-scoped issue label with optional fields", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "create",
+      "branch:unmerged",
+      "--team",
+      "DBL",
+      "--color",
+      "#B45309",
+      "--description",
+      "Created from DBL branch workflow",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "DBL");
+    expect(createLabel).toHaveBeenCalledWith(expect.anything(), {
+      name: "branch:unmerged",
+      teamId: "resolved-team-uuid",
+      color: "#B45309",
+      description: "Created from DBL branch workflow",
+    });
+  });
+});
+
+describe("labels read", () => {
+  it("reads a label by resolved id", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "read",
+      "branch:unmerged",
+      "--team",
+      "DBL",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "DBL");
+    expect(resolveLabelId).toHaveBeenCalledWith(
+      expect.anything(),
+      "branch:unmerged",
+      {
+        teamId: "resolved-team-uuid",
+        scope: undefined,
+      },
+    );
+    expect(getLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+    );
+  });
+});
+
+describe("labels update", () => {
+  it("updates a resolved label", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:unmerged",
+      "--team",
+      "DBL",
+      "--name",
+      "branch:merged",
+      "--color",
+      "#1D4ED8",
+      "--description",
+      "Updated from DBL branch workflow",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "DBL");
+    expect(resolveLabelId).toHaveBeenCalledWith(
+      expect.anything(),
+      "branch:unmerged",
+      {
+        teamId: "resolved-team-uuid",
+        scope: undefined,
+      },
+    );
+    expect(updateLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+      {
+        name: "branch:merged",
+        color: "#1D4ED8",
+        description: "Updated from DBL branch workflow",
+      },
+    );
+  });
+
+  it("clears the description when passed an empty string", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:merged",
+      "--description",
+      "",
+    ]);
+
+    expect(updateLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+      {
+        description: "",
+      },
+    );
+  });
+});
+
+describe("labels delete", () => {
+  it("deletes a resolved label", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "delete",
+      "branch:unmerged",
+      "--scope",
+      "workspace",
+    ]);
+
+    expect(resolveLabelId).toHaveBeenCalledWith(
+      expect.anything(),
+      "branch:unmerged",
+      {
+        teamId: undefined,
+        scope: "workspace",
+      },
+    );
+    expect(deleteLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith({
+      id: "resolved-label-uuid",
+      success: true,
+    });
+  });
+});
+
+describe("labels validation", () => {
   it("rejects unsupported label types", async () => {
     const program = createProgram();
 
@@ -365,5 +573,95 @@ describe("labels list validation", () => {
     expect(listLabels).not.toHaveBeenCalled();
     expect(listProjectLabels).not.toHaveBeenCalled();
     expect(resolveTeamId).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid label colors on create", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "create",
+      "branch:unmerged",
+      "--color",
+      "B45309",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid --color: must be a hex color like #B45309",
+    );
+    expect(createLabel).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid label colors on update", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:unmerged",
+      "--color",
+      "B45309",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid --color: must be a hex color like #B45309",
+    );
+    expect(updateLabel).not.toHaveBeenCalled();
+  });
+
+  it("rejects update with no fields", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:unmerged",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid label update: at least one option must be provided",
+    );
+    expect(updateLabel).not.toHaveBeenCalled();
+  });
+
+  it("rejects team scope without a team filter for read", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "read",
+      "branch:unmerged",
+      "--scope",
+      "team",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0][0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid --scope: team scope requires --team",
+    );
+    expect(resolveLabelId).not.toHaveBeenCalled();
   });
 });

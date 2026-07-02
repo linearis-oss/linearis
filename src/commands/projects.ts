@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
-import type { Priority } from "../common/domain-values.js";
+import { type Priority, parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
@@ -178,6 +178,8 @@ interface UpdateOptions {
   teams?: string;
   team?: string;
   labels?: string;
+  labelMode?: string;
+  clearLabels?: boolean;
 }
 
 export const PROJECTS_META: DomainMeta = {
@@ -700,6 +702,8 @@ export function setupProjectsCommands(program: Command): void {
     .option("--teams <teams>", "comma-separated team names or UUIDs")
     .option("--team <team>", "team name or UUID (alias for --teams)")
     .option("--labels <labels>", "comma-separated label names or UUIDs")
+    .option("--label-mode <mode>", "add | remove | overwrite")
+    .option("--clear-labels", "remove all labels")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [project, options, command] = args as [
@@ -730,7 +734,35 @@ export function setupProjectsCommands(program: Command): void {
           );
         }
 
+        if (options.labelMode && !options.labels) {
+          throw invalidParameterError(
+            "--label-mode",
+            "requires --labels to be specified",
+          );
+        }
+
+        if (options.clearLabels && options.labels) {
+          throw invalidParameterError(
+            "--clear-labels",
+            "cannot be used with --labels",
+          );
+        }
+
+        if (options.clearLabels && options.labelMode) {
+          throw invalidParameterError(
+            "--clear-labels",
+            "cannot be used with --label-mode",
+          );
+        }
+
+        const labelMode = parseLabelMode(options.labelMode);
+
         const projectId = await resolveProjectId(ctx.sdk, project);
+        const needsLabelContext =
+          options.labels && (labelMode === "add" || labelMode === "remove");
+        const projectContext = needsLabelContext
+          ? await getProject(ctx.gql, projectId)
+          : undefined;
 
         const input: ProjectUpdateInput = {};
 
@@ -800,12 +832,30 @@ export function setupProjectsCommands(program: Command): void {
           );
         }
 
-        if (options.labels) {
+        if (options.clearLabels) {
+          input.labelIds = [];
+        } else if (options.labels) {
           const labelNames = options.labels
             .split(",")
             .map((l) => l.trim())
             .filter(Boolean);
-          input.labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
+          const labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
+
+          if (labelMode === "add") {
+            const currentLabels = projectContext?.labels?.nodes
+              ? projectContext.labels.nodes.map((l) => l.id)
+              : [];
+            input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+          } else if (labelMode === "remove") {
+            const currentLabels = projectContext?.labels?.nodes
+              ? projectContext.labels.nodes.map((l) => l.id)
+              : [];
+            input.labelIds = currentLabels.filter(
+              (id) => !labelIds.includes(id),
+            );
+          } else {
+            input.labelIds = labelIds;
+          }
         }
 
         if (Object.keys(input).length === 0) {

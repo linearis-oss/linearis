@@ -1278,7 +1278,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--assignee <user>", "new assignee")
     .option("--project <project>", "new project")
     .option("--labels <labels>", "labels to apply (comma-separated)")
-    .option("--label-mode <mode>", "add | overwrite")
+    .option("--label-mode <mode>", "add | remove | overwrite")
     .option("--clear-labels", "remove all labels")
     .option("--parent-ticket <issue>", "set parent issue")
     .option("--clear-parent-ticket", "clear parent")
@@ -1382,7 +1382,7 @@ export function setupIssuesCommands(program: Command): void {
           options.status ||
           options.projectMilestone ||
           options.cycle ||
-          (options.labels && labelMode === "add");
+          (options.labels && (labelMode === "add" || labelMode === "remove"));
         const issueContext = needsContext
           ? await getIssue(ctx.gql, resolvedIssueId)
           : undefined;
@@ -1441,6 +1441,16 @@ export function setupIssuesCommands(program: Command): void {
                 ? issueContext.labels.nodes.map((l) => l.id)
                 : [];
             input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+          } else if (labelMode === "remove") {
+            const currentLabels =
+              issueContext &&
+              "labels" in issueContext &&
+              issueContext.labels?.nodes
+                ? issueContext.labels.nodes.map((l) => l.id)
+                : [];
+            input.labelIds = currentLabels.filter(
+              (id) => !labelIds.includes(id),
+            );
           } else {
             input.labelIds = labelIds;
           }

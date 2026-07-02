@@ -113,7 +113,10 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
 
 import { setupProjectsCommands } from "../../../src/commands/projects.js";
 import { outputSuccess } from "../../../src/common/output.js";
-import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
+import {
+  resolveProjectId,
+  resolveProjectLabelIds,
+} from "../../../src/resolvers/project-resolver.js";
 import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import {
   createDiscussionCommentReaction,
@@ -1051,5 +1054,106 @@ describe("projects update", () => {
       "resolved-project-uuid",
       expect.objectContaining({ name: "New Name" }),
     );
+  });
+
+  it("adds labels without dropping existing project labels", async () => {
+    vi.mocked(getProject).mockResolvedValueOnce({
+      id: "proj-1",
+      labels: { nodes: [{ id: "existing-label-uuid" }] },
+    } as Awaited<ReturnType<typeof getProject>>);
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--labels",
+      "Q3",
+      "--label-mode",
+      "add",
+    ]);
+
+    expect(getProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+    );
+    expect(resolveProjectLabelIds).toHaveBeenCalledWith(expect.anything(), [
+      "Q3",
+    ]);
+    expect(updateProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({
+        labelIds: ["existing-label-uuid", "resolved-label-uuid"],
+      }),
+    );
+  });
+
+  it("removes selected project labels without clearing all labels", async () => {
+    vi.mocked(getProject).mockResolvedValueOnce({
+      id: "proj-1",
+      labels: {
+        nodes: [{ id: "keep-label-uuid" }, { id: "resolved-label-uuid" }],
+      },
+    } as Awaited<ReturnType<typeof getProject>>);
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--labels",
+      "Q3",
+      "--label-mode",
+      "remove",
+    ]);
+
+    expect(updateProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({ labelIds: ["keep-label-uuid"] }),
+    );
+  });
+
+  it("clears all project labels", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--clear-labels",
+    ]);
+
+    expect(updateProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({ labelIds: [] }),
+    );
+  });
+
+  it("rejects invalid project label mode", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--labels",
+      "Q3",
+      "--label-mode",
+      "append",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("must be one of 'add', 'remove', or 'overwrite'"),
+    );
+    expect(updateProject).not.toHaveBeenCalled();
   });
 });

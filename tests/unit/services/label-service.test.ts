@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
+  createLabel,
+  deleteLabel,
+  getLabel,
   listLabels,
   listProjectLabels,
+  updateLabel,
 } from "../../../src/services/label-service.js";
 
 function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
@@ -10,6 +14,200 @@ function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
     request: vi.fn().mockResolvedValue(response),
   } as unknown as GraphQLClient;
 }
+
+describe("getLabel", () => {
+  it("returns a label by id", async () => {
+    const client = mockGqlClient({
+      issueLabel: {
+        id: "lbl-1",
+        name: "Bug",
+        color: "#ff0000",
+        description: "A bug",
+      },
+    });
+
+    const result = await getLabel(client, "lbl-1");
+
+    expect(result).toEqual({
+      id: "lbl-1",
+      name: "Bug",
+      color: "#ff0000",
+      description: "A bug",
+      type: "issue",
+    });
+  });
+
+  it("throws when label not found", async () => {
+    const client = mockGqlClient({ issueLabel: null });
+
+    await expect(getLabel(client, "lbl-1")).rejects.toThrow(
+      'Label with ID "lbl-1" not found',
+    );
+  });
+});
+
+describe("createLabel", () => {
+  it("returns created issue label with type", async () => {
+    const client = mockGqlClient({
+      issueLabelCreate: {
+        success: true,
+        issueLabel: {
+          id: "lbl-new",
+          name: "branch:unmerged",
+          color: "#B45309",
+          description: "Created from DBL branch workflow",
+        },
+      },
+    });
+
+    const result = await createLabel(client, {
+      name: "branch:unmerged",
+      teamId: "team-1",
+      color: "#B45309",
+      description: "Created from DBL branch workflow",
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      input: {
+        name: "branch:unmerged",
+        teamId: "team-1",
+        color: "#B45309",
+        description: "Created from DBL branch workflow",
+      },
+    });
+    expect(result).toEqual({
+      id: "lbl-new",
+      name: "branch:unmerged",
+      color: "#B45309",
+      description: "Created from DBL branch workflow",
+      type: "issue",
+    });
+  });
+
+  it("throws on create failure", async () => {
+    const client = mockGqlClient({
+      issueLabelCreate: {
+        success: false,
+        issueLabel: {
+          id: "lbl-new",
+          name: "branch:unmerged",
+          color: "#B45309",
+          description: null,
+        },
+      },
+    });
+
+    await expect(
+      createLabel(client, { name: "branch:unmerged" }),
+    ).rejects.toThrow('Failed to create label "branch:unmerged"');
+  });
+
+  it("converts null create description to undefined", async () => {
+    const client = mockGqlClient({
+      issueLabelCreate: {
+        success: true,
+        issueLabel: {
+          id: "lbl-new",
+          name: "branch:unmerged",
+          color: "#B45309",
+          description: null,
+        },
+      },
+    });
+
+    const result = await createLabel(client, { name: "branch:unmerged" });
+
+    expect(result.description).toBeUndefined();
+    expect(result.type).toBe("issue");
+  });
+});
+
+describe("updateLabel", () => {
+  it("returns updated issue label", async () => {
+    const client = mockGqlClient({
+      issueLabelUpdate: {
+        success: true,
+        issueLabel: {
+          id: "lbl-1",
+          name: "branch:merged",
+          color: "#1D4ED8",
+          description: "Updated from DBL branch workflow",
+        },
+      },
+    });
+
+    const result = await updateLabel(client, "lbl-1", {
+      name: "branch:merged",
+      color: "#1D4ED8",
+      description: "Updated from DBL branch workflow",
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "lbl-1",
+      input: {
+        name: "branch:merged",
+        color: "#1D4ED8",
+        description: "Updated from DBL branch workflow",
+      },
+    });
+    expect(result).toEqual({
+      id: "lbl-1",
+      name: "branch:merged",
+      color: "#1D4ED8",
+      description: "Updated from DBL branch workflow",
+      type: "issue",
+    });
+  });
+
+  it("throws on update failure", async () => {
+    const client = mockGqlClient({
+      issueLabelUpdate: {
+        success: false,
+        issueLabel: {
+          id: "lbl-1",
+          name: "branch:merged",
+          color: "#1D4ED8",
+          description: null,
+        },
+      },
+    });
+
+    await expect(
+      updateLabel(client, "lbl-1", { name: "branch:merged" }),
+    ).rejects.toThrow('Failed to update label "lbl-1"');
+  });
+});
+
+describe("deleteLabel", () => {
+  it("returns deleted label id", async () => {
+    const client = mockGqlClient({
+      issueLabelDelete: {
+        success: true,
+        entityId: "lbl-1",
+      },
+    });
+
+    const result = await deleteLabel(client, "lbl-1");
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "lbl-1",
+    });
+    expect(result).toEqual({ id: "lbl-1", success: true });
+  });
+
+  it("throws on delete failure", async () => {
+    const client = mockGqlClient({
+      issueLabelDelete: {
+        success: false,
+        entityId: "lbl-1",
+      },
+    });
+
+    await expect(deleteLabel(client, "lbl-1")).rejects.toThrow(
+      'Failed to delete label "lbl-1"',
+    );
+  });
+});
 
 describe("listLabels", () => {
   it("returns issue labels with type", async () => {

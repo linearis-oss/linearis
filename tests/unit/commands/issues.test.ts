@@ -209,6 +209,7 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../../../src/resolvers/issue-resolver.js";
+import { resolveLabelIds } from "../../../src/resolvers/label-resolver.js";
 import {
   resolveTeamEstimateContext,
   resolveTeamId,
@@ -1944,6 +1945,65 @@ describe("issues create relations", () => {
       expect.anything(),
       expect.objectContaining({ type: "similar" }),
     );
+  });
+});
+
+describe("issues update --labels", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("removes selected labels without clearing all labels", async () => {
+    vi.mocked(getIssue).mockResolvedValueOnce({
+      id: "resolved-issue-uuid",
+      team: { id: "team-uuid", key: "ENG" },
+      labels: {
+        nodes: [{ id: "keep-label-uuid" }, { id: "resolved-label-uuid" }],
+      },
+    } as Awaited<ReturnType<typeof getIssue>>);
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-123",
+      "--labels",
+      "bug",
+      "--label-mode",
+      "remove",
+    ]);
+
+    expect(resolveLabelIds).toHaveBeenCalledWith(expect.anything(), ["bug"]);
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ labelIds: ["keep-label-uuid"] }),
+    );
+  });
+
+  it("rejects invalid issue label mode", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-123",
+      "--labels",
+      "bug",
+      "--label-mode",
+      "append",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("must be one of 'add', 'remove', or 'overwrite'"),
+    );
+    expect(updateIssue).not.toHaveBeenCalled();
   });
 });
 
