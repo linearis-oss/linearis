@@ -27,8 +27,10 @@ import {
 import { PROJECTS_META, setupProjectsCommands } from "./commands/projects.js";
 import { setupTeamsCommands, TEAMS_META } from "./commands/teams.js";
 import { setupUsersCommands, USERS_META } from "./commands/users.js";
+import { setupVersionCommands, VERSION_META } from "./commands/version.js";
 import { getRootOpts } from "./common/context.js";
 import { parseFieldsList, setOutputOptions } from "./common/output.js";
+import { maybeNotifyUpdate } from "./common/update-notifier.js";
 import {
   type DomainMeta,
   formatDomainUsage,
@@ -47,8 +49,9 @@ program
     parseFieldsList,
   );
 
-program.hook("preAction", (_thisCommand, actionCommand) => {
+program.hook("preAction", async (_thisCommand, actionCommand) => {
   setOutputOptions(getRootOpts(actionCommand));
+  await maybeNotifyUpdate(pkg.version);
 });
 
 const allMetas: DomainMeta[] = [
@@ -65,6 +68,7 @@ const allMetas: DomainMeta[] = [
   TEAMS_META,
   USERS_META,
   INITIATIVES_META,
+  VERSION_META,
 ];
 
 program.action(() => console.log(formatOverview(pkg.version, allMetas)));
@@ -82,6 +86,7 @@ setupTeamsCommands(program);
 setupUsersCommands(program);
 setupInitiativesCommands(program);
 setupDocumentsCommands(program);
+setupVersionCommands(program);
 
 program
   .command("usage")
@@ -104,4 +109,4 @@ program
     }
   });
 
-program.parse();
+program.parseAsync();
