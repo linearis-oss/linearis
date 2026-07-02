@@ -22,21 +22,56 @@ async function resolveRelationValue(value: unknown): Promise<unknown> {
   return isPromiseLike(value) ? await value : value;
 }
 
-function getTeamLookupFromRelation(team: unknown): string | undefined {
+/** Narrow projection of the SDK issue node fields the team lookup consumes. */
+interface IssueTeamProjection {
+  id: string;
+  teamId?: string;
+  team?: unknown; // relation; may be a value or PromiseLike (SDK quirk)
+}
+
+/** Narrow projection of a resolved team relation node. */
+interface TeamLookupProjection {
+  id?: string;
+  key?: string;
+}
+
+function toIssueTeamProjection(
+  node: unknown,
+  ref: string,
+): IssueTeamProjection {
+  if (!isRecord(node) || typeof node.id !== "string") {
+    throw new Error(`Issue "${ref}" is missing required team context`);
+  }
+
+  return {
+    id: node.id,
+    teamId: typeof node.teamId === "string" ? node.teamId : undefined,
+    team: node.team,
+  };
+}
+
+function toTeamLookupProjection(
+  team: unknown,
+): TeamLookupProjection | undefined {
   if (!isRecord(team)) return undefined;
 
-  if (typeof team.id === "string") return team.id;
-  if (typeof team.key === "string") return team.key;
+  return {
+    id: typeof team.id === "string" ? team.id : undefined,
+    key: typeof team.key === "string" ? team.key : undefined,
+  };
+}
 
-  return undefined;
+function getTeamLookupFromRelation(team: unknown): string | undefined {
+  const relation = toTeamLookupProjection(team);
+  return relation?.id ?? relation?.key;
 }
 
 async function getIssueTeamLookup(
-  node: Record<string, unknown>,
+  projection: IssueTeamProjection,
 ): Promise<string | undefined> {
-  if (typeof node.teamId === "string") return node.teamId;
+  if (projection.teamId) return projection.teamId;
 
-  return getTeamLookupFromRelation(await resolveRelationValue(node.team));
+  return getTeamLookupFromRelation(await resolveRelationValue(projection.team));
 }
 
 export interface IssueEstimateContext {
@@ -104,14 +139,12 @@ export async function resolveIssueEstimateContext(
     throw notFoundError("Issue", issueIdOrIdentifier);
   }
 
-  const issueNode = issues.nodes[0];
-  if (!isRecord(issueNode) || typeof issueNode.id !== "string") {
-    throw new Error(
-      `Issue "${issueIdOrIdentifier}" is missing required team context`,
-    );
-  }
+  const projection = toIssueTeamProjection(
+    issues.nodes[0],
+    issueIdOrIdentifier,
+  );
 
-  const teamLookup = await getIssueTeamLookup(issueNode);
+  const teamLookup = await getIssueTeamLookup(projection);
   if (!teamLookup) {
     throw new Error(
       `Issue "${issueIdOrIdentifier}" is missing required team context`,
@@ -119,7 +152,7 @@ export async function resolveIssueEstimateContext(
   }
 
   return {
-    issueId: issueNode.id,
+    issueId: projection.id,
     team: await resolveTeamEstimateContext(client, teamLookup),
   };
 }

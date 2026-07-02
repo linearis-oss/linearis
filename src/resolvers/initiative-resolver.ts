@@ -1,3 +1,4 @@
+import type { LinearDocument } from "@linear/sdk";
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
@@ -21,7 +22,7 @@ export async function resolveInitiativeId(
     return nameOrId;
   }
 
-  const clauses: Array<Record<string, unknown>> = [
+  const clauses: LinearDocument.InitiativeFilter[] = [
     { name: { eqIgnoreCase: nameOrId } },
   ];
 
