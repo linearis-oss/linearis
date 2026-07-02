@@ -125,7 +125,7 @@ function buildUpdateInput(options: UpdateLabelOptions): IssueLabelUpdateInput {
     input.color = color;
   }
 
-  if (options.description) {
+  if (options.description !== undefined) {
     input.description = options.description;
   }
 

@@ -367,6 +367,28 @@ describe("labels update", () => {
       },
     );
   });
+
+  it("clears the description when passed an empty string", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:merged",
+      "--description",
+      "",
+    ]);
+
+    expect(updateLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+      {
+        description: "",
+      },
+    );
+  });
 });
 
 describe("labels delete", () => {
