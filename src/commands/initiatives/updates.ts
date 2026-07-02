@@ -6,10 +6,10 @@ import {
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
-import {
-  type InitiativeUpdateCreateInput,
+import type {
+  InitiativeUpdateCreateInput,
   InitiativeUpdateHealthType,
-  type InitiativeUpdateUpdateInput,
+  InitiativeUpdateUpdateInput,
 } from "../../gql/graphql.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import {
@@ -43,9 +43,9 @@ function parseHealth(value?: string): InitiativeUpdateHealthType | undefined {
   if (!value) return undefined;
 
   const normalized = value.trim().toLowerCase();
-  if (normalized === "ontrack") return InitiativeUpdateHealthType.OnTrack;
-  if (normalized === "atrisk") return InitiativeUpdateHealthType.AtRisk;
-  if (normalized === "offtrack") return InitiativeUpdateHealthType.OffTrack;
+  if (normalized === "ontrack") return "onTrack";
+  if (normalized === "atrisk") return "atRisk";
+  if (normalized === "offtrack") return "offTrack";
 
   throw invalidParameterError(
     "--health",
