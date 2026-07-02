@@ -5,7 +5,7 @@ import { expect } from "vitest";
  * Collect the names of every variable declared by the operation(s) in a
  * GraphQL document (e.g. `$projectId`, `$name` → "projectId", "name").
  */
-export function declaredVariableNames(doc: DocumentNode): Set<string> {
+function declaredVariableNames(doc: DocumentNode): Set<string> {
   const names = new Set<string>();
   for (const definition of doc.definitions) {
     if (definition.kind !== Kind.OPERATION_DEFINITION) {
