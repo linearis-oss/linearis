@@ -1,3 +1,13 @@
+## [2026.6.0-next.6](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.5...v2026.6.0-next.6) (2026-07-02)
+
+### Features
+
+* **projects:** restore project workflow options ([1f35779](https://github.com/linearis-oss/linearis/commit/1f35779fb07b42beb30d13a9e96917aa2d63d03e))
+
+### Bug Fixes
+
+* **ci:** skip PR comment posting for fork pull requests ([390dd38](https://github.com/linearis-oss/linearis/commit/390dd385cded3c3249e3ab9ad13864b1d377b810))
+
 ## [2026.6.0-next.5](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.4...v2026.6.0-next.5) (2026-07-02)
 
 ### Features
