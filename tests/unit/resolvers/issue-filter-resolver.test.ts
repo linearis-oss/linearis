@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { resolveSearchFilterIds } from "../../../src/resolvers/issue-filter-resolver.js";
 
-const { resolveStatusIdMock } = vi.hoisted(() => ({
+const { resolveStatusIdMock, resolveCycleIdMock } = vi.hoisted(() => ({
   resolveStatusIdMock: vi.fn(),
+  resolveCycleIdMock: vi.fn(),
 }));
 
 vi.mock("../../../src/resolvers/status-resolver.js", () => ({
   resolveStatusId: resolveStatusIdMock,
+}));
+
+vi.mock("../../../src/resolvers/cycle-resolver.js", () => ({
+  resolveCycleId: resolveCycleIdMock,
 }));
 
 type BatchNodes = {
@@ -146,6 +151,22 @@ describe("resolveSearchFilterIds", () => {
       undefined,
     );
     expect(result).toEqual({ stateIds: ["global-state-uuid"] });
+  });
+
+  it("falls back to global cycle resolution when no cycles are team-scoped", async () => {
+    const { client } = mockGql({}); // no cycles returned (e.g. no team)
+    resolveCycleIdMock.mockResolvedValue("global-cycle-uuid");
+
+    const result = await resolveSearchFilterIds(client, {
+      cycle: "Sprint 1",
+    });
+
+    expect(resolveCycleIdMock).toHaveBeenCalledWith(
+      client,
+      "Sprint 1",
+      undefined,
+    );
+    expect(result).toEqual({ cycleId: "global-cycle-uuid" });
   });
 
   it("throws when the team cannot be resolved", async () => {

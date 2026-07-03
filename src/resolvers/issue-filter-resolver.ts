@@ -15,6 +15,7 @@ import {
   mapProjectId,
   mapUser,
 } from "./batch-resolve-mappers.js";
+import { resolveCycleId } from "./cycle-resolver.js";
 import { resolveStatusId } from "./status-resolver.js";
 
 export interface SearchFilterResolutionInput {
@@ -44,11 +45,11 @@ export interface SearchFilterResolution {
  * `BatchResolveForSearch` request, preserving the exact semantics of the
  * individual resolvers via the shared batch mappers.
  *
- * Statuses are the one exception: the batch query returns the workflow states
- * of the scoped team (matched client-side by name). When no team is given — or
- * a name is not among the returned states — resolution falls back to
- * `resolveStatusId`, which matches globally, so status filtering without a team
- * keeps working.
+ * Statuses and cycles are the exception: the batch query scopes both to the
+ * team (matched client-side by name). When no team is given — or the name is
+ * not among the returned nodes — resolution falls back to `resolveStatusId` /
+ * `resolveCycleId`, which match globally, so filtering by status or cycle name
+ * without a team keeps working.
  */
 export async function resolveSearchFilterIds(
   gqlClient: GraphQLClient,
@@ -134,13 +135,24 @@ export async function resolveSearchFilterIds(
   }
 
   if (input.cycle) {
-    resolved.cycleId = isUuid(input.cycle)
-      ? asUuid(input.cycle)
-      : mapCycle(
-          response.cycles.nodes,
-          input.cycle,
-          resolved.teamId ?? input.team,
-        );
+    if (isUuid(input.cycle)) {
+      resolved.cycleId = asUuid(input.cycle);
+    } else if (response.cycles.nodes.length > 0) {
+      resolved.cycleId = mapCycle(
+        response.cycles.nodes,
+        input.cycle,
+        resolved.teamId ?? input.team,
+      );
+    } else {
+      // No cycles in the batch response (the query scopes them to a team, so
+      // this is the no-team case) — resolve individually to match globally, as
+      // resolveCycleId did before.
+      resolved.cycleId = await resolveCycleId(
+        gqlClient,
+        input.cycle,
+        resolved.teamId ?? input.team,
+      );
+    }
   }
 
   if (input.parent) {
