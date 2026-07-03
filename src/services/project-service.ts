@@ -38,6 +38,40 @@ export type DeletedProject = {
   success: true;
 };
 
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateProjectInput = Pick<
+  ProjectCreateInput,
+  | "name"
+  | "teamIds"
+  | "description"
+  | "content"
+  | "icon"
+  | "color"
+  | "leadId"
+  | "memberIds"
+  | "priority"
+  | "statusId"
+  | "startDate"
+  | "targetDate"
+  | "labelIds"
+>;
+export type UpdateProjectInput = Pick<
+  ProjectUpdateInput,
+  | "name"
+  | "description"
+  | "content"
+  | "icon"
+  | "color"
+  | "leadId"
+  | "memberIds"
+  | "priority"
+  | "statusId"
+  | "startDate"
+  | "targetDate"
+  | "teamIds"
+  | "labelIds"
+>;
+
 export interface ProjectListOptions extends PaginationOptions {
   includeArchived?: boolean;
 }
@@ -97,9 +131,12 @@ export async function getProject(
 
 export async function createProject(
   client: GraphQLClient,
-  input: ProjectCreateInput,
+  input: CreateProjectInput,
 ): Promise<CreatedProject> {
-  const result = await client.request(CreateProjectDocument, { input });
+  const gqlInput: ProjectCreateInput = input;
+  const result = await client.request(CreateProjectDocument, {
+    input: gqlInput,
+  });
 
   if (!result.projectCreate.success || !result.projectCreate.project) {
     throw new Error(`Failed to create project "${input.name}"`);
@@ -111,9 +148,13 @@ export async function createProject(
 export async function updateProject(
   client: GraphQLClient,
   id: string,
-  input: ProjectUpdateInput,
+  input: UpdateProjectInput,
 ): Promise<UpdatedProject> {
-  const result = await client.request(UpdateProjectDocument, { id, input });
+  const gqlInput: ProjectUpdateInput = input;
+  const result = await client.request(UpdateProjectDocument, {
+    id,
+    input: gqlInput,
+  });
 
   if (!result.projectUpdate.success || !result.projectUpdate.project) {
     throw new Error(`Failed to update project "${id}"`);

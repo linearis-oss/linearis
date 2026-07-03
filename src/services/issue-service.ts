@@ -76,6 +76,39 @@ export type UpdatedIssue = NonNullable<
   UpdateIssueMutation["issueUpdate"]["issue"]
 >;
 
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateIssueInput = Pick<
+  IssueCreateInput,
+  | "title"
+  | "teamId"
+  | "description"
+  | "assigneeId"
+  | "priority"
+  | "estimate"
+  | "projectId"
+  | "labelIds"
+  | "projectMilestoneId"
+  | "cycleId"
+  | "stateId"
+  | "parentId"
+  | "dueDate"
+>;
+export type UpdateIssueInput = Pick<
+  IssueUpdateInput,
+  | "title"
+  | "description"
+  | "stateId"
+  | "priority"
+  | "estimate"
+  | "assigneeId"
+  | "projectId"
+  | "labelIds"
+  | "parentId"
+  | "projectMilestoneId"
+  | "cycleId"
+  | "dueDate"
+>;
+
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
 };
@@ -403,9 +436,10 @@ export async function searchIssues(
 
 export async function createIssue(
   client: GraphQLClient,
-  input: IssueCreateInput,
+  input: CreateIssueInput,
 ): Promise<CreatedIssue> {
-  const result = await client.request(CreateIssueDocument, { input });
+  const gqlInput: IssueCreateInput = input;
+  const result = await client.request(CreateIssueDocument, { input: gqlInput });
   if (!result.issueCreate.success || !result.issueCreate.issue) {
     throw new Error("Failed to create issue");
   }
@@ -415,9 +449,13 @@ export async function createIssue(
 export async function updateIssue(
   client: GraphQLClient,
   id: string,
-  input: IssueUpdateInput,
+  input: UpdateIssueInput,
 ): Promise<UpdatedIssue> {
-  const result = await client.request(UpdateIssueDocument, { id, input });
+  const gqlInput: IssueUpdateInput = input;
+  const result = await client.request(UpdateIssueDocument, {
+    id,
+    input: gqlInput,
+  });
   if (!result.issueUpdate.success || !result.issueUpdate.issue) {
     throw new Error("Failed to update issue");
   }

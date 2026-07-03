@@ -15,11 +15,50 @@ export type AttachmentListItem =
 export type CreatedAttachment =
   AttachmentCreateMutation["attachmentCreate"]["attachment"];
 
+// Service-owned input type (UUIDs pre-resolved by the command).
+export type CreateAttachmentInput = Pick<
+  AttachmentCreateInput,
+  "issueId" | "title" | "url" | "subtitle" | "commentBody" | "iconUrl"
+>;
+
+export interface AttachmentFilterOptions {
+  sourceType?: string;
+  title?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+}
+
+export function buildAttachmentFilter(
+  options: AttachmentFilterOptions,
+): AttachmentFilter | undefined {
+  const filters: AttachmentFilter[] = [];
+
+  if (options.sourceType) {
+    filters.push({ sourceType: { eq: options.sourceType } });
+  }
+  if (options.title) {
+    filters.push({ title: { eqIgnoreCase: options.title } });
+  }
+  if (options.createdAfter) {
+    filters.push({ createdAt: { gte: options.createdAfter } });
+  }
+  if (options.createdBefore) {
+    filters.push({ createdAt: { lt: options.createdBefore } });
+  }
+
+  if (filters.length === 0) return undefined;
+  if (filters.length === 1) return filters[0];
+  return { and: filters };
+}
+
 export async function createAttachment(
   client: GraphQLClient,
-  input: AttachmentCreateInput,
+  input: CreateAttachmentInput,
 ): Promise<CreatedAttachment> {
-  const result = await client.request(AttachmentCreateDocument, { input });
+  const gqlInput: AttachmentCreateInput = input;
+  const result = await client.request(AttachmentCreateDocument, {
+    input: gqlInput,
+  });
 
   if (!result.attachmentCreate.success || !result.attachmentCreate.attachment) {
     throw new Error("Failed to create attachment");

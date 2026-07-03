@@ -26,6 +26,16 @@ export type UpdatedMilestone = NonNullable<
   UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
 >;
 
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateMilestoneInput = Pick<
+  ProjectMilestoneCreateInput,
+  "projectId" | "name" | "description" | "targetDate"
+>;
+export type UpdateMilestoneInput = Pick<
+  ProjectMilestoneUpdateInput,
+  "name" | "description" | "targetDate" | "sortOrder"
+>;
+
 export async function listMilestones(
   client: GraphQLClient,
   projectId: string,
@@ -66,10 +76,11 @@ export async function getMilestone(
 
 export async function createMilestone(
   client: GraphQLClient,
-  input: ProjectMilestoneCreateInput,
+  input: CreateMilestoneInput,
 ): Promise<CreatedMilestone> {
+  const gqlInput: ProjectMilestoneCreateInput = input;
   const result = await client.request(CreateProjectMilestoneDocument, {
-    input,
+    input: gqlInput,
   });
 
   if (
@@ -85,11 +96,12 @@ export async function createMilestone(
 export async function updateMilestone(
   client: GraphQLClient,
   id: string,
-  input: ProjectMilestoneUpdateInput,
+  input: UpdateMilestoneInput,
 ): Promise<UpdatedMilestone> {
+  const gqlInput: ProjectMilestoneUpdateInput = input;
   const result = await client.request(UpdateProjectMilestoneDocument, {
     id,
-    input,
+    input: gqlInput,
   });
 
   if (

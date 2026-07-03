@@ -6,17 +6,15 @@ import {
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
-import type {
-  InitiativeUpdateCreateInput,
-  InitiativeUpdateHealthType,
-  InitiativeUpdateUpdateInput,
-} from "../../gql/graphql.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import {
   archiveInitiativeUpdate,
+  type CreateInitiativeUpdateInput,
   createInitiativeUpdate,
   getInitiativeUpdate,
   listInitiativeUpdates,
+  parseHealth,
+  type UpdateInitiativeUpdateInput,
   unarchiveInitiativeUpdate,
   updateInitiativeUpdate,
 } from "../../services/initiative-update-service.js";
@@ -37,20 +35,6 @@ interface InitiativeUpdatesCreateOptions {
 interface InitiativeUpdatesUpdateOptions {
   body?: string;
   health?: string;
-}
-
-function parseHealth(value?: string): InitiativeUpdateHealthType | undefined {
-  if (!value) return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "ontrack") return "onTrack";
-  if (normalized === "atrisk") return "atRisk";
-  if (normalized === "offtrack") return "offTrack";
-
-  throw invalidParameterError(
-    "--health",
-    'must be one of: "onTrack", "atRisk", "offTrack"',
-  );
 }
 
 export function setupInitiativeUpdateCommands(initiatives: Command): void {
@@ -122,7 +106,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           options.initiative,
         );
 
-        const input: InitiativeUpdateCreateInput = { initiativeId };
+        const input: CreateInitiativeUpdateInput = { initiativeId };
 
         if (options.body !== undefined) {
           input.body = options.body;
@@ -152,7 +136,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const input: InitiativeUpdateUpdateInput = {};
+        const input: UpdateInitiativeUpdateInput = {};
 
         if (options.body !== undefined) {
           input.body = options.body;

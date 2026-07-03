@@ -34,20 +34,29 @@ vi.mock("../../../src/services/attachment-service.js", () => ({
   listAttachments: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../../src/services/document-service.js", () => ({
-  createDocument: vi.fn().mockResolvedValue({
-    id: "doc-1",
-    title: "Runbook",
-    url: "https://linear.app/example/document/runbook-abc123",
-  }),
-  deleteDocument: vi.fn().mockResolvedValue({ id: "doc-1", success: true }),
-  getDocument: vi.fn().mockResolvedValue({ id: "doc-1", title: "Runbook" }),
-  listDocuments: vi.fn().mockResolvedValue({
-    nodes: [{ id: "doc-1", title: "Runbook" }],
-    pageInfo: { hasNextPage: false, endCursor: null },
-  }),
-  updateDocument: vi.fn().mockResolvedValue({ id: "doc-1", title: "Runbook" }),
-}));
+vi.mock("../../../src/services/document-service.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/services/document-service.js")
+    >();
+  return {
+    ...actual,
+    createDocument: vi.fn().mockResolvedValue({
+      id: "doc-1",
+      title: "Runbook",
+      url: "https://linear.app/example/document/runbook-abc123",
+    }),
+    deleteDocument: vi.fn().mockResolvedValue({ id: "doc-1", success: true }),
+    getDocument: vi.fn().mockResolvedValue({ id: "doc-1", title: "Runbook" }),
+    listDocuments: vi.fn().mockResolvedValue({
+      nodes: [{ id: "doc-1", title: "Runbook" }],
+      pageInfo: { hasNextPage: false, endCursor: null },
+    }),
+    updateDocument: vi
+      .fn()
+      .mockResolvedValue({ id: "doc-1", title: "Runbook" }),
+  };
+});
 
 import { setupDocumentsCommands } from "../../../src/commands/documents.js";
 import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";

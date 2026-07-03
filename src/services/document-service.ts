@@ -23,6 +23,39 @@ export type CreatedDocument =
 export type UpdatedDocument =
   DocumentUpdateMutation["documentUpdate"]["document"];
 
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateDocumentInput = Pick<
+  DocumentCreateInput,
+  "title" | "content" | "projectId" | "teamId" | "issueId" | "icon" | "color"
+>;
+export type UpdateDocumentInput = Pick<
+  DocumentUpdateInput,
+  "title" | "content" | "projectId" | "icon" | "color"
+>;
+
+export function buildProjectDocumentFilter(projectId: string): DocumentFilter {
+  return { project: { id: { eq: projectId } } };
+}
+
+export function buildIssueDocumentFilter(
+  issueId: string,
+  legacyDocumentSlugIds: string[],
+): DocumentFilter {
+  const issueFilter: DocumentFilter = { issue: { id: { eq: issueId } } };
+  if (legacyDocumentSlugIds.length === 0) {
+    return issueFilter;
+  }
+
+  return {
+    or: [
+      issueFilter,
+      ...legacyDocumentSlugIds.map((slugId) => ({
+        slugId: { eq: slugId },
+      })),
+    ],
+  };
+}
+
 export async function getDocument(
   client: GraphQLClient,
   id: string,
@@ -40,9 +73,12 @@ export async function getDocument(
 
 export async function createDocument(
   client: GraphQLClient,
-  input: DocumentCreateInput,
+  input: CreateDocumentInput,
 ): Promise<CreatedDocument> {
-  const result = await client.request(DocumentCreateDocument, { input });
+  const gqlInput: DocumentCreateInput = input;
+  const result = await client.request(DocumentCreateDocument, {
+    input: gqlInput,
+  });
 
   if (!result.documentCreate.success || !result.documentCreate.document) {
     throw new Error("Failed to create document");
@@ -54,9 +90,13 @@ export async function createDocument(
 export async function updateDocument(
   client: GraphQLClient,
   id: string,
-  input: DocumentUpdateInput,
+  input: UpdateDocumentInput,
 ): Promise<UpdatedDocument> {
-  const result = await client.request(DocumentUpdateDocument, { id, input });
+  const gqlInput: DocumentUpdateInput = input;
+  const result = await client.request(DocumentUpdateDocument, {
+    id,
+    input: gqlInput,
+  });
 
   if (!result.documentUpdate.success || !result.documentUpdate.document) {
     throw new Error("Failed to update document");

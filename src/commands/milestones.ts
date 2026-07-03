@@ -2,13 +2,13 @@ import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { ProjectMilestoneUpdateInput } from "../gql/graphql.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import {
   createMilestone,
   getMilestone,
   listMilestones,
+  type UpdateMilestoneInput,
   updateMilestone,
 } from "../services/milestone-service.js";
 
@@ -177,7 +177,7 @@ export function setupMilestonesCommands(program: Command): void {
         );
 
         // Build update input (only include provided fields)
-        const updateInput: ProjectMilestoneUpdateInput = {};
+        const updateInput: UpdateMilestoneInput = {};
         if (options.name !== undefined) updateInput.name = options.name;
         if (options.description !== undefined) {
           updateInput.description = options.description;

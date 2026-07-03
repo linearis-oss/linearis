@@ -7,16 +7,13 @@ import {
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type {
-  IssueLabelCreateInput,
-  IssueLabelUpdateInput,
-} from "../gql/graphql.js";
 import {
   type LabelResolverScope,
   resolveLabelId,
 } from "../resolvers/label-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import {
+  type CreateLabelInput,
   createLabel,
   deleteLabel,
   getLabel,
@@ -24,6 +21,7 @@ import {
   type LabelType,
   listLabels,
   listProjectLabels,
+  type UpdateLabelInput,
   updateLabel,
 } from "../services/label-service.js";
 
@@ -113,8 +111,8 @@ async function resolveIssueLabelLookup(
   return { ctx, labelId };
 }
 
-function buildUpdateInput(options: UpdateLabelOptions): IssueLabelUpdateInput {
-  const input: IssueLabelUpdateInput = {};
+function buildUpdateInput(options: UpdateLabelOptions): UpdateLabelInput {
+  const input: UpdateLabelInput = {};
   const color = parseLabelColor(options.color);
 
   if (options.name) {
@@ -240,7 +238,7 @@ export function setupLabelsCommands(program: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const input: IssueLabelCreateInput = { name };
+        const input: CreateLabelInput = { name };
         const color = parseLabelColor(options.color);
 
         if (options.team) {

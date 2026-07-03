@@ -9,6 +9,7 @@ import {
   GetInitiativeUpdateDocument,
   type GetInitiativeUpdateQuery,
   type InitiativeUpdateCreateInput,
+  type InitiativeUpdateHealthType,
   type InitiativeUpdateUpdateInput,
   ListInitiativeUpdatesDocument,
   type ListInitiativeUpdatesQuery,
@@ -42,6 +43,32 @@ export interface InitiativeUpdateListOptions {
   limit?: number;
   after?: string;
   includeArchived?: boolean;
+}
+
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateInitiativeUpdateInput = Pick<
+  InitiativeUpdateCreateInput,
+  "initiativeId" | "body" | "health"
+>;
+export type UpdateInitiativeUpdateInput = Pick<
+  InitiativeUpdateUpdateInput,
+  "body" | "health"
+>;
+
+export function parseHealth(
+  value?: string,
+): InitiativeUpdateHealthType | undefined {
+  if (!value) return undefined;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "ontrack") return "onTrack";
+  if (normalized === "atrisk") return "atRisk";
+  if (normalized === "offtrack") return "offTrack";
+
+  throw invalidParameterError(
+    "--health",
+    'must be one of: "onTrack", "atRisk", "offTrack"',
+  );
 }
 
 export async function listInitiativeUpdates(
@@ -78,10 +105,11 @@ export async function getInitiativeUpdate(
 
 export async function createInitiativeUpdate(
   client: GraphQLClient,
-  input: InitiativeUpdateCreateInput,
+  input: CreateInitiativeUpdateInput,
 ): Promise<CreatedInitiativeUpdate> {
+  const gqlInput: InitiativeUpdateCreateInput = input;
   const result = await client.request(CreateInitiativeUpdateDocument, {
-    input,
+    input: gqlInput,
   });
 
   if (
@@ -97,7 +125,7 @@ export async function createInitiativeUpdate(
 export async function updateInitiativeUpdate(
   client: GraphQLClient,
   id: string,
-  input: InitiativeUpdateUpdateInput,
+  input: UpdateInitiativeUpdateInput,
 ): Promise<UpdatedInitiativeUpdate> {
   const hasAtLeastOneField = Object.values(input).some(
     (value) => value !== undefined,
@@ -110,9 +138,10 @@ export async function updateInitiativeUpdate(
     );
   }
 
+  const gqlInput: InitiativeUpdateUpdateInput = input;
   const result = await client.request(UpdateInitiativeUpdateDocument, {
     id,
-    input,
+    input: gqlInput,
   });
 
   if (
