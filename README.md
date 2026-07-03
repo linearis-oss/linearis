@@ -145,36 +145,28 @@ The agent never loads the full API surface into context — it pays for what it 
 
 Use Linearis when token efficiency matters and you work primarily with issues and related data. Use the MCP when you need full API coverage or tight tool-call integration.
 
-### Example agent prompt
+### Agent skill
 
-Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.md` so every session has it in context:
+Linearis ships an agent skill (following the [agentskills.io](https://agentskills.io) standard) so your agent knows how to use it — no prompt to paste. The skill preflights the install, advisory-checks for updates, then follows the discover-then-act protocol above.
 
-```markdown
-## Linear (project management)
+**Any harness (recommended)** — Vercel's skills CLI installs into the right place for 70+ agents and lists it on [skills.sh](https://skills.sh):
 
-Tool: `linearis` CLI, invoked via Bash. All output is JSON.
-
-Discovery (do this before acting): run `linearis usage` once for the list of
-domains, then `linearis <domain> usage` for a domain's full command reference.
-Never guess flags or subcommands — check usage first.
-
-Tickets: always reference by identifier, e.g. `ABC-123`.
-
-Workflow rules:
-- Ask which project a new ticket belongs to when it's unclear; subtasks inherit
-  the parent's project by default.
-- Keep the ticket description in sync when a task in it changes status.
-- Record progress that isn't a simple checkbox change in a discussion thread
-  (`issues discuss`), not in the description.
-
-Files: `files download <url>` only fetches Linear storage URLs
-(`uploads.linear.app`), such as images embedded in descriptions or comments.
-Upload new files with `files upload <file>`; it returns an `assetUrl` you can
-embed in descriptions or comments. `issues read --with-attachments` lists
-resources linked to an issue (PRs, docs, external URLs) under an
-`attachments.nodes` array whose entries carry a `url` — these are references,
-not necessarily downloadable files.
+```bash
+npx skills add linearis-oss/linearis
 ```
+
+**Claude Code** — native plugin:
+
+```
+/plugin marketplace add linearis-oss/linearis
+/plugin install linearis@linearis
+```
+
+**OpenAI Codex** — `npx skills add linearis-oss/linearis` installs to `~/.agents/skills/`; invoke with `/skills` or `$`.
+
+**pi** — `npx skills add linearis-oss/linearis` (or drop `skills/linearis/` into `.pi/skills/`); invoke `/skill:linearis`.
+
+**Google Antigravity** — `npx skills add linearis-oss/linearis` installs to `.agents/skills/`; auto-discovered from the skill list.
 
 ## Documentation
 
