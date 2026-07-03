@@ -50,7 +50,7 @@ export function setupTeamsCommands(program: Command): void {
         const team = args[0] as string;
         const command = args.at(-1) as Command;
         const ctx = createContext(getRootOpts(command));
-        const teamId = await resolveTeamId(ctx.sdk, team);
+        const teamId = await resolveTeamId(ctx.gql, team);
         const result = await getTeam(ctx.gql, { id: teamId });
         outputSuccess(result);
       }),

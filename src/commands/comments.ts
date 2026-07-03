@@ -98,7 +98,7 @@ export function setupCommentsCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const limit = parseLimit(options.limit || "25");
-        const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
+        const resolvedIssueId = await resolveIssueId(ctx.gql, issue);
         const result = await listDiscussionsForIssue(
           ctx.gql,
           resolvedIssueId,
@@ -133,7 +133,7 @@ export function setupCommentsCommands(program: Command): void {
           throw invalidParameterError("--body", "is required");
         }
 
-        const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
+        const resolvedIssueId = await resolveIssueId(ctx.gql, issue);
         const result = await startIssueDiscussion(ctx.gql, {
           issueId: resolvedIssueId,
           body: options.body,

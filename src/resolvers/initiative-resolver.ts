@@ -1,12 +1,12 @@
-import type { LinearDocument } from "@linear/sdk";
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import {
   FindInitiativeProjectLinkByPairDocument,
   FindInitiativeRelationByPairDocument,
+  FindInitiativesDocument,
+  type InitiativeFilter,
 } from "../gql/graphql.js";
 
 export interface InitiativeResolveScope {
@@ -15,7 +15,7 @@ export interface InitiativeResolveScope {
 }
 
 export async function resolveInitiativeId(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   nameOrId: string,
   scope: InitiativeResolveScope = {},
 ): Promise<UUID> {
@@ -23,10 +23,10 @@ export async function resolveInitiativeId(
     return asUuid(nameOrId);
   }
 
-  const nameClause: LinearDocument.InitiativeFilter = {
+  const nameClause: InitiativeFilter = {
     name: { eqIgnoreCase: nameOrId },
   };
-  const scopeClauses: LinearDocument.InitiativeFilter[] = [];
+  const scopeClauses: InitiativeFilter[] = [];
 
   if (scope.teamId) {
     scopeClauses.push({ teams: { some: { id: { eq: scope.teamId } } } });
@@ -36,28 +36,31 @@ export async function resolveInitiativeId(
     scopeClauses.push({ owner: { id: { eq: scope.ownerId } } });
   }
 
-  const filter: LinearDocument.InitiativeFilter =
+  const filter: InitiativeFilter =
     scopeClauses.length === 0
       ? nameClause
       : { and: [nameClause, ...scopeClauses] };
 
-  const result = await client.sdk.initiatives({
+  const { initiatives } = await client.request(FindInitiativesDocument, {
     filter,
     first: 20,
   });
 
-  if (result.nodes.length === 0) {
+  if (initiatives.nodes.length === 0) {
     throw notFoundError("Initiative", nameOrId);
   }
 
-  if (result.nodes.length === 1) {
+  if (initiatives.nodes.length === 1) {
     return asUuid(
-      firstOrThrow(result.nodes, () => notFoundError("Initiative", nameOrId))
-        .id,
+      firstOrThrow(initiatives.nodes, () =>
+        notFoundError("Initiative", nameOrId),
+      ).id,
     );
   }
 
-  const candidates = result.nodes.map((node) => `${node.name} (${node.id})`);
+  const candidates = initiatives.nodes.map(
+    (node) => `${node.name} (${node.id})`,
+  );
 
   throw multipleMatchesError(
     "initiative",

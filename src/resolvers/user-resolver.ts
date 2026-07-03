@@ -1,15 +1,16 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
+import { FindUsersDocument } from "../gql/graphql.js";
 
 export async function resolveUserId(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   nameOrEmailOrId: string,
 ): Promise<UUID> {
   if (isUuid(nameOrEmailOrId)) return asUuid(nameOrEmailOrId);
 
   // Try by display name first (case-insensitive)
-  const byName = await client.sdk.users({
+  const { users: byName } = await client.request(FindUsersDocument, {
     filter: { displayName: { eqIgnoreCase: nameOrEmailOrId } },
     first: 10,
   });
@@ -27,7 +28,7 @@ export async function resolveUserId(
   }
 
   // Fall back to email (case-insensitive)
-  const byEmail = await client.sdk.users({
+  const { users: byEmail } = await client.request(FindUsersDocument, {
     filter: { email: { eqIgnoreCase: nameOrEmailOrId } },
     first: 1,
   });

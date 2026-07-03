@@ -76,7 +76,7 @@ export function setupMilestonesCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         // Resolve project ID
-        const projectId = await resolveProjectId(ctx.sdk, options.project);
+        const projectId = await resolveProjectId(ctx.gql, options.project);
 
         const milestones = await listMilestones(
           ctx.gql,
@@ -108,7 +108,6 @@ export function setupMilestonesCommands(program: Command): void {
 
         const milestoneId = await resolveMilestoneId(
           ctx.gql,
-          ctx.sdk,
           milestone,
           options.project,
         );
@@ -140,7 +139,7 @@ export function setupMilestonesCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         // Resolve project ID
-        const projectId = await resolveProjectId(ctx.sdk, options.project);
+        const projectId = await resolveProjectId(ctx.gql, options.project);
 
         const milestone = await createMilestone(ctx.gql, {
           projectId,
@@ -176,7 +175,6 @@ export function setupMilestonesCommands(program: Command): void {
 
         const milestoneId = await resolveMilestoneId(
           ctx.gql,
-          ctx.sdk,
           milestone,
           options.project,
         );

@@ -72,7 +72,7 @@ export function setupCyclesCommands(program: Command): void {
 
         // Resolve team filter if provided
         const teamId = options.team
-          ? await resolveTeamId(ctx.sdk, options.team)
+          ? await resolveTeamId(ctx.gql, options.team)
           : undefined;
 
         // Fetch cycles
@@ -130,7 +130,7 @@ export function setupCyclesCommands(program: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const cycleId = await resolveCycleId(ctx.sdk, cycle, options.team);
+        const cycleId = await resolveCycleId(ctx.gql, cycle, options.team);
 
         const cycleResult = await getCycle(
           ctx.gql,

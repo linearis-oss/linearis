@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type { LinearSdkClient } from "../../client/linear-client.js";
+import type { GraphQLClient } from "../../client/graphql-client.js";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { resolveReactionEmojiInput } from "../../common/emoji.js";
 import { invalidParameterError } from "../../common/errors.js";
@@ -246,7 +246,7 @@ function getExpandFlags(options: InitiativeExpandOptions): string[] {
 }
 
 async function resolveInitiativeFilterInput(
-  sdk: LinearSdkClient,
+  gql: GraphQLClient,
   options: InitiativeListOptions,
 ): Promise<InitiativeFilterInput> {
   if (options.parent) {
@@ -276,19 +276,19 @@ async function resolveInitiativeFilterInput(
   });
 
   if (options.owner) {
-    input.ownerId = await resolveUserId(sdk, options.owner);
+    input.ownerId = await resolveUserId(gql, options.owner);
   }
 
   if (options.creator) {
-    input.creatorId = await resolveUserId(sdk, options.creator);
+    input.creatorId = await resolveUserId(gql, options.creator);
   }
 
   if (options.team) {
-    input.teamId = await resolveTeamId(sdk, options.team);
+    input.teamId = await resolveTeamId(gql, options.team);
   }
 
   if (options.ancestor) {
-    input.ancestorId = await resolveInitiativeId(sdk, options.ancestor);
+    input.ancestorId = await resolveInitiativeId(gql, options.ancestor);
   }
 
   return input;
@@ -367,7 +367,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const sort = mapSortByToInitiativeSort(sortBy, sortOrder);
 
           const filterInput = await resolveInitiativeFilterInput(
-            ctx.sdk,
+            ctx.gql,
             options,
           );
           const filter = buildInitiativeFilter(filterInput);
@@ -409,7 +409,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
       commandAction<[string, InitiativeReadOptions, Command]>(
         async (initiative, options, command) => {
           const ctx = createContext(getRootOpts(command));
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
           // Read query already returns expanded fields. Keep flags accepted for
           // CLI contract compatibility until conditional field selection is added.
@@ -434,7 +434,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
             throw invalidParameterError("--body", "is required");
           }
 
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await startInitiativeDiscussion(ctx.gql, {
             initiativeId,
             body: options.body,
@@ -456,7 +456,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         async (initiative, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "25"),
             options.after,
@@ -704,7 +704,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           }
 
           if (options.owner) {
-            input.ownerId = await resolveUserId(ctx.sdk, options.owner);
+            input.ownerId = await resolveUserId(ctx.gql, options.owner);
           }
 
           const status = parseInitiativeStatus(options.status);
@@ -741,7 +741,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
       commandAction<[string, InitiativeUpdateOptions, Command]>(
         async (initiative, options, command) => {
           const ctx = createContext(getRootOpts(command));
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
           const input: UpdateInitiativeInput = {};
 
@@ -758,7 +758,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           }
 
           if (options.owner) {
-            input.ownerId = await resolveUserId(ctx.sdk, options.owner);
+            input.ownerId = await resolveUserId(ctx.gql, options.owner);
           }
 
           const status = parseInitiativeStatus(options.status);
@@ -795,7 +795,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
       commandAction<[string, unknown, Command]>(
         async (initiative, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await archiveInitiative(ctx.gql, initiativeId);
           outputSuccess(result);
         },
@@ -809,7 +809,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
       commandAction<[string, unknown, Command]>(
         async (initiative, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await unarchiveInitiative(ctx.gql, initiativeId);
           outputSuccess(result);
         },
@@ -823,7 +823,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
       commandAction<[string, unknown, Command]>(
         async (initiative, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await deleteInitiative(ctx.gql, initiativeId);
           outputSuccess(result);
         },

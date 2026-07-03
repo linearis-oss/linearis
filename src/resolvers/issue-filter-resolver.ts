@@ -1,4 +1,4 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
 import type { UUID } from "../common/identifier.js";
 import { resolveCycleId } from "./cycle-resolver.js";
 import { resolveIssueId } from "./issue-resolver.js";
@@ -31,49 +31,49 @@ export interface SearchFilterResolution {
 }
 
 export async function resolveSearchFilterIds(
-  sdkClient: LinearSdkClient,
+  gqlClient: GraphQLClient,
   input: SearchFilterResolutionInput,
 ): Promise<SearchFilterResolution> {
   const resolved: SearchFilterResolution = {};
 
   if (input.team) {
-    resolved.teamId = await resolveTeamId(sdkClient, input.team);
+    resolved.teamId = await resolveTeamId(gqlClient, input.team);
   }
 
   if (input.assignee) {
-    resolved.assigneeId = await resolveUserId(sdkClient, input.assignee);
+    resolved.assigneeId = await resolveUserId(gqlClient, input.assignee);
   }
 
   if (input.creator) {
-    resolved.creatorId = await resolveUserId(sdkClient, input.creator);
+    resolved.creatorId = await resolveUserId(gqlClient, input.creator);
   }
 
   if (input.project) {
-    resolved.projectId = await resolveProjectId(sdkClient, input.project);
+    resolved.projectId = await resolveProjectId(gqlClient, input.project);
   }
 
   if (input.statusNames && input.statusNames.length > 0) {
     resolved.stateIds = await Promise.all(
       input.statusNames.map((status) =>
-        resolveStatusId(sdkClient, status, resolved.teamId),
+        resolveStatusId(gqlClient, status, resolved.teamId),
       ),
     );
   }
 
   if (input.labelNames && input.labelNames.length > 0) {
-    resolved.labelIds = await resolveLabelIds(sdkClient, input.labelNames);
+    resolved.labelIds = await resolveLabelIds(gqlClient, input.labelNames);
   }
 
   if (input.cycle) {
     resolved.cycleId = await resolveCycleId(
-      sdkClient,
+      gqlClient,
       input.cycle,
       resolved.teamId ?? input.team,
     );
   }
 
   if (input.parent) {
-    resolved.parentId = await resolveIssueId(sdkClient, input.parent);
+    resolved.parentId = await resolveIssueId(gqlClient, input.parent);
   }
 
   return resolved;

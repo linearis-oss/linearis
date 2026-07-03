@@ -425,7 +425,7 @@ async function resolveAndApplyRelations(
   const resolved = new Map<string, UUID>();
   await Promise.all(
     [...uniqueTargets].map(async (target) => {
-      resolved.set(target, await resolveIssueId(ctx.sdk, target));
+      resolved.set(target, await resolveIssueId(ctx.gql, target));
     }),
   );
 
@@ -532,7 +532,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (issue, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await listIssueRelations(ctx.gql, issueId);
 
           outputSuccess(result);
@@ -555,9 +555,9 @@ export function setupIssuesCommands(program: Command): void {
         async (issue, options, command) => {
           const relation = parseRelationAddOptions(options);
           const ctx = createContext(getRootOpts(command));
-          const sourceIssueId = await resolveIssueId(ctx.sdk, issue);
+          const sourceIssueId = await resolveIssueId(ctx.gql, issue);
           const targetIds = await Promise.all(
-            relation.targets.map((target) => resolveIssueId(ctx.sdk, target)),
+            relation.targets.map((target) => resolveIssueId(ctx.gql, target)),
           );
 
           const created = await Promise.all(
@@ -765,7 +765,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, string | undefined, ReactionOptions, Command]>(
         async (issue, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await createReactionForIssue(ctx.gql, {
             issueId,
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -788,7 +788,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, string | undefined, ReactionOptions, Command]>(
         async (issue, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await deleteOwnReactionByEmoji(ctx.gql, {
             kind: "issue",
             id: issueId,
@@ -811,7 +811,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, string, unknown, Command]>(
         async (issue, reactionId, _unused2, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await deleteOwnReactionById(ctx.gql, {
             kind: "issue",
             id: issueId,
@@ -840,7 +840,7 @@ export function setupIssuesCommands(program: Command): void {
             throw invalidParameterError("--body", "is required");
           }
 
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await startIssueDiscussion(ctx.gql, {
             issueId,
             body: options.body,
@@ -866,7 +866,7 @@ export function setupIssuesCommands(program: Command): void {
         async (issue, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "25"),
             options.after,
@@ -1131,12 +1131,12 @@ export function setupIssuesCommands(program: Command): void {
 
           const teamEstimateContext =
             parsedEstimate !== undefined
-              ? await resolveTeamEstimateContext(ctx.sdk, options.team)
+              ? await resolveTeamEstimateContext(ctx.gql, options.team)
               : undefined;
 
           const teamId = teamEstimateContext
             ? teamEstimateContext.teamId
-            : await resolveTeamId(ctx.sdk, options.team);
+            : await resolveTeamId(ctx.gql, options.team);
 
           if (parsedEstimate !== undefined && teamEstimateContext) {
             validateEstimateAgainstTeamConfig(parsedEstimate, {
@@ -1159,7 +1159,7 @@ export function setupIssuesCommands(program: Command): void {
           }
 
           if (options.assignee) {
-            input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
+            input.assigneeId = await resolveUserId(ctx.gql, options.assignee);
           }
 
           if (parsedPriority !== undefined) {
@@ -1171,12 +1171,12 @@ export function setupIssuesCommands(program: Command): void {
           }
 
           if (options.project) {
-            input.projectId = await resolveProjectId(ctx.sdk, options.project);
+            input.projectId = await resolveProjectId(ctx.gql, options.project);
           }
 
           if (options.labels) {
             const labelNames = options.labels.split(",").map((l) => l.trim());
-            input.labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+            input.labelIds = await resolveLabelIds(ctx.gql, labelNames);
           }
 
           if (options.projectMilestone) {
@@ -1187,7 +1187,6 @@ export function setupIssuesCommands(program: Command): void {
             }
             input.projectMilestoneId = await resolveMilestoneId(
               ctx.gql,
-              ctx.sdk,
               options.projectMilestone,
               options.project,
             );
@@ -1195,7 +1194,7 @@ export function setupIssuesCommands(program: Command): void {
 
           if (options.cycle) {
             input.cycleId = await resolveCycleId(
-              ctx.sdk,
+              ctx.gql,
               options.cycle,
               options.team,
             );
@@ -1203,7 +1202,7 @@ export function setupIssuesCommands(program: Command): void {
 
           if (options.status) {
             input.stateId = await resolveStatusId(
-              ctx.sdk,
+              ctx.gql,
               options.status,
               teamId,
             );
@@ -1211,7 +1210,7 @@ export function setupIssuesCommands(program: Command): void {
 
           if (options.parentTicket) {
             input.parentId = await resolveIssueId(
-              ctx.sdk,
+              ctx.gql,
               options.parentTicket,
             );
           }
@@ -1327,12 +1326,12 @@ export function setupIssuesCommands(program: Command): void {
 
           const issueEstimateContext =
             parsedEstimate !== undefined
-              ? await resolveIssueEstimateContext(ctx.sdk, issue)
+              ? await resolveIssueEstimateContext(ctx.gql, issue)
               : undefined;
 
           const resolvedIssueId = issueEstimateContext
             ? issueEstimateContext.issueId
-            : await resolveIssueId(ctx.sdk, issue);
+            : await resolveIssueId(ctx.gql, issue);
 
           if (parsedEstimate !== undefined && issueEstimateContext) {
             validateEstimateAgainstTeamConfig(parsedEstimate, {
@@ -1371,7 +1370,7 @@ export function setupIssuesCommands(program: Command): void {
                 ? asUuid(issueContext.team.id)
                 : undefined;
             input.stateId = await resolveStatusId(
-              ctx.sdk,
+              ctx.gql,
               options.status,
               teamId,
             );
@@ -1388,18 +1387,18 @@ export function setupIssuesCommands(program: Command): void {
           }
 
           if (options.assignee) {
-            input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
+            input.assigneeId = await resolveUserId(ctx.gql, options.assignee);
           }
 
           if (options.project) {
-            input.projectId = await resolveProjectId(ctx.sdk, options.project);
+            input.projectId = await resolveProjectId(ctx.gql, options.project);
           }
 
           if (options.clearLabels) {
             input.labelIds = [];
           } else if (options.labels) {
             const labelNames = options.labels.split(",").map((l) => l.trim());
-            const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+            const labelIds = await resolveLabelIds(ctx.gql, labelNames);
 
             if (labelMode === "add") {
               const currentLabels =
@@ -1428,7 +1427,7 @@ export function setupIssuesCommands(program: Command): void {
             input.parentId = null;
           } else if (options.parentTicket) {
             input.parentId = await resolveIssueId(
-              ctx.sdk,
+              ctx.gql,
               options.parentTicket,
             );
           }
@@ -1444,7 +1443,6 @@ export function setupIssuesCommands(program: Command): void {
                 : undefined;
             input.projectMilestoneId = await resolveMilestoneId(
               ctx.gql,
-              ctx.sdk,
               options.projectMilestone,
               projectName,
             );
@@ -1458,7 +1456,7 @@ export function setupIssuesCommands(program: Command): void {
                 ? issueContext.team.key
                 : undefined;
             input.cycleId = await resolveCycleId(
-              ctx.sdk,
+              ctx.gql,
               options.cycle,
               teamKey,
             );
@@ -1492,7 +1490,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (issue, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await archiveIssue(ctx.gql, issueId);
           outputSuccess(result);
         },
@@ -1506,7 +1504,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (issue, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await unarchiveIssue(ctx.gql, issueId);
           outputSuccess(result);
         },
@@ -1520,7 +1518,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (issue, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const issueId = await resolveIssueId(ctx.sdk, issue);
+          const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await deleteIssue(ctx.gql, issueId);
           outputSuccess(result);
         },

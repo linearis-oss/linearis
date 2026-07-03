@@ -108,7 +108,7 @@ export async function resolveFilterOptions(
 
   const batchResolved = hasResolvableFilters
     ? await resolveSearchFilterIds(
-        ctx.sdk,
+        ctx.gql,
         omitUndefined({
           team: opts.team,
           assignee: opts.assignee,
@@ -123,7 +123,7 @@ export async function resolveFilterOptions(
     : {};
 
   const milestoneId = opts.milestone
-    ? await resolveMilestoneId(ctx.gql, ctx.sdk, opts.milestone, opts.project)
+    ? await resolveMilestoneId(ctx.gql, opts.milestone, opts.project)
     : undefined;
 
   const resolved: IssueFilterOptions = omitUndefined({

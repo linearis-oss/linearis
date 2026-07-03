@@ -1,5 +1,4 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
@@ -15,14 +14,12 @@ import { resolveProjectId } from "./project-resolver.js";
  * Accepts UUID or milestone name. When multiple milestones match a name,
  * use projectNameOrId to scope the search to a specific project.
  *
- * ARCHITECTURAL EXCEPTION: This resolver uses GraphQLClient in addition to
- * LinearSdkClient because the Linear SDK does not expose milestone lookup
- * by name. The GraphQL client is needed for the FindProjectMilestoneScoped
- * and FindProjectMilestoneGlobal queries. This is a documented deviation
- * from the standard resolver contract (resolvers normally use SDK only).
+ * ARCHITECTURAL EXCEPTION: This resolver queries milestones directly via
+ * GraphQL (FindProjectMilestoneScoped / FindProjectMilestoneGlobal) because
+ * the Linear API exposes no lean lookup fragment for milestones by name. All
+ * lookups go through the single GraphQL client.
  *
- * @param gqlClient - GraphQL client for querying milestones
- * @param sdkClient - SDK client for project resolution
+ * @param gqlClient - GraphQL client for querying milestones and projects
  * @param nameOrId - Milestone name or UUID
  * @param projectNameOrId - Optional project name/ID to scope search
  * @returns Milestone UUID
@@ -30,7 +27,6 @@ import { resolveProjectId } from "./project-resolver.js";
  */
 export async function resolveMilestoneId(
   gqlClient: GraphQLClient,
-  sdkClient: LinearSdkClient,
   nameOrId: string,
   projectNameOrId?: string,
 ): Promise<UUID> {
@@ -44,7 +40,7 @@ export async function resolveMilestoneId(
   let nodes: MilestoneNode[] = [];
 
   if (projectNameOrId) {
-    const projectId = await resolveProjectId(sdkClient, projectNameOrId);
+    const projectId = await resolveProjectId(gqlClient, projectNameOrId);
     const result = await gqlClient.request(FindProjectMilestoneScopedDocument, {
       name: nameOrId,
       projectId,

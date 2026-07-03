@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { resolveSearchFilterIds } from "../../../src/resolvers/issue-filter-resolver.js";
 
 const {
@@ -54,22 +54,22 @@ describe("resolveSearchFilterIds", () => {
   });
 
   it("passes resolved team UUID to status/cycle lookups", async () => {
-    const sdk = {} as unknown as LinearSdkClient;
+    const gql = {} as unknown as GraphQLClient;
 
     resolveTeamIdMock.mockResolvedValue("team-uuid");
     resolveStatusIdMock.mockResolvedValue("state-uuid");
     resolveCycleIdMock.mockResolvedValue("cycle-uuid");
 
-    const result = await resolveSearchFilterIds(sdk, {
+    const result = await resolveSearchFilterIds(gql, {
       team: "ENG",
       statusNames: ["Todo"],
       cycle: "Sprint 1",
     });
 
-    expect(resolveTeamIdMock).toHaveBeenCalledWith(sdk, "ENG");
-    expect(resolveStatusIdMock).toHaveBeenCalledWith(sdk, "Todo", "team-uuid");
+    expect(resolveTeamIdMock).toHaveBeenCalledWith(gql, "ENG");
+    expect(resolveStatusIdMock).toHaveBeenCalledWith(gql, "Todo", "team-uuid");
     expect(resolveCycleIdMock).toHaveBeenCalledWith(
-      sdk,
+      gql,
       "Sprint 1",
       "team-uuid",
     );
@@ -81,17 +81,17 @@ describe("resolveSearchFilterIds", () => {
   });
 
   it("falls back to raw team input for cycle lookup when team not pre-resolved", async () => {
-    const sdk = {} as unknown as LinearSdkClient;
+    const gql = {} as unknown as GraphQLClient;
 
     resolveCycleIdMock.mockResolvedValue("cycle-uuid");
 
-    const result = await resolveSearchFilterIds(sdk, {
+    const result = await resolveSearchFilterIds(gql, {
       cycle: "Sprint 2",
       team: "Engineering",
     });
 
     expect(resolveCycleIdMock).toHaveBeenCalledWith(
-      sdk,
+      gql,
       "Sprint 2",
       "Engineering",
     );

@@ -122,12 +122,12 @@ export function setupDocumentsCommands(program: Command): void {
 
         let projectId: UUID | undefined;
         if (options.project) {
-          projectId = await resolveProjectId(ctx.sdk, options.project);
+          projectId = await resolveProjectId(ctx.gql, options.project);
         }
 
         let issueId: UUID | undefined;
         if (options.issue) {
-          issueId = await resolveIssueId(ctx.sdk, options.issue);
+          issueId = await resolveIssueId(ctx.gql, options.issue);
         }
 
         let filter: ReturnType<typeof buildIssueDocumentFilter> | undefined;
@@ -198,13 +198,13 @@ export function setupDocumentsCommands(program: Command): void {
         const ctx = createContext(rootOpts);
 
         const projectId = options.project
-          ? await resolveProjectId(ctx.sdk, options.project)
+          ? await resolveProjectId(ctx.gql, options.project)
           : undefined;
         const teamId = options.team
-          ? await resolveTeamId(ctx.sdk, options.team)
+          ? await resolveTeamId(ctx.gql, options.team)
           : undefined;
         const issueId = issueIdentifier
-          ? await resolveIssueId(ctx.sdk, issueIdentifier)
+          ? await resolveIssueId(ctx.gql, issueIdentifier)
           : undefined;
 
         const document = await createDocument(ctx.gql, {
@@ -243,7 +243,7 @@ export function setupDocumentsCommands(program: Command): void {
         if (options.title) input.title = options.title;
         if (options.content) input.content = options.content;
         if (options.project) {
-          input.projectId = await resolveProjectId(ctx.sdk, options.project);
+          input.projectId = await resolveProjectId(ctx.gql, options.project);
         }
         if (options.icon) input.icon = options.icon;
         if (options.color) input.color = options.color;
