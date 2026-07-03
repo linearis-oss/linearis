@@ -25,9 +25,9 @@
   "exclude": [
     "node_modules",
     "dist",
-    // Tests excluded from TypeScript compilation to prevent them from
-    // being compiled into dist/. Tests are type-checked and validated
-    // by Vitest at runtime, which provides sufficient type safety.
+    // Tests are excluded from the *build* so they are never emitted into
+    // dist/. They are NOT unchecked: tsconfig.test.json runs a dedicated
+    // `tsc --noEmit` over src + tests (see the "typecheck:test" script and CI).
     "tests",
     "**/*.test.ts",
     "**/*.spec.ts",
