@@ -3,16 +3,18 @@ import { createContext, getRootOpts } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { DocumentFilter, DocumentUpdateInput } from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { listAttachments } from "../services/attachment-service.js";
 import {
+  buildIssueDocumentFilter,
+  buildProjectDocumentFilter,
   createDocument,
   deleteDocument,
   getDocument,
   listDocuments,
+  type UpdateDocumentInput,
   updateDocument,
 } from "../services/document-service.js";
 
@@ -69,25 +71,6 @@ function extractDocumentIdFromUrl(url: string): string | null {
   }
 }
 
-function buildIssueDocumentFilter(
-  issueId: string,
-  legacyDocumentSlugIds: string[],
-): DocumentFilter {
-  const issueFilter: DocumentFilter = { issue: { id: { eq: issueId } } };
-  if (legacyDocumentSlugIds.length === 0) {
-    return issueFilter;
-  }
-
-  return {
-    or: [
-      issueFilter,
-      ...legacyDocumentSlugIds.map((slugId) => ({
-        slugId: { eq: slugId },
-      })),
-    ],
-  };
-}
-
 export const DOCUMENTS_META: DomainMeta = {
   name: "documents",
   summary: "long-form markdown docs attached to projects or issues",
@@ -142,9 +125,9 @@ export function setupDocumentsCommands(program: Command): void {
           issueId = await resolveIssueId(ctx.sdk, options.issue);
         }
 
-        let filter: DocumentFilter | undefined;
+        let filter: ReturnType<typeof buildIssueDocumentFilter> | undefined;
         if (projectId) {
-          filter = { project: { id: { eq: projectId } } };
+          filter = buildProjectDocumentFilter(projectId);
         } else if (issueId) {
           const attachments = await listAttachments(ctx.gql, issueId);
           const legacyDocumentSlugIds = [
@@ -248,7 +231,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
-        const input: DocumentUpdateInput = {};
+        const input: UpdateDocumentInput = {};
         if (options.title) input.title = options.title;
         if (options.content) input.content = options.content;
         if (options.project) {

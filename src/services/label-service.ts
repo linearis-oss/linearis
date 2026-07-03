@@ -32,6 +32,16 @@ export interface ListLabelOptions extends PaginationOptions {
   scope?: LabelScope;
 }
 
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateLabelInput = Pick<
+  IssueLabelCreateInput,
+  "name" | "teamId" | "color" | "description"
+>;
+export type UpdateLabelInput = Pick<
+  IssueLabelUpdateInput,
+  "name" | "color" | "description"
+>;
+
 function mapIssueLabel(label: {
   id: string;
   name: string;
@@ -64,9 +74,12 @@ export async function getLabel(
 
 export async function createLabel(
   client: GraphQLClient,
-  input: IssueLabelCreateInput,
+  input: CreateLabelInput,
 ): Promise<Label> {
-  const result = await client.request(CreateIssueLabelDocument, { input });
+  const gqlInput: IssueLabelCreateInput = input;
+  const result = await client.request(CreateIssueLabelDocument, {
+    input: gqlInput,
+  });
 
   if (!result.issueLabelCreate.success) {
     throw new Error(`Failed to create label "${input.name}"`);
@@ -78,9 +91,13 @@ export async function createLabel(
 export async function updateLabel(
   client: GraphQLClient,
   id: string,
-  input: IssueLabelUpdateInput,
+  input: UpdateLabelInput,
 ): Promise<Label> {
-  const result = await client.request(UpdateIssueLabelDocument, { id, input });
+  const gqlInput: IssueLabelUpdateInput = input;
+  const result = await client.request(UpdateIssueLabelDocument, {
+    id,
+    input: gqlInput,
+  });
 
   if (!result.issueLabelUpdate.success) {
     throw new Error(`Failed to update label "${id}"`);

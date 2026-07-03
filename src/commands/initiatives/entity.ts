@@ -8,14 +8,6 @@ import {
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
-import type {
-  InitiativeCreateInput,
-  InitiativeSortInput,
-  InitiativeStatus,
-  InitiativeUpdateInput,
-  ListInitiativesQueryVariables,
-  PaginationOrderBy,
-} from "../../gql/graphql.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import { resolveTeamId } from "../../resolvers/team-resolver.js";
 import { resolveUserId } from "../../resolvers/user-resolver.js";
@@ -38,10 +30,18 @@ import {
 } from "../../services/discussion-service.js";
 import {
   archiveInitiative,
+  buildInitiativeFilter,
+  type CreateInitiativeInput,
   createInitiative,
   deleteInitiative,
   getInitiative,
+  type InitiativeFilterInput,
+  type InitiativeSortBy,
   listInitiatives,
+  mapSortByToInitiativeSort,
+  mapSortByToPaginationOrderBy,
+  parseInitiativeStatus,
+  type UpdateInitiativeInput,
   unarchiveInitiative,
   updateInitiative,
 } from "../../services/initiative-service.js";
@@ -187,16 +187,6 @@ interface InitiativeUpdateOptions {
   sortOrder?: string;
 }
 
-type InitiativeSortBy =
-  | "name"
-  | "createdAt"
-  | "updatedAt"
-  | "targetDate"
-  | "health"
-  | "healthUpdatedAt"
-  | "manual"
-  | "owner";
-
 function parseSortOrder(value?: string): "asc" | "desc" | undefined {
   if (!value) return undefined;
   const normalized = value.toLowerCase();
@@ -226,60 +216,6 @@ function parseSortBy(value?: string): InitiativeSortBy | undefined {
   );
 }
 
-function mapSortByToPaginationOrderBy(
-  sortBy?: InitiativeSortBy,
-): PaginationOrderBy | undefined {
-  return sortBy === "createdAt" || sortBy === "updatedAt" ? sortBy : undefined;
-}
-
-function mapSortByToInitiativeSort(
-  sortBy?: InitiativeSortBy,
-  sortOrder?: "asc" | "desc",
-): ListInitiativesQueryVariables["sort"] | undefined {
-  if (!sortBy) return undefined;
-
-  const withNulls = {
-    order: sortOrder === "desc" ? "Descending" : "Ascending",
-    nulls: "last",
-  } as const;
-
-  const sortEntry: InitiativeSortInput =
-    sortBy === "manual"
-      ? { manual: withNulls }
-      : sortBy === "name"
-        ? { name: withNulls }
-        : sortBy === "createdAt"
-          ? { createdAt: withNulls }
-          : sortBy === "updatedAt"
-            ? { updatedAt: withNulls }
-            : sortBy === "targetDate"
-              ? { targetDate: withNulls }
-              : sortBy === "health"
-                ? { health: withNulls }
-                : sortBy === "healthUpdatedAt"
-                  ? { healthUpdatedAt: withNulls }
-                  : { owner: withNulls };
-
-  return [sortEntry];
-}
-
-const INITIATIVE_STATUS_VALUES = ["Planned", "Active", "Completed"] as const;
-
-function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
-  if (!value) return undefined;
-
-  const normalized = value.toLowerCase();
-  const match = INITIATIVE_STATUS_VALUES.find(
-    (status) => status.toLowerCase() === normalized,
-  );
-  if (match) return match;
-
-  throw invalidParameterError(
-    "--status",
-    'must be one of: "Planned", "Active", "Completed"',
-  );
-}
-
 function parseSortOrderNumber(value?: string): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number.parseFloat(value);
@@ -290,19 +226,6 @@ function parseSortOrderNumber(value?: string): number | undefined {
     );
   }
   return parsed;
-}
-
-function applyNullableDateRange(
-  target: { gte?: string | null; lte?: string | null },
-  after?: string,
-  before?: string,
-): void {
-  if (after !== undefined) {
-    target.gte = after;
-  }
-  if (before !== undefined) {
-    target.lte = before;
-  }
 }
 
 function getExpandFlags(options: InitiativeExpandOptions): string[] {
@@ -319,102 +242,10 @@ function getExpandFlags(options: InitiativeExpandOptions): string[] {
   return map.filter(([enabled]) => enabled).map(([, flag]) => flag);
 }
 
-async function buildInitiativeFilter(
+async function resolveInitiativeFilterInput(
   sdk: LinearSdkClient,
   options: InitiativeListOptions,
-): Promise<ListInitiativesQueryVariables["filter"] | undefined> {
-  const filter: NonNullable<ListInitiativesQueryVariables["filter"]> = {};
-
-  if (options.id) {
-    filter.id = { eq: options.id };
-  }
-
-  if (options.slug) {
-    filter.slugId = { eqIgnoreCase: options.slug };
-  }
-
-  if (options.name) {
-    filter.name = { eqIgnoreCase: options.name };
-  }
-
-  const status = parseInitiativeStatus(options.status);
-  if (status) {
-    filter.status = { eq: status };
-  }
-
-  if (options.health) {
-    filter.health = { eq: options.health };
-  }
-
-  if (options.healthWithAge) {
-    filter.healthWithAge = { eq: options.healthWithAge };
-  }
-
-  if (options.owner) {
-    const ownerId = await resolveUserId(sdk, options.owner);
-    filter.owner = { id: { eq: ownerId } };
-  }
-
-  if (options.creator) {
-    const creatorId = await resolveUserId(sdk, options.creator);
-    filter.creator = { id: { eq: creatorId } };
-  }
-
-  if (options.team) {
-    const teamId = await resolveTeamId(sdk, options.team);
-    filter.teams = { some: { id: { eq: teamId } } };
-  }
-
-  if (options.targetAfter || options.targetBefore) {
-    filter.targetDate = {};
-    applyNullableDateRange(
-      filter.targetDate,
-      options.targetAfter,
-      options.targetBefore,
-    );
-  }
-
-  if (options.startedAfter || options.startedBefore) {
-    filter.startedAt = {};
-    applyNullableDateRange(
-      filter.startedAt,
-      options.startedAfter,
-      options.startedBefore,
-    );
-  }
-
-  if (options.completedAfter || options.completedBefore) {
-    filter.completedAt = {};
-    applyNullableDateRange(
-      filter.completedAt,
-      options.completedAfter,
-      options.completedBefore,
-    );
-  }
-
-  if (options.createdAfter || options.createdBefore) {
-    filter.createdAt = {};
-    applyNullableDateRange(
-      filter.createdAt,
-      options.createdAfter,
-      options.createdBefore,
-    );
-  }
-
-  if (options.updatedAfter || options.updatedBefore) {
-    filter.updatedAt = {};
-    applyNullableDateRange(
-      filter.updatedAt,
-      options.updatedAfter,
-      options.updatedBefore,
-    );
-  }
-
-  if (options.ancestor) {
-    const ancestorId = await resolveInitiativeId(sdk, options.ancestor);
-    filter.ancestors = { some: { id: { eq: ancestorId } } };
-  }
-
+): Promise<InitiativeFilterInput> {
   if (options.parent) {
     throw invalidParameterError(
       "--parent",
@@ -422,7 +253,42 @@ async function buildInitiativeFilter(
     );
   }
 
-  return Object.keys(filter).length > 0 ? filter : undefined;
+  const input: InitiativeFilterInput = {
+    id: options.id,
+    slug: options.slug,
+    name: options.name,
+    status: parseInitiativeStatus(options.status),
+    health: options.health,
+    healthWithAge: options.healthWithAge,
+    targetAfter: options.targetAfter,
+    targetBefore: options.targetBefore,
+    startedAfter: options.startedAfter,
+    startedBefore: options.startedBefore,
+    completedAfter: options.completedAfter,
+    completedBefore: options.completedBefore,
+    createdAfter: options.createdAfter,
+    createdBefore: options.createdBefore,
+    updatedAfter: options.updatedAfter,
+    updatedBefore: options.updatedBefore,
+  };
+
+  if (options.owner) {
+    input.ownerId = await resolveUserId(sdk, options.owner);
+  }
+
+  if (options.creator) {
+    input.creatorId = await resolveUserId(sdk, options.creator);
+  }
+
+  if (options.team) {
+    input.teamId = await resolveTeamId(sdk, options.team);
+  }
+
+  if (options.ancestor) {
+    input.ancestorId = await resolveInitiativeId(sdk, options.ancestor);
+  }
+
+  return input;
 }
 
 export function setupInitiativeEntityCommands(initiatives: Command): void {
@@ -497,7 +363,11 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const orderBy = mapSortByToPaginationOrderBy(sortBy);
           const sort = mapSortByToInitiativeSort(sortBy, sortOrder);
 
-          const filter = await buildInitiativeFilter(ctx.sdk, options);
+          const filterInput = await resolveInitiativeFilterInput(
+            ctx.sdk,
+            options,
+          );
+          const filter = buildInitiativeFilter(filterInput);
 
           const result = await listInitiatives(ctx.gql, {
             limit: parseLimit(options.limit),
@@ -815,7 +685,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         async (name, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const input: InitiativeCreateInput = { name };
+          const input: CreateInitiativeInput = { name };
 
           if (options.description !== undefined) {
             input.description = options.description;
@@ -865,7 +735,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const ctx = createContext(getRootOpts(command));
           const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
 
-          const input: InitiativeUpdateInput = {};
+          const input: UpdateInitiativeInput = {};
 
           if (options.name !== undefined) {
             input.name = options.name;

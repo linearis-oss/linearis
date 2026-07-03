@@ -3,12 +3,10 @@ import { createContext, getRootOpts } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type {
-  AttachmentCreateInput,
-  AttachmentFilter,
-} from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
+  buildAttachmentFilter,
+  type CreateAttachmentInput,
   createAttachment,
   deleteAttachment,
   listAttachments,
@@ -67,29 +65,6 @@ function resolveIssueArgument(
   return issue;
 }
 
-function buildAttachmentFilter(
-  options: ListOptions,
-): AttachmentFilter | undefined {
-  const filters: AttachmentFilter[] = [];
-
-  if (options.sourceType) {
-    filters.push({ sourceType: { eq: options.sourceType } });
-  }
-  if (options.title) {
-    filters.push({ title: { eqIgnoreCase: options.title } });
-  }
-  if (options.createdAfter) {
-    filters.push({ createdAt: { gte: options.createdAfter } });
-  }
-  if (options.createdBefore) {
-    filters.push({ createdAt: { lt: options.createdBefore } });
-  }
-
-  if (filters.length === 0) return undefined;
-  if (filters.length === 1) return filters[0];
-  return { and: filters };
-}
-
 export function setupAttachmentsCommands(program: Command): void {
   const attachments = program
     .command("attachments")
@@ -143,7 +118,7 @@ export function setupAttachmentsCommands(program: Command): void {
         const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
         const issueId = await resolveIssueId(ctx.sdk, issueIdentifier);
-        const input: AttachmentCreateInput = {
+        const input: CreateAttachmentInput = {
           issueId,
           title: options.title,
           url: options.url,

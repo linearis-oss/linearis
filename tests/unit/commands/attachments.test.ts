@@ -22,22 +22,32 @@ vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
   resolveIssueId: vi.fn().mockResolvedValue("resolved-issue-uuid"),
 }));
 
-vi.mock("../../../src/services/attachment-service.js", () => ({
-  createAttachment: vi.fn().mockResolvedValue({
-    id: "att-1",
-    title: "Test",
-    url: "https://example.com",
-  }),
-  deleteAttachment: vi.fn().mockResolvedValue({
-    id: "att-1",
-    success: true,
-  }),
-  listAttachments: vi
-    .fn()
-    .mockResolvedValue([
-      { id: "att-1", title: "PR #42", sourceType: "github" },
-    ]),
-}));
+vi.mock(
+  "../../../src/services/attachment-service.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../src/services/attachment-service.js")
+      >();
+    return {
+      ...actual,
+      createAttachment: vi.fn().mockResolvedValue({
+        id: "att-1",
+        title: "Test",
+        url: "https://example.com",
+      }),
+      deleteAttachment: vi.fn().mockResolvedValue({
+        id: "att-1",
+        success: true,
+      }),
+      listAttachments: vi
+        .fn()
+        .mockResolvedValue([
+          { id: "att-1", title: "PR #42", sourceType: "github" },
+        ]),
+    };
+  },
+);
 
 import { setupAttachmentsCommands } from "../../../src/commands/attachments.js";
 import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
