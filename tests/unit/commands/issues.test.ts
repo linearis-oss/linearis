@@ -21,20 +21,13 @@ vi.mock("../../../src/common/output.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../src/resolvers/user-resolver.js", () => ({
-  resolveUserId: vi.fn().mockResolvedValue("resolved-user-uuid"),
+vi.mock("../../../src/resolvers/issue-mutation-resolver.js", () => ({
+  resolveCreateIssueIds: vi.fn(),
+  resolveUpdateIssueIds: vi.fn(),
 }));
 
-vi.mock("../../../src/resolvers/team-resolver.js", () => ({
-  resolveTeamId: vi.fn().mockResolvedValue("resolved-team-uuid"),
-  resolveTeamEstimateContext: vi.fn().mockResolvedValue({
-    teamId: "resolved-team-uuid",
-    teamKey: "ENG",
-    teamName: "Engineering",
-    issueEstimationType: "fibonacci",
-    issueEstimationExtended: false,
-    issueEstimationAllowZero: false,
-  }),
+vi.mock("../../../src/resolvers/issue-filter-resolver.js", () => ({
+  resolveSearchFilterIds: vi.fn(),
 }));
 
 vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
@@ -50,26 +43,6 @@ vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
       issueEstimationAllowZero: false,
     },
   }),
-}));
-
-vi.mock("../../../src/resolvers/project-resolver.js", () => ({
-  resolveProjectId: vi.fn().mockResolvedValue("resolved-project-uuid"),
-}));
-
-vi.mock("../../../src/resolvers/label-resolver.js", () => ({
-  resolveLabelIds: vi.fn().mockResolvedValue(["resolved-label-uuid"]),
-}));
-
-vi.mock("../../../src/resolvers/milestone-resolver.js", () => ({
-  resolveMilestoneId: vi.fn().mockResolvedValue("resolved-milestone-uuid"),
-}));
-
-vi.mock("../../../src/resolvers/cycle-resolver.js", () => ({
-  resolveCycleId: vi.fn().mockResolvedValue("resolved-cycle-uuid"),
-}));
-
-vi.mock("../../../src/resolvers/status-resolver.js", () => ({
-  resolveStatusId: vi.fn().mockResolvedValue("resolved-status-uuid"),
 }));
 
 vi.mock("../../../src/services/issue-service.js", () => ({
@@ -206,16 +179,15 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
 }));
 
 import { setupIssuesCommands } from "../../../src/commands/issues.js";
+import { resolveSearchFilterIds } from "../../../src/resolvers/issue-filter-resolver.js";
+import {
+  resolveCreateIssueIds,
+  resolveUpdateIssueIds,
+} from "../../../src/resolvers/issue-mutation-resolver.js";
 import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../../../src/resolvers/issue-resolver.js";
-import { resolveLabelIds } from "../../../src/resolvers/label-resolver.js";
-import {
-  resolveTeamEstimateContext,
-  resolveTeamId,
-} from "../../../src/resolvers/team-resolver.js";
-import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -257,6 +229,69 @@ import {
   deleteOwnReactionById,
 } from "../../../src/services/reaction-service.js";
 
+// Default echo implementations for the batch resolvers: each provided human
+// input is "resolved" to a deterministic UUID. Set once at module scope;
+// beforeEach uses clearAllMocks (call history only), so implementations persist.
+// Individual tests override with mock*Once for estimate-context / error cases.
+vi.mocked(resolveCreateIssueIds).mockImplementation(async (_gql, input) => {
+  const out: Awaited<ReturnType<typeof resolveCreateIssueIds>> = {
+    teamId: asUuid("resolved-team-uuid"),
+  };
+  if (input.assignee) out.assigneeId = asUuid("resolved-user-uuid");
+  if (input.project) out.projectId = asUuid("resolved-project-uuid");
+  if (input.labels) out.labelIds = [asUuid("resolved-label-uuid")];
+  if (input.projectMilestone) {
+    out.projectMilestoneId = asUuid("resolved-milestone-uuid");
+  }
+  if (input.cycle) out.cycleId = asUuid("resolved-cycle-uuid");
+  if (input.status) out.stateId = asUuid("resolved-status-uuid");
+  if (input.parentTicket) out.parentId = asUuid("resolved-parent-uuid");
+  if (input.withEstimateContext) {
+    out.estimateContext = {
+      teamId: asUuid("resolved-team-uuid"),
+      teamKey: "ENG",
+      teamName: "Engineering",
+      issueEstimationType: "fibonacci",
+      issueEstimationExtended: false,
+      issueEstimationAllowZero: false,
+    };
+  }
+  return out;
+});
+
+vi.mocked(resolveUpdateIssueIds).mockImplementation(async (_gql, input) => {
+  const out: Awaited<ReturnType<typeof resolveUpdateIssueIds>> = {};
+  if (input.assignee) out.assigneeId = asUuid("resolved-user-uuid");
+  if (input.project) out.projectId = asUuid("resolved-project-uuid");
+  if (input.labels) {
+    out.labelIds = input.labels.map(() => asUuid("resolved-label-uuid"));
+  }
+  if (input.projectMilestone) {
+    out.projectMilestoneId = asUuid("resolved-milestone-uuid");
+  }
+  if (input.cycle) out.cycleId = asUuid("resolved-cycle-uuid");
+  if (input.status) out.stateId = asUuid("resolved-status-uuid");
+  if (input.parentTicket) out.parentId = asUuid("resolved-parent-uuid");
+  return out;
+});
+
+vi.mocked(resolveSearchFilterIds).mockImplementation(async (_gql, input) => {
+  const out: Awaited<ReturnType<typeof resolveSearchFilterIds>> = {};
+  if (input.team) out.teamId = asUuid("resolved-team-uuid");
+  if (input.assignee) out.assigneeId = asUuid("resolved-user-uuid");
+  if (input.creator) out.creatorId = asUuid("resolved-creator-uuid");
+  if (input.project) out.projectId = asUuid("resolved-project-uuid");
+  if (input.statusNames && input.statusNames.length > 0) {
+    out.stateIds = [asUuid("resolved-status-uuid")];
+  }
+  if (input.labelNames && input.labelNames.length > 0) {
+    out.labelIds = [asUuid("resolved-label-uuid")];
+  }
+  if (input.cycle) out.cycleId = asUuid("resolved-cycle-uuid");
+  if (input.parent) out.parentId = asUuid("resolved-parent-uuid");
+  return out;
+});
+
 function createProgram(): Command {
   const program = new Command();
   program.option("--api-token <token>");
@@ -286,7 +321,10 @@ describe("issues create --assignee", () => {
       "John Doe",
     ]);
 
-    expect(resolveUserId).toHaveBeenCalledWith(expect.anything(), "John Doe");
+    expect(resolveCreateIssueIds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assignee: "John Doe" }),
+    );
     expect(createIssue).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ assigneeId: "resolved-user-uuid" }),
@@ -307,9 +345,9 @@ describe("issues create --assignee", () => {
       "john@example.com",
     ]);
 
-    expect(resolveUserId).toHaveBeenCalledWith(
+    expect(resolveCreateIssueIds).toHaveBeenCalledWith(
       expect.anything(),
-      "john@example.com",
+      expect.objectContaining({ assignee: "john@example.com" }),
     );
     expect(createIssue).toHaveBeenCalledWith(
       expect.anything(),
@@ -317,7 +355,7 @@ describe("issues create --assignee", () => {
     );
   });
 
-  it("does not call resolveUserId when --assignee is omitted", async () => {
+  it("does not resolve an assignee when --assignee is omitted", async () => {
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -329,7 +367,10 @@ describe("issues create --assignee", () => {
       "ENG",
     ]);
 
-    expect(resolveUserId).not.toHaveBeenCalled();
+    expect(resolveCreateIssueIds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ assignee: expect.anything() }),
+    );
     expect(createIssue).toHaveBeenCalledWith(
       expect.anything(),
       expect.not.objectContaining({ assigneeId: expect.anything() }),
@@ -366,13 +407,16 @@ describe("issues create --estimate", () => {
   });
 
   it("passes estimate 0 through to createIssue when team allows zero", async () => {
-    vi.mocked(resolveTeamEstimateContext).mockResolvedValueOnce({
+    vi.mocked(resolveCreateIssueIds).mockResolvedValueOnce({
       teamId: asUuid("resolved-team-uuid"),
-      teamKey: "ENG",
-      teamName: "Engineering",
-      issueEstimationType: "fibonacci",
-      issueEstimationExtended: false,
-      issueEstimationAllowZero: true,
+      estimateContext: {
+        teamId: asUuid("resolved-team-uuid"),
+        teamKey: "ENG",
+        teamName: "Engineering",
+        issueEstimationType: "fibonacci",
+        issueEstimationExtended: false,
+        issueEstimationAllowZero: true,
+      },
     });
 
     const program = createProgram();
@@ -437,13 +481,16 @@ describe("issues create --estimate", () => {
   });
 
   it("rejects create estimate when team estimation disabled", async () => {
-    vi.mocked(resolveTeamEstimateContext).mockResolvedValueOnce({
+    vi.mocked(resolveCreateIssueIds).mockResolvedValueOnce({
       teamId: asUuid("resolved-team-uuid"),
-      teamKey: "ENG",
-      teamName: "Engineering",
-      issueEstimationType: "notUsed",
-      issueEstimationExtended: false,
-      issueEstimationAllowZero: false,
+      estimateContext: {
+        teamId: asUuid("resolved-team-uuid"),
+        teamKey: "ENG",
+        teamName: "Engineering",
+        issueEstimationType: "notUsed",
+        issueEstimationExtended: false,
+        issueEstimationAllowZero: false,
+      },
     });
 
     const program = createProgram();
@@ -496,7 +543,7 @@ describe("issues create numeric option validation", () => {
         "Invalid --priority: must be an integer between 1 and 4",
       ),
     );
-    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(resolveCreateIssueIds).not.toHaveBeenCalled();
     expect(createIssue).not.toHaveBeenCalled();
   });
 
@@ -519,7 +566,7 @@ describe("issues create numeric option validation", () => {
         "Invalid --estimate: must be a non-negative integer",
       ),
     );
-    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(resolveCreateIssueIds).not.toHaveBeenCalled();
     expect(createIssue).not.toHaveBeenCalled();
   });
 
@@ -1023,7 +1070,11 @@ describe("issues update --assignee", () => {
       "Jane Smith",
     ]);
 
-    expect(resolveUserId).toHaveBeenCalledWith(expect.anything(), "Jane Smith");
+    expect(resolveUpdateIssueIds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assignee: "Jane Smith" }),
+      expect.anything(),
+    );
     expect(updateIssue).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-issue-uuid",
@@ -1031,7 +1082,7 @@ describe("issues update --assignee", () => {
     );
   });
 
-  it("does not call resolveUserId when --assignee is omitted", async () => {
+  it("does not resolve IDs when only non-reference fields change", async () => {
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -1043,7 +1094,7 @@ describe("issues update --assignee", () => {
       "New title",
     ]);
 
-    expect(resolveUserId).not.toHaveBeenCalled();
+    expect(resolveUpdateIssueIds).not.toHaveBeenCalled();
   });
 });
 
@@ -1979,7 +2030,11 @@ describe("issues update --labels", () => {
       "remove",
     ]);
 
-    expect(resolveLabelIds).toHaveBeenCalledWith(expect.anything(), ["bug"]);
+    expect(resolveUpdateIssueIds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ labels: ["bug"] }),
+      expect.anything(),
+    );
     expect(updateIssue).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-issue-uuid",

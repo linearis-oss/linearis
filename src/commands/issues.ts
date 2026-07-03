@@ -23,20 +23,18 @@ import { resolveFilterOptions } from "../common/resolve-filters.js";
 import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { IssueRelationType } from "../gql/graphql.js";
-import { resolveCycleId } from "../resolvers/cycle-resolver.js";
+import {
+  type ResolveCreateIssueIdsInput,
+  type ResolvedUpdateIssueIds,
+  type ResolveUpdateIssueIdsInput,
+  resolveCreateIssueIds,
+  resolveUpdateIssueIds,
+  type UpdateIssueContext,
+} from "../resolvers/issue-mutation-resolver.js";
 import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
-import { resolveLabelIds } from "../resolvers/label-resolver.js";
-import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
-import { resolveProjectId } from "../resolvers/project-resolver.js";
-import { resolveStatusId } from "../resolvers/status-resolver.js";
-import {
-  resolveTeamEstimateContext,
-  resolveTeamId,
-} from "../resolvers/team-resolver.js";
-import { resolveUserId } from "../resolvers/user-resolver.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -1129,37 +1127,53 @@ export function setupIssuesCommands(program: Command): void {
             throw new Error("--team is required");
           }
 
-          const teamEstimateContext =
-            parsedEstimate !== undefined
-              ? await resolveTeamEstimateContext(ctx.gql, options.team)
-              : undefined;
+          if (options.projectMilestone && !options.project) {
+            throw new Error(
+              "--project-milestone requires --project to be specified",
+            );
+          }
 
-          const teamId = teamEstimateContext
-            ? teamEstimateContext.teamId
-            : await resolveTeamId(ctx.gql, options.team);
+          const idsInput: ResolveCreateIssueIdsInput = {
+            team: options.team,
+            withEstimateContext: parsedEstimate !== undefined,
+          };
+          if (options.assignee) idsInput.assignee = options.assignee;
+          if (options.project) idsInput.project = options.project;
+          if (options.labels) {
+            idsInput.labels = options.labels.split(",").map((l) => l.trim());
+          }
+          if (options.projectMilestone) {
+            idsInput.projectMilestone = options.projectMilestone;
+          }
+          if (options.cycle) idsInput.cycle = options.cycle;
+          if (options.status) idsInput.status = options.status;
+          if (options.parentTicket)
+            idsInput.parentTicket = options.parentTicket;
 
-          if (parsedEstimate !== undefined && teamEstimateContext) {
+          const ids = await resolveCreateIssueIds(ctx.gql, idsInput);
+
+          if (parsedEstimate !== undefined && ids.estimateContext) {
             validateEstimateAgainstTeamConfig(parsedEstimate, {
-              teamKey: teamEstimateContext.teamKey,
-              issueEstimationType: teamEstimateContext.issueEstimationType,
+              teamKey: ids.estimateContext.teamKey,
+              issueEstimationType: ids.estimateContext.issueEstimationType,
               issueEstimationExtended:
-                teamEstimateContext.issueEstimationExtended,
+                ids.estimateContext.issueEstimationExtended,
               issueEstimationAllowZero:
-                teamEstimateContext.issueEstimationAllowZero,
+                ids.estimateContext.issueEstimationAllowZero,
             });
           }
 
           const input: CreateIssueInput = {
             title,
-            teamId,
+            teamId: ids.teamId,
           };
 
           if (options.description) {
             input.description = options.description;
           }
 
-          if (options.assignee) {
-            input.assigneeId = await resolveUserId(ctx.gql, options.assignee);
+          if (ids.assigneeId) {
+            input.assigneeId = ids.assigneeId;
           }
 
           if (parsedPriority !== undefined) {
@@ -1170,49 +1184,28 @@ export function setupIssuesCommands(program: Command): void {
             input.estimate = parsedEstimate;
           }
 
-          if (options.project) {
-            input.projectId = await resolveProjectId(ctx.gql, options.project);
+          if (ids.projectId) {
+            input.projectId = ids.projectId;
           }
 
-          if (options.labels) {
-            const labelNames = options.labels.split(",").map((l) => l.trim());
-            input.labelIds = await resolveLabelIds(ctx.gql, labelNames);
+          if (ids.labelIds) {
+            input.labelIds = ids.labelIds;
           }
 
-          if (options.projectMilestone) {
-            if (!options.project) {
-              throw new Error(
-                "--project-milestone requires --project to be specified",
-              );
-            }
-            input.projectMilestoneId = await resolveMilestoneId(
-              ctx.gql,
-              options.projectMilestone,
-              options.project,
-            );
+          if (ids.projectMilestoneId) {
+            input.projectMilestoneId = ids.projectMilestoneId;
           }
 
-          if (options.cycle) {
-            input.cycleId = await resolveCycleId(
-              ctx.gql,
-              options.cycle,
-              options.team,
-            );
+          if (ids.cycleId) {
+            input.cycleId = ids.cycleId;
           }
 
-          if (options.status) {
-            input.stateId = await resolveStatusId(
-              ctx.gql,
-              options.status,
-              teamId,
-            );
+          if (ids.stateId) {
+            input.stateId = ids.stateId;
           }
 
-          if (options.parentTicket) {
-            input.parentId = await resolveIssueId(
-              ctx.gql,
-              options.parentTicket,
-            );
+          if (ids.parentId) {
+            input.parentId = ids.parentId;
           }
 
           if (options.dueDate) {
@@ -1354,6 +1347,51 @@ export function setupIssuesCommands(program: Command): void {
             ? await getIssue(ctx.gql, resolvedIssueId)
             : undefined;
 
+          const updContext: UpdateIssueContext = {};
+          if (issueContext && "team" in issueContext && issueContext.team) {
+            updContext.teamId = asUuid(issueContext.team.id);
+            if (issueContext.team.key) {
+              updContext.teamKey = issueContext.team.key;
+            }
+          }
+          if (
+            issueContext &&
+            "project" in issueContext &&
+            issueContext.project?.name
+          ) {
+            updContext.projectName = issueContext.project.name;
+          }
+
+          const updIdsInput: ResolveUpdateIssueIdsInput = {};
+          if (options.assignee) updIdsInput.assignee = options.assignee;
+          if (options.project) updIdsInput.project = options.project;
+          if (!options.clearLabels && options.labels) {
+            updIdsInput.labels = options.labels.split(",").map((l) => l.trim());
+          }
+          if (!options.clearProjectMilestone && options.projectMilestone) {
+            updIdsInput.projectMilestone = options.projectMilestone;
+          }
+          if (!options.clearCycle && options.cycle) {
+            updIdsInput.cycle = options.cycle;
+          }
+          if (options.status) updIdsInput.status = options.status;
+          if (!options.clearParentTicket && options.parentTicket) {
+            updIdsInput.parentTicket = options.parentTicket;
+          }
+
+          const needsResolution =
+            updIdsInput.assignee !== undefined ||
+            updIdsInput.project !== undefined ||
+            updIdsInput.labels !== undefined ||
+            updIdsInput.projectMilestone !== undefined ||
+            updIdsInput.cycle !== undefined ||
+            updIdsInput.status !== undefined ||
+            updIdsInput.parentTicket !== undefined;
+
+          const ids: ResolvedUpdateIssueIds = needsResolution
+            ? await resolveUpdateIssueIds(ctx.gql, updIdsInput, updContext)
+            : {};
+
           const input: UpdateIssueInput = {};
 
           if (options.title) {
@@ -1364,16 +1402,8 @@ export function setupIssuesCommands(program: Command): void {
             input.description = options.description;
           }
 
-          if (options.status) {
-            const teamId =
-              issueContext && "team" in issueContext && issueContext.team
-                ? asUuid(issueContext.team.id)
-                : undefined;
-            input.stateId = await resolveStatusId(
-              ctx.gql,
-              options.status,
-              teamId,
-            );
+          if (ids.stateId) {
+            input.stateId = ids.stateId;
           }
 
           if (parsedPriority !== undefined) {
@@ -1386,35 +1416,28 @@ export function setupIssuesCommands(program: Command): void {
             input.estimate = parsedEstimate;
           }
 
-          if (options.assignee) {
-            input.assigneeId = await resolveUserId(ctx.gql, options.assignee);
+          if (ids.assigneeId) {
+            input.assigneeId = ids.assigneeId;
           }
 
-          if (options.project) {
-            input.projectId = await resolveProjectId(ctx.gql, options.project);
+          if (ids.projectId) {
+            input.projectId = ids.projectId;
           }
 
           if (options.clearLabels) {
             input.labelIds = [];
-          } else if (options.labels) {
-            const labelNames = options.labels.split(",").map((l) => l.trim());
-            const labelIds = await resolveLabelIds(ctx.gql, labelNames);
+          } else if (options.labels && ids.labelIds) {
+            const labelIds = ids.labelIds;
+            const currentLabels =
+              issueContext &&
+              "labels" in issueContext &&
+              issueContext.labels?.nodes
+                ? issueContext.labels.nodes.map((l) => asUuid(l.id))
+                : [];
 
             if (labelMode === "add") {
-              const currentLabels =
-                issueContext &&
-                "labels" in issueContext &&
-                issueContext.labels?.nodes
-                  ? issueContext.labels.nodes.map((l) => asUuid(l.id))
-                  : [];
               input.labelIds = [...new Set([...currentLabels, ...labelIds])];
             } else if (labelMode === "remove") {
-              const currentLabels =
-                issueContext &&
-                "labels" in issueContext &&
-                issueContext.labels?.nodes
-                  ? issueContext.labels.nodes.map((l) => asUuid(l.id))
-                  : [];
               input.labelIds = currentLabels.filter(
                 (id) => !labelIds.includes(id),
               );
@@ -1425,41 +1448,20 @@ export function setupIssuesCommands(program: Command): void {
 
           if (options.clearParentTicket) {
             input.parentId = null;
-          } else if (options.parentTicket) {
-            input.parentId = await resolveIssueId(
-              ctx.gql,
-              options.parentTicket,
-            );
+          } else if (ids.parentId) {
+            input.parentId = ids.parentId;
           }
 
           if (options.clearProjectMilestone) {
             input.projectMilestoneId = null;
-          } else if (options.projectMilestone) {
-            const projectName =
-              issueContext &&
-              "project" in issueContext &&
-              issueContext.project?.name
-                ? issueContext.project.name
-                : undefined;
-            input.projectMilestoneId = await resolveMilestoneId(
-              ctx.gql,
-              options.projectMilestone,
-              projectName,
-            );
+          } else if (ids.projectMilestoneId) {
+            input.projectMilestoneId = ids.projectMilestoneId;
           }
 
           if (options.clearCycle) {
             input.cycleId = null;
-          } else if (options.cycle) {
-            const teamKey =
-              issueContext && "team" in issueContext && issueContext.team?.key
-                ? issueContext.team.key
-                : undefined;
-            input.cycleId = await resolveCycleId(
-              ctx.gql,
-              options.cycle,
-              teamKey,
-            );
+          } else if (ids.cycleId) {
+            input.cycleId = ids.cycleId;
           }
 
           if (options.clearDueDate) {
