@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../src/common/context.js", () => ({
   createContext: vi.fn(() => ({
     gql: { request: vi.fn() },
-    sdk: {},
   })),
   getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));

@@ -135,8 +135,9 @@ npm run test:commands   # Run command coverage analysis
 
 | Package | Version | Purpose |
 |---|---|---|
-| `@linear/sdk` | ^58.1.0 | Linear API SDK for ID resolution |
-| `commander` | ^14.0.0 | CLI argument parsing |
+| `commander` | 14.0.3 | CLI argument parsing |
+| `graphql` | 16.12.0 | GraphQL document parsing/types for the typed client |
+| `node-emoji` | 2.2.0 | Emoji shortcode handling |
 
 ### Development
 

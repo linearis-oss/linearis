@@ -20,7 +20,7 @@ import { omitUndefined } from "./object.js";
  * Validation order: format → dependency → date ranges → ID resolution.
  * Fails fast before making any API calls when input is invalid.
  *
- * @param ctx - Command context with SDK and GraphQL clients
+ * @param ctx - Command context with the GraphQL client
  * @param opts - Raw filter flags from CLI options
  * @returns Resolved filter options with UUIDs ready for buildIssueFilter()
  */

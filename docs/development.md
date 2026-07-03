@@ -33,19 +33,19 @@ The codebase is organized into five layers, each with a single responsibility:
 ```
 CLI Input --> Command --> Resolver --> Service --> JSON Output
                            |             |
-                        SDK client    GraphQL client
+                        GraphQL client GraphQL client
                         (ID lookup)   (data operations)
 ```
 
 | Layer | Directory | Client | Responsibility |
 |-------|-----------|--------|----------------|
-| Client | `src/client/` | -- | API client wrappers |
-| Resolver | `src/resolvers/` | `LinearSdkClient` | Convert human IDs to UUIDs |
+| Client | `src/client/` | -- | API client wrapper |
+| Resolver | `src/resolvers/` | `GraphQLClient` | Convert human IDs to UUIDs |
 | Service | `src/services/` | `GraphQLClient` | Business logic and CRUD |
-| Command | `src/commands/` | Both (via `createContext()`) | CLI orchestration |
+| Command | `src/commands/` | `GraphQLClient` (via `createContext()`) | CLI orchestration |
 | Common | `src/common/` | -- | Shared utilities and types |
 
-Two separate clients exist because the Linear SDK is convenient for ID lookups (resolvers), while direct GraphQL queries are more efficient for data operations (services). Commands get both clients through `createContext()`.
+A single typed GraphQL client backs every layer: resolvers use lean filter-based lookup queries for ID resolution, while services use richer queries for data operations. Commands get the client through `createContext()` as `ctx.gql`.
 
 ## Code Style
 
@@ -90,7 +90,7 @@ export function setupIssuesCommands(program: Command): void {
     .action(handleCommand(async (title, options, command) => {
       const ctx = await createContext(command.parent!.parent!.opts());
       const teamId = options.team
-        ? await resolveTeamId(ctx.sdk, options.team)
+        ? await resolveTeamId(ctx.gql, options.team)
         : undefined;
       const result = await createIssue(ctx.gql, { title, teamId });
       outputSuccess(result);
@@ -109,38 +109,44 @@ setupEntityCommands(program);
 
 ### Resolver Pattern
 
-Resolvers convert human-friendly identifiers (team keys, names, issue identifiers like `ENG-123`) into UUIDs. They use the `LinearSdkClient` and live in `src/resolvers/`.
+Resolvers convert human-friendly identifiers (team keys, names, issue identifiers like `ENG-123`) into UUIDs. They use the `GraphQLClient` with lean filter-based lookup queries and live in `src/resolvers/`.
 
 ```typescript
-import type { LinearSdkClient } from "../client/linear-client.js";
-import { isUuid } from "../common/identifier.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
+import { notFoundError } from "../common/errors.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
+import { FindTeamsDocument } from "../gql/graphql.js";
 
 export async function resolveTeamId(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   keyOrNameOrId: string,
-): Promise<string> {
-  if (isUuid(keyOrNameOrId)) return keyOrNameOrId;
+): Promise<UUID> {
+  if (isUuid(keyOrNameOrId)) return asUuid(keyOrNameOrId);
 
-  const byKey = await client.sdk.teams({
+  // Try by key first
+  const byKey = await client.request(FindTeamsDocument, {
     filter: { key: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byKey.nodes.length > 0) return byKey.nodes[0].id;
+  const [byKeyMatch] = byKey.teams.nodes;
+  if (byKeyMatch) return asUuid(byKeyMatch.id);
 
-  const byName = await client.sdk.teams({
+  // Fall back to name
+  const byName = await client.request(FindTeamsDocument, {
     filter: { name: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byName.nodes.length > 0) return byName.nodes[0].id;
+  const [byNameMatch] = byName.teams.nodes;
+  if (byNameMatch) return asUuid(byNameMatch.id);
 
-  throw new Error(`Team "${keyOrNameOrId}" not found`);
+  throw notFoundError("Team", keyOrNameOrId);
 }
 ```
 
 Rules for resolvers:
 - Always accept a UUID passthrough as the first check.
 - Return a UUID string, never an object.
-- Use `LinearSdkClient` only (not `GraphQLClient`).
+- Use `GraphQLClient` with a lean lookup query; do not import services.
 - No CRUD operations or data transformations.
 
 ### Service Pattern
@@ -180,7 +186,7 @@ export async function createIssue(
 ```
 
 Rules for services:
-- Use `GraphQLClient` only (not `LinearSdkClient`).
+- Use `GraphQLClient` (the only client).
 - Accept UUIDs, not human-friendly identifiers.
 - Import `DocumentNode` constants and types from `src/gql/graphql.js`.
 - Always type the `client.request<T>()` call.
@@ -299,7 +305,7 @@ A typical feature addition touches four layers. Here is the sequence:
 
 1. **GraphQL operations** -- Define queries and mutations in `graphql/queries/` or `graphql/mutations/`, then run `npm run generate`.
 
-2. **Resolver** (if new entity types need ID resolution) -- Add a `resolve*Id()` function in `src/resolvers/`. Use `LinearSdkClient`, return a UUID string.
+2. **Resolver** (if new entity types need ID resolution) -- Add a `resolve*Id()` function in `src/resolvers/`. Use `GraphQLClient` with a lean lookup query, return a UUID string.
 
 3. **Service** -- Add functions in `src/services/`. Use `GraphQLClient`, accept UUIDs, import codegen types.
 
@@ -353,7 +359,6 @@ src/
   main.ts                    # Entry point, registers all command groups
   client/
     graphql-client.ts        # GraphQLClient - direct GraphQL execution
-    linear-client.ts         # LinearSdkClient - SDK wrapper for resolvers
   resolvers/                 # Human ID to UUID resolution
     team-resolver.ts
     project-resolver.ts
@@ -403,7 +408,7 @@ graphql/
   mutations/                 # GraphQL mutation definitions
 tests/
   unit/
-    resolvers/               # Resolver tests (mock SDK)
+    resolvers/               # Resolver tests (mock GraphQLClient)
     services/                # Service tests (mock GraphQL)
     common/                  # Pure function tests
 ```
@@ -411,8 +416,9 @@ tests/
 ## Dependencies
 
 **Runtime:**
-- `@linear/sdk` -- Linear SDK, used by resolvers for ID lookups
 - `commander` -- CLI framework
+- `graphql` -- GraphQL document parsing/types for the typed client
+- `node-emoji` -- emoji shortcode handling
 
 **Development:**
 - `typescript` -- Compiler

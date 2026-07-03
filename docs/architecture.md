@@ -2,24 +2,19 @@
 
 Linearis follows a modular, five-layer architecture with clear separation of concerns. The application uses a command-based structure with Commander.js, typed GraphQL operations, standalone resolver functions, and service functions that eliminate code duplication.
 
-The architecture emphasizes performance through GraphQL batch operations, single-query optimizations, and smart ID resolution for user convenience. All components are fully typed with TypeScript - no `any` types in the new architecture. The system uses both direct GraphQL queries (via typed client) and Linear SDK (for ID resolution).
+The architecture emphasizes performance through GraphQL batch operations, single-query optimizations, and smart ID resolution for user convenience. All components are fully typed with TypeScript - no `any` types in the new architecture. Every layer talks to the Linear API through a single typed GraphQL client — both ID resolution and data operations.
 
 ## Five-Layer Architecture
 
 ### 1. Client Layer (`src/client/`)
 
-Thin wrappers around GraphQL and Linear SDK with no business logic.
+Thin wrapper around the Linear GraphQL API with no business logic.
 
 - **graphql-client.ts** - Typed GraphQL client
   - Takes `DocumentNode` from codegen
   - Returns typed results via generics
   - Handles error transformation
   - No ID resolution or business logic
-
-- **linear-client.ts** - Linear SDK wrapper
-  - Simple wrapper exposing `sdk` property
-  - Used by resolvers for lookups
-  - No business logic
 
 ### 2. Resolver Layer (`src/resolvers/`)
 
@@ -34,10 +29,10 @@ Pure functions that convert human-friendly identifiers to UUIDs.
 - **issue-resolver.ts** - `resolveIssueId(client, issueIdOrIdentifier)` - Parses ABC-123 format
 - **status-resolver.ts** - `resolveStatusId(client, nameOrId, teamId?)`
 - **cycle-resolver.ts** - `resolveCycleId(client, nameOrId, teamFilter?)` - Complex disambiguation
-- **milestone-resolver.ts** - `resolveMilestoneId(gqlClient, sdkClient, nameOrId, projectNameOrId?)`
+- **milestone-resolver.ts** - `resolveMilestoneId(gqlClient, nameOrId, projectNameOrId?)`
 
 **Pattern:**
-- Accept SDK or GraphQL client
+- Accept the `GraphQLClient`
 - Check if input is UUID (early return)
 - Query Linear API for name/key match
 - Throw descriptive error if not found
@@ -60,7 +55,7 @@ Pure, typed functions for CRUD operations. Receive pre-resolved UUIDs.
 - **file-service.ts** - File upload/download operations
 
 **Pattern:**
-- Accept `GraphQLClient` or `LinearSdkClient`
+- Accept `GraphQLClient`
 - Take pre-resolved UUIDs in inputs
 - Use codegen `DocumentNode` types
 - Return typed results
@@ -91,8 +86,8 @@ Thin orchestration layer that composes resolvers and services.
       const ctx = await createContext(command.parent!.parent!.opts());
 
       // Resolve IDs
-      const teamId = await resolveTeamId(ctx.sdk, options.team);
-      const labelIds = await resolveLabelIds(ctx.sdk, options.labels.split(','));
+      const teamId = await resolveTeamId(ctx.gql, options.team);
+      const labelIds = await resolveLabelIds(ctx.gql, options.labels.split(','));
 
       // Call service
       const result = await createIssue(ctx.gql, {
@@ -111,7 +106,7 @@ Thin orchestration layer that composes resolvers and services.
 
 Shared utilities used across layers.
 
-- **context.ts** - `createContext(options)` - Creates `{ gql, sdk }` from auth
+- **context.ts** - `createContext(options)` - Creates `{ gql }` from auth
 - **auth.ts** - `resolveApiToken(options)` - Multi-source authentication (flag, env, encrypted storage, legacy file)
 - **output.ts** - `outputSuccess(data)`, `outputError(error)`, `handleCommand(fn)`
 - **errors.ts** - `notFoundError()`, `multipleMatchesError()`, `invalidParameterError()`
@@ -140,7 +135,6 @@ Shared utilities used across layers.
 ### Client Layer - API Wrappers
 
 - **src/client/graphql-client.ts** - Typed GraphQL client with error handling
-- **src/client/linear-client.ts** - Linear SDK wrapper
 
 ### Resolver Layer - ID Resolution
 
@@ -170,7 +164,6 @@ Shared utilities used across layers.
 **Client Layer**
 
 - src/client/graphql-client.ts - GraphQLClient class with typed request method
-- src/client/linear-client.ts - LinearSdkClient wrapper
 
 **Resolver Layer**
 
@@ -202,9 +195,9 @@ Shared utilities used across layers.
 ### Command Execution Flow
 
 1. **Command Parsing** - src/main.ts parses CLI arguments via Commander.js
-2. **Context Creation** - src/common/context.ts creates `{ gql, sdk }` from auth options
+2. **Context Creation** - src/common/context.ts creates `{ gql }` from auth options
 3. **Authentication** - src/common/auth.ts resolves API token from multiple sources
-4. **ID Resolution** - src/resolvers/* convert human inputs to UUIDs via SDK
+4. **ID Resolution** - src/resolvers/* convert human inputs to UUIDs via GraphQL
 5. **Service Operations** - src/services/* execute typed GraphQL operations
 6. **Response Formatting** - src/common/output.ts outputs structured JSON
 
