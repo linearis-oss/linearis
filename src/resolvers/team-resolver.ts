@@ -51,12 +51,12 @@ function toTeamEstimateNode(
     );
   }
 
-  const id = node.id;
-  const key = node.key;
-  const name = node.name;
-  const issueEstimationType = node.issueEstimationType;
-  const issueEstimationExtended = node.issueEstimationExtended;
-  const issueEstimationAllowZero = node.issueEstimationAllowZero;
+  const id = node["id"];
+  const key = node["key"];
+  const name = node["name"];
+  const issueEstimationType = node["issueEstimationType"];
+  const issueEstimationExtended = node["issueEstimationExtended"];
+  const issueEstimationAllowZero = node["issueEstimationAllowZero"];
 
   if (
     typeof id !== "string" ||
@@ -145,14 +145,16 @@ export async function resolveTeamId(
     filter: { key: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byKey.nodes.length > 0) return byKey.nodes[0].id;
+  const [byKeyMatch] = byKey.nodes;
+  if (byKeyMatch) return byKeyMatch.id;
 
   // Fall back to name
   const byName = await client.sdk.teams({
     filter: { name: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byName.nodes.length > 0) return byName.nodes[0].id;
+  const [byNameMatch] = byName.nodes;
+  if (byNameMatch) return byNameMatch.id;
 
   throw notFoundError("Team", keyOrNameOrId);
 }

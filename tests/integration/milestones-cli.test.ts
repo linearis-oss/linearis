@@ -20,7 +20,7 @@ const execAsync = promisify(exec);
  */
 
 const CLI_PATH = "./dist/main.js";
-const hasApiToken = !!process.env.LINEAR_API_TOKEN;
+const hasApiToken = !!process.env["LINEAR_API_TOKEN"];
 
 describe("Milestones CLI Commands", () => {
   beforeAll(async () => {

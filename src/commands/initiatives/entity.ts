@@ -3,11 +3,13 @@ import type { LinearSdkClient } from "../../client/linear-client.js";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { resolveReactionEmojiInput } from "../../common/emoji.js";
 import { invalidParameterError } from "../../common/errors.js";
+import { omitUndefined } from "../../common/object.js";
 import {
   commandAction,
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
+import { buildPaginationOptions } from "../../common/types.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import { resolveTeamId } from "../../resolvers/team-resolver.js";
 import { resolveUserId } from "../../resolvers/user-resolver.js";
@@ -253,7 +255,7 @@ async function resolveInitiativeFilterInput(
     );
   }
 
-  const input: InitiativeFilterInput = {
+  const input: InitiativeFilterInput = omitUndefined({
     id: options.id,
     slug: options.slug,
     name: options.name,
@@ -270,7 +272,7 @@ async function resolveInitiativeFilterInput(
     createdBefore: options.createdBefore,
     updatedAfter: options.updatedAfter,
     updatedBefore: options.updatedBefore,
-  };
+  });
 
   if (options.owner) {
     input.ownerId = await resolveUserId(sdk, options.owner);
@@ -369,14 +371,17 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           );
           const filter = buildInitiativeFilter(filterInput);
 
-          const result = await listInitiatives(ctx.gql, {
-            limit: parseLimit(options.limit),
-            after: options.after,
-            includeArchived: options.includeArchived ?? false,
-            filter,
-            orderBy,
-            sort,
-          });
+          const result = await listInitiatives(
+            ctx.gql,
+            omitUndefined({
+              limit: parseLimit(options.limit),
+              after: options.after,
+              includeArchived: options.includeArchived ?? false,
+              filter,
+              orderBy,
+              sort,
+            }),
+          );
 
           outputSuccess(result);
         },
@@ -451,10 +456,10 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const ctx = createContext(getRootOpts(command));
 
           const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-          const paginationOptions = {
-            limit: parseLimit(options.limit || "25"),
-            after: options.after,
-          };
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "25"),
+            options.after,
+          );
           const result = options.withReactions
             ? await listDiscussionsForInitiativeWithReactions(
                 ctx.gql,
@@ -488,10 +493,10 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const paginationOptions = {
-            limit: parseLimit(options.limit || "50"),
-            after: options.after,
-          };
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          );
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
@@ -643,7 +648,9 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
           const result = await resolveDiscussion(ctx.gql, {
             threadId: thread,
-            resolvingCommentId: options.withComment,
+            ...(options.withComment !== undefined
+              ? { resolvingCommentId: options.withComment }
+              : {}),
             entityKind: "initiative",
           });
 

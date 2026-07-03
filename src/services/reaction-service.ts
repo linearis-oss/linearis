@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { normalizeReactionEmojiInput } from "../common/emoji.js";
 import { requireMutationSuccess } from "../common/mutation-payload.js";
 import {
@@ -252,7 +253,13 @@ export async function deleteOwnReactionByEmoji(
     );
   }
 
-  return deleteReaction(client, matchingReactions[0].id);
+  return deleteReaction(
+    client,
+    firstOrThrow(
+      matchingReactions,
+      `No own reaction found with emoji ${normalizedEmoji}`,
+    ).id,
+  );
 }
 
 export async function deleteOwnReactionById(

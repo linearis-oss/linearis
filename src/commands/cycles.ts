@@ -10,6 +10,7 @@ import {
   requiresParameterError,
 } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
@@ -79,7 +80,7 @@ export function setupCyclesCommands(program: Command): void {
           ctx.gql,
           teamId,
           options.active || false,
-          { limit: parseLimit(options.limit), after: options.after },
+          buildPaginationOptions(parseLimit(options.limit), options.after),
         );
 
         if (options.window) {

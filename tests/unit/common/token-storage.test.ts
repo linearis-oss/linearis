@@ -27,7 +27,7 @@ const originalPlatform = process.platform;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  delete process.env.XDG_CONFIG_HOME;
+  delete process.env["XDG_CONFIG_HOME"];
   vi.mocked(os.homedir).mockReturnValue(HOME);
 });
 
@@ -62,13 +62,13 @@ describe("getTokenDir", () => {
 
   it("uses XDG_CONFIG_HOME on Linux when set", () => {
     setPlatform("linux");
-    process.env.XDG_CONFIG_HOME = "/custom/config";
+    process.env["XDG_CONFIG_HOME"] = "/custom/config";
     expect(getTokenDir()).toBe(path.join("/custom/config", "linearis"));
   });
 
   it("ignores relative XDG_CONFIG_HOME", () => {
     setPlatform("linux");
-    process.env.XDG_CONFIG_HOME = "relative/path";
+    process.env["XDG_CONFIG_HOME"] = "relative/path";
     expect(getTokenDir()).toBe(xdgDir);
   });
 });

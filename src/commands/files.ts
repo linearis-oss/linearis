@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { type CommandOptions, getApiToken } from "../common/auth.js";
 import { getRootOpts } from "../common/context.js";
+import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { FileService } from "../services/file-service.js";
@@ -40,10 +41,13 @@ export function setupFilesCommands(program: Command): void {
         ];
         const apiToken = getApiToken(getRootOpts(command));
         const fileService = new FileService(apiToken);
-        const result = await fileService.downloadFile(url, {
-          output: options.output,
-          overwrite: options.overwrite,
-        });
+        const result = await fileService.downloadFile(
+          url,
+          omitUndefined({
+            output: options.output,
+            overwrite: options.overwrite,
+          }),
+        );
 
         if (!result.success) {
           throw new Error(result.error || "Download failed");

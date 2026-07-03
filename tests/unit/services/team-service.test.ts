@@ -46,9 +46,9 @@ describe("listTeams", () => {
     });
     const result = await listTeams(client);
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("team-1");
-    expect(result.nodes[0].key).toBe("ENG");
-    expect(result.nodes[0].name).toBe("Engineering");
+    expect(result.nodes[0]?.id).toBe("team-1");
+    expect(result.nodes[0]?.key).toBe("ENG");
+    expect(result.nodes[0]?.name).toBe("Engineering");
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: "c1" });
   });
 

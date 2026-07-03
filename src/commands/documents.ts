@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
+import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
@@ -59,6 +60,9 @@ function extractDocumentIdFromUrl(url: string): string | null {
     }
 
     const docSlug = pathParts[docIndex + 1];
+    if (docSlug === undefined) {
+      return null;
+    }
     const lastHyphenIndex = docSlug.lastIndexOf("-");
     if (lastHyphenIndex === -1) {
       return docSlug || null;
@@ -140,11 +144,14 @@ export function setupDocumentsCommands(program: Command): void {
           filter = buildIssueDocumentFilter(issueId, legacyDocumentSlugIds);
         }
 
-        const documents = await listDocuments(ctx.gql, {
-          limit,
-          after: options.after,
-          filter,
-        });
+        const documents = await listDocuments(
+          ctx.gql,
+          omitUndefined({
+            limit,
+            after: options.after,
+            filter,
+          }),
+        );
 
         outputSuccess(documents);
       }),

@@ -61,12 +61,13 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
   const subcommands = command.commands.filter((c) => c.name() !== "usage");
   lines.push("commands:");
 
-  const signatures = subcommands.map((c) => formatCommandSignature(c));
-  const maxSigLen = Math.max(...signatures.map((s) => s.length));
+  const subcommandEntries = subcommands.map((c) => ({
+    sig: formatCommandSignature(c),
+    desc: c.description(),
+  }));
+  const maxSigLen = Math.max(...subcommandEntries.map((e) => e.sig.length));
 
-  for (let i = 0; i < subcommands.length; i++) {
-    const sig = signatures[i];
-    const desc = subcommands[i].description();
+  for (const { sig, desc } of subcommandEntries) {
     lines.push(`  ${sig.padEnd(maxSigLen + 2)}${desc}`);
   }
 
@@ -89,15 +90,17 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
     lines.push("");
     lines.push(`${cmd.name()} options:`);
 
-    const flags = opts.map((o) => extractLongFlag(o.flags));
-    const maxFlagLen = Math.max(...flags.map((f) => f.length));
+    const optionEntries = opts.map((o) => ({
+      flag: extractLongFlag(o.flags),
+      description: o.description,
+      defaultValue: o.defaultValue,
+    }));
+    const maxFlagLen = Math.max(...optionEntries.map((e) => e.flag.length));
 
-    for (let j = 0; j < opts.length; j++) {
-      const flag = flags[j];
-      let desc = opts[j].description;
-      const defaultVal = opts[j].defaultValue;
-      if (defaultVal !== undefined && defaultVal !== false) {
-        desc += ` (default: ${defaultVal})`;
+    for (const { flag, description, defaultValue } of optionEntries) {
+      let desc = description;
+      if (defaultValue !== undefined && defaultValue !== false) {
+        desc += ` (default: ${defaultValue})`;
       }
       lines.push(`  ${flag.padEnd(maxFlagLen + 2)}${desc}`);
     }

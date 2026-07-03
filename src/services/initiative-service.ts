@@ -160,7 +160,12 @@ export interface InitiativeFilterInput {
 }
 
 function applyNullableDateRange(
-  target: { gte?: string | null; lte?: string | null },
+  // Accepts a GraphQL date comparator whose optional fields are `InputMaybe`
+  // (i.e. include `undefined`); the function only ever writes to gte/lte.
+  target: {
+    gte?: string | null | undefined;
+    lte?: string | null | undefined;
+  },
   after?: string,
   before?: string,
 ): void {

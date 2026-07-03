@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
 import {
@@ -76,5 +77,5 @@ export async function resolveMilestoneId(
     );
   }
 
-  return nodes[0].id;
+  return firstOrThrow(nodes, () => notFoundError("Milestone", nameOrId)).id;
 }

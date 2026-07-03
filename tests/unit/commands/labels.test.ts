@@ -438,7 +438,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -462,7 +462,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -486,7 +486,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -512,7 +512,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -538,7 +538,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -564,7 +564,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -589,7 +589,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -612,7 +612,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -633,7 +633,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(
@@ -656,7 +656,7 @@ describe("labels validation", () => {
     ]);
 
     const errorOutput = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
 
     expect(errorOutput.error).toBe(

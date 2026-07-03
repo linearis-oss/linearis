@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
@@ -77,10 +78,14 @@ export function setupMilestonesCommands(program: Command): void {
         // Resolve project ID
         const projectId = await resolveProjectId(ctx.sdk, options.project);
 
-        const milestones = await listMilestones(ctx.gql, projectId, {
-          limit: parseLimit(options.limit || "50"),
-          after: options.after,
-        });
+        const milestones = await listMilestones(
+          ctx.gql,
+          projectId,
+          buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          ),
+        );
 
         outputSuccess(milestones);
       }),

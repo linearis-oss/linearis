@@ -1,8 +1,10 @@
 import type { LinearDocument } from "@linear/sdk";
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
+import { omitUndefined } from "../common/object.js";
 import {
   FindInitiativeProjectLinkByPairDocument,
   FindInitiativeRelationByPairDocument,
@@ -36,17 +38,21 @@ export async function resolveInitiativeId(
 
   const filter = clauses.length === 1 ? clauses[0] : { and: clauses };
 
-  const result = await client.sdk.initiatives({
-    filter,
-    first: 20,
-  });
+  const result = await client.sdk.initiatives(
+    omitUndefined({
+      filter,
+      first: 20,
+    }),
+  );
 
   if (result.nodes.length === 0) {
     throw notFoundError("Initiative", nameOrId);
   }
 
   if (result.nodes.length === 1) {
-    return result.nodes[0].id;
+    return firstOrThrow(result.nodes, () =>
+      notFoundError("Initiative", nameOrId),
+    ).id;
   }
 
   const candidates = result.nodes.map((node) => `${node.name} (${node.id})`);

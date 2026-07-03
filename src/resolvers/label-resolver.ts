@@ -1,4 +1,5 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
 
@@ -49,11 +50,7 @@ export async function resolveLabelId(
     first: 1,
   });
 
-  if (result.nodes.length === 0) {
-    throw notFoundError("Label", nameOrId);
-  }
-
-  return result.nodes[0].id;
+  return firstOrThrow(result.nodes, () => notFoundError("Label", nameOrId)).id;
 }
 
 export async function resolveLabelIds(

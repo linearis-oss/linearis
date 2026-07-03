@@ -6,6 +6,7 @@ import {
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
+import { buildPaginationOptions } from "../../common/types.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import {
   archiveInitiativeUpdate,
@@ -66,8 +67,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
 
         const result = await listInitiativeUpdates(ctx.gql, {
           initiativeId,
-          limit: parseLimit(options.limit),
-          after: options.after,
+          ...buildPaginationOptions(parseLimit(options.limit), options.after),
           includeArchived: options.includeArchived ?? false,
         });
 

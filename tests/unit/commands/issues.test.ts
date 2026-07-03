@@ -427,7 +427,7 @@ describe("issues create --estimate", () => {
     ]);
 
     const outOfScaleCreateError = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
     expect(outOfScaleCreateError.error).toBe(
       'Invalid --estimate: must be one of [1, 2, 3, 5, 8] for team "ENG" (fibonacci)',
@@ -459,7 +459,7 @@ describe("issues create --estimate", () => {
     ]);
 
     const disabledEstimationCreateError = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
     expect(disabledEstimationCreateError.error).toBe(
       'Invalid --estimate: team "ENG" has estimates disabled (issueEstimationType=notUsed)',
@@ -669,7 +669,7 @@ describe("issues update --estimate", () => {
     ]);
 
     const outOfScaleUpdateError = JSON.parse(
-      vi.mocked(console.error).mock.calls[0][0] as string,
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
     ) as { error: string };
     expect(outOfScaleUpdateError.error).toBe(
       'Invalid --estimate: must be one of [1, 2, 3, 4, 5] for team "ENG" (linear)',

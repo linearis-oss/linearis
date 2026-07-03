@@ -119,7 +119,7 @@ describe("listComments", () => {
       parentId: null,
       user: MOCK_USER,
     });
-    expect(result.nodes[1].parentId).toBe("comment-1");
+    expect(result.nodes[1]?.parentId).toBe("comment-1");
     expect(result.pageInfo).toEqual({
       hasNextPage: true,
       endCursor: "cursor-abc",
