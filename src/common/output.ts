@@ -124,3 +124,35 @@ export function handleCommand(
     }
   };
 }
+
+/**
+ * Typed wrapper around {@link handleCommand} for Commander action handlers.
+ *
+ * Commander invokes an action with the positional arguments first, followed by
+ * the parsed options object and the `Command` instance. That boundary is
+ * inherently `unknown[]`, so command bodies used to open with a hand-written
+ * tuple cast (`const [issue, options, command] = args as [...]`). Those casts
+ * are invisible to the compiler: if a command signature changes, TypeScript
+ * cannot flag the now-wrong destructuring.
+ *
+ * `commandAction` centralizes the cast in one place. Declare the expected
+ * argument tuple once via the generic parameter and the handler receives fully
+ * typed arguments, while `handleCommand` remains the single error wrapper.
+ *
+ * @example
+ * .action(
+ *   commandAction<[string, ReadOptions, Command]>(
+ *     async (issue, options, command) => {
+ *       const ctx = createContext(getRootOpts(command));
+ *       // ...
+ *     },
+ *   ),
+ * )
+ */
+export function commandAction<TArgs extends readonly unknown[]>(
+  fn: (...args: TArgs) => Promise<void>,
+): (...args: unknown[]) => Promise<void> {
+  return handleCommand(async (...args: unknown[]) => {
+    await fn(...(args as unknown as TArgs));
+  });
+}

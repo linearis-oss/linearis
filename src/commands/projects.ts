@@ -3,7 +3,7 @@ import { createContext, getRootOpts } from "../common/context.js";
 import { type Priority, parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
-import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { ProjectCreateInput, ProjectUpdateInput } from "../gql/graphql.js";
 import {
@@ -78,22 +78,18 @@ function addCommentReactionCommands(
     .description(`add a reaction to a discussion ${noun}`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await createDiscussionCommentReaction(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "project",
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (commentId, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await createDiscussionCommentReaction(ctx.gql, {
+            commentId,
+            target: noun,
+            expectedEntityKind: "project",
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 
   parent
@@ -101,22 +97,18 @@ function addCommentReactionCommands(
     .description(`remove your reaction from a discussion ${noun} by emoji`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "project",
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (commentId, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+            commentId,
+            target: noun,
+            expectedEntityKind: "project",
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 
   parent
@@ -125,22 +117,18 @@ function addCommentReactionCommands(
       `remove your reaction from a discussion ${noun} by reaction ID`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, reactionId, , command] = args as [
-          string,
-          string,
-          unknown,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await deleteDiscussionCommentReactionById(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "project",
-          reactionId,
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, string, unknown, Command]>(
+        async (commentId, reactionId, _unused2, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteDiscussionCommentReactionById(ctx.gql, {
+            commentId,
+            target: noun,
+            expectedEntityKind: "project",
+            reactionId,
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 }
 
@@ -271,8 +259,7 @@ export function setupProjectsCommands(program: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--include-archived", "include archived projects")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [ListOptions, Command];
+      commandAction<[ListOptions, Command]>(async (options, command) => {
         const ctx = createContext(getRootOpts(command));
         const result = await listProjects(ctx.gql, {
           limit: parseLimit(options.limit),
@@ -297,26 +284,23 @@ export function setupProjectsCommands(program: Command): void {
       "50",
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, options, command] = args as [
-          string,
-          ReadOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const projectId = await resolveProjectId(ctx.sdk, project);
-        const result = await getProject(ctx.gql, projectId, {
-          milestonesFirst: parseNonNegativeIntegerOption(
-            "--milestones-first",
-            options.milestonesFirst,
-          ),
-          issuesFirst: parseNonNegativeIntegerOption(
-            "--issues-first",
-            options.issuesFirst,
-          ),
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, ReadOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const projectId = await resolveProjectId(ctx.sdk, project);
+          const result = await getProject(ctx.gql, projectId, {
+            milestonesFirst: parseNonNegativeIntegerOption(
+              "--milestones-first",
+              options.milestonesFirst,
+            ),
+            issuesFirst: parseNonNegativeIntegerOption(
+              "--issues-first",
+              options.issuesFirst,
+            ),
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -324,26 +308,23 @@ export function setupProjectsCommands(program: Command): void {
     .description("start a discussion thread on a project")
     .option("--body <text>", "discussion body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const projectId = await resolveProjectId(ctx.sdk, project);
-        const result = await startProjectDiscussion(ctx.gql, {
-          projectId,
-          body: options.body,
-        });
+          const projectId = await resolveProjectId(ctx.sdk, project);
+          const result = await startProjectDiscussion(ctx.gql, {
+            projectId,
+            body: options.body,
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -353,33 +334,30 @@ export function setupProjectsCommands(program: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, options, command] = args as [
-          string,
-          DiscussionsOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionsOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const projectId = await resolveProjectId(ctx.sdk, project);
-        const paginationOptions = {
-          limit: parseLimit(options.limit || "25"),
-          after: options.after,
-        };
-        const result = options.withReactions
-          ? await listDiscussionsForProjectWithReactions(
-              ctx.gql,
-              projectId,
-              paginationOptions,
-            )
-          : await listDiscussionsForProject(
-              ctx.gql,
-              projectId,
-              paginationOptions,
-            );
+          const projectId = await resolveProjectId(ctx.sdk, project);
+          const paginationOptions = {
+            limit: parseLimit(options.limit || "25"),
+            after: options.after,
+          };
+          const result = options.withReactions
+            ? await listDiscussionsForProjectWithReactions(
+                ctx.gql,
+                projectId,
+                paginationOptions,
+              )
+            : await listDiscussionsForProject(
+                ctx.gql,
+                projectId,
+                paginationOptions,
+              );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   const projectThreads = projects
@@ -394,34 +372,31 @@ export function setupProjectsCommands(program: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          DiscussionsOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionsOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const paginationOptions = {
-          limit: parseLimit(options.limit || "50"),
-          after: options.after,
-        };
-        const result = options.withReactions
-          ? await listDiscussionRepliesWithReactions(
-              ctx.gql,
-              thread,
-              paginationOptions,
-              "project",
-            )
-          : await listDiscussionReplies(
-              ctx.gql,
-              thread,
-              paginationOptions,
-              "project",
-            );
+          const paginationOptions = {
+            limit: parseLimit(options.limit || "50"),
+            after: options.after,
+          };
+          const result = options.withReactions
+            ? await listDiscussionRepliesWithReactions(
+                ctx.gql,
+                thread,
+                paginationOptions,
+                "project",
+              )
+            : await listDiscussionReplies(
+                ctx.gql,
+                thread,
+                paginationOptions,
+                "project",
+              );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
   addCommentReactionCommands(projectReplies, "reply");
 
@@ -434,26 +409,23 @@ export function setupProjectsCommands(program: Command): void {
     )
     .option("--body <text>", "reply body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await replyToDiscussion(ctx.gql, {
-          threadId: thread,
-          body: options.body,
-          entityKind: "project",
-        });
+          const result = await replyToDiscussion(ctx.gql, {
+            threadId: thread,
+            body: options.body,
+            entityKind: "project",
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -461,29 +433,26 @@ export function setupProjectsCommands(program: Command): void {
     .description("edit a root discussion or reply comment")
     .option("--body <text>", "new comment body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [comment, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (comment, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await editDiscussionComment(
-          ctx.gql,
-          comment,
-          {
-            body: options.body,
-          },
-          "project",
-        );
+          const result = await editDiscussionComment(
+            ctx.gql,
+            comment,
+            {
+              body: options.body,
+            },
+            "project",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -491,61 +460,60 @@ export function setupProjectsCommands(program: Command): void {
     .description("edit a discussion reply")
     .option("--body <text>", "new reply body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [reply, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (reply, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await editDiscussionReply(
-          ctx.gql,
-          reply,
-          {
-            body: options.body,
-          },
-          "project",
-        );
+          const result = await editDiscussionReply(
+            ctx.gql,
+            reply,
+            {
+              body: options.body,
+            },
+            "project",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
     .command("delete-comment <comment>")
     .description("delete a root discussion or reply comment")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [comment, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (comment, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionComment(
-          ctx.gql,
-          comment,
-          "project",
-        );
+          const result = await deleteDiscussionComment(
+            ctx.gql,
+            comment,
+            "project",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
     .command("delete-reply <reply>")
     .description("delete a discussion reply")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [reply, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (reply, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionReply(ctx.gql, reply, "project");
+          const result = await deleteDiscussionReply(ctx.gql, reply, "project");
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -553,36 +521,34 @@ export function setupProjectsCommands(program: Command): void {
     .description("resolve a discussion thread")
     .option("--with-comment <comment>", "comment to mark as resolving comment")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          ResolveDiscussionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, ResolveDiscussionOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await resolveDiscussion(ctx.gql, {
-          threadId: thread,
-          resolvingCommentId: options.withComment,
-          entityKind: "project",
-        });
+          const result = await resolveDiscussion(ctx.gql, {
+            threadId: thread,
+            resolvingCommentId: options.withComment,
+            entityKind: "project",
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
     .command("unresolve <thread>")
     .description("unresolve a discussion thread")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (thread, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await unresolveDiscussion(ctx.gql, thread, "project");
+          const result = await unresolveDiscussion(ctx.gql, thread, "project");
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -602,84 +568,81 @@ export function setupProjectsCommands(program: Command): void {
     .option("--target-date <date>", "target date (YYYY-MM-DD)")
     .option("--labels <labels>", "comma-separated label names or UUIDs")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [name, options, command] = args as [
-          string,
-          CreateOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, CreateOptions, Command]>(
+        async (name, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const teamNames = getCreateTeamNames(options);
-        const teamIds = await Promise.all(
-          teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
-        );
-
-        const input: ProjectCreateInput = {
-          name,
-          teamIds,
-        };
-
-        if (options.description) {
-          input.description = options.description;
-        }
-
-        if (options.content) {
-          input.content = options.content;
-        }
-
-        if (options.icon !== undefined) {
-          input.icon = options.icon;
-        }
-
-        if (options.color !== undefined) {
-          input.color = options.color;
-        }
-
-        if (options.lead) {
-          input.leadId = await resolveUserId(ctx.sdk, options.lead);
-        }
-
-        if (options.members) {
-          const memberNames = options.members
-            .split(",")
-            .map((m) => m.trim())
-            .filter(Boolean);
-          input.memberIds = await Promise.all(
-            memberNames.map((m) => resolveUserId(ctx.sdk, m)),
+          const teamNames = getCreateTeamNames(options);
+          const teamIds = await Promise.all(
+            teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
           );
-        }
 
-        if (options.priority) {
-          input.priority = parsePriority(options.priority);
-        }
+          const input: ProjectCreateInput = {
+            name,
+            teamIds,
+          };
 
-        if (options.status) {
-          input.statusId = await resolveProjectStatusId(
-            ctx.gql,
-            options.status,
-          );
-        }
+          if (options.description) {
+            input.description = options.description;
+          }
 
-        if (options.startDate) {
-          input.startDate = options.startDate;
-        }
+          if (options.content) {
+            input.content = options.content;
+          }
 
-        if (options.targetDate) {
-          input.targetDate = options.targetDate;
-        }
+          if (options.icon !== undefined) {
+            input.icon = options.icon;
+          }
 
-        if (options.labels) {
-          const labelNames = options.labels
-            .split(",")
-            .map((l) => l.trim())
-            .filter(Boolean);
-          input.labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
-        }
+          if (options.color !== undefined) {
+            input.color = options.color;
+          }
 
-        const result = await createProject(ctx.gql, input);
-        outputSuccess(result);
-      }),
+          if (options.lead) {
+            input.leadId = await resolveUserId(ctx.sdk, options.lead);
+          }
+
+          if (options.members) {
+            const memberNames = options.members
+              .split(",")
+              .map((m) => m.trim())
+              .filter(Boolean);
+            input.memberIds = await Promise.all(
+              memberNames.map((m) => resolveUserId(ctx.sdk, m)),
+            );
+          }
+
+          if (options.priority) {
+            input.priority = parsePriority(options.priority);
+          }
+
+          if (options.status) {
+            input.statusId = await resolveProjectStatusId(
+              ctx.gql,
+              options.status,
+            );
+          }
+
+          if (options.startDate) {
+            input.startDate = options.startDate;
+          }
+
+          if (options.targetDate) {
+            input.targetDate = options.targetDate;
+          }
+
+          if (options.labels) {
+            const labelNames = options.labels
+              .split(",")
+              .map((l) => l.trim())
+              .filter(Boolean);
+            input.labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
+          }
+
+          const result = await createProject(ctx.gql, input);
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -705,212 +668,212 @@ export function setupProjectsCommands(program: Command): void {
     .option("--label-mode <mode>", "add | remove | overwrite")
     .option("--clear-labels", "remove all labels")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, options, command] = args as [
-          string,
-          UpdateOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, UpdateOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (options.lead && options.clearLead) {
-          throw invalidParameterError(
-            "--lead",
-            "cannot be combined with --clear-lead",
-          );
-        }
-
-        if (options.startDate && options.clearStartDate) {
-          throw invalidParameterError(
-            "--start-date",
-            "cannot be combined with --clear-start-date",
-          );
-        }
-
-        if (options.targetDate && options.clearTargetDate) {
-          throw invalidParameterError(
-            "--target-date",
-            "cannot be combined with --clear-target-date",
-          );
-        }
-
-        if (options.labelMode && !options.labels) {
-          throw invalidParameterError(
-            "--label-mode",
-            "requires --labels to be specified",
-          );
-        }
-
-        if (options.clearLabels && options.labels) {
-          throw invalidParameterError(
-            "--clear-labels",
-            "cannot be used with --labels",
-          );
-        }
-
-        if (options.clearLabels && options.labelMode) {
-          throw invalidParameterError(
-            "--clear-labels",
-            "cannot be used with --label-mode",
-          );
-        }
-
-        const labelMode = parseLabelMode(options.labelMode);
-
-        const projectId = await resolveProjectId(ctx.sdk, project);
-        const needsLabelContext =
-          options.labels && (labelMode === "add" || labelMode === "remove");
-        const projectContext = needsLabelContext
-          ? await getProject(ctx.gql, projectId)
-          : undefined;
-
-        const input: ProjectUpdateInput = {};
-
-        if (options.name) {
-          input.name = options.name;
-        }
-
-        if (options.description) {
-          input.description = options.description;
-        }
-
-        if (options.content) {
-          input.content = options.content;
-        }
-
-        if (options.icon !== undefined) {
-          input.icon = options.icon;
-        }
-
-        if (options.color !== undefined) {
-          input.color = options.color;
-        }
-
-        if (options.clearLead) {
-          input.leadId = null;
-        } else if (options.lead) {
-          input.leadId = await resolveUserId(ctx.sdk, options.lead);
-        }
-
-        if (options.members) {
-          const memberNames = options.members
-            .split(",")
-            .map((m) => m.trim())
-            .filter(Boolean);
-          input.memberIds = await Promise.all(
-            memberNames.map((m) => resolveUserId(ctx.sdk, m)),
-          );
-        }
-
-        if (options.priority) {
-          input.priority = parsePriority(options.priority);
-        }
-
-        if (options.status) {
-          input.statusId = await resolveProjectStatusId(
-            ctx.gql,
-            options.status,
-          );
-        }
-
-        if (options.clearStartDate) {
-          input.startDate = null;
-        } else if (options.startDate) {
-          input.startDate = options.startDate;
-        }
-
-        if (options.clearTargetDate) {
-          input.targetDate = null;
-        } else if (options.targetDate) {
-          input.targetDate = options.targetDate;
-        }
-
-        const teamNames = getUpdateTeamNames(options);
-        if (teamNames) {
-          input.teamIds = await Promise.all(
-            teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
-          );
-        }
-
-        if (options.clearLabels) {
-          input.labelIds = [];
-        } else if (options.labels) {
-          const labelNames = options.labels
-            .split(",")
-            .map((l) => l.trim())
-            .filter(Boolean);
-          const labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
-
-          if (labelMode === "add") {
-            const currentLabels = projectContext?.labels?.nodes
-              ? projectContext.labels.nodes.map((l) => l.id)
-              : [];
-            input.labelIds = [...new Set([...currentLabels, ...labelIds])];
-          } else if (labelMode === "remove") {
-            const currentLabels = projectContext?.labels?.nodes
-              ? projectContext.labels.nodes.map((l) => l.id)
-              : [];
-            input.labelIds = currentLabels.filter(
-              (id) => !labelIds.includes(id),
+          if (options.lead && options.clearLead) {
+            throw invalidParameterError(
+              "--lead",
+              "cannot be combined with --clear-lead",
             );
-          } else {
-            input.labelIds = labelIds;
           }
-        }
 
-        if (Object.keys(input).length === 0) {
-          throw invalidParameterError(
-            "update options",
-            "at least one option must be provided",
-          );
-        }
+          if (options.startDate && options.clearStartDate) {
+            throw invalidParameterError(
+              "--start-date",
+              "cannot be combined with --clear-start-date",
+            );
+          }
 
-        const result = await updateProject(ctx.gql, projectId, input);
-        outputSuccess(result);
-      }),
+          if (options.targetDate && options.clearTargetDate) {
+            throw invalidParameterError(
+              "--target-date",
+              "cannot be combined with --clear-target-date",
+            );
+          }
+
+          if (options.labelMode && !options.labels) {
+            throw invalidParameterError(
+              "--label-mode",
+              "requires --labels to be specified",
+            );
+          }
+
+          if (options.clearLabels && options.labels) {
+            throw invalidParameterError(
+              "--clear-labels",
+              "cannot be used with --labels",
+            );
+          }
+
+          if (options.clearLabels && options.labelMode) {
+            throw invalidParameterError(
+              "--clear-labels",
+              "cannot be used with --label-mode",
+            );
+          }
+
+          const labelMode = parseLabelMode(options.labelMode);
+
+          const projectId = await resolveProjectId(ctx.sdk, project);
+          const needsLabelContext =
+            options.labels && (labelMode === "add" || labelMode === "remove");
+          const projectContext = needsLabelContext
+            ? await getProject(ctx.gql, projectId)
+            : undefined;
+
+          const input: ProjectUpdateInput = {};
+
+          if (options.name) {
+            input.name = options.name;
+          }
+
+          if (options.description) {
+            input.description = options.description;
+          }
+
+          if (options.content) {
+            input.content = options.content;
+          }
+
+          if (options.icon !== undefined) {
+            input.icon = options.icon;
+          }
+
+          if (options.color !== undefined) {
+            input.color = options.color;
+          }
+
+          if (options.clearLead) {
+            input.leadId = null;
+          } else if (options.lead) {
+            input.leadId = await resolveUserId(ctx.sdk, options.lead);
+          }
+
+          if (options.members) {
+            const memberNames = options.members
+              .split(",")
+              .map((m) => m.trim())
+              .filter(Boolean);
+            input.memberIds = await Promise.all(
+              memberNames.map((m) => resolveUserId(ctx.sdk, m)),
+            );
+          }
+
+          if (options.priority) {
+            input.priority = parsePriority(options.priority);
+          }
+
+          if (options.status) {
+            input.statusId = await resolveProjectStatusId(
+              ctx.gql,
+              options.status,
+            );
+          }
+
+          if (options.clearStartDate) {
+            input.startDate = null;
+          } else if (options.startDate) {
+            input.startDate = options.startDate;
+          }
+
+          if (options.clearTargetDate) {
+            input.targetDate = null;
+          } else if (options.targetDate) {
+            input.targetDate = options.targetDate;
+          }
+
+          const teamNames = getUpdateTeamNames(options);
+          if (teamNames) {
+            input.teamIds = await Promise.all(
+              teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
+            );
+          }
+
+          if (options.clearLabels) {
+            input.labelIds = [];
+          } else if (options.labels) {
+            const labelNames = options.labels
+              .split(",")
+              .map((l) => l.trim())
+              .filter(Boolean);
+            const labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
+
+            if (labelMode === "add") {
+              const currentLabels = projectContext?.labels?.nodes
+                ? projectContext.labels.nodes.map((l) => l.id)
+                : [];
+              input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+            } else if (labelMode === "remove") {
+              const currentLabels = projectContext?.labels?.nodes
+                ? projectContext.labels.nodes.map((l) => l.id)
+                : [];
+              input.labelIds = currentLabels.filter(
+                (id) => !labelIds.includes(id),
+              );
+            } else {
+              input.labelIds = labelIds;
+            }
+          }
+
+          if (Object.keys(input).length === 0) {
+            throw invalidParameterError(
+              "update options",
+              "at least one option must be provided",
+            );
+          }
+
+          const result = await updateProject(ctx.gql, projectId, input);
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
     .command("archive <project>")
     .description("archive a project")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const projectId = await resolveProjectId(ctx.sdk, project);
-        const result = await archiveProject(ctx.gql, projectId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (project, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const projectId = await resolveProjectId(ctx.sdk, project);
+          const result = await archiveProject(ctx.gql, projectId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
     .command("unarchive <project>")
     .description("unarchive a project")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const projectId = await resolveProjectId(ctx.sdk, project, {
-          includeArchived: true,
-        });
-        const result = await unarchiveProject(ctx.gql, projectId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (project, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const projectId = await resolveProjectId(ctx.sdk, project, {
+            includeArchived: true,
+          });
+          const result = await unarchiveProject(ctx.gql, projectId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
     .command("delete <project>")
     .description("delete a project")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [project, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const projectId = await resolveProjectId(ctx.sdk, project, {
-          includeArchived: true,
-        });
-        const result = await deleteProject(ctx.gql, projectId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (project, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const projectId = await resolveProjectId(ctx.sdk, project, {
+            includeArchived: true,
+          });
+          const result = await deleteProject(ctx.gql, projectId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
