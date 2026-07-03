@@ -14,10 +14,9 @@ export function firstOrThrow<T>(
   items: readonly T[],
   error: string | Error | (() => string | Error),
 ): T {
-  const first = items[0];
-  if (first === undefined) {
+  if (items.length === 0) {
     const resolved = typeof error === "function" ? error() : error;
     throw typeof resolved === "string" ? new Error(resolved) : resolved;
   }
-  return first;
+  return items[0] as T;
 }

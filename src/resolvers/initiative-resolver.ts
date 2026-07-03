@@ -4,7 +4,6 @@ import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
-import { omitUndefined } from "../common/object.js";
 import {
   FindInitiativeProjectLinkByPairDocument,
   FindInitiativeRelationByPairDocument,
@@ -24,26 +23,28 @@ export async function resolveInitiativeId(
     return nameOrId;
   }
 
-  const clauses: LinearDocument.InitiativeFilter[] = [
-    { name: { eqIgnoreCase: nameOrId } },
-  ];
+  const nameClause: LinearDocument.InitiativeFilter = {
+    name: { eqIgnoreCase: nameOrId },
+  };
+  const scopeClauses: LinearDocument.InitiativeFilter[] = [];
 
   if (scope.teamId) {
-    clauses.push({ teams: { some: { id: { eq: scope.teamId } } } });
+    scopeClauses.push({ teams: { some: { id: { eq: scope.teamId } } } });
   }
 
   if (scope.ownerId) {
-    clauses.push({ owner: { id: { eq: scope.ownerId } } });
+    scopeClauses.push({ owner: { id: { eq: scope.ownerId } } });
   }
 
-  const filter = clauses.length === 1 ? clauses[0] : { and: clauses };
+  const filter: LinearDocument.InitiativeFilter =
+    scopeClauses.length === 0
+      ? nameClause
+      : { and: [nameClause, ...scopeClauses] };
 
-  const result = await client.sdk.initiatives(
-    omitUndefined({
-      filter,
-      first: 20,
-    }),
-  );
+  const result = await client.sdk.initiatives({
+    filter,
+    first: 20,
+  });
 
   if (result.nodes.length === 0) {
     throw notFoundError("Initiative", nameOrId);

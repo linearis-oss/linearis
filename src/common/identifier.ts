@@ -44,20 +44,22 @@ export function tryParseIssueIdentifier(
   }
 }
 
-const DUE_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DUE_DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** @throws Error if date format is invalid or date doesn't exist */
 export function parseDueDate(value: string): string {
-  if (!DUE_DATE_REGEX.test(value)) {
+  const match = DUE_DATE_REGEX.exec(value);
+  if (!match) {
     throw new Error(
       `Invalid due date format: "${value}". Expected format: YYYY-MM-DD`,
     );
   }
 
-  const [year, month, day] = value.split("-").map(Number);
-  if (year === undefined || month === undefined || day === undefined) {
-    throw new Error(`Invalid due date: "${value}". The date does not exist.`);
-  }
+  // The three capture groups are guaranteed present when the regex matches.
+  const [, yearStr, monthStr, dayStr] = match;
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
   const date = new Date(year, month - 1, day);
 
   if (

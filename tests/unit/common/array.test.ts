@@ -12,6 +12,10 @@ describe("firstOrThrow", () => {
     expect(() => firstOrThrow([], "no items found")).toThrow("no items found");
   });
 
+  it("returns an undefined first element without throwing", () => {
+    expect(firstOrThrow([undefined, 2], "empty")).toBeUndefined();
+  });
+
   it("throws the provided Error instance when the array is empty", () => {
     const err = new Error("custom");
     expect(() => firstOrThrow([], err)).toThrow(err);

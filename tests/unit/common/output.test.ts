@@ -180,7 +180,8 @@ describe("pickFields", () => {
     const result = pickFields(input, [["__proto__", "x"], ["a"]]);
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
     expect((result as { a: number }).a).toBe(1);
-    expect((result as Record<string, { x: number }>)["__proto__"]?.x).toBe(9);
+    const ownProto = Object.getOwnPropertyDescriptor(result, "__proto__");
+    expect((ownProto?.value as { x: number }).x).toBe(9);
   });
 });
 
