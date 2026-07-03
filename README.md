@@ -167,10 +167,13 @@ Workflow rules:
 - Record progress that isn't a simple checkbox change in a discussion thread
   (`issues discuss`), not in the description.
 
-Files: `issues read --with-attachments` includes an `attachments` array whose
-entries carry a `url`. Fetch those with `files download <url>`. Upload new
-files with `files upload <file>`; it returns an `assetUrl` you can embed in
-descriptions or comments.
+Files: `files download <url>` only fetches Linear storage URLs
+(`uploads.linear.app`), such as images embedded in descriptions or comments.
+Upload new files with `files upload <file>`; it returns an `assetUrl` you can
+embed in descriptions or comments. `issues read --with-attachments` lists
+resources linked to an issue (PRs, docs, external URLs) under an
+`attachments.nodes` array whose entries carry a `url` — these are references,
+not necessarily downloadable files.
 ```
 
 ## Documentation
