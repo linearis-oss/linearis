@@ -64,7 +64,7 @@ describe("GraphQLClient", () => {
       ];
       expect(url).toBe("https://api.linear.app/graphql");
       expect(options.method).toBe("POST");
-      expect(options.headers.Authorization).toBe("test-token");
+      expect(options.headers["Authorization"]).toBe("test-token");
       expect(options.headers["Content-Type"]).toBe("application/json");
       expect(options.headers["public-file-urls-expire-in"]).toBe("3600");
       const body = JSON.parse(options.body as string);
