@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
+import { asUuid, type UUID } from "../common/identifier.js";
 import { requireMutationSuccess } from "../common/mutation-payload.js";
 import {
   CreateIssueRelationDocument,
@@ -19,8 +20,8 @@ type IssueRelationsIssue = NonNullable<GetIssueRelationsQuery["issue"]>;
 export async function createIssueRelation(
   client: GraphQLClient,
   input: {
-    issueId: string;
-    relatedIssueId: string;
+    issueId: UUID;
+    relatedIssueId: UUID;
     type: IssueRelationType;
   },
 ): Promise<CreatedIssueRelation> {
@@ -34,7 +35,7 @@ export async function createIssueRelation(
 
 export async function listIssueRelations(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
 ): Promise<{
   issueId: string;
   identifier: string;
@@ -61,9 +62,9 @@ export async function listIssueRelations(
 
 export async function findIssueRelation(
   client: GraphQLClient,
-  issueId: string,
-  relatedIssueId: string,
-): Promise<string> {
+  issueId: UUID,
+  relatedIssueId: UUID,
+): Promise<UUID> {
   const result = await client.request(GetIssueRelationsDocument, { issueId });
 
   if (!result.issue) {
@@ -74,20 +75,20 @@ export async function findIssueRelation(
   const forwardMatch = result.issue.relations.nodes.find(
     (r) => r.relatedIssue.id === relatedIssueId,
   );
-  if (forwardMatch) return forwardMatch.id;
+  if (forwardMatch) return asUuid(forwardMatch.id);
 
   // Check inverse relations
   const inverseMatch = result.issue.inverseRelations.nodes.find(
     (r) => r.issue.id === relatedIssueId,
   );
-  if (inverseMatch) return inverseMatch.id;
+  if (inverseMatch) return asUuid(inverseMatch.id);
 
   throw notFoundError("Relation", `between ${issueId} and ${relatedIssueId}`);
 }
 
 export async function deleteIssueRelation(
   client: GraphQLClient,
-  relationId: string,
+  relationId: UUID,
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(DeleteIssueRelationDocument, {
     id: relationId,

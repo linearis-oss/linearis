@@ -3,6 +3,7 @@ import type { LinearSdkClient } from "../../client/linear-client.js";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { resolveReactionEmojiInput } from "../../common/emoji.js";
 import { invalidParameterError } from "../../common/errors.js";
+import { asUuid } from "../../common/identifier.js";
 import { omitUndefined } from "../../common/object.js";
 import {
   commandAction,
@@ -120,7 +121,7 @@ function addCommentReactionCommands(
         async (commentId, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await createDiscussionCommentReaction(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "initiative",
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -139,7 +140,7 @@ function addCommentReactionCommands(
         async (commentId, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "initiative",
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -159,10 +160,10 @@ function addCommentReactionCommands(
         async (commentId, reactionId, _unused2, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await deleteDiscussionCommentReactionById(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "initiative",
-            reactionId,
+            reactionId: asUuid(reactionId),
           });
           outputSuccess(result);
         },
@@ -500,13 +501,13 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
-                thread,
+                asUuid(thread),
                 paginationOptions,
                 "initiative",
               )
             : await listDiscussionReplies(
                 ctx.gql,
-                thread,
+                asUuid(thread),
                 paginationOptions,
                 "initiative",
               );
@@ -535,7 +536,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           }
 
           const result = await replyToDiscussion(ctx.gql, {
-            threadId: thread,
+            threadId: asUuid(thread),
             body: options.body,
             entityKind: "initiative",
           });
@@ -560,7 +561,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
           const result = await editDiscussionComment(
             ctx.gql,
-            comment,
+            asUuid(comment),
             {
               body: options.body,
             },
@@ -587,7 +588,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
           const result = await editDiscussionReply(
             ctx.gql,
-            reply,
+            asUuid(reply),
             {
               body: options.body,
             },
@@ -609,7 +610,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
           const result = await deleteDiscussionComment(
             ctx.gql,
-            comment,
+            asUuid(comment),
             "initiative",
           );
 
@@ -628,7 +629,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
           const result = await deleteDiscussionReply(
             ctx.gql,
-            reply,
+            asUuid(reply),
             "initiative",
           );
 
@@ -647,9 +648,9 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const ctx = createContext(getRootOpts(command));
 
           const result = await resolveDiscussion(ctx.gql, {
-            threadId: thread,
+            threadId: asUuid(thread),
             ...(options.withComment !== undefined
-              ? { resolvingCommentId: options.withComment }
+              ? { resolvingCommentId: asUuid(options.withComment) }
               : {}),
             entityKind: "initiative",
           });
@@ -669,7 +670,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
 
           const result = await unresolveDiscussion(
             ctx.gql,
-            thread,
+            asUuid(thread),
             "initiative",
           );
 

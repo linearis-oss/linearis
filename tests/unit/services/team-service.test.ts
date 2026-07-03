@@ -1,6 +1,8 @@
 // tests/unit/services/team-service.test.ts
+
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   getTeam,
   listTeams,
@@ -129,7 +131,7 @@ describe("getTeam", () => {
     ]);
 
     const result = assertTeamDetailShape(
-      await getTeam(client, { id: "team-1" }),
+      await getTeam(client, { id: asUuid("team-1") }),
     );
 
     expect(assertEstimationSource(result.estimationSource)).toBe("self");
@@ -207,7 +209,7 @@ describe("getTeam", () => {
     ]);
 
     const result = assertTeamDetailShape(
-      await getTeam(client, { id: "team-child" }),
+      await getTeam(client, { id: asUuid("team-child") }),
     );
 
     expect(assertEstimationSource(result.estimationSource)).toBe("parent");
@@ -257,7 +259,7 @@ describe("getTeam", () => {
       },
     ]);
 
-    const result = await getTeam(client, { id: "team-2" });
+    const result = await getTeam(client, { id: asUuid("team-2") });
     expect(result.validEstimates).toEqual([]);
     expect(result.estimationSource).toBe("self");
   });
@@ -296,7 +298,7 @@ describe("getTeam", () => {
       },
     ]);
 
-    const result = await getTeam(client, { id: "team-unknown" });
+    const result = await getTeam(client, { id: asUuid("team-unknown") });
     expect(result.validEstimates).toEqual([]);
     expect(result.estimationSource).toBe("self");
   });
@@ -335,7 +337,7 @@ describe("getTeam", () => {
       },
     ]);
 
-    const result = await getTeam(client, { id: "team-3" });
+    const result = await getTeam(client, { id: asUuid("team-3") });
     expect(result.validEstimates).toEqual([
       { value: 1, label: "XS" },
       { value: 2, label: "S" },
@@ -384,7 +386,7 @@ describe("getTeam", () => {
         .mockRejectedValueOnce(new Error("parent lookup failed")),
     } as unknown as GraphQLClient;
 
-    const result = await getTeam(client, { id: "team-child" });
+    const result = await getTeam(client, { id: asUuid("team-child") });
 
     expect(result.estimationSource).toBe("self_fallback");
     expect(result.validEstimates).toEqual([

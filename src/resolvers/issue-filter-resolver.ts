@@ -1,4 +1,5 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
+import type { UUID } from "../common/identifier.js";
 import { resolveCycleId } from "./cycle-resolver.js";
 import { resolveIssueId } from "./issue-resolver.js";
 import { resolveLabelIds } from "./label-resolver.js";
@@ -19,14 +20,14 @@ export interface SearchFilterResolutionInput {
 }
 
 export interface SearchFilterResolution {
-  teamId?: string;
-  assigneeId?: string;
-  creatorId?: string;
-  projectId?: string;
-  stateIds?: string[];
-  labelIds?: string[];
-  cycleId?: string;
-  parentId?: string;
+  teamId?: UUID;
+  assigneeId?: UUID;
+  creatorId?: UUID;
+  projectId?: UUID;
+  stateIds?: UUID[];
+  labelIds?: UUID[];
+  cycleId?: UUID;
+  parentId?: UUID;
 }
 
 export async function resolveSearchFilterIds(

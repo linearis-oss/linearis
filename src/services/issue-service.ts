@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { firstOrThrow } from "../common/array.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
@@ -79,36 +80,55 @@ export type UpdatedIssue = NonNullable<
 >;
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateIssueInput = Pick<
-  IssueCreateInput,
-  | "title"
+export type CreateIssueInput = BrandUuidFields<
+  Pick<
+    IssueCreateInput,
+    | "title"
+    | "teamId"
+    | "description"
+    | "assigneeId"
+    | "priority"
+    | "estimate"
+    | "projectId"
+    | "labelIds"
+    | "projectMilestoneId"
+    | "cycleId"
+    | "stateId"
+    | "parentId"
+    | "dueDate"
+  >,
   | "teamId"
-  | "description"
   | "assigneeId"
-  | "priority"
-  | "estimate"
   | "projectId"
   | "labelIds"
   | "projectMilestoneId"
   | "cycleId"
   | "stateId"
   | "parentId"
-  | "dueDate"
 >;
-export type UpdateIssueInput = Pick<
-  IssueUpdateInput,
-  | "title"
-  | "description"
+export type UpdateIssueInput = BrandUuidFields<
+  Pick<
+    IssueUpdateInput,
+    | "title"
+    | "description"
+    | "stateId"
+    | "priority"
+    | "estimate"
+    | "assigneeId"
+    | "projectId"
+    | "labelIds"
+    | "parentId"
+    | "projectMilestoneId"
+    | "cycleId"
+    | "dueDate"
+  >,
   | "stateId"
-  | "priority"
-  | "estimate"
   | "assigneeId"
   | "projectId"
   | "labelIds"
   | "parentId"
   | "projectMilestoneId"
   | "cycleId"
-  | "dueDate"
 >;
 
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
@@ -279,7 +299,7 @@ export async function listIssues(
 
 export async function getIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetail> {
   const result = await client.request(GetIssueByIdDocument, {
     id,
@@ -292,7 +312,7 @@ export async function getIssue(
 
 export async function getIssueWithComments(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithComments> {
   const result = await client.request(GetIssueByIdWithCommentsDocument, { id });
   if (!result.issue) {
@@ -303,7 +323,7 @@ export async function getIssueWithComments(
 
 export async function getIssueWithCommentThreads(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithCommentThreads> {
   const issue = await getIssueWithComments(client, id);
   return threadIssueComments(issue);
@@ -354,7 +374,7 @@ export async function getIssueByIdentifierWithCommentThreads(
 
 export async function getIssueWithReactions(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithReactions> {
   const result = await client.request(GetIssueByIdWithReactionsDocument, {
     id,
@@ -384,7 +404,7 @@ export async function getIssueByIdentifierWithReactions(
 
 export async function getIssueWithAttachments(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithAttachments> {
   const result = await client.request(GetIssueByIdWithAttachmentsDocument, {
     id,
@@ -445,7 +465,7 @@ export async function createIssue(
 
 export async function updateIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateIssueInput,
 ): Promise<UpdatedIssue> {
   const gqlInput: IssueUpdateInput = input;
@@ -462,7 +482,7 @@ export async function updateIssue(
 
 export async function archiveIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetail> {
   const result = await client.request(ArchiveIssueDocument, { id });
 
@@ -475,7 +495,7 @@ export async function archiveIssue(
 
 export async function unarchiveIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetail> {
   const result = await client.request(UnarchiveIssueDocument, { id });
 
@@ -488,7 +508,7 @@ export async function unarchiveIssue(
 
 export async function deleteIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<{ id: string; success: true }> {
   const result = await client.request(DeleteIssueDocument, {
     id,

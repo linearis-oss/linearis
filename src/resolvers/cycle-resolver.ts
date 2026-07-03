@@ -1,7 +1,7 @@
 import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import { resolveTeamId } from "./team-resolver.js";
 
 /**
@@ -20,8 +20,8 @@ export async function resolveCycleId(
   client: LinearSdkClient,
   nameOrId: string,
   teamFilter?: string,
-): Promise<string> {
-  if (isUuid(nameOrId)) return nameOrId;
+): Promise<UUID> {
+  if (isUuid(nameOrId)) return asUuid(nameOrId);
 
   const filter: LinearDocument.CycleFilter = {
     name: { eq: nameOrId },
@@ -92,5 +92,5 @@ export async function resolveCycleId(
     );
   }
 
-  return chosen.id;
+  return asUuid(chosen.id);
 }

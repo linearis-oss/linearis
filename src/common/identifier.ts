@@ -1,9 +1,46 @@
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function isUuid(value: string): boolean {
+type Brand<T, TBrand extends string> = T & { readonly __brand: TBrand };
+
+export function isUuid(value: string): value is UUID {
   return UUID_REGEX.test(value);
 }
+
+/**
+ * A resolved Linear entity UUID.
+ *
+ * Branded so the compiler enforces the architecture invariant that services
+ * receive already-resolved IDs: a plain `string` (e.g. a human identifier like
+ * `ENG-123`) is not assignable to `UUID`, but a `UUID` flows into `string`
+ * slots (such as codegen GraphQL inputs) untouched. The brand is erased at
+ * runtime, so a `UUID` behaves exactly like the underlying string.
+ */
+export type UUID = Brand<string, "UUID">;
+
+/**
+ * Brand a string as a resolved UUID at a trust boundary — the output of a
+ * resolver, or a UUID the user supplied directly on the CLI. Performs no
+ * runtime validation.
+ */
+export function asUuid(value: string): UUID {
+  return value as UUID;
+}
+
+/** Replace a `string`/`string[]` core with `UUID`/`UUID[]`, preserving null/undefined. */
+type ReplaceStringWithUuid<V> = V extends string
+  ? UUID
+  : V extends string[]
+    ? UUID[]
+    : V;
+
+/**
+ * Brand selected keys of an input type as UUID, preserving each field's
+ * optional and readonly modifiers (homomorphic over `keyof T`).
+ */
+export type BrandUuidFields<T, K extends keyof T> = {
+  [P in keyof T]: P extends K ? ReplaceStringWithUuid<T[P]> : T[P];
+};
 
 export interface IssueIdentifier {
   teamKey: string;

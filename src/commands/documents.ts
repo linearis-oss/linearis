@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
+import { asUuid, type UUID } from "../common/identifier.js";
 import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -119,12 +120,12 @@ export function setupDocumentsCommands(program: Command): void {
 
         const limit = parseLimit(options.limit || "50");
 
-        let projectId: string | undefined;
+        let projectId: UUID | undefined;
         if (options.project) {
           projectId = await resolveProjectId(ctx.sdk, options.project);
         }
 
-        let issueId: string | undefined;
+        let issueId: UUID | undefined;
         if (options.issue) {
           issueId = await resolveIssueId(ctx.sdk, options.issue);
         }
@@ -166,7 +167,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
-        const documentResult = await getDocument(ctx.gql, document);
+        const documentResult = await getDocument(ctx.gql, asUuid(document));
         outputSuccess(documentResult);
       }),
     );
@@ -247,7 +248,11 @@ export function setupDocumentsCommands(program: Command): void {
         if (options.icon) input.icon = options.icon;
         if (options.color) input.color = options.color;
 
-        const updatedDocument = await updateDocument(ctx.gql, document, input);
+        const updatedDocument = await updateDocument(
+          ctx.gql,
+          asUuid(document),
+          input,
+        );
         outputSuccess(updatedDocument);
       }),
     );
@@ -261,7 +266,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
-        const result = await deleteDocument(ctx.gql, document);
+        const result = await deleteDocument(ctx.gql, asUuid(document));
         outputSuccess(result);
       }),
     );

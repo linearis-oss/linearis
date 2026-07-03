@@ -5,6 +5,7 @@ import {
   getRootOpts,
 } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
+import type { UUID } from "../common/identifier.js";
 import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -86,7 +87,7 @@ async function resolveIssueLabelLookup(
   command: Command,
   label: string,
   options: LabelLookupOptions,
-): Promise<{ ctx: ReturnType<typeof createContext>; labelId: string }> {
+): Promise<{ ctx: ReturnType<typeof createContext>; labelId: UUID }> {
   const ctx = createContext(getRootOpts(command));
   const scope = parseLabelScope(options.scope);
 

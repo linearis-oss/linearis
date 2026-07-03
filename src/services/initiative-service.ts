@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { invalidParameterError } from "../common/errors.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult } from "../common/types.js";
 import {
@@ -47,25 +48,31 @@ export type DeletedInitiative = {
 };
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateInitiativeInput = Pick<
-  InitiativeCreateInput,
-  | "name"
-  | "description"
-  | "content"
-  | "ownerId"
-  | "status"
-  | "targetDate"
-  | "sortOrder"
+export type CreateInitiativeInput = BrandUuidFields<
+  Pick<
+    InitiativeCreateInput,
+    | "name"
+    | "description"
+    | "content"
+    | "ownerId"
+    | "status"
+    | "targetDate"
+    | "sortOrder"
+  >,
+  "ownerId"
 >;
-export type UpdateInitiativeInput = Pick<
-  InitiativeUpdateInput,
-  | "name"
-  | "description"
-  | "content"
-  | "ownerId"
-  | "status"
-  | "targetDate"
-  | "sortOrder"
+export type UpdateInitiativeInput = BrandUuidFields<
+  Pick<
+    InitiativeUpdateInput,
+    | "name"
+    | "description"
+    | "content"
+    | "ownerId"
+    | "status"
+    | "targetDate"
+    | "sortOrder"
+  >,
+  "ownerId"
 >;
 
 export type InitiativeSortBy =
@@ -143,9 +150,9 @@ export interface InitiativeFilterInput {
   status?: InitiativeStatus;
   health?: string;
   healthWithAge?: string;
-  ownerId?: string;
-  creatorId?: string;
-  teamId?: string;
+  ownerId?: UUID;
+  creatorId?: UUID;
+  teamId?: UUID;
   targetAfter?: string;
   targetBefore?: string;
   startedAfter?: string;
@@ -156,7 +163,7 @@ export interface InitiativeFilterInput {
   createdBefore?: string;
   updatedAfter?: string;
   updatedBefore?: string;
-  ancestorId?: string;
+  ancestorId?: UUID;
 }
 
 function applyNullableDateRange(
@@ -309,7 +316,7 @@ export async function listInitiatives(
 
 export async function getInitiative(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<InitiativeDetail> {
   const result = await client.request(GetInitiativeDocument, {
     id,
@@ -340,7 +347,7 @@ export async function createInitiative(
 
 export async function updateInitiative(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateInitiativeInput,
 ): Promise<UpdatedInitiative> {
   const hasAtLeastOneField = Object.values(input).some(
@@ -369,7 +376,7 @@ export async function updateInitiative(
 
 export async function archiveInitiative(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<ArchivedInitiative> {
   const result = await client.request(ArchiveInitiativeDocument, { id });
 
@@ -382,7 +389,7 @@ export async function archiveInitiative(
 
 export async function unarchiveInitiative(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<UnarchivedInitiative> {
   const result = await client.request(UnarchiveInitiativeDocument, { id });
 
@@ -395,7 +402,7 @@ export async function unarchiveInitiative(
 
 export async function deleteInitiative(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedInitiative> {
   const result = await client.request(DeleteInitiativeDocument, { id });
 

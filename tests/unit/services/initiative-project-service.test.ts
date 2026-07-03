@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   CreateInitiativeToProjectDocument,
   DeleteInitiativeToProjectDocument,
@@ -38,8 +39,8 @@ describe("createInitiativeProjectLink", () => {
 
     await expect(
       createInitiativeProjectLink(client, {
-        initiativeId: "init-1",
-        projectId: "proj-1",
+        initiativeId: asUuid("init-1"),
+        projectId: asUuid("proj-1"),
       }),
     ).resolves.toEqual(link);
 
@@ -63,8 +64,8 @@ describe("createInitiativeProjectLink", () => {
 
     await expect(
       createInitiativeProjectLink(client, {
-        initiativeId: "init-1",
-        projectId: "proj-1",
+        initiativeId: asUuid("init-1"),
+        projectId: asUuid("proj-1"),
       }),
     ).rejects.toThrow(
       'Failed to create initiative-project link for initiative "init-1" and project "proj-1"',
@@ -81,8 +82,8 @@ describe("createInitiativeProjectLink", () => {
 
     await expect(
       createInitiativeProjectLink(client, {
-        initiativeId: "init-1",
-        projectId: "proj-1",
+        initiativeId: asUuid("init-1"),
+        projectId: asUuid("proj-1"),
       }),
     ).rejects.toThrow(
       'Failed to create initiative-project link for initiative "init-1" and project "proj-1"',
@@ -100,7 +101,7 @@ describe("deleteInitiativeProjectLink", () => {
     });
 
     await expect(
-      deleteInitiativeProjectLink(client, "link-1"),
+      deleteInitiativeProjectLink(client, asUuid("link-1")),
     ).resolves.toEqual({
       id: "link-1",
       success: true,
@@ -119,9 +120,9 @@ describe("deleteInitiativeProjectLink", () => {
       },
     });
 
-    await expect(deleteInitiativeProjectLink(client, "link-1")).rejects.toThrow(
-      'Failed to delete initiative-project link "link-1"',
-    );
+    await expect(
+      deleteInitiativeProjectLink(client, asUuid("link-1")),
+    ).rejects.toThrow('Failed to delete initiative-project link "link-1"');
   });
 
   it("throws when payload is missing", async () => {
@@ -132,8 +133,8 @@ describe("deleteInitiativeProjectLink", () => {
       },
     });
 
-    await expect(deleteInitiativeProjectLink(client, "link-1")).rejects.toThrow(
-      'Failed to delete initiative-project link "link-1"',
-    );
+    await expect(
+      deleteInitiativeProjectLink(client, asUuid("link-1")),
+    ).rejects.toThrow('Failed to delete initiative-project link "link-1"');
   });
 });

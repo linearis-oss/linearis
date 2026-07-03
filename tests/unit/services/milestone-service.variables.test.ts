@@ -1,6 +1,7 @@
 import type { DocumentNode } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createMilestone,
   updateMilestone,
@@ -42,7 +43,7 @@ describe("milestone service variable shapes (issues #223 / #228)", () => {
     });
 
     await createMilestone(client, {
-      projectId: "proj-1",
+      projectId: asUuid("proj-1"),
       name: "v2.0",
       description: "Second release",
       targetDate: "2025-12-01",
@@ -61,7 +62,7 @@ describe("milestone service variable shapes (issues #223 / #228)", () => {
       },
     });
 
-    await updateMilestone(client, "ms-1", {
+    await updateMilestone(client, asUuid("ms-1"), {
       name: "v1.1",
       description: "Updated",
       targetDate: "2026-01-01",

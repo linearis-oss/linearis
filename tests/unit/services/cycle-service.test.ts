@@ -1,6 +1,8 @@
 // tests/unit/services/cycle-service.test.ts
+
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import { getCycle, listCycles } from "../../../src/services/cycle-service.js";
 
 function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
@@ -88,7 +90,7 @@ describe("listCycles", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
-    await listCycles(client, "team-1");
+    await listCycles(client, asUuid("team-1"));
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: undefined,
@@ -158,7 +160,7 @@ describe("getCycle", () => {
         },
       },
     });
-    const result = await getCycle(client, "cyc-1");
+    const result = await getCycle(client, asUuid("cyc-1"));
     expect(result.id).toBe("cyc-1");
     expect(result.name).toBe("Sprint 1");
     expect(result.issues).toHaveLength(1);
@@ -168,6 +170,8 @@ describe("getCycle", () => {
 
   it("throws when cycle not found", async () => {
     const client = mockGqlClient({ cycle: null });
-    await expect(getCycle(client, "missing-id")).rejects.toThrow("not found");
+    await expect(getCycle(client, asUuid("missing-id"))).rejects.toThrow(
+      "not found",
+    );
   });
 });

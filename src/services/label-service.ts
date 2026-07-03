@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import { requireMutationSuccess } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
@@ -34,9 +35,9 @@ export interface ListLabelOptions extends PaginationOptions {
 }
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateLabelInput = Pick<
-  IssueLabelCreateInput,
-  "name" | "teamId" | "color" | "description"
+export type CreateLabelInput = BrandUuidFields<
+  Pick<IssueLabelCreateInput, "name" | "teamId" | "color" | "description">,
+  "teamId"
 >;
 export type UpdateLabelInput = Pick<
   IssueLabelUpdateInput,
@@ -60,7 +61,7 @@ function mapIssueLabel(label: {
 
 export async function getLabel(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<Label> {
   const result = await client.request(GetIssueLabelDocument, {
     id,
@@ -92,7 +93,7 @@ export async function createLabel(
 
 export async function updateLabel(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateLabelInput,
 ): Promise<Label> {
   const gqlInput: IssueLabelUpdateInput = input;
@@ -111,7 +112,7 @@ export async function updateLabel(
 
 export async function deleteLabel(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeleteLabelResult> {
   const result = await client.request(DeleteIssueLabelDocument, { id });
 
@@ -127,7 +128,7 @@ export async function deleteLabel(
 }
 
 function buildIssueLabelFilter(
-  teamId?: string,
+  teamId?: UUID,
   scope?: LabelScope,
 ): IssueLabelFilter | undefined {
   if (scope === "workspace") {
@@ -147,7 +148,7 @@ function buildIssueLabelFilter(
 
 export async function listLabels(
   client: GraphQLClient,
-  teamId?: string,
+  teamId?: UUID,
   options: ListLabelOptions = {},
 ): Promise<PaginatedResult<Label>> {
   const { limit = 50, after, scope } = options;

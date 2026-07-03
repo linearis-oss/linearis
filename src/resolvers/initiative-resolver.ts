@@ -3,24 +3,24 @@ import type { GraphQLClient } from "../client/graphql-client.js";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import {
   FindInitiativeProjectLinkByPairDocument,
   FindInitiativeRelationByPairDocument,
 } from "../gql/graphql.js";
 
 export interface InitiativeResolveScope {
-  teamId?: string;
-  ownerId?: string;
+  teamId?: UUID;
+  ownerId?: UUID;
 }
 
 export async function resolveInitiativeId(
   client: LinearSdkClient,
   nameOrId: string,
   scope: InitiativeResolveScope = {},
-): Promise<string> {
+): Promise<UUID> {
   if (isUuid(nameOrId)) {
-    return nameOrId;
+    return asUuid(nameOrId);
   }
 
   const nameClause: LinearDocument.InitiativeFilter = {
@@ -51,9 +51,10 @@ export async function resolveInitiativeId(
   }
 
   if (result.nodes.length === 1) {
-    return firstOrThrow(result.nodes, () =>
-      notFoundError("Initiative", nameOrId),
-    ).id;
+    return asUuid(
+      firstOrThrow(result.nodes, () => notFoundError("Initiative", nameOrId))
+        .id,
+    );
   }
 
   const candidates = result.nodes.map((node) => `${node.name} (${node.id})`);
@@ -70,9 +71,9 @@ export async function resolveInitiativeId(
 
 export async function resolveInitiativeRelationId(
   client: GraphQLClient,
-  parentId: string,
-  childId: string,
-): Promise<string> {
+  parentId: UUID,
+  childId: UUID,
+): Promise<UUID> {
   let after: string | undefined;
 
   while (true) {
@@ -89,7 +90,7 @@ export async function resolveInitiativeRelationId(
     );
 
     if (relation) {
-      return relation.id;
+      return asUuid(relation.id);
     }
 
     if (!result.initiativeRelations.pageInfo.hasNextPage) {
@@ -107,9 +108,9 @@ export async function resolveInitiativeRelationId(
 
 export async function resolveInitiativeProjectLinkId(
   client: GraphQLClient,
-  initiativeId: string,
-  projectId: string,
-): Promise<string> {
+  initiativeId: UUID,
+  projectId: UUID,
+): Promise<UUID> {
   let after: string | undefined;
 
   while (true) {
@@ -124,7 +125,7 @@ export async function resolveInitiativeProjectLinkId(
     );
 
     if (link) {
-      return link.id;
+      return asUuid(link.id);
     }
 
     if (!result.initiativeToProjects.pageInfo.hasNextPage) {

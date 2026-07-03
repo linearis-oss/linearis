@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
@@ -28,7 +29,7 @@ export type CommentListItem =
 
 export async function createComment(
   client: GraphQLClient,
-  input: CommentCreateInput,
+  input: BrandUuidFields<CommentCreateInput, "issueId" | "parentId">,
 ): Promise<CreatedComment> {
   const result = await client.request(CreateCommentDocument, { input });
 
@@ -41,7 +42,7 @@ export async function createComment(
 
 export async function updateComment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: CommentUpdateInput,
 ): Promise<UpdatedComment> {
   const result = await client.request(UpdateCommentDocument, { id, input });
@@ -55,7 +56,7 @@ export async function updateComment(
 
 export async function listComments(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<CommentListItem>> {
   const { limit = 25, after } = options;
@@ -81,7 +82,7 @@ export async function listComments(
 
 export async function replyToComment(
   client: GraphQLClient,
-  input: { parentId: string; body: string },
+  input: { parentId: UUID; body: string },
 ): Promise<CreatedComment> {
   const result = await client.request(CreateCommentDocument, {
     input: { parentId: input.parentId, body: input.body },
@@ -96,7 +97,7 @@ export async function replyToComment(
 
 export async function deleteComment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(DeleteCommentDocument, { id });
 

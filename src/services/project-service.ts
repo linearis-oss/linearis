@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
@@ -43,37 +44,43 @@ export type DeletedProject = {
 };
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateProjectInput = Pick<
-  ProjectCreateInput,
-  | "name"
-  | "teamIds"
-  | "description"
-  | "content"
-  | "icon"
-  | "color"
-  | "leadId"
-  | "memberIds"
-  | "priority"
-  | "statusId"
-  | "startDate"
-  | "targetDate"
-  | "labelIds"
+export type CreateProjectInput = BrandUuidFields<
+  Pick<
+    ProjectCreateInput,
+    | "name"
+    | "teamIds"
+    | "description"
+    | "content"
+    | "icon"
+    | "color"
+    | "leadId"
+    | "memberIds"
+    | "priority"
+    | "statusId"
+    | "startDate"
+    | "targetDate"
+    | "labelIds"
+  >,
+  "teamIds" | "leadId" | "memberIds" | "statusId" | "labelIds"
 >;
-export type UpdateProjectInput = Pick<
-  ProjectUpdateInput,
-  | "name"
-  | "description"
-  | "content"
-  | "icon"
-  | "color"
-  | "leadId"
-  | "memberIds"
-  | "priority"
-  | "statusId"
-  | "startDate"
-  | "targetDate"
-  | "teamIds"
-  | "labelIds"
+export type UpdateProjectInput = BrandUuidFields<
+  Pick<
+    ProjectUpdateInput,
+    | "name"
+    | "description"
+    | "content"
+    | "icon"
+    | "color"
+    | "leadId"
+    | "memberIds"
+    | "priority"
+    | "statusId"
+    | "startDate"
+    | "targetDate"
+    | "teamIds"
+    | "labelIds"
+  >,
+  "teamIds" | "leadId" | "memberIds" | "statusId" | "labelIds"
 >;
 
 export interface ProjectListOptions extends PaginationOptions {
@@ -111,7 +118,7 @@ export async function listProjects(
 
 export async function getProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   options: ProjectDetailOptions = {},
 ): Promise<ProjectDetail> {
   const milestonesFirst =
@@ -151,7 +158,7 @@ export async function createProject(
 
 export async function updateProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateProjectInput,
 ): Promise<UpdatedProject> {
   const gqlInput: ProjectUpdateInput = input;
@@ -169,7 +176,7 @@ export async function updateProject(
 
 export async function archiveProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<ArchivedProject> {
   const result = await client.request(ArchiveProjectDocument, { id });
 
@@ -182,7 +189,7 @@ export async function archiveProject(
 
 export async function unarchiveProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<UnarchivedProject> {
   const result = await client.request(UnarchiveProjectDocument, { id });
 
@@ -195,7 +202,7 @@ export async function unarchiveProject(
 
 export async function deleteProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedProject> {
   const result = await client.request(DeleteProjectDocument, { id });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createComment,
   deleteComment,
@@ -33,7 +34,7 @@ describe("createComment", () => {
     });
 
     const result = await createComment(client, {
-      issueId: "issue-1",
+      issueId: asUuid("issue-1"),
       body: "This is a comment",
     });
 
@@ -59,7 +60,7 @@ describe("createComment", () => {
     });
 
     await expect(
-      createComment(client, { issueId: "issue-1", body: "test" }),
+      createComment(client, { issueId: asUuid("issue-1"), body: "test" }),
     ).rejects.toThrow("Failed to create comment");
   });
 
@@ -72,7 +73,7 @@ describe("createComment", () => {
     });
 
     await expect(
-      createComment(client, { issueId: "issue-1", body: "test" }),
+      createComment(client, { issueId: asUuid("issue-1"), body: "test" }),
     ).rejects.toThrow("Failed to create comment");
   });
 });
@@ -108,7 +109,7 @@ describe("listComments", () => {
       },
     });
 
-    const result = await listComments(client, "issue-1");
+    const result = await listComments(client, asUuid("issue-1"));
 
     expect(result.nodes).toHaveLength(2);
     expect(result.nodes[0]).toEqual({
@@ -141,7 +142,7 @@ describe("listComments", () => {
       },
     });
 
-    const result = await listComments(client, "issue-1");
+    const result = await listComments(client, asUuid("issue-1"));
 
     expect(result.nodes).toEqual([]);
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: null });
@@ -150,9 +151,9 @@ describe("listComments", () => {
   it("throws when issue does not exist", async () => {
     const client = mockGqlClient({ issue: null });
 
-    await expect(listComments(client, "nonexistent-id")).rejects.toThrow(
-      'Issue with ID "nonexistent-id" not found',
-    );
+    await expect(
+      listComments(client, asUuid("nonexistent-id")),
+    ).rejects.toThrow('Issue with ID "nonexistent-id" not found');
   });
 
   it("passes pagination options to request", async () => {
@@ -165,7 +166,10 @@ describe("listComments", () => {
       },
     });
 
-    await listComments(client, "issue-1", { limit: 10, after: "cursor-xyz" });
+    await listComments(client, asUuid("issue-1"), {
+      limit: 10,
+      after: "cursor-xyz",
+    });
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       issueId: "issue-1",
@@ -192,7 +196,7 @@ describe("replyToComment", () => {
     });
 
     const result = await replyToComment(client, {
-      parentId: "comment-1",
+      parentId: asUuid("comment-1"),
       body: "This is a reply",
     });
 
@@ -218,7 +222,7 @@ describe("replyToComment", () => {
     });
 
     await expect(
-      replyToComment(client, { parentId: "comment-1", body: "reply" }),
+      replyToComment(client, { parentId: asUuid("comment-1"), body: "reply" }),
     ).rejects.toThrow("Failed to create reply");
   });
 });
@@ -239,7 +243,7 @@ describe("updateComment", () => {
       },
     });
 
-    const result = await updateComment(client, "comment-1", {
+    const result = await updateComment(client, asUuid("comment-1"), {
       body: "Updated body",
     });
 
@@ -266,7 +270,7 @@ describe("updateComment", () => {
     });
 
     await expect(
-      updateComment(client, "comment-1", { body: "new" }),
+      updateComment(client, asUuid("comment-1"), { body: "new" }),
     ).rejects.toThrow("Failed to update comment");
   });
 });
@@ -280,7 +284,7 @@ describe("deleteComment", () => {
       },
     });
 
-    const result = await deleteComment(client, "comment-1");
+    const result = await deleteComment(client, asUuid("comment-1"));
 
     expect(result).toEqual({ id: "comment-1", success: true });
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
@@ -296,7 +300,7 @@ describe("deleteComment", () => {
       },
     });
 
-    await expect(deleteComment(client, "comment-1")).rejects.toThrow(
+    await expect(deleteComment(client, asUuid("comment-1"))).rejects.toThrow(
       "Failed to delete comment",
     );
   });

@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
@@ -28,21 +29,27 @@ export type UpdatedDocument =
   DocumentUpdateMutation["documentUpdate"]["document"];
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateDocumentInput = Pick<
-  DocumentCreateInput,
-  "title" | "content" | "projectId" | "teamId" | "issueId" | "icon" | "color"
+export type CreateDocumentInput = BrandUuidFields<
+  Pick<
+    DocumentCreateInput,
+    "title" | "content" | "projectId" | "teamId" | "issueId" | "icon" | "color"
+  >,
+  "projectId" | "teamId" | "issueId"
 >;
-export type UpdateDocumentInput = Pick<
-  DocumentUpdateInput,
-  "title" | "content" | "projectId" | "icon" | "color"
+export type UpdateDocumentInput = BrandUuidFields<
+  Pick<
+    DocumentUpdateInput,
+    "title" | "content" | "projectId" | "icon" | "color"
+  >,
+  "projectId"
 >;
 
-export function buildProjectDocumentFilter(projectId: string): DocumentFilter {
+export function buildProjectDocumentFilter(projectId: UUID): DocumentFilter {
   return { project: { id: { eq: projectId } } };
 }
 
 export function buildIssueDocumentFilter(
-  issueId: string,
+  issueId: UUID,
   legacyDocumentSlugIds: string[],
 ): DocumentFilter {
   const issueFilter: DocumentFilter = { issue: { id: { eq: issueId } } };
@@ -62,7 +69,7 @@ export function buildIssueDocumentFilter(
 
 export async function getDocument(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DocumentDetail> {
   const result = await client.request(GetDocumentDocument, {
     id,
@@ -93,7 +100,7 @@ export async function createDocument(
 
 export async function updateDocument(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateDocumentInput,
 ): Promise<UpdatedDocument> {
   const gqlInput: DocumentUpdateInput = input;
@@ -134,7 +141,7 @@ export async function listDocuments(
 
 export async function deleteDocument(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(DocumentDeleteDocument, { id });
 
