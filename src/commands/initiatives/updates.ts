@@ -62,7 +62,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(
-          ctx.sdk,
+          ctx.gql,
           options.initiative,
         );
 
@@ -103,7 +103,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(
-          ctx.sdk,
+          ctx.gql,
           options.initiative,
         );
 

@@ -79,3 +79,16 @@ query FindProjectLabelByName($name: String!) {
     }
   }
 }
+
+# Find issue labels by a dynamic filter for ID resolution
+#
+# The filter is supplied by the caller so the resolver can preserve its
+# scope-aware filter construction (workspace/team/team-scoped) rather than
+# baking the scope clauses into the query.
+query FindIssueLabels($filter: IssueLabelFilter, $first: Int = 1) {
+  issueLabels(filter: $filter, first: $first) {
+    nodes {
+      id
+    }
+  }
+}

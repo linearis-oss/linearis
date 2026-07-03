@@ -93,7 +93,7 @@ export function setupAttachmentsCommands(program: Command): void {
         ];
         const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issueIdentifier);
+        const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
         const filter = buildAttachmentFilter(options);
         const result = await listAttachments(ctx.gql, issueId, filter);
         outputSuccess(result);
@@ -118,7 +118,7 @@ export function setupAttachmentsCommands(program: Command): void {
         ];
         const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issueIdentifier);
+        const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
         const input: CreateAttachmentInput = {
           issueId,
           title: options.title,

@@ -103,10 +103,10 @@ async function resolveIssueLabelLookup(
   }
 
   const teamId = options.team
-    ? await resolveTeamId(ctx.sdk, options.team)
+    ? await resolveTeamId(ctx.gql, options.team)
     : undefined;
   const labelId = await resolveLabelId(
-    ctx.sdk,
+    ctx.gql,
     label,
     omitUndefined({
       teamId,
@@ -222,7 +222,7 @@ export function setupLabelsCommands(program: Command): void {
         }
 
         const teamId = options.team
-          ? await resolveTeamId(ctx.sdk, options.team)
+          ? await resolveTeamId(ctx.gql, options.team)
           : undefined;
 
         outputSuccess(await listLabels(ctx.gql, teamId, pagination));
@@ -248,7 +248,7 @@ export function setupLabelsCommands(program: Command): void {
         const color = parseLabelColor(options.color);
 
         if (options.team) {
-          input.teamId = await resolveTeamId(ctx.sdk, options.team);
+          input.teamId = await resolveTeamId(ctx.gql, options.team);
         }
 
         if (color) {

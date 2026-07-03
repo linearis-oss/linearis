@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import type { LinearSdkClient } from "../../../src/client/linear-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
   resolveInitiativeId,
@@ -13,12 +12,10 @@ type InitiativeLookupNode = {
   name: string;
 };
 
-function mockSdkClient(nodes: InitiativeLookupNode[]) {
+function mockInitiativesClient(nodes: InitiativeLookupNode[]) {
   return {
-    sdk: {
-      initiatives: vi.fn().mockResolvedValue({ nodes }),
-    },
-  } as unknown as LinearSdkClient;
+    request: vi.fn().mockResolvedValue({ initiatives: { nodes } }),
+  } as unknown as GraphQLClient;
 }
 
 function mockGqlClient(response: Record<string, unknown>) {
@@ -41,59 +38,59 @@ function mockPagedGqlClient(responses: Array<Record<string, unknown>>) {
 
 describe("resolveInitiativeId", () => {
   it("returns UUID as-is", async () => {
-    const sdk = mockSdkClient([]);
+    const client = mockInitiativesClient([]);
     const result = await resolveInitiativeId(
-      sdk,
+      client,
       "550e8400-e29b-41d4-a716-446655440000",
     );
 
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
-    expect(sdk.sdk.initiatives).not.toHaveBeenCalled();
+    expect(client.request).not.toHaveBeenCalled();
   });
 
   it("resolves initiative name", async () => {
-    const sdk = mockSdkClient([{ id: "init-1", name: "Growth" }]);
+    const client = mockInitiativesClient([{ id: "init-1", name: "Growth" }]);
 
-    await expect(resolveInitiativeId(sdk, "growth")).resolves.toBe("init-1");
-    expect(sdk.sdk.initiatives).toHaveBeenCalledWith({
+    await expect(resolveInitiativeId(client, "growth")).resolves.toBe("init-1");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       filter: { name: { eqIgnoreCase: "growth" } },
       first: 20,
     });
   });
 
   it("throws not found", async () => {
-    const sdk = mockSdkClient([]);
+    const client = mockInitiativesClient([]);
 
-    await expect(resolveInitiativeId(sdk, "Missing")).rejects.toThrow(
+    await expect(resolveInitiativeId(client, "Missing")).rejects.toThrow(
       'Initiative "Missing" not found',
     );
   });
 
   it("throws ambiguity without scope", async () => {
-    const sdk = mockSdkClient([
+    const client = mockInitiativesClient([
       { id: "init-1", name: "Growth" },
       { id: "init-2", name: "Growth" },
     ]);
 
-    await expect(resolveInitiativeId(sdk, "Growth")).rejects.toThrow(
+    await expect(resolveInitiativeId(client, "Growth")).rejects.toThrow(
       "Multiple initiatives found matching",
     );
-    await expect(resolveInitiativeId(sdk, "Growth")).rejects.toThrow(
+    await expect(resolveInitiativeId(client, "Growth")).rejects.toThrow(
       "provide --team or --owner, or use UUID",
     );
   });
 
   it("resolves scoped disambiguation", async () => {
-    const sdk = mockSdkClient([{ id: "init-2", name: "Growth" }]);
+    const client = mockInitiativesClient([{ id: "init-2", name: "Growth" }]);
 
     await expect(
-      resolveInitiativeId(sdk, "Growth", {
+      resolveInitiativeId(client, "Growth", {
         teamId: asUuid("team-1"),
         ownerId: asUuid("user-1"),
       }),
     ).resolves.toBe("init-2");
 
-    expect(sdk.sdk.initiatives).toHaveBeenCalledWith({
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       filter: {
         and: [
           { name: { eqIgnoreCase: "Growth" } },

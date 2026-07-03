@@ -291,7 +291,7 @@ export function setupProjectsCommands(program: Command): void {
       commandAction<[string, ReadOptions, Command]>(
         async (project, options, command) => {
           const ctx = createContext(getRootOpts(command));
-          const projectId = await resolveProjectId(ctx.sdk, project);
+          const projectId = await resolveProjectId(ctx.gql, project);
           const result = await getProject(ctx.gql, projectId, {
             milestonesFirst: parseNonNegativeIntegerOption(
               "--milestones-first",
@@ -320,7 +320,7 @@ export function setupProjectsCommands(program: Command): void {
             throw invalidParameterError("--body", "is required");
           }
 
-          const projectId = await resolveProjectId(ctx.sdk, project);
+          const projectId = await resolveProjectId(ctx.gql, project);
           const result = await startProjectDiscussion(ctx.gql, {
             projectId,
             body: options.body,
@@ -342,7 +342,7 @@ export function setupProjectsCommands(program: Command): void {
         async (project, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const projectId = await resolveProjectId(ctx.sdk, project);
+          const projectId = await resolveProjectId(ctx.gql, project);
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "25"),
             options.after,
@@ -588,7 +588,7 @@ export function setupProjectsCommands(program: Command): void {
 
           const teamNames = getCreateTeamNames(options);
           const teamIds = await Promise.all(
-            teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
+            teamNames.map((t) => resolveTeamId(ctx.gql, t)),
           );
 
           const input: CreateProjectInput = {
@@ -613,7 +613,7 @@ export function setupProjectsCommands(program: Command): void {
           }
 
           if (options.lead) {
-            input.leadId = await resolveUserId(ctx.sdk, options.lead);
+            input.leadId = await resolveUserId(ctx.gql, options.lead);
           }
 
           if (options.members) {
@@ -622,7 +622,7 @@ export function setupProjectsCommands(program: Command): void {
               .map((m) => m.trim())
               .filter(Boolean);
             input.memberIds = await Promise.all(
-              memberNames.map((m) => resolveUserId(ctx.sdk, m)),
+              memberNames.map((m) => resolveUserId(ctx.gql, m)),
             );
           }
 
@@ -650,7 +650,7 @@ export function setupProjectsCommands(program: Command): void {
               .split(",")
               .map((l) => l.trim())
               .filter(Boolean);
-            input.labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
+            input.labelIds = await resolveProjectLabelIds(ctx.gql, labelNames);
           }
 
           const result = await createProject(ctx.gql, input);
@@ -730,7 +730,7 @@ export function setupProjectsCommands(program: Command): void {
 
           const labelMode = parseLabelMode(options.labelMode);
 
-          const projectId = await resolveProjectId(ctx.sdk, project);
+          const projectId = await resolveProjectId(ctx.gql, project);
           const needsLabelContext =
             options.labels && (labelMode === "add" || labelMode === "remove");
           const projectContext = needsLabelContext
@@ -762,7 +762,7 @@ export function setupProjectsCommands(program: Command): void {
           if (options.clearLead) {
             input.leadId = null;
           } else if (options.lead) {
-            input.leadId = await resolveUserId(ctx.sdk, options.lead);
+            input.leadId = await resolveUserId(ctx.gql, options.lead);
           }
 
           if (options.members) {
@@ -771,7 +771,7 @@ export function setupProjectsCommands(program: Command): void {
               .map((m) => m.trim())
               .filter(Boolean);
             input.memberIds = await Promise.all(
-              memberNames.map((m) => resolveUserId(ctx.sdk, m)),
+              memberNames.map((m) => resolveUserId(ctx.gql, m)),
             );
           }
 
@@ -801,7 +801,7 @@ export function setupProjectsCommands(program: Command): void {
           const teamNames = getUpdateTeamNames(options);
           if (teamNames) {
             input.teamIds = await Promise.all(
-              teamNames.map((t) => resolveTeamId(ctx.sdk, t)),
+              teamNames.map((t) => resolveTeamId(ctx.gql, t)),
             );
           }
 
@@ -812,7 +812,7 @@ export function setupProjectsCommands(program: Command): void {
               .split(",")
               .map((l) => l.trim())
               .filter(Boolean);
-            const labelIds = await resolveProjectLabelIds(ctx.sdk, labelNames);
+            const labelIds = await resolveProjectLabelIds(ctx.gql, labelNames);
 
             if (labelMode === "add") {
               const currentLabels = projectContext?.labels?.nodes
@@ -851,7 +851,7 @@ export function setupProjectsCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const projectId = await resolveProjectId(ctx.sdk, project);
+          const projectId = await resolveProjectId(ctx.gql, project);
           const result = await archiveProject(ctx.gql, projectId);
           outputSuccess(result);
         },
@@ -865,7 +865,7 @@ export function setupProjectsCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const projectId = await resolveProjectId(ctx.sdk, project, {
+          const projectId = await resolveProjectId(ctx.gql, project, {
             includeArchived: true,
           });
           const result = await unarchiveProject(ctx.gql, projectId);
@@ -881,7 +881,7 @@ export function setupProjectsCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const projectId = await resolveProjectId(ctx.sdk, project, {
+          const projectId = await resolveProjectId(ctx.gql, project, {
             includeArchived: true,
           });
           const result = await deleteProject(ctx.gql, projectId);

@@ -1,21 +1,19 @@
 // tests/unit/resolvers/status-resolver.test.ts
 
 import { describe, expect, it, vi } from "vitest";
-import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import { resolveStatusId } from "../../../src/resolvers/status-resolver.js";
 
-function mockSdkClient(nodes: Array<{ id: string }>) {
+function mockGqlClient(nodes: Array<{ id: string }>) {
   return {
-    sdk: {
-      workflowStates: vi.fn().mockResolvedValue({ nodes }),
-    },
-  } as unknown as LinearSdkClient;
+    request: vi.fn().mockResolvedValue({ workflowStates: { nodes } }),
+  } as unknown as GraphQLClient;
 }
 
 describe("resolveStatusId", () => {
   it("returns UUID as-is", async () => {
-    const client = mockSdkClient([]);
+    const client = mockGqlClient([]);
     const result = await resolveStatusId(
       client,
       "550e8400-e29b-41d4-a716-446655440000",
@@ -24,15 +22,15 @@ describe("resolveStatusId", () => {
   });
 
   it("resolves status by name", async () => {
-    const client = mockSdkClient([{ id: "status-uuid" }]);
+    const client = mockGqlClient([{ id: "status-uuid" }]);
     const result = await resolveStatusId(client, "In Progress");
     expect(result).toBe("status-uuid");
   });
 
   it("resolves status by name with team context", async () => {
-    const client = mockSdkClient([{ id: "status-uuid" }]);
+    const client = mockGqlClient([{ id: "status-uuid" }]);
     await resolveStatusId(client, "In Progress", asUuid("team-uuid"));
-    expect(client.sdk.workflowStates).toHaveBeenCalledWith({
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       filter: {
         name: { eqIgnoreCase: "In Progress" },
         team: { id: { eq: "team-uuid" } },
@@ -42,7 +40,7 @@ describe("resolveStatusId", () => {
   });
 
   it("throws when status not found", async () => {
-    const client = mockSdkClient([]);
+    const client = mockGqlClient([]);
     await expect(resolveStatusId(client, "Nonexistent")).rejects.toThrow(
       'Status "Nonexistent" not found',
     );

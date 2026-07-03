@@ -1,4 +1,4 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { notFoundError } from "../common/errors.js";
 import {
@@ -7,78 +7,23 @@ import {
   parseIssueIdentifier,
   type UUID,
 } from "../common/identifier.js";
-import { omitUndefined } from "../common/object.js";
+import { FindIssuesDocument, type IssueFilter } from "../gql/graphql.js";
 import {
   resolveTeamEstimateContext,
   type TeamEstimateContext,
 } from "./team-resolver.js";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  if ((typeof value !== "object" && typeof value !== "function") || !value) {
-    return false;
+/** Builds the FindIssues filter for a UUID or "TEAM-123" identifier. */
+function issueLookupFilter(issueIdOrIdentifier: string): IssueFilter {
+  if (isUuid(issueIdOrIdentifier)) {
+    return { id: { eq: issueIdOrIdentifier } };
   }
 
-  return typeof (value as { then?: unknown }).then === "function";
-}
-
-async function resolveRelationValue(value: unknown): Promise<unknown> {
-  return isPromiseLike(value) ? await value : value;
-}
-
-/** Narrow projection of the SDK issue node fields the team lookup consumes. */
-interface IssueTeamProjection {
-  id: string;
-  teamId?: string;
-  team?: unknown; // relation; may be a value or PromiseLike (SDK quirk)
-}
-
-/** Narrow projection of a resolved team relation node. */
-interface TeamLookupProjection {
-  id?: string;
-  key?: string;
-}
-
-function toIssueTeamProjection(
-  node: unknown,
-  ref: string,
-): IssueTeamProjection {
-  if (!isRecord(node) || typeof node["id"] !== "string") {
-    throw new Error(`Issue "${ref}" is missing required team context`);
-  }
-
+  const { teamKey, issueNumber } = parseIssueIdentifier(issueIdOrIdentifier);
   return {
-    id: node["id"],
-    team: node["team"],
-    ...(typeof node["teamId"] === "string" ? { teamId: node["teamId"] } : {}),
+    number: { eq: issueNumber },
+    team: { key: { eq: teamKey } },
   };
-}
-
-function toTeamLookupProjection(
-  team: unknown,
-): TeamLookupProjection | undefined {
-  if (!isRecord(team)) return undefined;
-
-  return omitUndefined({
-    id: typeof team["id"] === "string" ? team["id"] : undefined,
-    key: typeof team["key"] === "string" ? team["key"] : undefined,
-  });
-}
-
-function getTeamLookupFromRelation(team: unknown): string | undefined {
-  const relation = toTeamLookupProjection(team);
-  return relation?.id ?? relation?.key;
-}
-
-async function getIssueTeamLookup(
-  projection: IssueTeamProjection,
-): Promise<string | undefined> {
-  if (projection.teamId) return projection.teamId;
-
-  return getTeamLookupFromRelation(await resolveRelationValue(projection.team));
 }
 
 export interface IssueEstimateContext {
@@ -91,24 +36,19 @@ export interface IssueEstimateContext {
  *
  * Accepts UUID or issue identifier (e.g., "ENG-123").
  *
- * @param client - Linear SDK client
+ * @param client - GraphQL client
  * @param issueIdOrIdentifier - Issue UUID or identifier
  * @returns Issue UUID
  * @throws Error if issue not found
  */
 export async function resolveIssueId(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   issueIdOrIdentifier: string,
 ): Promise<UUID> {
   if (isUuid(issueIdOrIdentifier)) return asUuid(issueIdOrIdentifier);
 
-  const { teamKey, issueNumber } = parseIssueIdentifier(issueIdOrIdentifier);
-
-  const issues = await client.sdk.issues({
-    filter: {
-      number: { eq: issueNumber },
-      team: { key: { eq: teamKey } },
-    },
+  const { issues } = await client.request(FindIssuesDocument, {
+    filter: issueLookupFilter(issueIdOrIdentifier),
     first: 1,
   });
 
@@ -120,46 +60,20 @@ export async function resolveIssueId(
 }
 
 export async function resolveIssueEstimateContext(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   issueIdOrIdentifier: string,
 ): Promise<IssueEstimateContext> {
-  const issueIsUuid = isUuid(issueIdOrIdentifier);
-  const issues = await (issueIsUuid
-    ? client.sdk.issues({
-        filter: { id: { eq: issueIdOrIdentifier } },
-        first: 1,
-      })
-    : (() => {
-        const { teamKey, issueNumber } =
-          parseIssueIdentifier(issueIdOrIdentifier);
+  const { issues } = await client.request(FindIssuesDocument, {
+    filter: issueLookupFilter(issueIdOrIdentifier),
+    first: 1,
+  });
 
-        return client.sdk.issues({
-          filter: {
-            number: { eq: issueNumber },
-            team: { key: { eq: teamKey } },
-          },
-          first: 1,
-        });
-      })());
-
-  if (issues.nodes.length === 0) {
-    throw notFoundError("Issue", issueIdOrIdentifier);
-  }
-
-  const projection = toIssueTeamProjection(
-    issues.nodes[0],
-    issueIdOrIdentifier,
+  const node = firstOrThrow(issues.nodes, () =>
+    notFoundError("Issue", issueIdOrIdentifier),
   );
 
-  const teamLookup = await getIssueTeamLookup(projection);
-  if (!teamLookup) {
-    throw new Error(
-      `Issue "${issueIdOrIdentifier}" is missing required team context`,
-    );
-  }
-
   return {
-    issueId: asUuid(projection.id),
-    team: await resolveTeamEstimateContext(client, teamLookup),
+    issueId: asUuid(node.id),
+    team: await resolveTeamEstimateContext(client, node.team.id),
   };
 }

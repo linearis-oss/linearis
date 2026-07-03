@@ -848,6 +848,25 @@ query FindWorkflowStates($filter: WorkflowStateFilter, $first: Int = 1) {
   }
 }
 
+# Find issues by a dynamic filter for ID resolution
+#
+# The filter is supplied by the caller so the resolver can preserve both the
+# UUID lookup ({ id: { eq } }) and the identifier lookup
+# ({ number: { eq }, team: { key: { eq } } }). team { id key } is selected so
+# the estimate-context resolver can derive the owning team without a second
+# round-trip.
+query FindIssues($filter: IssueFilter, $first: Int = 1) {
+  issues(filter: $filter, first: $first) {
+    nodes {
+      id
+      team {
+        id
+        key
+      }
+    }
+  }
+}
+
 # Complete issue fragment with attachments
 fragment CompleteIssueWithAttachmentsFields on Issue {
   ...CompleteIssueWithDefaultCommentsFields

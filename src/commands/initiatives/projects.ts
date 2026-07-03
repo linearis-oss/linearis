@@ -25,8 +25,8 @@ export function setupInitiativeProjectCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const projectId = await resolveProjectId(ctx.sdk, project);
+        const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+        const projectId = await resolveProjectId(ctx.gql, project);
 
         const result = await createInitiativeProjectLink(ctx.gql, {
           initiativeId,
@@ -50,8 +50,8 @@ export function setupInitiativeProjectCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const projectId = await resolveProjectId(ctx.sdk, project);
+        const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+        const projectId = await resolveProjectId(ctx.gql, project);
 
         const linkId = await resolveInitiativeProjectLinkId(
           ctx.gql,

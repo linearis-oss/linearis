@@ -8,12 +8,8 @@ import { GetProjectStatusesDocument } from "../gql/graphql.js";
  *
  * Accepts UUID (returned as-is) or a status name (case-insensitive match).
  *
- * ARCHITECTURAL EXCEPTION: This resolver uses GraphQLClient instead of
- * LinearSdkClient because the Linear SDK's projectStatuses() method does
- * not support server-side filtering. A GraphQL query fetches all statuses
- * (a small fixed set) and filters client-side. This is a documented
- * deviation from the standard resolver contract (resolvers normally use
- * SDK only).
+ * projectStatuses has no server-side name filter, so this fetches the full
+ * (small, fixed) set and matches client-side.
  *
  * @param client - GraphQL client for querying project statuses
  * @param nameOrId - Status name or UUID
