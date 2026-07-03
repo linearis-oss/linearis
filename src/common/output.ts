@@ -4,6 +4,7 @@ import {
   AuthenticationError,
   invalidParameterError,
 } from "./errors.js";
+import type { JsonSerializable } from "./json.js";
 
 // Derived from CommandOptions so the two can never drift; `fields` holds raw
 // dot-paths, e.g. ["identifier", "state.name"].
@@ -64,7 +65,7 @@ export function pickFields(value: unknown, paths: string[][]): unknown {
   return out;
 }
 
-export function outputSuccess(data: unknown): void {
+export function outputSuccess<T>(data: JsonSerializable<T>): void {
   const { compact, fields } = currentOutputOptions;
   const shaped =
     fields && fields.length > 0

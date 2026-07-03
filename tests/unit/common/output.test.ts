@@ -50,6 +50,27 @@ describe("outputSuccess", () => {
     spy.mockRestore();
   });
 
+  it("drops undefined properties from optional fields", () => {
+    // Generated GraphQL results widen optional (`field?:`) props to
+    // `undefined`; JSON.stringify drops them, so the output stays valid JSON.
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    outputSuccess({ id: "123", editedAt: undefined });
+    expect(spy).toHaveBeenCalledWith(JSON.stringify({ id: "123" }, null, 2));
+    spy.mockRestore();
+  });
+
+  it("serializes opaque Record<string, unknown> metadata as JSON", () => {
+    // Attachment metadata is an opaque JSON blob the type layer tolerates; it
+    // must still round-trip through the output boundary unchanged.
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const metadata: Record<string, unknown> = { size: 42, nested: { a: [1] } };
+    outputSuccess({ id: "123", metadata });
+    expect(spy).toHaveBeenCalledWith(
+      JSON.stringify({ id: "123", metadata }, null, 2),
+    );
+    spy.mockRestore();
+  });
+
   it("combines compact and fields (issue example)", () => {
     setOutputOptions({
       compact: true,
