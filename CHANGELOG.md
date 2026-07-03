@@ -1,3 +1,13 @@
+## [2026.6.0-next.10](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.9...v2026.6.0-next.10) (2026-07-03)
+
+### Bug Fixes
+
+* **resolvers:** restore global cycle fallback in search without team ([c0cbc95](https://github.com/linearis-oss/linearis/commit/c0cbc95889c4b7aaafe7e3281e9c8458bb71fefe)), closes [#126](https://github.com/linearis-oss/linearis/issues/126)
+
+### Performance Improvements
+
+* **issues:** batch-resolve assignee and IDs in create/update ([819c045](https://github.com/linearis-oss/linearis/commit/819c0451c909bbe2c5d297b6b584ce4da1358391)), closes [#126](https://github.com/linearis-oss/linearis/issues/126)
+
 ## [2026.6.0-next.9](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.8...v2026.6.0-next.9) (2026-07-03)
 
 ### Bug Fixes
