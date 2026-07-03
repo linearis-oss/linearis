@@ -195,3 +195,19 @@ query GetProjectStatuses {
     }
   }
 }
+
+# Find projects by case-insensitive name for ID resolution
+#
+# Returns up to two matches so the resolver can throw on ambiguity.
+# includeArchived is passed through to preserve archive-aware lookups.
+query FindProjectsByName($name: String!, $includeArchived: Boolean) {
+  projects(
+    filter: { name: { eqIgnoreCase: $name } }
+    first: 2
+    includeArchived: $includeArchived
+  ) {
+    nodes {
+      id
+    }
+  }
+}

@@ -835,6 +835,19 @@ query BatchResolveWorkflowStatesPage($first: Int!, $after: String) {
   }
 }
 
+# Find workflow states by a dynamic filter for status ID resolution
+#
+# The filter is supplied by the caller (name plus optional team scope)
+# so the unscoped case omits the team clause entirely rather than
+# filtering on a null team id. Emits the WorkflowStateFilter input type.
+query FindWorkflowStates($filter: WorkflowStateFilter, $first: Int = 1) {
+  workflowStates(filter: $filter, first: $first) {
+    nodes {
+      id
+    }
+  }
+}
+
 # Complete issue fragment with attachments
 fragment CompleteIssueWithAttachmentsFields on Issue {
   ...CompleteIssueWithDefaultCommentsFields

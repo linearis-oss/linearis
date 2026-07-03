@@ -67,3 +67,15 @@ query GetProjectLabels($first: Int = 50, $after: String) {
     }
   }
 }
+
+# Find a project label by case-insensitive name for ID resolution
+#
+# Returns the first match; project label names are treated as unique
+# for resolution purposes (no ambiguity error).
+query FindProjectLabelByName($name: String!) {
+  projectLabels(filter: { name: { eqIgnoreCase: $name } }, first: 1) {
+    nodes {
+      id
+    }
+  }
+}
