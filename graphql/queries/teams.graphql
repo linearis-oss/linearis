@@ -78,3 +78,30 @@ query GetTeamById($id: String!) {
     ...TeamDetailFields
   }
 }
+
+# Lean fields for team ID/estimate resolution
+#
+# Covers both resolveTeamId (id only) and resolveTeamEstimateContext
+# (id, key, name plus the estimation fields) without over-fetching the
+# heavy TeamDetailFields fragment.
+fragment TeamLookupFields on Team {
+  id
+  key
+  name
+  issueEstimationType
+  issueEstimationExtended
+  issueEstimationAllowZero
+}
+
+# Find teams by an arbitrary filter for resolver lookups
+#
+# The filter is supplied dynamically so callers can preserve the
+# key-first-then-name lookup order (two calls) and the id/key/name
+# estimate lookups with a single operation.
+query FindTeams($filter: TeamFilter, $first: Int = 1) {
+  teams(filter: $filter, first: $first) {
+    nodes {
+      ...TeamLookupFields
+    }
+  }
+}

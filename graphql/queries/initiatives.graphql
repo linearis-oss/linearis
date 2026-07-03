@@ -182,6 +182,21 @@ query FindInitiativesByName($name: String!, $teamId: ID, $ownerId: ID) {
   }
 }
 
+# Find initiatives by a dynamic filter for ID resolution
+#
+# The filter is supplied by the caller (name plus optional team/owner
+# scope), preserving the resolver's dynamic filter construction and
+# avoiding the nullable-scope behavior of FindInitiativesByName.
+# Emits the InitiativeFilter input type. first: 20 matches the resolver's
+# candidate limit for ambiguity reporting.
+query FindInitiatives($filter: InitiativeFilter, $first: Int = 20) {
+  initiatives(filter: $filter, first: $first) {
+    nodes {
+      ...InitiativeNameLookupFields
+    }
+  }
+}
+
 query FindInitiativeRelationByPair(
   $parentId: String!
   $childId: String!
