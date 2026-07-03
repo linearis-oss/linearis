@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveIssueDocument,
@@ -440,10 +441,11 @@ export async function createIssue(
 ): Promise<CreatedIssue> {
   const gqlInput: IssueCreateInput = input;
   const result = await client.request(CreateIssueDocument, { input: gqlInput });
-  if (!result.issueCreate.success || !result.issueCreate.issue) {
-    throw new Error("Failed to create issue");
-  }
-  return result.issueCreate.issue;
+  return requireMutationEntity(
+    result.issueCreate,
+    "issue",
+    "Failed to create issue",
+  );
 }
 
 export async function updateIssue(
@@ -456,10 +458,11 @@ export async function updateIssue(
     id,
     input: gqlInput,
   });
-  if (!result.issueUpdate.success || !result.issueUpdate.issue) {
-    throw new Error("Failed to update issue");
-  }
-  return result.issueUpdate.issue;
+  return requireMutationEntity(
+    result.issueUpdate,
+    "issue",
+    "Failed to update issue",
+  );
 }
 
 export async function archiveIssue(
@@ -468,11 +471,11 @@ export async function archiveIssue(
 ): Promise<IssueDetail> {
   const result = await client.request(ArchiveIssueDocument, { id });
 
-  if (!result.issueArchive.success || !result.issueArchive.entity) {
-    throw new Error(`Failed to archive issue "${id}"`);
-  }
-
-  return result.issueArchive.entity;
+  return requireMutationEntity(
+    result.issueArchive,
+    "entity",
+    `Failed to archive issue "${id}"`,
+  );
 }
 
 export async function unarchiveIssue(
@@ -481,11 +484,11 @@ export async function unarchiveIssue(
 ): Promise<IssueDetail> {
   const result = await client.request(UnarchiveIssueDocument, { id });
 
-  if (!result.issueUnarchive.success || !result.issueUnarchive.entity) {
-    throw new Error(`Failed to unarchive issue "${id}"`);
-  }
-
-  return result.issueUnarchive.entity;
+  return requireMutationEntity(
+    result.issueUnarchive,
+    "entity",
+    `Failed to unarchive issue "${id}"`,
+  );
 }
 
 export async function deleteIssue(

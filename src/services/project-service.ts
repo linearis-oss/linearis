@@ -1,4 +1,8 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveProjectDocument,
@@ -138,11 +142,11 @@ export async function createProject(
     input: gqlInput,
   });
 
-  if (!result.projectCreate.success || !result.projectCreate.project) {
-    throw new Error(`Failed to create project "${input.name}"`);
-  }
-
-  return result.projectCreate.project;
+  return requireMutationEntity(
+    result.projectCreate,
+    "project",
+    `Failed to create project "${input.name}"`,
+  );
 }
 
 export async function updateProject(
@@ -156,11 +160,11 @@ export async function updateProject(
     input: gqlInput,
   });
 
-  if (!result.projectUpdate.success || !result.projectUpdate.project) {
-    throw new Error(`Failed to update project "${id}"`);
-  }
-
-  return result.projectUpdate.project;
+  return requireMutationEntity(
+    result.projectUpdate,
+    "project",
+    `Failed to update project "${id}"`,
+  );
 }
 
 export async function archiveProject(
@@ -169,11 +173,11 @@ export async function archiveProject(
 ): Promise<ArchivedProject> {
   const result = await client.request(ArchiveProjectDocument, { id });
 
-  if (!result.projectArchive.success || !result.projectArchive.entity) {
-    throw new Error(`Failed to archive project "${id}"`);
-  }
-
-  return result.projectArchive.entity;
+  return requireMutationEntity(
+    result.projectArchive,
+    "entity",
+    `Failed to archive project "${id}"`,
+  );
 }
 
 export async function unarchiveProject(
@@ -182,11 +186,11 @@ export async function unarchiveProject(
 ): Promise<UnarchivedProject> {
   const result = await client.request(UnarchiveProjectDocument, { id });
 
-  if (!result.projectUnarchive.success || !result.projectUnarchive.entity) {
-    throw new Error(`Failed to unarchive project "${id}"`);
-  }
-
-  return result.projectUnarchive.entity;
+  return requireMutationEntity(
+    result.projectUnarchive,
+    "entity",
+    `Failed to unarchive project "${id}"`,
+  );
 }
 
 export async function deleteProject(
@@ -195,9 +199,10 @@ export async function deleteProject(
 ): Promise<DeletedProject> {
   const result = await client.request(DeleteProjectDocument, { id });
 
-  if (!result.projectDelete.success) {
-    throw new Error(`Failed to delete project "${id}"`);
-  }
+  requireMutationSuccess(
+    result.projectDelete,
+    `Failed to delete project "${id}"`,
+  );
 
   return {
     id: result.projectDelete.entity?.id ?? id,

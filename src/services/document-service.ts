@@ -1,4 +1,8 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
 import type { PaginatedResult } from "../common/types.js";
 import {
   DocumentCreateDocument,
@@ -80,11 +84,11 @@ export async function createDocument(
     input: gqlInput,
   });
 
-  if (!result.documentCreate.success || !result.documentCreate.document) {
-    throw new Error("Failed to create document");
-  }
-
-  return result.documentCreate.document;
+  return requireMutationEntity(
+    result.documentCreate,
+    "document",
+    "Failed to create document",
+  );
 }
 
 export async function updateDocument(
@@ -98,11 +102,11 @@ export async function updateDocument(
     input: gqlInput,
   });
 
-  if (!result.documentUpdate.success || !result.documentUpdate.document) {
-    throw new Error("Failed to update document");
-  }
-
-  return result.documentUpdate.document;
+  return requireMutationEntity(
+    result.documentUpdate,
+    "document",
+    "Failed to update document",
+  );
 }
 
 export async function listDocuments(
@@ -134,9 +138,7 @@ export async function deleteDocument(
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(DocumentDeleteDocument, { id });
 
-  if (!result.documentDelete.success) {
-    throw new Error("Failed to delete document");
-  }
+  requireMutationSuccess(result.documentDelete, "Failed to delete document");
 
   return { id: result.documentDelete.entity?.id ?? id, success: true };
 }

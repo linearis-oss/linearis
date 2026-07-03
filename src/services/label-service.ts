@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { requireMutationSuccess } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   CreateIssueLabelDocument,
@@ -81,9 +82,10 @@ export async function createLabel(
     input: gqlInput,
   });
 
-  if (!result.issueLabelCreate.success) {
-    throw new Error(`Failed to create label "${input.name}"`);
-  }
+  requireMutationSuccess(
+    result.issueLabelCreate,
+    `Failed to create label "${input.name}"`,
+  );
 
   return mapIssueLabel(result.issueLabelCreate.issueLabel);
 }
@@ -99,9 +101,10 @@ export async function updateLabel(
     input: gqlInput,
   });
 
-  if (!result.issueLabelUpdate.success) {
-    throw new Error(`Failed to update label "${id}"`);
-  }
+  requireMutationSuccess(
+    result.issueLabelUpdate,
+    `Failed to update label "${id}"`,
+  );
 
   return mapIssueLabel(result.issueLabelUpdate.issueLabel);
 }
@@ -112,9 +115,10 @@ export async function deleteLabel(
 ): Promise<DeleteLabelResult> {
   const result = await client.request(DeleteIssueLabelDocument, { id });
 
-  if (!result.issueLabelDelete.success) {
-    throw new Error(`Failed to delete label "${id}"`);
-  }
+  requireMutationSuccess(
+    result.issueLabelDelete,
+    `Failed to delete label "${id}"`,
+  );
 
   return {
     id: result.issueLabelDelete.entityId,

@@ -1,4 +1,8 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   type CommentCreateInput,
@@ -28,11 +32,11 @@ export async function createComment(
 ): Promise<CreatedComment> {
   const result = await client.request(CreateCommentDocument, { input });
 
-  if (!result.commentCreate.success || !result.commentCreate.comment) {
-    throw new Error("Failed to create comment");
-  }
-
-  return result.commentCreate.comment;
+  return requireMutationEntity(
+    result.commentCreate,
+    "comment",
+    "Failed to create comment",
+  );
 }
 
 export async function updateComment(
@@ -42,11 +46,11 @@ export async function updateComment(
 ): Promise<UpdatedComment> {
   const result = await client.request(UpdateCommentDocument, { id, input });
 
-  if (!result.commentUpdate.success || !result.commentUpdate.comment) {
-    throw new Error("Failed to update comment");
-  }
-
-  return result.commentUpdate.comment;
+  return requireMutationEntity(
+    result.commentUpdate,
+    "comment",
+    "Failed to update comment",
+  );
 }
 
 export async function listComments(
@@ -83,11 +87,11 @@ export async function replyToComment(
     input: { parentId: input.parentId, body: input.body },
   });
 
-  if (!result.commentCreate.success || !result.commentCreate.comment) {
-    throw new Error("Failed to create reply");
-  }
-
-  return result.commentCreate.comment;
+  return requireMutationEntity(
+    result.commentCreate,
+    "comment",
+    "Failed to create reply",
+  );
 }
 
 export async function deleteComment(
@@ -96,9 +100,7 @@ export async function deleteComment(
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(DeleteCommentDocument, { id });
 
-  if (!result.commentDelete.success) {
-    throw new Error("Failed to delete comment");
-  }
+  requireMutationSuccess(result.commentDelete, "Failed to delete comment");
 
   return {
     id: result.commentDelete.entityId,

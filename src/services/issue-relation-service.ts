@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
+import { requireMutationSuccess } from "../common/mutation-payload.js";
 import {
   CreateIssueRelationDocument,
   type CreateIssueRelationMutation,
@@ -24,9 +25,10 @@ export async function createIssueRelation(
   },
 ): Promise<CreatedIssueRelation> {
   const result = await client.request(CreateIssueRelationDocument, { input });
-  if (!result.issueRelationCreate.success) {
-    throw new Error("Failed to create issue relation");
-  }
+  requireMutationSuccess(
+    result.issueRelationCreate,
+    "Failed to create issue relation",
+  );
   return result.issueRelationCreate.issueRelation;
 }
 
@@ -90,8 +92,9 @@ export async function deleteIssueRelation(
   const result = await client.request(DeleteIssueRelationDocument, {
     id: relationId,
   });
-  if (!result.issueRelationDelete.success) {
-    throw new Error("Failed to delete issue relation");
-  }
+  requireMutationSuccess(
+    result.issueRelationDelete,
+    "Failed to delete issue relation",
+  );
   return { id: result.issueRelationDelete.entityId, success: true };
 }
