@@ -851,6 +851,23 @@ query FindWorkflowStates($filter: WorkflowStateFilter, $first: Int = 1) {
   }
 }
 
+# List workflow states for a single team, ordered by position
+#
+# Used by the interactive status picker to present every status a team
+# offers. Mirrors the WorkflowStateFilter team-scoping used by
+# FindWorkflowStates, but returns the full node set with type and position
+# so the caller can order and label them.
+query ListWorkflowStatesForTeam($teamId: ID!, $first: Int = 50) {
+  workflowStates(filter: { team: { id: { eq: $teamId } } }, first: $first) {
+    nodes {
+      id
+      name
+      type
+      position
+    }
+  }
+}
+
 # Find issues by a dynamic filter for ID resolution
 #
 # The filter is supplied by the caller so the resolver can preserve both the

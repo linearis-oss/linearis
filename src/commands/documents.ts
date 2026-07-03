@@ -1,7 +1,21 @@
 import type { Command } from "commander";
-import { createContext, getRootOpts } from "../common/context.js";
-import { invalidParameterError } from "../common/errors.js";
+import {
+  type CommandContext,
+  createContext,
+  getRootOpts,
+} from "../common/context.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../common/errors.js";
 import { asUuid, type UUID } from "../common/identifier.js";
+import {
+  documentChoices,
+  projectChoices,
+  teamChoices,
+} from "../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -76,12 +90,117 @@ function extractDocumentIdFromUrl(url: string): string | null {
   }
 }
 
+/** Create-wizard shape: the create options plus the `title` positional. */
+type DocumentCreateWizardOptions = Partial<DocumentCreateOptions> &
+  Record<string, unknown>;
+
+/** Update-wizard shape: the update options with an index signature. */
+type DocumentUpdateWizardOptions = DocumentUpdateOptions &
+  Record<string, unknown>;
+
+/**
+ * Interactive wizard for `documents create`. `--title` is a required text
+ * field; project/team choice values are UUIDs (see choices.ts), which the
+ * `resolveProjectId`/`resolveTeamId` resolvers pass through unchanged.
+ */
+export const documentCreateSpec: PromptSpec<DocumentCreateWizardOptions> = {
+  intro: "Create a new document",
+  fields: [
+    { name: "title", kind: "text", message: "Title", required: true },
+    { name: "content", kind: "multiline", message: "Content (markdown)" },
+    {
+      name: "project",
+      kind: "select",
+      message: "Project",
+      choices: projectChoices,
+    },
+    { name: "team", kind: "select", message: "Team", choices: teamChoices },
+    { name: "icon", kind: "text", message: "Icon" },
+    { name: "color", kind: "text", message: "Icon color" },
+  ],
+};
+
+/**
+ * Interactive wizard for `documents update`. All fields optional; current
+ * option values seed each field and prevent re-prompting for provided flags.
+ */
+export const documentUpdateSpec: PromptSpec<DocumentUpdateWizardOptions> = {
+  intro: "Update a document",
+  fields: [
+    { name: "title", kind: "text", message: "Title", default: (d) => d.title },
+    {
+      name: "content",
+      kind: "multiline",
+      message: "Content (markdown)",
+      default: (d) => d.content,
+    },
+    {
+      name: "project",
+      kind: "select",
+      message: "Project",
+      choices: projectChoices,
+    },
+    { name: "icon", kind: "text", message: "Icon", default: (d) => d.icon },
+    {
+      name: "color",
+      kind: "text",
+      message: "Icon color",
+      default: (d) => d.color,
+    },
+  ],
+};
+
+/**
+ * Entity picker for an absent `[document]` positional. Lists recent documents
+ * and returns the selected document's UUID (which `asUuid` accepts).
+ */
+async function documentPicker(
+  ctx: CommandContext,
+  io: PromptIO,
+): Promise<string> {
+  const options = await documentChoices(ctx);
+  const answer = await io.select({ message: "Document", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
+
+/**
+ * Fill an absent `[document]` positional via {@link documentPicker} when gating
+ * allows, else preserve the old missing-argument error.
+ */
+async function resolveDocumentPositional(
+  ctx: CommandContext,
+  command: Command,
+  document: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: document === undefined,
+      positional: { name: "document", value: document, picker: documentPicker },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("document", "is required");
+  }
+  return filled.positional;
+}
+
 export const DOCUMENTS_META: DomainMeta = {
   name: "documents",
   summary: "long-form markdown docs attached to projects or issues",
   context: [
     "a document is a markdown page. it can belong to a project and/or be",
     "attached to an issue. documents support icons and colors.",
+    "in a terminal, run with -i (or omit a required arg) to pick the",
+    "document and enter fields interactively.",
   ].join("\n"),
   arguments: {
     document: "document identifier (UUID)",
@@ -159,13 +278,22 @@ export function setupDocumentsCommands(program: Command): void {
     );
 
   documents
-    .command("read <document>")
+    .command("read [document]")
     .description("get document content")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [document, , command] = args as [string, unknown, Command];
+        const [documentArg, , command] = args as [
+          string | undefined,
+          unknown,
+          Command,
+        ];
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
+        const document = await resolveDocumentPositional(
+          ctx,
+          command,
+          documentArg,
+        );
 
         const documentResult = await getDocument(ctx.gql, asUuid(document));
         outputSuccess(documentResult);
@@ -175,7 +303,7 @@ export function setupDocumentsCommands(program: Command): void {
   documents
     .command("create")
     .description("create a new document")
-    .requiredOption("--title <title>", "document title (required)")
+    .option("--title <title>", "document title (required)")
     .option("--content <text>", "document content (markdown)")
     .option("--project <project>", "project name or ID")
     .option("--team <team>", "team key or name")
@@ -185,7 +313,27 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--attach-to <issue>", "alias for --issue")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [DocumentCreateOptions, Command];
+        const [rawOptions, command] = args as [
+          Partial<DocumentCreateOptions>,
+          Command,
+        ];
+        const rootOpts = getRootOpts(command);
+        const ctx = createContext(rootOpts);
+
+        const filled = await maybeCollectInteractive<
+          DocumentCreateWizardOptions,
+          never
+        >(ctx, rootOpts, {
+          spec: documentCreateSpec,
+          options: rawOptions as DocumentCreateWizardOptions,
+          missingRequired: rawOptions.title === undefined,
+        });
+        const options = filled.options as DocumentCreateOptions;
+
+        if (options.title === undefined) {
+          throw invalidParameterError("--title", "is required");
+        }
+
         if (options.issue && options.attachTo) {
           throw invalidParameterError(
             "--attach-to",
@@ -194,8 +342,6 @@ export function setupDocumentsCommands(program: Command): void {
         }
 
         const issueIdentifier = options.issue ?? options.attachTo;
-        const rootOpts = getRootOpts(command);
-        const ctx = createContext(rootOpts);
 
         const projectId = options.project
           ? await resolveProjectId(ctx.gql, options.project)
@@ -222,7 +368,7 @@ export function setupDocumentsCommands(program: Command): void {
     );
 
   documents
-    .command("update <document>")
+    .command("update [document]")
     .description("update an existing document")
     .option("--title <title>", "new title")
     .option("--content <text>", "new content (markdown)")
@@ -231,13 +377,32 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--color <color>", "new icon color")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [document, options, command] = args as [
-          string,
+        const [documentArg, rawOptions, command] = args as [
+          string | undefined,
           DocumentUpdateOptions,
           Command,
         ];
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
+
+        const filled = await maybeCollectInteractive<
+          DocumentUpdateWizardOptions,
+          string
+        >(ctx, rootOpts, {
+          spec: documentUpdateSpec,
+          options: rawOptions as DocumentUpdateWizardOptions,
+          missingRequired: documentArg === undefined,
+          positional: {
+            name: "document",
+            value: documentArg,
+            picker: documentPicker,
+          },
+        });
+        if (filled.positional === undefined) {
+          throw invalidParameterError("document", "is required");
+        }
+        const document = filled.positional;
+        const options = filled.options as DocumentUpdateOptions;
 
         const input: UpdateDocumentInput = {};
         if (options.title) input.title = options.title;
@@ -258,13 +423,22 @@ export function setupDocumentsCommands(program: Command): void {
     );
 
   documents
-    .command("delete <document>")
+    .command("delete [document]")
     .description("trash a document")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [document, , command] = args as [string, unknown, Command];
+        const [documentArg, , command] = args as [
+          string | undefined,
+          unknown,
+          Command,
+        ];
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
+        const document = await resolveDocumentPositional(
+          ctx,
+          command,
+          documentArg,
+        );
 
         const result = await deleteDocument(ctx.gql, asUuid(document));
         outputSuccess(result);

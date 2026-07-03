@@ -1,14 +1,23 @@
 import type { Command } from "commander";
+import type { CommandContext } from "../common/context.js";
 import {
   type CommandOptions,
   createContext,
   getRootOpts,
 } from "../common/context.js";
 import {
+  InteractiveCancelledError,
   invalidParameterError,
   notFoundError,
   requiresParameterError,
 } from "../common/errors.js";
+import {
+  cycleChoices,
+  teamChoices,
+  withNoneChoice,
+} from "../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -27,6 +36,65 @@ interface CycleListOptions extends CommandOptions {
 interface CycleReadOptions extends CommandOptions {
   team?: string;
   limit?: string;
+}
+
+/** List-wizard shape: offers a team select to fill `--team` when interactive. */
+interface CycleListWizardOptions extends Record<string, unknown> {
+  team?: string;
+}
+
+/**
+ * Interactive spec for `cycles list`. Cycles are team-scoped, so offering a team
+ * select lets an interactive user narrow the listing. The team choice value is a
+ * UUID (see choices.ts) which the resolver passes through via `isUuid(...)`.
+ */
+export const cycleListSpec: PromptSpec<CycleListWizardOptions> = {
+  intro: "List cycles",
+  fields: [
+    {
+      name: "team",
+      kind: "select",
+      message: "Team",
+      choices: async (ctx) =>
+        withNoneChoice(await teamChoices(ctx), "— all teams —"),
+    },
+  ],
+};
+
+/**
+ * Entity picker for an absent `[cycle]` positional. Cycles are team-scoped, so
+ * this first resolves/prompts the parent team (via `--team` or a team select),
+ * then loads that team's cycles via `cycleChoices({ team })`. This is the
+ * cross-field-dependency case for the cycles domain: the cycle list is only
+ * fetched once the parent team UUID is known.
+ *
+ * Returns the selected cycle UUID (which the resolver accepts).
+ */
+function makeCyclePicker(
+  teamHint: string | undefined,
+): (ctx: CommandContext, io: PromptIO) => Promise<string> {
+  return async (ctx, io) => {
+    let teamId = teamHint;
+    if (teamId === undefined) {
+      const teamAnswer = await io.select({
+        message: "Team",
+        options: await teamChoices(ctx),
+      });
+      if (io.isCancel(teamAnswer)) {
+        throw new InteractiveCancelledError();
+      }
+      teamId = teamAnswer as string;
+    } else {
+      teamId = await resolveTeamId(ctx.gql, teamId);
+    }
+
+    const options = await cycleChoices(ctx, { team: teamId });
+    const answer = await io.select({ message: "Cycle", options });
+    if (io.isCancel(answer)) {
+      throw new InteractiveCancelledError();
+    }
+    return answer as string;
+  };
 }
 
 export const CYCLES_META: DomainMeta = {
@@ -70,9 +138,24 @@ export function setupCyclesCommands(program: Command): void {
 
         const ctx = createContext(getRootOpts(command));
 
+        // Offer a team select when interactive to narrow the listing. `--window`
+        // already requires a team, so only prompt when it was not requested.
+        const filled = options.window
+          ? { options }
+          : await maybeCollectInteractive<CycleListWizardOptions, never>(
+              ctx,
+              getRootOpts(command),
+              {
+                spec: cycleListSpec,
+                options: { ...options } as CycleListWizardOptions,
+                missingRequired: false,
+              },
+            );
+        const listOptions = filled.options as CycleListOptions;
+
         // Resolve team filter if provided
-        const teamId = options.team
-          ? await resolveTeamId(ctx.gql, options.team)
+        const teamId = listOptions.team
+          ? await resolveTeamId(ctx.gql, listOptions.team)
           : undefined;
 
         // Fetch cycles
@@ -117,18 +200,36 @@ export function setupCyclesCommands(program: Command): void {
     );
 
   cycles
-    .command("read <cycle>")
+    .command("read [cycle]")
     .description("get cycle details including issues")
     .option("--team <team>", "scope name lookup to team")
     .option("--limit <n>", "max issues to fetch", "50")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [cycle, options, command] = args as [
-          string,
+        const [cycleArg, options, command] = args as [
+          string | undefined,
           CycleReadOptions,
           Command,
         ];
         const ctx = createContext(getRootOpts(command));
+
+        const filled = await maybeCollectInteractive<
+          Record<string, never>,
+          string
+        >(ctx, getRootOpts(command), {
+          spec: { fields: [] },
+          options: {},
+          missingRequired: cycleArg === undefined,
+          positional: {
+            name: "cycle",
+            value: cycleArg,
+            picker: makeCyclePicker(options.team),
+          },
+        });
+        if (filled.positional === undefined) {
+          throw invalidParameterError("cycle", "is required");
+        }
+        const cycle = filled.positional;
 
         const cycleId = await resolveCycleId(ctx.gql, cycle, options.team);
 

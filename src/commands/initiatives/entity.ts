@@ -1,9 +1,23 @@
 import type { Command } from "commander";
 import type { GraphQLClient } from "../../client/graphql-client.js";
+import type { CommandContext } from "../../common/context.js";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { resolveReactionEmojiInput } from "../../common/emoji.js";
-import { invalidParameterError } from "../../common/errors.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../../common/errors.js";
 import { asUuid } from "../../common/identifier.js";
+import {
+  initiativeChoices,
+  userChoices,
+} from "../../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../../common/interactive/engine.js";
+import type {
+  Choice,
+  PromptIO,
+  PromptSpec,
+} from "../../common/interactive/types.js";
 import { omitUndefined } from "../../common/object.js";
 import {
   commandAction,
@@ -188,6 +202,145 @@ interface InitiativeUpdateOptions {
   status?: string;
   targetDate?: string;
   sortOrder?: string;
+}
+
+/** Create-wizard shape: create options plus the `name` positional. */
+interface InitiativeCreateWizardOptions
+  extends InitiativeCreateOptions,
+    Record<string, unknown> {
+  name?: string;
+}
+
+/** Update-wizard shape: update options with an index signature. */
+type InitiativeUpdateWizardOptions = InitiativeUpdateOptions &
+  Record<string, unknown>;
+
+/** Static initiative status scale. */
+function initiativeStatusChoices(): Choice[] {
+  return [
+    { value: "Planned", label: "Planned" },
+    { value: "Active", label: "Active" },
+    { value: "Completed", label: "Completed" },
+  ];
+}
+
+/**
+ * Interactive wizard for `initiatives create`. Entity choice values are UUIDs
+ * (see choices.ts); the resolvers pass those through unchanged via
+ * `isUuid(...)`.
+ */
+export const initiativeCreateSpec: PromptSpec<InitiativeCreateWizardOptions> = {
+  intro: "Create a new initiative",
+  fields: [
+    { name: "name", kind: "text", message: "Name", required: true },
+    { name: "description", kind: "multiline", message: "Description" },
+    { name: "content", kind: "multiline", message: "Content (markdown)" },
+    {
+      name: "owner",
+      kind: "select",
+      message: "Owner",
+      choices: userChoices,
+    },
+    {
+      name: "status",
+      kind: "select",
+      message: "Status",
+      choices: async () => initiativeStatusChoices(),
+    },
+    { name: "targetDate", kind: "text", message: "Target date (YYYY-MM-DD)" },
+  ],
+};
+
+/**
+ * Interactive wizard for `initiatives update`. All fields optional; the current
+ * option values seed each field.
+ */
+export const initiativeUpdateSpec: PromptSpec<InitiativeUpdateWizardOptions> = {
+  intro: "Update an initiative",
+  fields: [
+    {
+      name: "name",
+      kind: "text",
+      message: "Name",
+      default: (draft) => draft.name,
+    },
+    {
+      name: "description",
+      kind: "multiline",
+      message: "Description",
+      default: (draft) => draft.description,
+    },
+    {
+      name: "content",
+      kind: "multiline",
+      message: "Content (markdown)",
+      default: (draft) => draft.content,
+    },
+    {
+      name: "owner",
+      kind: "select",
+      message: "Owner",
+      choices: userChoices,
+    },
+    {
+      name: "status",
+      kind: "select",
+      message: "Status",
+      choices: async () => initiativeStatusChoices(),
+    },
+    {
+      name: "targetDate",
+      kind: "text",
+      message: "Target date (YYYY-MM-DD)",
+      default: (draft) => draft.targetDate,
+    },
+  ],
+};
+
+/**
+ * Entity picker for an absent `[initiative]` positional. Lists recent
+ * initiatives and returns the selected initiative's UUID (which the resolver
+ * accepts).
+ */
+async function initiativePicker(
+  ctx: CommandContext,
+  io: PromptIO,
+): Promise<string> {
+  const options = await initiativeChoices(ctx);
+  const answer = await io.select({ message: "Initiative", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+/**
+ * Fill an absent `[initiative]` positional via the picker when gating allows,
+ * else require it (preserving the old missing-argument error for agents/pipes).
+ */
+async function resolveInitiativePositional(
+  ctx: CommandContext,
+  command: Command,
+  initiative: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: { fields: [] },
+      options: {},
+      missingRequired: initiative === undefined,
+      positional: {
+        name: "initiative",
+        value: initiative,
+        picker: initiativePicker,
+      },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("initiative", "is required");
+  }
+  return filled.positional;
 }
 
 function parseSortOrder(value?: string): "asc" | "desc" | undefined {
@@ -390,7 +543,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("read <initiative>")
+    .command("read [initiative]")
     .description("get initiative details")
     .option("--with-projects", "include linked projects in read output")
     .option(
@@ -406,9 +559,14 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--with-history", "include history in read output")
     .option("--with-documents", "include documents in read output")
     .action(
-      commandAction<[string, InitiativeReadOptions, Command]>(
-        async (initiative, options, command) => {
+      commandAction<[string | undefined, InitiativeReadOptions, Command]>(
+        async (initiativeArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
+          const initiative = await resolveInitiativePositional(
+            ctx,
+            command,
+            initiativeArg,
+          );
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
           // Read query already returns expanded fields. Keep flags accepted for
@@ -422,18 +580,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("discuss <initiative>")
+    .command("discuss [initiative]")
     .description("start a discussion thread on an initiative")
     .option("--body <text>", "discussion body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
-        async (initiative, options, command) => {
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
+        async (initiativeArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
           if (!options.body) {
             throw invalidParameterError("--body", "is required");
           }
 
+          const initiative = await resolveInitiativePositional(
+            ctx,
+            command,
+            initiativeArg,
+          );
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await startInitiativeDiscussion(ctx.gql, {
             initiativeId,
@@ -446,16 +609,21 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("discussions <initiative>")
+    .command("discussions [initiative]")
     .description("list root discussion threads on an initiative")
     .option("-l, --limit <n>", "max results", "25")
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      commandAction<[string, DiscussionsOptions, Command]>(
-        async (initiative, options, command) => {
+      commandAction<[string | undefined, DiscussionsOptions, Command]>(
+        async (initiativeArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const initiative = await resolveInitiativePositional(
+            ctx,
+            command,
+            initiativeArg,
+          );
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "25"),
@@ -680,7 +848,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("create <name>")
+    .command("create [name]")
     .description("create a new initiative")
     .option("--description <text>", "initiative description")
     .option("--content <text>", "initiative content (markdown)")
@@ -689,9 +857,26 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--target-date <date>", "target date (YYYY-MM-DD)")
     .option("--sort-order <n>", "display sort order")
     .action(
-      commandAction<[string, InitiativeCreateOptions, Command]>(
-        async (name, options, command) => {
+      commandAction<[string | undefined, InitiativeCreateOptions, Command]>(
+        async (nameArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
+
+          const filled = await maybeCollectInteractive<
+            InitiativeCreateWizardOptions,
+            never
+          >(ctx, getRootOpts(command), {
+            spec: initiativeCreateSpec,
+            options: {
+              ...options,
+              ...(nameArg !== undefined ? { name: nameArg } : {}),
+            } as InitiativeCreateWizardOptions,
+            missingRequired: nameArg === undefined,
+          });
+          const name = (filled.options.name as string | undefined) ?? nameArg;
+          if (name === undefined) {
+            throw invalidParameterError("name", "is required");
+          }
+          options = filled.options as InitiativeCreateOptions;
 
           const input: CreateInitiativeInput = { name };
 
@@ -728,7 +913,7 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("update <initiative>")
+    .command("update [initiative]")
     .description("update an initiative")
     .option("--name <name>", "new name")
     .option("--description <text>", "new description")
@@ -738,9 +923,28 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--target-date <date>", "new target date (YYYY-MM-DD)")
     .option("--sort-order <n>", "new display sort order")
     .action(
-      commandAction<[string, InitiativeUpdateOptions, Command]>(
-        async (initiative, options, command) => {
+      commandAction<[string | undefined, InitiativeUpdateOptions, Command]>(
+        async (initiativeArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
+
+          const filled = await maybeCollectInteractive<
+            InitiativeUpdateWizardOptions,
+            string
+          >(ctx, getRootOpts(command), {
+            spec: initiativeUpdateSpec,
+            options: options as InitiativeUpdateWizardOptions,
+            missingRequired: initiativeArg === undefined,
+            positional: {
+              name: "initiative",
+              value: initiativeArg,
+              picker: initiativePicker,
+            },
+          });
+          options = filled.options as InitiativeUpdateOptions;
+          if (filled.positional === undefined) {
+            throw invalidParameterError("initiative", "is required");
+          }
+          const initiative = filled.positional;
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
           const input: UpdateInitiativeInput = {};
@@ -789,12 +993,17 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("archive <initiative>")
+    .command("archive [initiative]")
     .description("archive an initiative")
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (initiative, _unused1, command) => {
+      commandAction<[string | undefined, unknown, Command]>(
+        async (initiativeArg, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
+          const initiative = await resolveInitiativePositional(
+            ctx,
+            command,
+            initiativeArg,
+          );
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await archiveInitiative(ctx.gql, initiativeId);
           outputSuccess(result);
@@ -803,12 +1012,17 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("unarchive <initiative>")
+    .command("unarchive [initiative]")
     .description("unarchive an initiative")
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (initiative, _unused1, command) => {
+      commandAction<[string | undefined, unknown, Command]>(
+        async (initiativeArg, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
+          const initiative = await resolveInitiativePositional(
+            ctx,
+            command,
+            initiativeArg,
+          );
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await unarchiveInitiative(ctx.gql, initiativeId);
           outputSuccess(result);
@@ -817,12 +1031,17 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("delete <initiative>")
+    .command("delete [initiative]")
     .description("delete an initiative")
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (initiative, _unused1, command) => {
+      commandAction<[string | undefined, unknown, Command]>(
+        async (initiativeArg, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
+          const initiative = await resolveInitiativePositional(
+            ctx,
+            command,
+            initiativeArg,
+          );
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await deleteInitiative(ctx.gql, initiativeId);
           outputSuccess(result);

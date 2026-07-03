@@ -126,7 +126,7 @@ describe("comments compatibility delegation", () => {
     expect(replyHelp).toMatch(
       /Nested-reply targets are not\s+supported in compatibility mode/i,
     );
-    expect(replyHelp).toContain("reply [options] <thread>");
+    expect(replyHelp).toContain("reply [options] [thread]");
   });
 
   it("comments list resolves issue and delegates to listDiscussionsForIssue", async () => {

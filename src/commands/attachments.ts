@@ -1,7 +1,17 @@
 import type { Command } from "commander";
-import { createContext, getRootOpts } from "../common/context.js";
-import { invalidParameterError } from "../common/errors.js";
+import {
+  type CommandContext,
+  createContext,
+  getRootOpts,
+} from "../common/context.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../common/errors.js";
 import { asUuid } from "../common/identifier.js";
+import { issueChoices } from "../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
@@ -22,6 +32,8 @@ export const ATTACHMENTS_META: DomainMeta = {
     "title, subtitle, sourceType (e.g. 'github', 'slack'), and metadata",
     "with integration-specific data. creating an attachment with the same",
     "url on the same issue updates the existing record (idempotent).",
+    "in a terminal, run with -i (or omit a required arg) to pick the issue",
+    "or attachment and enter title/url interactively.",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
@@ -45,6 +57,105 @@ interface CreateOptions {
   subtitle?: string;
   comment?: string;
   iconUrl?: string;
+}
+
+/** Create-wizard shape: create options with an index signature. */
+type CreateWizardOptions = Partial<CreateOptions> & Record<string, unknown>;
+
+/**
+ * Interactive wizard for `attachments create`. `--title` and `--url` become
+ * required text fields; the `[issue]` positional is filled by the issue picker.
+ */
+export const attachmentCreateSpec: PromptSpec<CreateWizardOptions> = {
+  intro: "Create an attachment on an issue",
+  fields: [
+    { name: "title", kind: "text", message: "Title", required: true },
+    { name: "url", kind: "text", message: "URL", required: true },
+    { name: "subtitle", kind: "text", message: "Subtitle" },
+  ],
+};
+
+/** Entity picker for an absent `[issue]` positional (shared loader). */
+async function issuePicker(ctx: CommandContext, io: PromptIO): Promise<string> {
+  const options = await issueChoices(ctx);
+  const answer = await io.select({ message: "Issue", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+/**
+ * Cross-field picker for an absent attachment `<id>`. First picks the parent
+ * issue, then lists that issue's attachments and returns the selected
+ * attachment's UUID (which `asUuid` accepts unchanged downstream).
+ */
+async function attachmentPicker(
+  ctx: CommandContext,
+  io: PromptIO,
+): Promise<string> {
+  const issueIdentifier = await issuePicker(ctx, io);
+  const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
+  const attachments = await listAttachments(ctx.gql, issueId);
+  const options = attachments.map((att) => ({
+    value: att.id,
+    label: att.title || att.url,
+    ...(att.sourceType ? { hint: att.sourceType } : {}),
+  }));
+  if (options.length === 0) {
+    throw invalidParameterError("id", "the selected issue has no attachments");
+  }
+  const answer = await io.select({ message: "Attachment", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
+
+/** Fill an absent `[issue]` positional via the issue picker when gating allows. */
+async function resolveIssuePositional(
+  ctx: CommandContext,
+  command: Command,
+  issue: string | undefined,
+): Promise<string | undefined> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: issue === undefined,
+      positional: { name: "issue", value: issue, picker: issuePicker },
+    },
+  );
+  return filled.positional;
+}
+
+/**
+ * Fill an absent attachment `<id>` via {@link attachmentPicker} when gating
+ * allows, else preserve the old missing-argument error.
+ */
+async function resolveAttachmentPositional(
+  ctx: CommandContext,
+  command: Command,
+  id: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: id === undefined,
+      positional: { name: "id", value: id, picker: attachmentPicker },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("id", "is required");
+  }
+  return filled.positional;
 }
 
 function resolveIssueArgument(
@@ -86,13 +197,17 @@ export function setupAttachmentsCommands(program: Command): void {
     .option("--created-before <date>", "created before date (YYYY-MM-DD)")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [issue, options, command] = args as [
+        const [issueArg, options, command] = args as [
           string | undefined,
           ListOptions,
           Command,
         ];
-        const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
+        const issue =
+          issueArg === undefined && options.issue === undefined
+            ? await resolveIssuePositional(ctx, command, issueArg)
+            : issueArg;
+        const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
         const filter = buildAttachmentFilter(options);
         const result = await listAttachments(ctx.gql, issueId, filter);
@@ -104,20 +219,54 @@ export function setupAttachmentsCommands(program: Command): void {
     .command("create [issue]")
     .description("create an attachment on an issue")
     .option("--issue <issue>", "issue identifier (alias for positional issue)")
-    .requiredOption("--title <title>", "attachment title")
-    .requiredOption("--url <url>", "attachment URL")
+    .option("--title <title>", "attachment title (required)")
+    .option("--url <url>", "attachment URL (required)")
     .option("--subtitle <text>", "attachment subtitle")
     .option("--comment <text>", "comment body to create with the attachment")
     .option("--icon-url <url>", "attachment icon URL")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [issue, options, command] = args as [
+        const [issueArg, rawOptions, command] = args as [
           string | undefined,
-          CreateOptions,
+          Partial<CreateOptions>,
           Command,
         ];
-        const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
+
+        const filled = await maybeCollectInteractive<
+          CreateWizardOptions,
+          string
+        >(ctx, getRootOpts(command), {
+          spec: attachmentCreateSpec,
+          options: rawOptions as CreateWizardOptions,
+          missingRequired:
+            (issueArg === undefined && rawOptions.issue === undefined) ||
+            rawOptions.title === undefined ||
+            rawOptions.url === undefined,
+          // Only offer the issue picker when the issue was not already supplied
+          // via --issue; otherwise the picked value would collide with
+          // options.issue in resolveIssueArgument.
+          ...(rawOptions.issue === undefined
+            ? {
+                positional: {
+                  name: "issue",
+                  value: issueArg,
+                  picker: issuePicker,
+                },
+              }
+            : {}),
+        });
+        const options = filled.options as CreateOptions;
+        const issue = filled.positional;
+
+        if (options.title === undefined) {
+          throw invalidParameterError("--title", "is required");
+        }
+        if (options.url === undefined) {
+          throw invalidParameterError("--url", "is required");
+        }
+
+        const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
         const input: CreateAttachmentInput = {
           issueId,
@@ -133,12 +282,17 @@ export function setupAttachmentsCommands(program: Command): void {
     );
 
   attachments
-    .command("delete <id>")
+    .command("delete [id]")
     .description("delete an attachment by UUID")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [id, , command] = args as [string, unknown, Command];
+        const [idArg, , command] = args as [
+          string | undefined,
+          unknown,
+          Command,
+        ];
         const ctx = createContext(getRootOpts(command));
+        const id = await resolveAttachmentPositional(ctx, command, idArg);
         const result = await deleteAttachment(ctx.gql, asUuid(id));
         outputSuccess(result);
       }),

@@ -1,11 +1,22 @@
 import type { Command } from "commander";
+import type { CommandContext } from "../common/context.js";
 import {
   type CommandOptions,
   createContext,
   getRootOpts,
 } from "../common/context.js";
-import { invalidParameterError } from "../common/errors.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../common/errors.js";
 import type { UUID } from "../common/identifier.js";
+import {
+  labelChoices,
+  teamChoices,
+  withNoneChoice,
+} from "../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -52,6 +63,111 @@ interface UpdateLabelOptions extends LabelLookupOptions {
   description?: string;
 }
 
+/** Create-wizard shape: the create options plus the `name` positional. */
+interface CreateLabelWizardOptions extends Record<string, unknown> {
+  team?: string;
+  color?: string;
+  description?: string;
+  name?: string;
+}
+
+/** Update-wizard shape: the update options with an index signature. */
+interface UpdateLabelWizardOptions extends Record<string, unknown> {
+  team?: string;
+  scope?: string;
+  name?: string;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Interactive wizard for `labels create`. `name` is the required positional;
+ * `team` is optional (a workspace label when omitted). The team choice value is
+ * a UUID (see choices.ts), which the resolver passes through via `isUuid(...)`.
+ * Color is a free-text hex field validated the same way as `--color`.
+ */
+export const labelCreateSpec: PromptSpec<CreateLabelWizardOptions> = {
+  intro: "Create a new issue label",
+  fields: [
+    { name: "name", kind: "text", message: "Name", required: true },
+    {
+      name: "team",
+      kind: "select",
+      message: "Team",
+      choices: async (ctx) =>
+        withNoneChoice(await teamChoices(ctx), "— none (workspace label) —"),
+    },
+    {
+      name: "color",
+      kind: "text",
+      message: "Color (hex, e.g. #B45309)",
+      validate: (value) =>
+        value === "" || /^#[0-9a-fA-F]{6}$/.test(value)
+          ? undefined
+          : "must be a hex color like #B45309",
+    },
+    { name: "description", kind: "multiline", message: "Description" },
+  ],
+};
+
+/**
+ * Interactive wizard for `labels update`. All fields optional; current option
+ * values seed each field so an explicit flag is never re-prompted. The label
+ * picker (run afterwards by the positional flow) resolves the `[label]`.
+ */
+export const labelUpdateSpec: PromptSpec<UpdateLabelWizardOptions> = {
+  intro: "Update an issue label",
+  fields: [
+    {
+      name: "name",
+      kind: "text",
+      message: "Name",
+      default: (draft) => draft.name as string | undefined,
+    },
+    {
+      name: "color",
+      kind: "text",
+      message: "Color (hex, e.g. #B45309)",
+      default: (draft) => draft.color as string | undefined,
+      validate: (value) =>
+        value === "" || /^#[0-9a-fA-F]{6}$/.test(value)
+          ? undefined
+          : "must be a hex color like #B45309",
+    },
+    {
+      name: "description",
+      kind: "multiline",
+      message: "Description",
+      default: (draft) => draft.description as string | undefined,
+    },
+  ],
+};
+
+/**
+ * Entity picker for an absent `[label]` positional. Lists labels (scoped to the
+ * team from `--team` when supplied) and returns the selected label's UUID, which
+ * the resolver accepts via `isUuid(...)` passthrough.
+ */
+function makeLabelPicker(
+  teamHint: string | undefined,
+): (ctx: CommandContext, io: PromptIO) => Promise<string> {
+  return async (ctx, io) => {
+    let teamId = teamHint;
+    if (teamId !== undefined) {
+      teamId = await resolveTeamId(ctx.gql, teamId);
+    }
+    const options = await labelChoices(
+      ctx,
+      teamId !== undefined ? { team: teamId } : {},
+    );
+    const answer = await io.select({ message: "Label", options });
+    if (io.isCancel(answer)) {
+      throw new InteractiveCancelledError();
+    }
+    return answer as string;
+  };
+}
+
 function parseLabelType(value?: string): LabelType {
   if (value === undefined || value === "issue" || value === "project") {
     return value ?? "issue";
@@ -83,12 +199,43 @@ function parseLabelColor(value?: string): string | undefined {
   return value;
 }
 
-async function resolveIssueLabelLookup(
+const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
+
+/**
+ * Fill an absent `[label]` positional via the label picker when gating allows,
+ * else require it (preserving the old missing-argument error for agents/pipes).
+ */
+async function resolveLabelPositional(
+  ctx: CommandContext,
   command: Command,
+  label: string | undefined,
+  teamHint: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: label === undefined,
+      positional: {
+        name: "label",
+        value: label,
+        picker: makeLabelPicker(teamHint),
+      },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("label", "is required");
+  }
+  return filled.positional;
+}
+
+async function resolveIssueLabelLookup(
+  ctx: CommandContext,
   label: string,
   options: LabelLookupOptions,
-): Promise<{ ctx: ReturnType<typeof createContext>; labelId: UUID }> {
-  const ctx = createContext(getRootOpts(command));
+): Promise<{ labelId: UUID }> {
   const scope = parseLabelScope(options.scope);
 
   if (scope === "team" && !options.team) {
@@ -114,7 +261,7 @@ async function resolveIssueLabelLookup(
     }),
   );
 
-  return { ctx, labelId };
+  return { labelId };
 }
 
 function buildUpdateInput(options: UpdateLabelOptions): UpdateLabelInput {
@@ -230,19 +377,36 @@ export function setupLabelsCommands(program: Command): void {
     );
 
   labels
-    .command("create <name>")
+    .command("create [name]")
     .description("create an issue label")
     .option("--team <team>", "create a team-scoped label (key, name, or UUID)")
     .option("--color <hex>", "label color as a hex code (for example #B45309)")
     .option("--description <text>", "label description")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [name, options, command] = args as [
-          string,
+        const [nameArg, rawOptions, command] = args as [
+          string | undefined,
           CreateLabelOptions,
           Command,
         ];
         const ctx = createContext(getRootOpts(command));
+
+        const filled = await maybeCollectInteractive<
+          CreateLabelWizardOptions,
+          never
+        >(ctx, getRootOpts(command), {
+          spec: labelCreateSpec,
+          options: {
+            ...rawOptions,
+            ...(nameArg !== undefined ? { name: nameArg } : {}),
+          } as CreateLabelWizardOptions,
+          missingRequired: nameArg === undefined,
+        });
+        const options = filled.options as CreateLabelOptions;
+        const name = (filled.options.name as string | undefined) ?? nameArg;
+        if (name === undefined) {
+          throw invalidParameterError("name", "is required");
+        }
 
         const input: CreateLabelInput = { name };
         const color = parseLabelColor(options.color);
@@ -264,7 +428,7 @@ export function setupLabelsCommands(program: Command): void {
     );
 
   labels
-    .command("read <label>")
+    .command("read [label]")
     .description("read an issue label")
     .option(
       "--team <team>",
@@ -273,23 +437,26 @@ export function setupLabelsCommands(program: Command): void {
     .option("--scope <scope>", "resolve within workspace or team scope")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [label, options, command] = args as [
-          string,
+        const [labelArg, options, command] = args as [
+          string | undefined,
           LabelLookupOptions,
           Command,
         ];
-        const { ctx, labelId } = await resolveIssueLabelLookup(
+        const ctx = createContext(getRootOpts(command));
+        const label = await resolveLabelPositional(
+          ctx,
           command,
-          label,
-          options,
+          labelArg,
+          options.team,
         );
+        const { labelId } = await resolveIssueLabelLookup(ctx, label, options);
 
         outputSuccess(await getLabel(ctx.gql, labelId));
       }),
     );
 
   labels
-    .command("update <label>")
+    .command("update [label]")
     .description("update an issue label")
     .option(
       "--team <team>",
@@ -301,24 +468,41 @@ export function setupLabelsCommands(program: Command): void {
     .option("--description <text>", "new label description")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [label, options, command] = args as [
-          string,
+        const [labelArg, rawOptions, command] = args as [
+          string | undefined,
           UpdateLabelOptions,
           Command,
         ];
+        const ctx = createContext(getRootOpts(command));
+
+        const filled = await maybeCollectInteractive<
+          UpdateLabelWizardOptions,
+          string
+        >(ctx, getRootOpts(command), {
+          spec: labelUpdateSpec,
+          options: { ...rawOptions } as UpdateLabelWizardOptions,
+          missingRequired: labelArg === undefined,
+          positional: {
+            name: "label",
+            value: labelArg,
+            picker: makeLabelPicker(rawOptions.team),
+          },
+        });
+        const options = filled.options as UpdateLabelOptions;
+        if (filled.positional === undefined) {
+          throw invalidParameterError("label", "is required");
+        }
+        const label = filled.positional;
+
         const input = buildUpdateInput(options);
-        const { ctx, labelId } = await resolveIssueLabelLookup(
-          command,
-          label,
-          options,
-        );
+        const { labelId } = await resolveIssueLabelLookup(ctx, label, options);
 
         outputSuccess(await updateLabel(ctx.gql, labelId, input));
       }),
     );
 
   labels
-    .command("delete <label>")
+    .command("delete [label]")
     .description("delete an issue label")
     .option(
       "--team <team>",
@@ -327,16 +511,19 @@ export function setupLabelsCommands(program: Command): void {
     .option("--scope <scope>", "resolve within workspace or team scope")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [label, options, command] = args as [
-          string,
+        const [labelArg, options, command] = args as [
+          string | undefined,
           LabelLookupOptions,
           Command,
         ];
-        const { ctx, labelId } = await resolveIssueLabelLookup(
+        const ctx = createContext(getRootOpts(command));
+        const label = await resolveLabelPositional(
+          ctx,
           command,
-          label,
-          options,
+          labelArg,
+          options.team,
         );
+        const { labelId } = await resolveIssueLabelLookup(ctx, label, options);
 
         outputSuccess(await deleteLabel(ctx.gql, labelId));
       }),

@@ -1,9 +1,22 @@
 import type { Command } from "commander";
+import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
 import { type Priority, parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
-import { invalidParameterError } from "../common/errors.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../common/errors.js";
 import { asUuid } from "../common/identifier.js";
+import {
+  labelChoices,
+  priorityChoices,
+  projectStatusChoices,
+  teamChoices,
+  userChoices,
+} from "../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -173,6 +186,213 @@ interface UpdateOptions {
   clearLabels?: boolean;
 }
 
+/** Create-wizard shape: the create options plus the `name` positional. */
+type CreateWizardOptions = CreateOptions &
+  Record<string, unknown> & { name?: string };
+
+/** Update-wizard shape: the update options with an index signature. */
+type UpdateWizardOptions = UpdateOptions & Record<string, unknown>;
+
+/**
+ * Interactive wizard for `projects create`. Entity choice values are UUIDs
+ * (see choices.ts); the resolvers pass those through unchanged via
+ * `isUuid(...)`. `teams` is a multiselect whose UUID list is joined into the
+ * comma-separated `--teams` string the command body expects.
+ */
+export const projectCreateSpec: PromptSpec<CreateWizardOptions> = {
+  intro: "Create a new project",
+  fields: [
+    { name: "name", kind: "text", message: "Name", required: true },
+    {
+      name: "teams",
+      kind: "multiselect",
+      message: "Teams",
+      required: true,
+      choices: teamChoices,
+    },
+    { name: "description", kind: "multiline", message: "Description" },
+    { name: "content", kind: "multiline", message: "Content (markdown)" },
+    {
+      name: "lead",
+      kind: "select",
+      message: "Lead",
+      choices: userChoices,
+    },
+    {
+      name: "members",
+      kind: "multiselect",
+      message: "Members",
+      choices: userChoices,
+    },
+    {
+      name: "priority",
+      kind: "select",
+      message: "Priority",
+      choices: async () => priorityChoices(),
+    },
+    {
+      name: "status",
+      kind: "select",
+      message: "Status",
+      choices: projectStatusChoices,
+    },
+    {
+      name: "labels",
+      kind: "multiselect",
+      message: "Labels",
+      required: false,
+      choices: labelChoices,
+    },
+    { name: "startDate", kind: "text", message: "Start date (YYYY-MM-DD)" },
+    { name: "targetDate", kind: "text", message: "Target date (YYYY-MM-DD)" },
+  ],
+};
+
+/**
+ * Interactive wizard for `projects update`. All fields optional; current option
+ * values seed each field and prevent re-prompting for fields already provided
+ * by flags.
+ */
+export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
+  intro: "Update a project",
+  fields: [
+    {
+      name: "name",
+      kind: "text",
+      message: "Name",
+      default: (draft) => draft.name,
+    },
+    {
+      name: "description",
+      kind: "multiline",
+      message: "Description",
+      default: (draft) => draft.description,
+    },
+    {
+      name: "content",
+      kind: "multiline",
+      message: "Content (markdown)",
+      default: (draft) => draft.content,
+    },
+    {
+      name: "lead",
+      kind: "select",
+      message: "Lead",
+      choices: userChoices,
+    },
+    {
+      name: "members",
+      kind: "multiselect",
+      message: "Members",
+      choices: userChoices,
+    },
+    {
+      name: "priority",
+      kind: "select",
+      message: "Priority",
+      choices: async () => priorityChoices(),
+    },
+    {
+      name: "status",
+      kind: "select",
+      message: "Status",
+      choices: projectStatusChoices,
+    },
+    {
+      name: "labels",
+      kind: "multiselect",
+      message: "Labels",
+      required: false,
+      choices: labelChoices,
+    },
+    {
+      name: "startDate",
+      kind: "text",
+      message: "Start date (YYYY-MM-DD)",
+      default: (draft) => draft.startDate,
+    },
+    {
+      name: "targetDate",
+      kind: "text",
+      message: "Target date (YYYY-MM-DD)",
+      default: (draft) => draft.targetDate,
+    },
+  ],
+};
+
+/**
+ * Multiselect fields yield a `string[]` of UUIDs, but the command body expects
+ * the CLI-shaped comma-separated `string`. Normalise the named keys in place so
+ * the command body below the wizard call stays unchanged.
+ */
+function normalizeWizardLists<O extends Record<string, unknown>>(
+  filled: O,
+  keys: readonly string[],
+): O {
+  const normalized = { ...filled };
+  for (const key of keys) {
+    const value = normalized[key];
+    if (Array.isArray(value)) {
+      const joined = value.join(",");
+      if (joined.length > 0) {
+        (normalized as Record<string, unknown>)[key] = joined;
+      } else {
+        delete (normalized as Record<string, unknown>)[key];
+      }
+    }
+  }
+  return normalized;
+}
+
+/**
+ * Entity picker for an absent `[project]` positional. Lists recent projects and
+ * returns the selected project's UUID (which the resolver accepts).
+ */
+async function projectPicker(
+  ctx: CommandContext,
+  io: PromptIO,
+): Promise<string> {
+  const { nodes } = await listProjects(ctx.gql);
+  const options = nodes.map((project) => ({
+    value: project.id,
+    label: project.name,
+    hint: project.state,
+  }));
+  const answer = await io.select({ message: "Project", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
+
+/**
+ * Fill an absent `[project]` positional via the project picker when gating
+ * allows, else require it (preserving the old missing-argument error for
+ * agents/pipes). The command body downstream is unchanged.
+ */
+async function resolveProjectPositional(
+  ctx: CommandContext,
+  command: Command,
+  project: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: project === undefined,
+      positional: { name: "project", value: project, picker: projectPicker },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("project", "is required");
+  }
+  return filled.positional;
+}
+
 export const PROJECTS_META: DomainMeta = {
   name: "projects",
   summary: "groups of issues toward a goal",
@@ -275,7 +495,7 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("read <project>")
+    .command("read [project]")
     .description("get full project details")
     .option(
       "--milestones-first <n>",
@@ -288,9 +508,14 @@ export function setupProjectsCommands(program: Command): void {
       "50",
     )
     .action(
-      commandAction<[string, ReadOptions, Command]>(
-        async (project, options, command) => {
+      commandAction<[string | undefined, ReadOptions, Command]>(
+        async (projectArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
+          const project = await resolveProjectPositional(
+            ctx,
+            command,
+            projectArg,
+          );
           const projectId = await resolveProjectId(ctx.gql, project);
           const result = await getProject(ctx.gql, projectId, {
             milestonesFirst: parseNonNegativeIntegerOption(
@@ -308,18 +533,23 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("discuss <project>")
+    .command("discuss [project]")
     .description("start a discussion thread on a project")
     .option("--body <text>", "discussion body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
-        async (project, options, command) => {
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
+        async (projectArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
           if (!options.body) {
             throw invalidParameterError("--body", "is required");
           }
 
+          const project = await resolveProjectPositional(
+            ctx,
+            command,
+            projectArg,
+          );
           const projectId = await resolveProjectId(ctx.gql, project);
           const result = await startProjectDiscussion(ctx.gql, {
             projectId,
@@ -332,16 +562,21 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("discussions <project>")
+    .command("discussions [project]")
     .description("list root discussion threads on a project")
     .option("-l, --limit <n>", "max results", "25")
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      commandAction<[string, DiscussionsOptions, Command]>(
-        async (project, options, command) => {
+      commandAction<[string | undefined, DiscussionsOptions, Command]>(
+        async (projectArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const project = await resolveProjectPositional(
+            ctx,
+            command,
+            projectArg,
+          );
           const projectId = await resolveProjectId(ctx.gql, project);
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "25"),
@@ -566,7 +801,7 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("create <name>")
+    .command("create [name]")
     .description("create a new project")
     .option("--teams <teams>", "comma-separated team names or UUIDs")
     .option("--team <team>", "team name or UUID (alias for --teams)")
@@ -582,9 +817,32 @@ export function setupProjectsCommands(program: Command): void {
     .option("--target-date <date>", "target date (YYYY-MM-DD)")
     .option("--labels <labels>", "comma-separated label names or UUIDs")
     .action(
-      commandAction<[string, CreateOptions, Command]>(
-        async (name, options, command) => {
+      commandAction<[string | undefined, CreateOptions, Command]>(
+        async (nameArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
+
+          const filled = await maybeCollectInteractive<
+            CreateWizardOptions,
+            never
+          >(ctx, getRootOpts(command), {
+            spec: projectCreateSpec,
+            options: {
+              ...options,
+              ...(nameArg !== undefined ? { name: nameArg } : {}),
+            } as CreateWizardOptions,
+            missingRequired:
+              nameArg === undefined ||
+              (options.team === undefined && options.teams === undefined),
+          });
+          const name = filled.options.name ?? nameArg;
+          if (name === undefined) {
+            throw invalidParameterError("name", "is required");
+          }
+          options = normalizeWizardLists(filled.options, [
+            "teams",
+            "members",
+            "labels",
+          ]);
 
           const teamNames = getCreateTeamNames(options);
           const teamIds = await Promise.all(
@@ -660,7 +918,7 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("update <project>")
+    .command("update [project]")
     .description("update an existing project")
     .option("--name <name>", "new name")
     .option("--description <text>", "new description")
@@ -682,9 +940,32 @@ export function setupProjectsCommands(program: Command): void {
     .option("--label-mode <mode>", "add | remove | overwrite")
     .option("--clear-labels", "remove all labels")
     .action(
-      commandAction<[string, UpdateOptions, Command]>(
-        async (project, options, command) => {
+      commandAction<[string | undefined, UpdateOptions, Command]>(
+        async (projectArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
+
+          const filled = await maybeCollectInteractive<
+            UpdateWizardOptions,
+            string
+          >(ctx, getRootOpts(command), {
+            spec: projectUpdateSpec,
+            options: options as UpdateWizardOptions,
+            missingRequired: projectArg === undefined,
+            positional: {
+              name: "project",
+              value: projectArg,
+              picker: projectPicker,
+            },
+          });
+          options = normalizeWizardLists(filled.options, [
+            "teams",
+            "members",
+            "labels",
+          ]);
+          if (filled.positional === undefined) {
+            throw invalidParameterError("project", "is required");
+          }
+          const project = filled.positional;
 
           if (options.lead && options.clearLead) {
             throw invalidParameterError(
@@ -845,12 +1126,17 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("archive <project>")
+    .command("archive [project]")
     .description("archive a project")
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (project, _unused1, command) => {
+      commandAction<[string | undefined, unknown, Command]>(
+        async (projectArg, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
+          const project = await resolveProjectPositional(
+            ctx,
+            command,
+            projectArg,
+          );
           const projectId = await resolveProjectId(ctx.gql, project);
           const result = await archiveProject(ctx.gql, projectId);
           outputSuccess(result);
@@ -859,12 +1145,17 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("unarchive <project>")
+    .command("unarchive [project]")
     .description("unarchive a project")
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (project, _unused1, command) => {
+      commandAction<[string | undefined, unknown, Command]>(
+        async (projectArg, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
+          const project = await resolveProjectPositional(
+            ctx,
+            command,
+            projectArg,
+          );
           const projectId = await resolveProjectId(ctx.gql, project, {
             includeArchived: true,
           });
@@ -875,12 +1166,17 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("delete <project>")
+    .command("delete [project]")
     .description("delete a project")
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (project, _unused1, command) => {
+      commandAction<[string | undefined, unknown, Command]>(
+        async (projectArg, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
+          const project = await resolveProjectPositional(
+            ctx,
+            command,
+            projectArg,
+          );
           const projectId = await resolveProjectId(ctx.gql, project, {
             includeArchived: true,
           });

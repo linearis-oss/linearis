@@ -2,6 +2,7 @@ import type { CommandOptions } from "./auth.js";
 import {
   AUTH_ERROR_CODE,
   AuthenticationError,
+  InteractiveCancelledError,
   invalidParameterError,
 } from "./errors.js";
 import type { JsonSerializable } from "./json.js";
@@ -101,6 +102,20 @@ export function outputAuthError(error: AuthenticationError): void {
   process.exit(AUTH_ERROR_CODE);
 }
 
+function outputInteractiveCancelled(error: InteractiveCancelledError): void {
+  console.error(
+    JSON.stringify(
+      {
+        error: "INTERACTIVE_CANCELLED",
+        message: error.message,
+      },
+      null,
+      2,
+    ),
+  );
+  process.exit(1);
+}
+
 export function parseLimit(value: string): number {
   const limit = parseInt(value, 10);
   if (Number.isNaN(limit) || limit < 1) {
@@ -118,6 +133,10 @@ export function handleCommand(
     } catch (error) {
       if (error instanceof AuthenticationError) {
         outputAuthError(error);
+        return;
+      }
+      if (error instanceof InteractiveCancelledError) {
+        outputInteractiveCancelled(error);
         return;
       }
       outputError(error instanceof Error ? error : new Error(String(error)));

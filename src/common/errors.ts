@@ -47,6 +47,13 @@ export class AuthenticationError extends Error {
   }
 }
 
+export class InteractiveCancelledError extends Error {
+  constructor() {
+    super("Interactive input cancelled");
+    this.name = "InteractiveCancelledError";
+  }
+}
+
 const AUTH_ERROR_PATTERNS: ReadonlyArray<string> = [
   "authentication required",
   "unauthorized",

@@ -4,7 +4,13 @@ import {
   createContext,
   getRootOpts,
 } from "../common/context.js";
-import { invalidParameterError } from "../common/errors.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../common/errors.js";
+import { teamChoices } from "../common/interactive/choices.js";
+import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -39,6 +45,21 @@ export const TEAMS_META: DomainMeta = {
   },
   seeAlso: ["users list", "issues create --team", "cycles list --team"],
 };
+
+/**
+ * Entity picker for an absent `[team]` positional. Returns the selected team's
+ * UUID, which the resolver passes through via `isUuid(...)`.
+ */
+async function teamPicker(ctx: CommandContext, io: PromptIO): Promise<string> {
+  const options = await teamChoices(ctx);
+  const answer = await io.select({ message: "Team", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
 
 const ESTIMATION_TYPES = [
   "notUsed",
@@ -281,14 +302,28 @@ export function setupTeamsCommands(program: Command): void {
     );
 
   teams
-    .command("read <team>")
+    .command("read [team]")
     .description("get team details")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const team = args[0] as string;
+        const teamArg = args[0] as string | undefined;
         const command = args.at(-1) as Command;
         const ctx = createContext(getRootOpts(command));
-        const teamId = await resolveTeamId(ctx.gql, team);
+
+        const filled = await maybeCollectInteractive<
+          Record<string, never>,
+          string
+        >(ctx, getRootOpts(command), {
+          spec: EMPTY_SPEC,
+          options: {},
+          missingRequired: teamArg === undefined,
+          positional: { name: "team", value: teamArg, picker: teamPicker },
+        });
+        if (filled.positional === undefined) {
+          throw invalidParameterError("team", "is required");
+        }
+
+        const teamId = await resolveTeamId(ctx.gql, filled.positional);
         const result = await getTeam(ctx.gql, { id: teamId });
         outputSuccess(result);
       }),
