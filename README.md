@@ -152,24 +152,28 @@ Add this (or a version adapted to your workflow) to your `AGENTS.md` or `CLAUDE.
 ```markdown
 ## Linear (project management)
 
-Tool: `linearis` CLI via Bash. All output is JSON.
+Tool: `linearis` CLI, invoked via Bash. All output is JSON.
 
-Discovery: Run `linearis usage` once to see available domains. Run
-`linearis <domain> usage` for the full command reference of a specific domain.
-Do NOT guess flags or subcommands — check usage first.
+Discovery (do this before acting): run `linearis usage` once for the list of
+domains, then `linearis <domain> usage` for a domain's full command reference.
+Never guess flags or subcommands — check usage first.
 
-Ticket format: "ABC-123". Always reference tickets by their identifier.
+Tickets: always reference by identifier, e.g. `ABC-123`.
 
 Workflow rules:
-- When creating a ticket, ask which project to assign it to if unclear.
-- For subtasks, inherit the parent ticket's project by default.
-- When a task in a ticket description changes status, update the description.
-- For progress beyond checkbox changes, use a discussion thread instead of
-  editing the description.
+- Ask which project a new ticket belongs to when it's unclear; subtasks inherit
+  the parent's project by default.
+- Keep the ticket description in sync when a task in it changes status.
+- Record progress that isn't a simple checkbox change in a discussion thread
+  (`issues discuss`), not in the description.
 
-File handling: `issues read` returns an `embeds` array with signed download
-URLs and expiration timestamps. Use `files download` to retrieve them, and
-`files upload` to attach new files.
+Files: `files download <url>` only fetches Linear storage URLs
+(`uploads.linear.app`), such as images embedded in descriptions or comments.
+Upload new files with `files upload <file>`; it returns an `assetUrl` you can
+embed in descriptions or comments. `issues read --with-attachments` lists
+resources linked to an issue (PRs, docs, external URLs) under an
+`attachments.nodes` array whose entries carry a `url` — these are references,
+not necessarily downloadable files.
 ```
 
 ## Documentation
