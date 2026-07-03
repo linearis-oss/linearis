@@ -1,3 +1,13 @@
+## [2026.6.0-next.11](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.10...v2026.6.0-next.11) (2026-07-03)
+
+### Features
+
+* **skill:** add agent skill and Claude Code plugin for the CLI ([1233ad9](https://github.com/linearis-oss/linearis/commit/1233ad995e858ee61b925ac580e4b231c6dfa1c8))
+
+### Bug Fixes
+
+* **skill:** comma-separate allowed-tools in SKILL.md frontmatter ([66db248](https://github.com/linearis-oss/linearis/commit/66db24863e1669ac2dad88aa9fc60ca0cfdd0e31))
+
 ## [2026.6.0-next.10](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.9...v2026.6.0-next.10) (2026-07-03)
 
 ### Bug Fixes
