@@ -90,6 +90,23 @@ linearis issues read ENG-42
 
 For the complete reference of every command and flag, run `linearis <domain> usage`.
 
+### Interactive prompts
+
+In a real terminal, Linearis can prompt for missing input instead of erroring — pickers for entities (issue, project, document, ...) and field wizards for create/update. The final stdout is always the same JSON; prompts are drawn on stderr.
+
+```bash
+# Auto-launches a wizard when a required arg is missing (TTY only)
+linearis issues create
+
+# Force interactive; only the gaps are prompted, flags win
+linearis issues create "Fix login" -i
+
+# Opt out entirely (also the default for pipes, CI, and non-TTY)
+linearis issues create "Fix login" --team ENG --no-interactive
+```
+
+Prompts are hard-gated off whenever stdin/stdout is not a TTY, `CI` or `LINEARIS_NO_INTERACTIVE` is set, `--no-interactive` is passed, or `--compact`/`--fields` is used — so agents and pipes never hang and stdout stays pure JSON.
+
 ### Discussions
 
 Discussions are modeled as root threads with replies, rather than a flat comment list:

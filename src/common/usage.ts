@@ -19,6 +19,9 @@ export function formatOverview(version: string, metas: DomainMeta[]): string {
   );
   lines.push("output: JSON");
   lines.push("ids: UUID or human-readable (team key, issue ABC-123, name)");
+  lines.push(
+    "agents: pass --no-interactive on every call to disable prompts (recommended for scripts/LLMs)",
+  );
   lines.push("");
   lines.push("domains:");
   for (const meta of metas) {
