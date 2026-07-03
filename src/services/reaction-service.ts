@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { normalizeReactionEmojiInput } from "../common/emoji.js";
+import { requireMutationSuccess } from "../common/mutation-payload.js";
 import {
   CreateReactionDocument,
   type CreateReactionMutation,
@@ -135,9 +136,7 @@ async function createReaction(
     input: normalizedInput,
   });
 
-  if (!result.reactionCreate.success) {
-    throw new Error("Failed to create reaction");
-  }
+  requireMutationSuccess(result.reactionCreate, "Failed to create reaction");
 
   return result.reactionCreate.reaction;
 }
@@ -150,9 +149,7 @@ async function deleteReaction(
     id: reactionId,
   });
 
-  if (!result.reactionDelete.success) {
-    throw new Error("Failed to delete reaction");
-  }
+  requireMutationSuccess(result.reactionDelete, "Failed to delete reaction");
 
   return { id: result.reactionDelete.entityId, success: true };
 }

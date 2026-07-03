@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import {
   CreateInitiativeToProjectDocument,
   type CreateInitiativeToProjectMutation,
@@ -25,16 +26,11 @@ export async function createInitiativeProjectLink(
     input,
   });
 
-  if (
-    !result.initiativeToProjectCreate.success ||
-    !result.initiativeToProjectCreate.initiativeToProject
-  ) {
-    throw new Error(
-      `Failed to create initiative-project link for initiative "${input.initiativeId}" and project "${input.projectId}"`,
-    );
-  }
-
-  return result.initiativeToProjectCreate.initiativeToProject;
+  return requireMutationEntity(
+    result.initiativeToProjectCreate,
+    "initiativeToProject",
+    `Failed to create initiative-project link for initiative "${input.initiativeId}" and project "${input.projectId}"`,
+  );
 }
 
 export async function deleteInitiativeProjectLink(
@@ -45,15 +41,14 @@ export async function deleteInitiativeProjectLink(
     id,
   });
 
-  if (
-    !result.initiativeToProjectDelete.success ||
-    !result.initiativeToProjectDelete.entityId
-  ) {
-    throw new Error(`Failed to delete initiative-project link "${id}"`);
-  }
+  const entityId = requireMutationEntity(
+    result.initiativeToProjectDelete,
+    "entityId",
+    `Failed to delete initiative-project link "${id}"`,
+  );
 
   return {
-    id: result.initiativeToProjectDelete.entityId,
+    id: entityId,
     success: true,
   };
 }

@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import {
   CreateInitiativeRelationDocument,
   type CreateInitiativeRelationMutation,
@@ -28,16 +29,11 @@ export async function createInitiativeRelation(
     },
   });
 
-  if (
-    !result.initiativeRelationCreate.success ||
-    !result.initiativeRelationCreate.initiativeRelation
-  ) {
-    throw new Error(
-      `Failed to create initiative relation from "${input.parentId}" to "${input.childId}"`,
-    );
-  }
-
-  return result.initiativeRelationCreate.initiativeRelation;
+  return requireMutationEntity(
+    result.initiativeRelationCreate,
+    "initiativeRelation",
+    `Failed to create initiative relation from "${input.parentId}" to "${input.childId}"`,
+  );
 }
 
 export async function deleteInitiativeRelation(
@@ -46,15 +42,14 @@ export async function deleteInitiativeRelation(
 ): Promise<DeletedInitiativeRelation> {
   const result = await client.request(DeleteInitiativeRelationDocument, { id });
 
-  if (
-    !result.initiativeRelationDelete.success ||
-    !result.initiativeRelationDelete.entityId
-  ) {
-    throw new Error(`Failed to delete initiative relation "${id}"`);
-  }
+  const entityId = requireMutationEntity(
+    result.initiativeRelationDelete,
+    "entityId",
+    `Failed to delete initiative relation "${id}"`,
+  );
 
   return {
-    id: result.initiativeRelationDelete.entityId,
+    id: entityId,
     success: true,
   };
 }

@@ -1,4 +1,8 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   type CommentCreateInput,
@@ -471,11 +475,11 @@ async function startDiscussion(
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   const result = await client.request(StartDiscussionDocument, { input });
 
-  if (!result.commentCreate.success || !result.commentCreate.comment) {
-    throw new Error("Failed to start discussion");
-  }
-
-  return result.commentCreate.comment;
+  return requireMutationEntity(
+    result.commentCreate,
+    "comment",
+    "Failed to start discussion",
+  );
 }
 
 export async function createDiscussionCommentReaction(
@@ -788,11 +792,11 @@ export async function replyToDiscussion(
     },
   });
 
-  if (!result.commentCreate.success || !result.commentCreate.comment) {
-    throw new Error("Failed to create discussion reply");
-  }
-
-  return result.commentCreate.comment;
+  return requireMutationEntity(
+    result.commentCreate,
+    "comment",
+    "Failed to create discussion reply",
+  );
 }
 
 export async function editDiscussionReply(
@@ -808,11 +812,11 @@ export async function editDiscussionReply(
     input,
   });
 
-  if (!result.commentUpdate.success || !result.commentUpdate.comment) {
-    throw new Error("Failed to edit discussion reply");
-  }
-
-  return result.commentUpdate.comment;
+  return requireMutationEntity(
+    result.commentUpdate,
+    "comment",
+    "Failed to edit discussion reply",
+  );
 }
 
 export async function deleteDiscussionReply(
@@ -824,9 +828,10 @@ export async function deleteDiscussionReply(
 
   const result = await client.request(DeleteDiscussionReplyDocument, { id });
 
-  if (!result.commentDelete.success) {
-    throw new Error("Failed to delete discussion reply");
-  }
+  requireMutationSuccess(
+    result.commentDelete,
+    "Failed to delete discussion reply",
+  );
 
   return {
     id: result.commentDelete.entityId,
@@ -847,11 +852,11 @@ export async function editDiscussionComment(
     input,
   });
 
-  if (!result.commentUpdate.success || !result.commentUpdate.comment) {
-    throw new Error("Failed to edit discussion comment");
-  }
-
-  return result.commentUpdate.comment;
+  return requireMutationEntity(
+    result.commentUpdate,
+    "comment",
+    "Failed to edit discussion comment",
+  );
 }
 
 export async function deleteDiscussionComment(
@@ -863,9 +868,10 @@ export async function deleteDiscussionComment(
 
   const result = await client.request(DeleteDiscussionReplyDocument, { id });
 
-  if (!result.commentDelete.success) {
-    throw new Error("Failed to delete discussion comment");
-  }
+  requireMutationSuccess(
+    result.commentDelete,
+    "Failed to delete discussion comment",
+  );
 
   return {
     id: result.commentDelete.entityId,
@@ -888,11 +894,11 @@ export async function resolveDiscussion(
     resolvingCommentId: input.resolvingCommentId,
   });
 
-  if (!result.commentResolve.success || !result.commentResolve.comment) {
-    throw new Error("Failed to resolve discussion");
-  }
-
-  return result.commentResolve.comment;
+  return requireMutationEntity(
+    result.commentResolve,
+    "comment",
+    "Failed to resolve discussion",
+  );
 }
 
 export async function unresolveDiscussion(
@@ -906,9 +912,9 @@ export async function unresolveDiscussion(
     id: threadId,
   });
 
-  if (!result.commentUnresolve.success || !result.commentUnresolve.comment) {
-    throw new Error("Failed to unresolve discussion");
-  }
-
-  return result.commentUnresolve.comment;
+  return requireMutationEntity(
+    result.commentUnresolve,
+    "comment",
+    "Failed to unresolve discussion",
+  );
 }

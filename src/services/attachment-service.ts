@@ -1,5 +1,9 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
+import {
   AttachmentCreateDocument,
   type AttachmentCreateInput,
   type AttachmentCreateMutation,
@@ -60,11 +64,11 @@ export async function createAttachment(
     input: gqlInput,
   });
 
-  if (!result.attachmentCreate.success || !result.attachmentCreate.attachment) {
-    throw new Error("Failed to create attachment");
-  }
-
-  return result.attachmentCreate.attachment;
+  return requireMutationEntity(
+    result.attachmentCreate,
+    "attachment",
+    "Failed to create attachment",
+  );
 }
 
 export async function deleteAttachment(
@@ -73,9 +77,10 @@ export async function deleteAttachment(
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(AttachmentDeleteDocument, { id });
 
-  if (!result.attachmentDelete.success) {
-    throw new Error("Failed to delete attachment");
-  }
+  requireMutationSuccess(
+    result.attachmentDelete,
+    "Failed to delete attachment",
+  );
 
   return { id: result.attachmentDelete.entityId, success: true };
 }

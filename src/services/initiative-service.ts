@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { invalidParameterError } from "../common/errors.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult } from "../common/types.js";
 import {
   ArchiveInitiativeDocument,
@@ -325,11 +326,11 @@ export async function createInitiative(
     input: gqlInput,
   });
 
-  if (!result.initiativeCreate.success || !result.initiativeCreate.initiative) {
-    throw new Error(`Failed to create initiative "${input.name}"`);
-  }
-
-  return result.initiativeCreate.initiative;
+  return requireMutationEntity(
+    result.initiativeCreate,
+    "initiative",
+    `Failed to create initiative "${input.name}"`,
+  );
 }
 
 export async function updateInitiative(
@@ -354,11 +355,11 @@ export async function updateInitiative(
     input: gqlInput,
   });
 
-  if (!result.initiativeUpdate.success || !result.initiativeUpdate.initiative) {
-    throw new Error(`Failed to update initiative "${id}"`);
-  }
-
-  return result.initiativeUpdate.initiative;
+  return requireMutationEntity(
+    result.initiativeUpdate,
+    "initiative",
+    `Failed to update initiative "${id}"`,
+  );
 }
 
 export async function archiveInitiative(
@@ -367,11 +368,11 @@ export async function archiveInitiative(
 ): Promise<ArchivedInitiative> {
   const result = await client.request(ArchiveInitiativeDocument, { id });
 
-  if (!result.initiativeArchive.success || !result.initiativeArchive.entity) {
-    throw new Error(`Failed to archive initiative "${id}"`);
-  }
-
-  return result.initiativeArchive.entity;
+  return requireMutationEntity(
+    result.initiativeArchive,
+    "entity",
+    `Failed to archive initiative "${id}"`,
+  );
 }
 
 export async function unarchiveInitiative(
@@ -380,14 +381,11 @@ export async function unarchiveInitiative(
 ): Promise<UnarchivedInitiative> {
   const result = await client.request(UnarchiveInitiativeDocument, { id });
 
-  if (
-    !result.initiativeUnarchive.success ||
-    !result.initiativeUnarchive.entity
-  ) {
-    throw new Error(`Failed to unarchive initiative "${id}"`);
-  }
-
-  return result.initiativeUnarchive.entity;
+  return requireMutationEntity(
+    result.initiativeUnarchive,
+    "entity",
+    `Failed to unarchive initiative "${id}"`,
+  );
 }
 
 export async function deleteInitiative(
@@ -396,12 +394,14 @@ export async function deleteInitiative(
 ): Promise<DeletedInitiative> {
   const result = await client.request(DeleteInitiativeDocument, { id });
 
-  if (!result.initiativeDelete.success || !result.initiativeDelete.entityId) {
-    throw new Error(`Failed to delete initiative "${id}"`);
-  }
+  const entityId = requireMutationEntity(
+    result.initiativeDelete,
+    "entityId",
+    `Failed to delete initiative "${id}"`,
+  );
 
   return {
-    id: result.initiativeDelete.entityId,
+    id: entityId,
     success: true,
   };
 }

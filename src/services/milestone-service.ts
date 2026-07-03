@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   CreateProjectMilestoneDocument,
@@ -83,14 +84,11 @@ export async function createMilestone(
     input: gqlInput,
   });
 
-  if (
-    !result.projectMilestoneCreate.success ||
-    !result.projectMilestoneCreate.projectMilestone
-  ) {
-    throw new Error("Failed to create milestone");
-  }
-
-  return result.projectMilestoneCreate.projectMilestone;
+  return requireMutationEntity(
+    result.projectMilestoneCreate,
+    "projectMilestone",
+    "Failed to create milestone",
+  );
 }
 
 export async function updateMilestone(
@@ -104,12 +102,9 @@ export async function updateMilestone(
     input: gqlInput,
   });
 
-  if (
-    !result.projectMilestoneUpdate.success ||
-    !result.projectMilestoneUpdate.projectMilestone
-  ) {
-    throw new Error("Failed to update milestone");
-  }
-
-  return result.projectMilestoneUpdate.projectMilestone;
+  return requireMutationEntity(
+    result.projectMilestoneUpdate,
+    "projectMilestone",
+    "Failed to update milestone",
+  );
 }
