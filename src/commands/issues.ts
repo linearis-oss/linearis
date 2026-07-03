@@ -7,9 +7,11 @@ import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
 import {
+  asUuid,
   isUuid,
   parseDueDate,
   parseIssueIdentifier,
+  type UUID,
 } from "../common/identifier.js";
 import type { RawFilterFlags } from "../common/issue-filter.js";
 import {
@@ -192,7 +194,7 @@ function addCommentReactionCommands(
         async (commentId, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await createDiscussionCommentReaction(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "issue",
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -212,7 +214,7 @@ function addCommentReactionCommands(
         async (commentId, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "issue",
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -233,10 +235,10 @@ function addCommentReactionCommands(
         async (commentId, reactionId, _unused2, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await deleteDiscussionCommentReactionById(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "issue",
-            reactionId,
+            reactionId: asUuid(reactionId),
           });
 
           outputSuccess(result);
@@ -415,12 +417,12 @@ function parseRelationAddOptions(options: RelationAddOptions): {
 
 async function resolveAndApplyRelations(
   ctx: CommandContext,
-  issueId: string,
+  issueId: UUID,
   actions: RelationAction[],
 ): Promise<void> {
   // Resolve all unique targets to UUIDs
   const uniqueTargets = new Set(actions.flatMap((a) => a.targets));
-  const resolved = new Map<string, string>();
+  const resolved = new Map<string, UUID>();
   await Promise.all(
     [...uniqueTargets].map(async (target) => {
       resolved.set(target, await resolveIssueId(ctx.sdk, target));
@@ -580,7 +582,7 @@ export function setupIssuesCommands(program: Command): void {
       commandAction<[string, unknown, Command]>(
         async (relation, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const result = await deleteIssueRelation(ctx.gql, relation);
+          const result = await deleteIssueRelation(ctx.gql, asUuid(relation));
 
           outputSuccess(result);
         },
@@ -813,7 +815,7 @@ export function setupIssuesCommands(program: Command): void {
           const result = await deleteOwnReactionById(ctx.gql, {
             kind: "issue",
             id: issueId,
-            reactionId,
+            reactionId: asUuid(reactionId),
           });
 
           outputSuccess(result);
@@ -909,13 +911,13 @@ export function setupIssuesCommands(program: Command): void {
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
-                thread,
+                asUuid(thread),
                 paginationOptions,
                 "issue",
               )
             : await listDiscussionReplies(
                 ctx.gql,
-                thread,
+                asUuid(thread),
                 paginationOptions,
                 "issue",
               );
@@ -944,7 +946,7 @@ export function setupIssuesCommands(program: Command): void {
           }
 
           const result = await replyToDiscussion(ctx.gql, {
-            threadId: thread,
+            threadId: asUuid(thread),
             body: options.body,
             entityKind: "issue",
           });
@@ -969,7 +971,7 @@ export function setupIssuesCommands(program: Command): void {
 
           const result = await editDiscussionComment(
             ctx.gql,
-            comment,
+            asUuid(comment),
             {
               body: options.body,
             },
@@ -996,7 +998,7 @@ export function setupIssuesCommands(program: Command): void {
 
           const result = await editDiscussionReply(
             ctx.gql,
-            reply,
+            asUuid(reply),
             {
               body: options.body,
             },
@@ -1018,7 +1020,7 @@ export function setupIssuesCommands(program: Command): void {
 
           const result = await deleteDiscussionComment(
             ctx.gql,
-            comment,
+            asUuid(comment),
             "issue",
           );
 
@@ -1035,7 +1037,11 @@ export function setupIssuesCommands(program: Command): void {
         async (reply, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const result = await deleteDiscussionReply(ctx.gql, reply, "issue");
+          const result = await deleteDiscussionReply(
+            ctx.gql,
+            asUuid(reply),
+            "issue",
+          );
 
           outputSuccess(result);
         },
@@ -1052,9 +1058,9 @@ export function setupIssuesCommands(program: Command): void {
           const ctx = createContext(getRootOpts(command));
 
           const result = await resolveDiscussion(ctx.gql, {
-            threadId: thread,
+            threadId: asUuid(thread),
             ...(options.withComment !== undefined
-              ? { resolvingCommentId: options.withComment }
+              ? { resolvingCommentId: asUuid(options.withComment) }
               : {}),
             entityKind: "issue",
           });
@@ -1072,7 +1078,11 @@ export function setupIssuesCommands(program: Command): void {
         async (thread, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const result = await unresolveDiscussion(ctx.gql, thread, "issue");
+          const result = await unresolveDiscussion(
+            ctx.gql,
+            asUuid(thread),
+            "issue",
+          );
 
           outputSuccess(result);
         },
@@ -1213,7 +1223,11 @@ export function setupIssuesCommands(program: Command): void {
           const result = await createIssue(ctx.gql, input);
 
           if (relationActions.length > 0) {
-            await resolveAndApplyRelations(ctx, result.id, relationActions);
+            await resolveAndApplyRelations(
+              ctx,
+              asUuid(result.id),
+              relationActions,
+            );
           }
 
           outputSuccess(result);
@@ -1354,7 +1368,7 @@ export function setupIssuesCommands(program: Command): void {
           if (options.status) {
             const teamId =
               issueContext && "team" in issueContext && issueContext.team
-                ? issueContext.team.id
+                ? asUuid(issueContext.team.id)
                 : undefined;
             input.stateId = await resolveStatusId(
               ctx.sdk,
@@ -1392,7 +1406,7 @@ export function setupIssuesCommands(program: Command): void {
                 issueContext &&
                 "labels" in issueContext &&
                 issueContext.labels?.nodes
-                  ? issueContext.labels.nodes.map((l) => l.id)
+                  ? issueContext.labels.nodes.map((l) => asUuid(l.id))
                   : [];
               input.labelIds = [...new Set([...currentLabels, ...labelIds])];
             } else if (labelMode === "remove") {
@@ -1400,7 +1414,7 @@ export function setupIssuesCommands(program: Command): void {
                 issueContext &&
                 "labels" in issueContext &&
                 issueContext.labels?.nodes
-                  ? issueContext.labels.nodes.map((l) => l.id)
+                  ? issueContext.labels.nodes.map((l) => asUuid(l.id))
                   : [];
               input.labelIds = currentLabels.filter(
                 (id) => !labelIds.includes(id),

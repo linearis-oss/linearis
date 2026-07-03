@@ -1,6 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import { GetProjectStatusesDocument } from "../gql/graphql.js";
 
 /**
@@ -23,8 +23,8 @@ import { GetProjectStatusesDocument } from "../gql/graphql.js";
 export async function resolveProjectStatusId(
   client: GraphQLClient,
   nameOrId: string,
-): Promise<string> {
-  if (isUuid(nameOrId)) return nameOrId;
+): Promise<UUID> {
+  if (isUuid(nameOrId)) return asUuid(nameOrId);
 
   const result = await client.request(GetProjectStatusesDocument);
   const match = result.projectStatuses.nodes.find(
@@ -35,5 +35,5 @@ export async function resolveProjectStatusId(
     throw notFoundError("Project status", nameOrId);
   }
 
-  return match.id;
+  return asUuid(match.id);
 }

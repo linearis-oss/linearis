@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   resolveInitiativeId,
   resolveInitiativeProjectLinkId,
@@ -87,8 +88,8 @@ describe("resolveInitiativeId", () => {
 
     await expect(
       resolveInitiativeId(sdk, "Growth", {
-        teamId: "team-1",
-        ownerId: "user-1",
+        teamId: asUuid("team-1"),
+        ownerId: asUuid("user-1"),
       }),
     ).resolves.toBe("init-2");
 
@@ -128,7 +129,7 @@ describe("resolveInitiativeRelationId", () => {
     });
 
     await expect(
-      resolveInitiativeRelationId(gql, "parent-id", "child-id"),
+      resolveInitiativeRelationId(gql, asUuid("parent-id"), asUuid("child-id")),
     ).resolves.toBe("rel-1");
   });
 
@@ -143,7 +144,7 @@ describe("resolveInitiativeRelationId", () => {
     });
 
     await expect(
-      resolveInitiativeRelationId(gql, "parent-id", "child-id"),
+      resolveInitiativeRelationId(gql, asUuid("parent-id"), asUuid("child-id")),
     ).rejects.toThrow(
       'Initiative relation "between parent-id and child-id" not found',
     );
@@ -182,7 +183,7 @@ describe("resolveInitiativeRelationId", () => {
     ]);
 
     await expect(
-      resolveInitiativeRelationId(gql, "parent-id", "child-id"),
+      resolveInitiativeRelationId(gql, asUuid("parent-id"), asUuid("child-id")),
     ).resolves.toBe("rel-2");
 
     expect(gql.request).toHaveBeenNthCalledWith(1, expect.anything(), {
@@ -218,7 +219,7 @@ describe("resolveInitiativeRelationId", () => {
     ]);
 
     await expect(
-      resolveInitiativeRelationId(gql, "parent-id", "child-id"),
+      resolveInitiativeRelationId(gql, asUuid("parent-id"), asUuid("child-id")),
     ).rejects.toThrow(
       'Initiative relation "between parent-id and child-id" not found',
     );
@@ -248,7 +249,11 @@ describe("resolveInitiativeProjectLinkId", () => {
     });
 
     await expect(
-      resolveInitiativeProjectLinkId(gql, "init-id", "project-id"),
+      resolveInitiativeProjectLinkId(
+        gql,
+        asUuid("init-id"),
+        asUuid("project-id"),
+      ),
     ).resolves.toBe("link-1");
   });
 
@@ -263,7 +268,11 @@ describe("resolveInitiativeProjectLinkId", () => {
     });
 
     await expect(
-      resolveInitiativeProjectLinkId(gql, "init-id", "project-id"),
+      resolveInitiativeProjectLinkId(
+        gql,
+        asUuid("init-id"),
+        asUuid("project-id"),
+      ),
     ).rejects.toThrow(
       'Initiative project link "between init-id and project-id" not found',
     );
@@ -302,7 +311,11 @@ describe("resolveInitiativeProjectLinkId", () => {
     ]);
 
     await expect(
-      resolveInitiativeProjectLinkId(gql, "init-id", "project-id"),
+      resolveInitiativeProjectLinkId(
+        gql,
+        asUuid("init-id"),
+        asUuid("project-id"),
+      ),
     ).resolves.toBe("link-2");
 
     expect(gql.request).toHaveBeenNthCalledWith(1, expect.anything(), {
@@ -338,7 +351,11 @@ describe("resolveInitiativeProjectLinkId", () => {
     ]);
 
     await expect(
-      resolveInitiativeProjectLinkId(gql, "init-id", "project-id"),
+      resolveInitiativeProjectLinkId(
+        gql,
+        asUuid("init-id"),
+        asUuid("project-id"),
+      ),
     ).rejects.toThrow(
       'Initiative project link "between init-id and project-id" not found',
     );

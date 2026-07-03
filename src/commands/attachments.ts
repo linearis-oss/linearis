@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
+import { asUuid } from "../common/identifier.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
@@ -138,7 +139,7 @@ export function setupAttachmentsCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [id, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await deleteAttachment(ctx.gql, id);
+        const result = await deleteAttachment(ctx.gql, asUuid(id));
         outputSuccess(result);
       }),
     );

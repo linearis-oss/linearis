@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { UUID } from "../common/identifier.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   GetTeamByIdDocument,
@@ -26,7 +27,7 @@ export interface Team {
 }
 
 interface GetTeamInput {
-  id: string;
+  id: UUID;
 }
 
 type TeamConfigSource = Pick<

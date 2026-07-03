@@ -1,6 +1,6 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 
 type TeamEstimationType =
   | "notUsed"
@@ -10,7 +10,7 @@ type TeamEstimationType =
   | "tShirt";
 
 export interface TeamEstimateContext {
-  teamId: string;
+  teamId: UUID;
   teamKey: string;
   teamName: string;
   issueEstimationType: TeamEstimationType;
@@ -85,7 +85,7 @@ function mapTeamNodeToEstimateContext(
   node: TeamEstimateNode,
 ): TeamEstimateContext {
   return {
-    teamId: node.id,
+    teamId: asUuid(node.id),
     teamKey: node.key,
     teamName: node.name,
     issueEstimationType: node.issueEstimationType,
@@ -137,8 +137,8 @@ export async function resolveTeamEstimateContext(
 export async function resolveTeamId(
   client: LinearSdkClient,
   keyOrNameOrId: string,
-): Promise<string> {
-  if (isUuid(keyOrNameOrId)) return keyOrNameOrId;
+): Promise<UUID> {
+  if (isUuid(keyOrNameOrId)) return asUuid(keyOrNameOrId);
 
   // Try by key first
   const byKey = await client.sdk.teams({
@@ -146,7 +146,7 @@ export async function resolveTeamId(
     first: 1,
   });
   const [byKeyMatch] = byKey.nodes;
-  if (byKeyMatch) return byKeyMatch.id;
+  if (byKeyMatch) return asUuid(byKeyMatch.id);
 
   // Fall back to name
   const byName = await client.sdk.teams({
@@ -154,7 +154,7 @@ export async function resolveTeamId(
     first: 1,
   });
   const [byNameMatch] = byName.nodes;
-  if (byNameMatch) return byNameMatch.id;
+  if (byNameMatch) return asUuid(byNameMatch.id);
 
   throw notFoundError("Team", keyOrNameOrId);
 }

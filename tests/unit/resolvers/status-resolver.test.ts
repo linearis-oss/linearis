@@ -1,6 +1,8 @@
 // tests/unit/resolvers/status-resolver.test.ts
+
 import { describe, expect, it, vi } from "vitest";
 import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import { resolveStatusId } from "../../../src/resolvers/status-resolver.js";
 
 function mockSdkClient(nodes: Array<{ id: string }>) {
@@ -29,7 +31,7 @@ describe("resolveStatusId", () => {
 
   it("resolves status by name with team context", async () => {
     const client = mockSdkClient([{ id: "status-uuid" }]);
-    await resolveStatusId(client, "In Progress", "team-uuid");
+    await resolveStatusId(client, "In Progress", asUuid("team-uuid"));
     expect(client.sdk.workflowStates).toHaveBeenCalledWith({
       filter: {
         name: { eqIgnoreCase: "In Progress" },

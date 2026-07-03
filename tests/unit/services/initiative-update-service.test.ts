@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveInitiativeUpdateDocument,
   CreateInitiativeUpdateDocument,
@@ -40,7 +41,7 @@ describe("listInitiativeUpdates", () => {
     });
 
     await listInitiativeUpdates(client, {
-      initiativeId: "init-1",
+      initiativeId: asUuid("init-1"),
       limit: 5,
       after: "cursor-1",
       includeArchived: true,
@@ -62,7 +63,7 @@ describe("listInitiativeUpdates", () => {
     } as unknown as GraphQLClient;
 
     await expect(
-      listInitiativeUpdates(client, { initiativeId: "init-1" }),
+      listInitiativeUpdates(client, { initiativeId: asUuid("init-1") }),
     ).rejects.toThrow(requestError);
 
     expect(request).toHaveBeenCalledWith(ListInitiativeUpdatesDocument, {
@@ -88,7 +89,9 @@ describe("getInitiativeUpdate", () => {
     };
     const { client, request } = mockGqlClient({ initiativeUpdate: update });
 
-    await expect(getInitiativeUpdate(client, "upd-1")).resolves.toEqual(update);
+    await expect(getInitiativeUpdate(client, asUuid("upd-1"))).resolves.toEqual(
+      update,
+    );
 
     expect(request).toHaveBeenCalledWith(GetInitiativeUpdateDocument, {
       id: "upd-1",
@@ -98,9 +101,9 @@ describe("getInitiativeUpdate", () => {
   it("throws when update is not found", async () => {
     const { client } = mockGqlClient({ initiativeUpdate: null });
 
-    await expect(getInitiativeUpdate(client, "upd-missing")).rejects.toThrow(
-      'Initiative update with ID "upd-missing" not found',
-    );
+    await expect(
+      getInitiativeUpdate(client, asUuid("upd-missing")),
+    ).rejects.toThrow('Initiative update with ID "upd-missing" not found');
   });
 });
 
@@ -122,7 +125,7 @@ describe("createInitiativeUpdate", () => {
 
     await expect(
       createInitiativeUpdate(client, {
-        initiativeId: "init-1",
+        initiativeId: asUuid("init-1"),
         body: "Week 1",
       }),
     ).resolves.toEqual(update);
@@ -142,7 +145,7 @@ describe("createInitiativeUpdate", () => {
 
     await expect(
       createInitiativeUpdate(client, {
-        initiativeId: "init-1",
+        initiativeId: asUuid("init-1"),
         body: "Week 1",
       }),
     ).rejects.toThrow("Failed to create initiative update");
@@ -155,7 +158,7 @@ describe("createInitiativeUpdate", () => {
 
     await expect(
       createInitiativeUpdate(client, {
-        initiativeId: "init-1",
+        initiativeId: asUuid("init-1"),
         body: "Week 1",
       }),
     ).rejects.toThrow("Failed to create initiative update");
@@ -166,7 +169,9 @@ describe("updateInitiativeUpdate", () => {
   it("rejects no-op update input", async () => {
     const { client } = mockGqlClient({});
 
-    await expect(updateInitiativeUpdate(client, "upd-1", {})).rejects.toThrow(
+    await expect(
+      updateInitiativeUpdate(client, asUuid("upd-1"), {}),
+    ).rejects.toThrow(
       "Invalid update options: at least one update field must be provided",
     );
   });
@@ -187,7 +192,7 @@ describe("updateInitiativeUpdate", () => {
     });
 
     await expect(
-      updateInitiativeUpdate(client, "upd-1", { body: "Week 2" }),
+      updateInitiativeUpdate(client, asUuid("upd-1"), { body: "Week 2" }),
     ).resolves.toEqual(update);
 
     expect(request).toHaveBeenCalledWith(UpdateInitiativeUpdateDocument, {
@@ -205,7 +210,7 @@ describe("updateInitiativeUpdate", () => {
     });
 
     await expect(
-      updateInitiativeUpdate(client, "upd-1", { body: "Week 2" }),
+      updateInitiativeUpdate(client, asUuid("upd-1"), { body: "Week 2" }),
     ).rejects.toThrow('Failed to update initiative update "upd-1"');
   });
 
@@ -215,7 +220,7 @@ describe("updateInitiativeUpdate", () => {
     });
 
     await expect(
-      updateInitiativeUpdate(client, "upd-1", { body: "Week 2" }),
+      updateInitiativeUpdate(client, asUuid("upd-1"), { body: "Week 2" }),
     ).rejects.toThrow('Failed to update initiative update "upd-1"');
   });
 });
@@ -236,9 +241,9 @@ describe("archiveInitiativeUpdate", () => {
       initiativeUpdateArchive: { success: true, entity: archived },
     });
 
-    await expect(archiveInitiativeUpdate(client, "upd-1")).resolves.toEqual(
-      archived,
-    );
+    await expect(
+      archiveInitiativeUpdate(client, asUuid("upd-1")),
+    ).resolves.toEqual(archived);
 
     expect(request).toHaveBeenCalledWith(ArchiveInitiativeUpdateDocument, {
       id: "upd-1",
@@ -250,9 +255,9 @@ describe("archiveInitiativeUpdate", () => {
       initiativeUpdateArchive: { success: false, entity: { id: "upd-1" } },
     });
 
-    await expect(archiveInitiativeUpdate(client, "upd-1")).rejects.toThrow(
-      'Failed to archive initiative update "upd-1"',
-    );
+    await expect(
+      archiveInitiativeUpdate(client, asUuid("upd-1")),
+    ).rejects.toThrow('Failed to archive initiative update "upd-1"');
   });
 
   it("throws when mutation payload is missing", async () => {
@@ -260,9 +265,9 @@ describe("archiveInitiativeUpdate", () => {
       initiativeUpdateArchive: { success: true, entity: null },
     });
 
-    await expect(archiveInitiativeUpdate(client, "upd-1")).rejects.toThrow(
-      'Failed to archive initiative update "upd-1"',
-    );
+    await expect(
+      archiveInitiativeUpdate(client, asUuid("upd-1")),
+    ).rejects.toThrow('Failed to archive initiative update "upd-1"');
   });
 });
 
@@ -282,9 +287,9 @@ describe("unarchiveInitiativeUpdate", () => {
       initiativeUpdateUnarchive: { success: true, entity: unarchived },
     });
 
-    await expect(unarchiveInitiativeUpdate(client, "upd-1")).resolves.toEqual(
-      unarchived,
-    );
+    await expect(
+      unarchiveInitiativeUpdate(client, asUuid("upd-1")),
+    ).resolves.toEqual(unarchived);
 
     expect(request).toHaveBeenCalledWith(UnarchiveInitiativeUpdateDocument, {
       id: "upd-1",
@@ -296,9 +301,9 @@ describe("unarchiveInitiativeUpdate", () => {
       initiativeUpdateUnarchive: { success: false, entity: { id: "upd-1" } },
     });
 
-    await expect(unarchiveInitiativeUpdate(client, "upd-1")).rejects.toThrow(
-      'Failed to unarchive initiative update "upd-1"',
-    );
+    await expect(
+      unarchiveInitiativeUpdate(client, asUuid("upd-1")),
+    ).rejects.toThrow('Failed to unarchive initiative update "upd-1"');
   });
 
   it("throws when mutation payload is missing", async () => {
@@ -306,8 +311,8 @@ describe("unarchiveInitiativeUpdate", () => {
       initiativeUpdateUnarchive: { success: true, entity: null },
     });
 
-    await expect(unarchiveInitiativeUpdate(client, "upd-1")).rejects.toThrow(
-      'Failed to unarchive initiative update "upd-1"',
-    );
+    await expect(
+      unarchiveInitiativeUpdate(client, asUuid("upd-1")),
+    ).rejects.toThrow('Failed to unarchive initiative update "upd-1"');
   });
 });

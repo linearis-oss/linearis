@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { UUID } from "../common/identifier.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import {
   CreateInitiativeToProjectDocument,
@@ -20,7 +21,7 @@ export type DeletedInitiativeProjectLink = {
 
 export async function createInitiativeProjectLink(
   client: GraphQLClient,
-  input: { initiativeId: string; projectId: string },
+  input: { initiativeId: UUID; projectId: UUID },
 ): Promise<InitiativeProjectLink> {
   const result = await client.request(CreateInitiativeToProjectDocument, {
     input,
@@ -35,7 +36,7 @@ export async function createInitiativeProjectLink(
 
 export async function deleteInitiativeProjectLink(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedInitiativeProjectLink> {
   const result = await client.request(DeleteInitiativeToProjectDocument, {
     id,

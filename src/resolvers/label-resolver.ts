@@ -1,7 +1,7 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 
 export type LabelResolverScope = "workspace" | "team";
 
@@ -42,20 +42,22 @@ export async function resolveLabelId(
   client: LinearSdkClient,
   nameOrId: string,
   options: ResolveLabelOptions = {},
-): Promise<string> {
-  if (isUuid(nameOrId)) return nameOrId;
+): Promise<UUID> {
+  if (isUuid(nameOrId)) return asUuid(nameOrId);
 
   const result = await client.sdk.issueLabels({
     filter: buildLabelFilter(nameOrId, options),
     first: 1,
   });
 
-  return firstOrThrow(result.nodes, () => notFoundError("Label", nameOrId)).id;
+  return asUuid(
+    firstOrThrow(result.nodes, () => notFoundError("Label", nameOrId)).id,
+  );
 }
 
 export async function resolveLabelIds(
   client: LinearSdkClient,
   namesOrIds: string[],
-): Promise<string[]> {
+): Promise<UUID[]> {
   return Promise.all(namesOrIds.map((id) => resolveLabelId(client, id)));
 }

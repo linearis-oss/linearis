@@ -1,6 +1,8 @@
 // tests/unit/commands/issues.test.ts
+
 import { Command } from "commander";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { asUuid } from "../../../src/common/identifier.js";
 
 // Mock all external dependencies before importing the module under test
 vi.mock("../../../src/common/context.js", () => ({
@@ -366,7 +368,7 @@ describe("issues create --estimate", () => {
 
   it("passes estimate 0 through to createIssue when team allows zero", async () => {
     vi.mocked(resolveTeamEstimateContext).mockResolvedValueOnce({
-      teamId: "resolved-team-uuid",
+      teamId: asUuid("resolved-team-uuid"),
       teamKey: "ENG",
       teamName: "Engineering",
       issueEstimationType: "fibonacci",
@@ -437,7 +439,7 @@ describe("issues create --estimate", () => {
 
   it("rejects create estimate when team estimation disabled", async () => {
     vi.mocked(resolveTeamEstimateContext).mockResolvedValueOnce({
-      teamId: "resolved-team-uuid",
+      teamId: asUuid("resolved-team-uuid"),
       teamKey: "ENG",
       teamName: "Engineering",
       issueEstimationType: "notUsed",

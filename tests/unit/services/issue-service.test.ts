@@ -1,6 +1,7 @@
 import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveIssueDocument,
   DeleteIssueDocument,
@@ -253,7 +254,7 @@ describe("getIssue", () => {
     });
     const result = await getIssue(
       client,
-      "550e8400-e29b-41d4-a716-446655440000",
+      asUuid("550e8400-e29b-41d4-a716-446655440000"),
     );
     expect(result.id).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(result.comments.nodes).toEqual([{ id: "comment-1", body: "First" }]);
@@ -265,7 +266,7 @@ describe("getIssue", () => {
   it("throws when issue not found by UUID", async () => {
     const client = mockGqlClient({ issue: null });
     await expect(
-      getIssue(client, "550e8400-e29b-41d4-a716-446655440000"),
+      getIssue(client, asUuid("550e8400-e29b-41d4-a716-446655440000")),
     ).rejects.toThrow("not found");
   });
 });
@@ -322,7 +323,7 @@ describe("getIssueWithComments", () => {
         },
       },
     });
-    const result = await getIssueWithComments(client, "issue-1");
+    const result = await getIssueWithComments(client, asUuid("issue-1"));
 
     expect(result.comments.nodes[0]).toEqual({
       id: "comment-1",
@@ -431,7 +432,7 @@ describe("getIssueWithCommentThreads", () => {
       },
     });
 
-    const result = await getIssueWithCommentThreads(client, "issue-1");
+    const result = await getIssueWithCommentThreads(client, asUuid("issue-1"));
 
     expect(result.comments.nodes).toHaveLength(2);
     expect(result.comments.nodes[0]?.id).toBe("comment-1");
@@ -506,7 +507,7 @@ describe("createIssue", () => {
     });
     const result = await createIssue(client, {
       title: "New",
-      teamId: "team-uuid",
+      teamId: asUuid("team-uuid"),
       estimate: 5,
     });
     expect(result.id).toBe("new-id");
@@ -520,7 +521,7 @@ describe("createIssue", () => {
       issueCreate: { success: false, issue: null },
     });
     await expect(
-      createIssue(client, { title: "Fail", teamId: "team-uuid" }),
+      createIssue(client, { title: "Fail", teamId: asUuid("team-uuid") }),
     ).rejects.toThrow("Failed to create issue");
   });
 });
@@ -538,7 +539,9 @@ describe("updateIssue", () => {
         },
       },
     });
-    const result = await updateIssue(client, "issue-id", { estimate: 8 });
+    const result = await updateIssue(client, asUuid("issue-id"), {
+      estimate: 8,
+    });
     expect(result.id).toBe("issue-id");
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       id: "issue-id",
@@ -553,7 +556,9 @@ describe("updateIssue", () => {
         issue: { id: "issue-id", identifier: "ENG-1", title: "Cleared" },
       },
     });
-    const result = await updateIssue(client, "issue-id", { estimate: null });
+    const result = await updateIssue(client, asUuid("issue-id"), {
+      estimate: null,
+    });
     expect(result.id).toBe("issue-id");
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       id: "issue-id",
@@ -566,7 +571,7 @@ describe("updateIssue", () => {
       issueUpdate: { success: false, issue: null },
     });
     await expect(
-      updateIssue(client, "issue-id", { title: "Fail" }),
+      updateIssue(client, asUuid("issue-id"), { title: "Fail" }),
     ).rejects.toThrow("Failed to update issue");
   });
 });
@@ -601,7 +606,7 @@ describe("getIssueWithReactions", () => {
       },
     });
 
-    const result = await getIssueWithReactions(client, "issue-1");
+    const result = await getIssueWithReactions(client, asUuid("issue-1"));
 
     expect(result.reactions).toEqual([
       {
@@ -629,9 +634,9 @@ describe("getIssueWithReactions", () => {
   it("throws when issue not found by UUID", async () => {
     const client = mockGqlClient({ issue: null });
 
-    await expect(getIssueWithReactions(client, "missing")).rejects.toThrow(
-      'Issue with ID "missing" not found',
-    );
+    await expect(
+      getIssueWithReactions(client, asUuid("missing")),
+    ).rejects.toThrow('Issue with ID "missing" not found');
   });
 });
 
@@ -705,7 +710,7 @@ describe("getIssueWithAttachments", () => {
         },
       },
     });
-    const result = await getIssueWithAttachments(client, "issue-1");
+    const result = await getIssueWithAttachments(client, asUuid("issue-1"));
     expect(result.id).toBe("issue-1");
     expect(client.request).toHaveBeenCalledWith(
       GetIssueByIdWithAttachmentsDocument,
@@ -715,9 +720,9 @@ describe("getIssueWithAttachments", () => {
 
   it("throws when issue not found", async () => {
     const client = mockGqlClient({ issue: null });
-    await expect(getIssueWithAttachments(client, "missing")).rejects.toThrow(
-      "not found",
-    );
+    await expect(
+      getIssueWithAttachments(client, asUuid("missing")),
+    ).rejects.toThrow("not found");
   });
 });
 
@@ -827,7 +832,7 @@ describe("archiveIssue", () => {
       },
     });
 
-    const result = await archiveIssue(client, "issue-1");
+    const result = await archiveIssue(client, asUuid("issue-1"));
 
     expect(result.id).toBe("issue-1");
     expect(client.request).toHaveBeenCalledWith(ArchiveIssueDocument, {
@@ -840,7 +845,7 @@ describe("archiveIssue", () => {
       issueArchive: { success: false, entity: null },
     });
 
-    await expect(archiveIssue(client, "issue-1")).rejects.toThrow(
+    await expect(archiveIssue(client, asUuid("issue-1"))).rejects.toThrow(
       'Failed to archive issue "issue-1"',
     );
   });
@@ -855,7 +860,7 @@ describe("unarchiveIssue", () => {
       },
     });
 
-    const result = await unarchiveIssue(client, "issue-1");
+    const result = await unarchiveIssue(client, asUuid("issue-1"));
 
     expect(result.id).toBe("issue-1");
     expect(client.request).toHaveBeenCalledWith(UnarchiveIssueDocument, {
@@ -868,7 +873,7 @@ describe("unarchiveIssue", () => {
       issueUnarchive: { success: false, entity: null },
     });
 
-    await expect(unarchiveIssue(client, "issue-1")).rejects.toThrow(
+    await expect(unarchiveIssue(client, asUuid("issue-1"))).rejects.toThrow(
       'Failed to unarchive issue "issue-1"',
     );
   });
@@ -880,7 +885,7 @@ describe("deleteIssue", () => {
       issueDelete: { success: true, entity: { id: "issue-1" } },
     });
 
-    await expect(deleteIssue(client, "issue-1")).resolves.toEqual({
+    await expect(deleteIssue(client, asUuid("issue-1"))).resolves.toEqual({
       id: "issue-1",
       success: true,
     });
@@ -895,7 +900,7 @@ describe("deleteIssue", () => {
       issueDelete: { success: false, entity: null },
     });
 
-    await expect(deleteIssue(client, "issue-1")).rejects.toThrow(
+    await expect(deleteIssue(client, asUuid("issue-1"))).rejects.toThrow(
       'Failed to delete issue "issue-1"',
     );
   });

@@ -2,7 +2,7 @@ import type { GraphQLClient } from "../client/graphql-client.js";
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import {
   FindProjectMilestoneGlobalDocument,
   FindProjectMilestoneScopedDocument,
@@ -33,8 +33,8 @@ export async function resolveMilestoneId(
   sdkClient: LinearSdkClient,
   nameOrId: string,
   projectNameOrId?: string,
-): Promise<string> {
-  if (isUuid(nameOrId)) return nameOrId;
+): Promise<UUID> {
+  if (isUuid(nameOrId)) return asUuid(nameOrId);
 
   type MilestoneNode = {
     id: string;
@@ -77,5 +77,7 @@ export async function resolveMilestoneId(
     );
   }
 
-  return firstOrThrow(nodes, () => notFoundError("Milestone", nameOrId)).id;
+  return asUuid(
+    firstOrThrow(nodes, () => notFoundError("Milestone", nameOrId)).id,
+  );
 }

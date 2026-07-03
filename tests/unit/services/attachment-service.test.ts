@@ -1,6 +1,8 @@
 // tests/unit/services/attachment-service.test.ts
+
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createAttachment,
   deleteAttachment,
@@ -26,7 +28,7 @@ describe("createAttachment", () => {
       },
     });
     const result = await createAttachment(client, {
-      issueId: "issue-1",
+      issueId: asUuid("issue-1"),
       title: "Test.pdf",
       url: "https://example.com/test.pdf",
     });
@@ -39,7 +41,7 @@ describe("createAttachment", () => {
     });
     await expect(
       createAttachment(client, {
-        issueId: "issue-1",
+        issueId: asUuid("issue-1"),
         title: "Test.pdf",
         url: "https://example.com/test.pdf",
       }),
@@ -52,13 +54,13 @@ describe("deleteAttachment", () => {
     const client = mockGqlClient({
       attachmentDelete: { success: true, entityId: "att-1" },
     });
-    const result = await deleteAttachment(client, "att-1");
+    const result = await deleteAttachment(client, asUuid("att-1"));
     expect(result).toEqual({ id: "att-1", success: true });
   });
 
   it("throws when delete fails", async () => {
     const client = mockGqlClient({ attachmentDelete: { success: false } });
-    await expect(deleteAttachment(client, "att-1")).rejects.toThrow(
+    await expect(deleteAttachment(client, asUuid("att-1"))).rejects.toThrow(
       "Failed to delete attachment",
     );
   });
@@ -76,7 +78,7 @@ describe("listAttachments", () => {
         },
       },
     });
-    const result = await listAttachments(client, "issue-1");
+    const result = await listAttachments(client, asUuid("issue-1"));
     expect(result).toHaveLength(2);
   });
 
@@ -84,13 +86,13 @@ describe("listAttachments", () => {
     const client = mockGqlClient({
       issue: { attachments: { nodes: [] } },
     });
-    const result = await listAttachments(client, "issue-1");
+    const result = await listAttachments(client, asUuid("issue-1"));
     expect(result).toEqual([]);
   });
 
   it("throws when issue not found", async () => {
     const client = mockGqlClient({ issue: null });
-    await expect(listAttachments(client, "missing")).rejects.toThrow(
+    await expect(listAttachments(client, asUuid("missing"))).rejects.toThrow(
       "not found",
     );
   });
@@ -104,7 +106,7 @@ describe("listAttachments", () => {
       },
     });
     const filter = { sourceType: { eq: "github" } };
-    const result = await listAttachments(client, "issue-1", filter);
+    const result = await listAttachments(client, asUuid("issue-1"), filter);
     expect(result).toHaveLength(1);
     expect(client.request).toHaveBeenCalledWith(
       expect.anything(),

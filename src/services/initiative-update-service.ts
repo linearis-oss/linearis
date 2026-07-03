@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { invalidParameterError } from "../common/errors.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult } from "../common/types.js";
 import {
@@ -40,16 +41,16 @@ export type UnarchivedInitiativeUpdate = NonNullable<
 >;
 
 export interface InitiativeUpdateListOptions {
-  initiativeId: string;
+  initiativeId: UUID;
   limit?: number;
   after?: string;
   includeArchived?: boolean;
 }
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateInitiativeUpdateInput = Pick<
-  InitiativeUpdateCreateInput,
-  "initiativeId" | "body" | "health"
+export type CreateInitiativeUpdateInput = BrandUuidFields<
+  Pick<InitiativeUpdateCreateInput, "initiativeId" | "body" | "health">,
+  "initiativeId"
 >;
 export type UpdateInitiativeUpdateInput = Pick<
   InitiativeUpdateUpdateInput,
@@ -93,7 +94,7 @@ export async function listInitiativeUpdates(
 
 export async function getInitiativeUpdate(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<InitiativeUpdateDetail> {
   const result = await client.request(GetInitiativeUpdateDocument, { id });
 
@@ -122,7 +123,7 @@ export async function createInitiativeUpdate(
 
 export async function updateInitiativeUpdate(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateInitiativeUpdateInput,
 ): Promise<UpdatedInitiativeUpdate> {
   const hasAtLeastOneField = Object.values(input).some(
@@ -151,7 +152,7 @@ export async function updateInitiativeUpdate(
 
 export async function archiveInitiativeUpdate(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<ArchivedInitiativeUpdate> {
   const result = await client.request(ArchiveInitiativeUpdateDocument, { id });
 
@@ -164,7 +165,7 @@ export async function archiveInitiativeUpdate(
 
 export async function unarchiveInitiativeUpdate(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<UnarchivedInitiativeUpdate> {
   const result = await client.request(UnarchiveInitiativeUpdateDocument, {
     id,

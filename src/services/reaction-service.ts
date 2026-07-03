@@ -1,6 +1,7 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { normalizeReactionEmojiInput } from "../common/emoji.js";
+import type { UUID } from "../common/identifier.js";
 import { requireMutationSuccess } from "../common/mutation-payload.js";
 import {
   CreateReactionDocument,
@@ -30,7 +31,7 @@ interface NormalizedReactionGroup {
 
 interface ReactionLookupInput {
   kind: "issue" | "comment";
-  id: string;
+  id: UUID;
 }
 
 interface DeleteOwnReactionByEmojiInput extends ReactionLookupInput {
@@ -38,7 +39,7 @@ interface DeleteOwnReactionByEmojiInput extends ReactionLookupInput {
 }
 
 interface DeleteOwnReactionByIdInput extends ReactionLookupInput {
-  reactionId: string;
+  reactionId: UUID;
 }
 
 function compareNormalizedUsers(
@@ -205,7 +206,7 @@ export function normalizeReactions(
 export async function createReactionForIssue(
   client: GraphQLClient,
   input: {
-    issueId: string;
+    issueId: UUID;
     emoji: string;
   },
 ): Promise<CreateReactionMutation["reactionCreate"]["reaction"]> {
@@ -219,7 +220,7 @@ export async function createReactionForIssue(
 export async function createReactionForComment(
   client: GraphQLClient,
   input: {
-    commentId: string;
+    commentId: UUID;
     emoji: string;
   },
 ): Promise<CreateReactionMutation["reactionCreate"]["reaction"]> {

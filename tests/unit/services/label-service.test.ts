@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createLabel,
   deleteLabel,
@@ -26,7 +27,7 @@ describe("getLabel", () => {
       },
     });
 
-    const result = await getLabel(client, "lbl-1");
+    const result = await getLabel(client, asUuid("lbl-1"));
 
     expect(result).toEqual({
       id: "lbl-1",
@@ -40,7 +41,7 @@ describe("getLabel", () => {
   it("throws when label not found", async () => {
     const client = mockGqlClient({ issueLabel: null });
 
-    await expect(getLabel(client, "lbl-1")).rejects.toThrow(
+    await expect(getLabel(client, asUuid("lbl-1"))).rejects.toThrow(
       'Label with ID "lbl-1" not found',
     );
   });
@@ -62,7 +63,7 @@ describe("createLabel", () => {
 
     const result = await createLabel(client, {
       name: "branch:unmerged",
-      teamId: "team-1",
+      teamId: asUuid("team-1"),
       color: "#B45309",
       description: "Created from DBL branch workflow",
     });
@@ -136,7 +137,7 @@ describe("updateLabel", () => {
       },
     });
 
-    const result = await updateLabel(client, "lbl-1", {
+    const result = await updateLabel(client, asUuid("lbl-1"), {
       name: "branch:merged",
       color: "#1D4ED8",
       description: "Updated from DBL branch workflow",
@@ -173,7 +174,7 @@ describe("updateLabel", () => {
     });
 
     await expect(
-      updateLabel(client, "lbl-1", { name: "branch:merged" }),
+      updateLabel(client, asUuid("lbl-1"), { name: "branch:merged" }),
     ).rejects.toThrow('Failed to update label "lbl-1"');
   });
 });
@@ -187,7 +188,7 @@ describe("deleteLabel", () => {
       },
     });
 
-    const result = await deleteLabel(client, "lbl-1");
+    const result = await deleteLabel(client, asUuid("lbl-1"));
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       id: "lbl-1",
@@ -203,7 +204,7 @@ describe("deleteLabel", () => {
       },
     });
 
-    await expect(deleteLabel(client, "lbl-1")).rejects.toThrow(
+    await expect(deleteLabel(client, asUuid("lbl-1"))).rejects.toThrow(
       'Failed to delete label "lbl-1"',
     );
   });
@@ -290,7 +291,7 @@ describe("listLabels", () => {
       },
     });
 
-    await listLabels(client, "team-1");
+    await listLabels(client, asUuid("team-1"));
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
@@ -324,7 +325,7 @@ describe("listLabels", () => {
       },
     });
 
-    await listLabels(client, "team-1", { scope: "team" });
+    await listLabels(client, asUuid("team-1"), { scope: "team" });
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,

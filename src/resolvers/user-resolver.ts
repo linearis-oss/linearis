@@ -1,12 +1,12 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 
 export async function resolveUserId(
   client: LinearSdkClient,
   nameOrEmailOrId: string,
-): Promise<string> {
-  if (isUuid(nameOrEmailOrId)) return nameOrEmailOrId;
+): Promise<UUID> {
+  if (isUuid(nameOrEmailOrId)) return asUuid(nameOrEmailOrId);
 
   // Try by display name first (case-insensitive)
   const byName = await client.sdk.users({
@@ -15,7 +15,7 @@ export async function resolveUserId(
   });
 
   const [byNameMatch] = byName.nodes;
-  if (byName.nodes.length === 1 && byNameMatch) return byNameMatch.id;
+  if (byName.nodes.length === 1 && byNameMatch) return asUuid(byNameMatch.id);
 
   if (byName.nodes.length > 1) {
     throw multipleMatchesError(
@@ -33,7 +33,7 @@ export async function resolveUserId(
   });
 
   const [byEmailMatch] = byEmail.nodes;
-  if (byEmailMatch) return byEmailMatch.id;
+  if (byEmailMatch) return asUuid(byEmailMatch.id);
 
   throw notFoundError("User", nameOrEmailOrId);
 }

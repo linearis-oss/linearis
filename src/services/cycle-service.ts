@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { UUID } from "../common/identifier.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   type CycleFilter,
@@ -28,7 +29,7 @@ export interface CycleDetail extends Cycle {
 
 export async function listCycles(
   client: GraphQLClient,
-  teamId?: string,
+  teamId?: UUID,
   activeOnly: boolean = false,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<Cycle>> {
@@ -66,7 +67,7 @@ export async function listCycles(
 
 export async function getCycle(
   client: GraphQLClient,
-  cycleId: string,
+  cycleId: UUID,
   issuesLimit: number = 50,
 ): Promise<CycleDetail> {
   const result = await client.request(GetCycleByIdDocument, {

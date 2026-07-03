@@ -1,7 +1,9 @@
 // tests/unit/services/project-service.test.ts
+
 import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveProjectDocument,
   GetProjectDocument,
@@ -278,7 +280,7 @@ describe("getProject", () => {
         initiatives: { nodes: [{ id: "init-1", name: "Growth" }] },
       },
     });
-    const result = await getProject(client, "proj-1");
+    const result = await getProject(client, asUuid("proj-1"));
     expect(result.id).toBe("proj-1");
     expect(result.name).toBe("Project Alpha");
     expect(result.status.name).toBe("Started");
@@ -301,7 +303,7 @@ describe("getProject", () => {
       },
     });
 
-    await getProject(client, "proj-1", {
+    await getProject(client, asUuid("proj-1"), {
       milestonesFirst: 0,
       issuesFirst: 0,
     });
@@ -323,7 +325,7 @@ describe("getProject", () => {
       },
     });
 
-    await getProject(client, "proj-1", {
+    await getProject(client, asUuid("proj-1"), {
       milestonesFirst: 5,
       issuesFirst: 10,
     });
@@ -339,7 +341,7 @@ describe("getProject", () => {
 
   it("throws when project not found", async () => {
     const client = mockGqlClient({ project: null });
-    await expect(getProject(client, "nonexistent")).rejects.toThrow(
+    await expect(getProject(client, asUuid("nonexistent"))).rejects.toThrow(
       'Project with ID "nonexistent" not found',
     );
   });
@@ -384,7 +386,7 @@ describe("createProject", () => {
     });
     const result = await createProject(client, {
       name: "New Project",
-      teamIds: ["team-1"],
+      teamIds: [asUuid("team-1")],
     });
     expect(result.id).toBe("proj-new");
     expect(result.name).toBe("New Project");
@@ -395,7 +397,7 @@ describe("createProject", () => {
       projectCreate: { success: false, project: null },
     });
     await expect(
-      createProject(client, { name: "Fail", teamIds: ["team-1"] }),
+      createProject(client, { name: "Fail", teamIds: [asUuid("team-1")] }),
     ).rejects.toThrow('Failed to create project "Fail"');
   });
 });
@@ -437,7 +439,7 @@ describe("updateProject", () => {
         },
       },
     });
-    const result = await updateProject(client, "proj-1", {
+    const result = await updateProject(client, asUuid("proj-1"), {
       name: "Updated Name",
     });
     expect(result.id).toBe("proj-1");
@@ -450,7 +452,7 @@ describe("updateProject", () => {
       projectUpdate: { success: false, project: null },
     });
     await expect(
-      updateProject(client, "proj-1", { name: "Fail" }),
+      updateProject(client, asUuid("proj-1"), { name: "Fail" }),
     ).rejects.toThrow('Failed to update project "proj-1"');
   });
 });
@@ -464,7 +466,7 @@ describe("archiveProject", () => {
       },
     });
 
-    await expect(archiveProject(client, "proj-1")).resolves.toEqual({
+    await expect(archiveProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       name: "Archived Project",
     });
@@ -479,7 +481,7 @@ describe("archiveProject", () => {
       projectArchive: { success: false, entity: null },
     });
 
-    await expect(archiveProject(client, "proj-1")).rejects.toThrow(
+    await expect(archiveProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to archive project "proj-1"',
     );
   });
@@ -494,7 +496,7 @@ describe("unarchiveProject", () => {
       },
     });
 
-    await expect(unarchiveProject(client, "proj-1")).resolves.toEqual({
+    await expect(unarchiveProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       name: "Active Project",
     });
@@ -509,7 +511,7 @@ describe("unarchiveProject", () => {
       projectUnarchive: { success: false, entity: null },
     });
 
-    await expect(unarchiveProject(client, "proj-1")).rejects.toThrow(
+    await expect(unarchiveProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to unarchive project "proj-1"',
     );
   });
@@ -521,7 +523,7 @@ describe("deleteProject", () => {
       projectDelete: { success: true, entity: { id: "proj-1" } },
     });
 
-    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+    await expect(deleteProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       success: true,
     });
@@ -536,7 +538,7 @@ describe("deleteProject", () => {
       projectDelete: { success: true, entity: null },
     });
 
-    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+    await expect(deleteProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       success: true,
     });
@@ -547,7 +549,7 @@ describe("deleteProject", () => {
       projectDelete: { success: false, entity: null },
     });
 
-    await expect(deleteProject(client, "proj-1")).rejects.toThrow(
+    await expect(deleteProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to delete project "proj-1"',
     );
   });

@@ -3,6 +3,7 @@ import { createContext, getRootOpts } from "../common/context.js";
 import { type Priority, parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
+import { asUuid } from "../common/identifier.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -84,7 +85,7 @@ function addCommentReactionCommands(
         async (commentId, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await createDiscussionCommentReaction(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "project",
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -103,7 +104,7 @@ function addCommentReactionCommands(
         async (commentId, emoji, options, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "project",
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
@@ -123,10 +124,10 @@ function addCommentReactionCommands(
         async (commentId, reactionId, _unused2, command) => {
           const ctx = createContext(getRootOpts(command));
           const result = await deleteDiscussionCommentReactionById(ctx.gql, {
-            commentId,
+            commentId: asUuid(commentId),
             target: noun,
             expectedEntityKind: "project",
-            reactionId,
+            reactionId: asUuid(reactionId),
           });
           outputSuccess(result);
         },
@@ -386,13 +387,13 @@ export function setupProjectsCommands(program: Command): void {
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
-                thread,
+                asUuid(thread),
                 paginationOptions,
                 "project",
               )
             : await listDiscussionReplies(
                 ctx.gql,
-                thread,
+                asUuid(thread),
                 paginationOptions,
                 "project",
               );
@@ -421,7 +422,7 @@ export function setupProjectsCommands(program: Command): void {
           }
 
           const result = await replyToDiscussion(ctx.gql, {
-            threadId: thread,
+            threadId: asUuid(thread),
             body: options.body,
             entityKind: "project",
           });
@@ -446,7 +447,7 @@ export function setupProjectsCommands(program: Command): void {
 
           const result = await editDiscussionComment(
             ctx.gql,
-            comment,
+            asUuid(comment),
             {
               body: options.body,
             },
@@ -473,7 +474,7 @@ export function setupProjectsCommands(program: Command): void {
 
           const result = await editDiscussionReply(
             ctx.gql,
-            reply,
+            asUuid(reply),
             {
               body: options.body,
             },
@@ -495,7 +496,7 @@ export function setupProjectsCommands(program: Command): void {
 
           const result = await deleteDiscussionComment(
             ctx.gql,
-            comment,
+            asUuid(comment),
             "project",
           );
 
@@ -512,7 +513,11 @@ export function setupProjectsCommands(program: Command): void {
         async (reply, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const result = await deleteDiscussionReply(ctx.gql, reply, "project");
+          const result = await deleteDiscussionReply(
+            ctx.gql,
+            asUuid(reply),
+            "project",
+          );
 
           outputSuccess(result);
         },
@@ -529,9 +534,9 @@ export function setupProjectsCommands(program: Command): void {
           const ctx = createContext(getRootOpts(command));
 
           const result = await resolveDiscussion(ctx.gql, {
-            threadId: thread,
+            threadId: asUuid(thread),
             ...(options.withComment !== undefined
-              ? { resolvingCommentId: options.withComment }
+              ? { resolvingCommentId: asUuid(options.withComment) }
               : {}),
             entityKind: "project",
           });
@@ -549,7 +554,11 @@ export function setupProjectsCommands(program: Command): void {
         async (thread, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const result = await unresolveDiscussion(ctx.gql, thread, "project");
+          const result = await unresolveDiscussion(
+            ctx.gql,
+            asUuid(thread),
+            "project",
+          );
 
           outputSuccess(result);
         },
@@ -807,12 +816,12 @@ export function setupProjectsCommands(program: Command): void {
 
             if (labelMode === "add") {
               const currentLabels = projectContext?.labels?.nodes
-                ? projectContext.labels.nodes.map((l) => l.id)
+                ? projectContext.labels.nodes.map((l) => asUuid(l.id))
                 : [];
               input.labelIds = [...new Set([...currentLabels, ...labelIds])];
             } else if (labelMode === "remove") {
               const currentLabels = projectContext?.labels?.nodes
-                ? projectContext.labels.nodes.map((l) => l.id)
+                ? projectContext.labels.nodes.map((l) => asUuid(l.id))
                 : [];
               input.labelIds = currentLabels.filter(
                 (id) => !labelIds.includes(id),

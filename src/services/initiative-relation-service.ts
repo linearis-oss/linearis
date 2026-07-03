@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { UUID } from "../common/identifier.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import {
   CreateInitiativeRelationDocument,
@@ -20,7 +21,7 @@ export type DeletedInitiativeRelation = {
 
 export async function createInitiativeRelation(
   client: GraphQLClient,
-  input: { parentId: string; childId: string },
+  input: { parentId: UUID; childId: UUID },
 ): Promise<InitiativeRelation> {
   const result = await client.request(CreateInitiativeRelationDocument, {
     input: {
@@ -38,7 +39,7 @@ export async function createInitiativeRelation(
 
 export async function deleteInitiativeRelation(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedInitiativeRelation> {
   const result = await client.request(DeleteInitiativeRelationDocument, { id });
 

@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
+import { asUuid } from "../../common/identifier.js";
 import {
   handleCommand,
   outputSuccess,
@@ -82,7 +83,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await getInitiativeUpdate(ctx.gql, updateId);
+        const result = await getInitiativeUpdate(ctx.gql, asUuid(updateId));
         outputSuccess(result);
       }),
     );
@@ -154,7 +155,11 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           );
         }
 
-        const result = await updateInitiativeUpdate(ctx.gql, updateId, input);
+        const result = await updateInitiativeUpdate(
+          ctx.gql,
+          asUuid(updateId),
+          input,
+        );
         outputSuccess(result);
       }),
     );
@@ -166,7 +171,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await archiveInitiativeUpdate(ctx.gql, updateId);
+        const result = await archiveInitiativeUpdate(ctx.gql, asUuid(updateId));
         outputSuccess(result);
       }),
     );
@@ -178,7 +183,10 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await unarchiveInitiativeUpdate(ctx.gql, updateId);
+        const result = await unarchiveInitiativeUpdate(
+          ctx.gql,
+          asUuid(updateId),
+        );
         outputSuccess(result);
       }),
     );

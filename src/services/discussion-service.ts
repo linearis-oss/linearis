@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
@@ -82,7 +83,7 @@ type DeleteDiscussionReactionResult = Awaited<
 >;
 
 interface DiscussionReactionTargetInput {
-  commentId: string;
+  commentId: UUID;
   target: DiscussionReactionTarget;
   expectedEntityKind?: DiscussionEntityKind;
 }
@@ -98,7 +99,7 @@ interface DeleteDiscussionReactionByEmojiInput
 
 interface DeleteDiscussionReactionByIdInput
   extends DiscussionReactionTargetInput {
-  reactionId: string;
+  reactionId: UUID;
 }
 
 function normalizeDiscussionCommentReactions<
@@ -165,7 +166,7 @@ function assertExpectedDiscussionEntityKind(
 
 async function assertDiscussionCommentExists(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   expectedEntityKind?: DiscussionEntityKind,
   label: "comment" | "reply" = "comment",
 ): Promise<DiscussionCommentContext> {
@@ -184,7 +185,7 @@ async function assertDiscussionCommentExists(
 
 async function assertRootDiscussionThread(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<DiscussionThreadContext> {
   const result = await client.request(GetDiscussionCommentContextDocument, {
@@ -212,7 +213,7 @@ async function assertRootDiscussionThread(
 
 async function assertReplyComment(
   client: GraphQLClient,
-  commentId: string,
+  commentId: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<DiscussionCommentContext> {
   const comment = await assertDiscussionCommentExists(
@@ -403,7 +404,7 @@ async function listDiscussionReplyCandidatesWithReactions(
 
 function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
   comments: readonly T[],
-  threadId: string,
+  threadId: UUID,
 ): T[] {
   const childrenByParentId = new Map<string, T[]>();
 
@@ -499,7 +500,7 @@ export async function createDiscussionCommentReaction(
 
 export async function createIssueDiscussionCommentReaction(
   client: GraphQLClient,
-  input: { commentId: string; emoji: string },
+  input: { commentId: UUID; emoji: string },
 ): Promise<CreateDiscussionReactionResult> {
   await assertDiscussionCommentExists(client, input.commentId, "issue");
 
@@ -524,7 +525,7 @@ export async function deleteDiscussionCommentReactionByEmoji(
 
 export async function deleteIssueDiscussionCommentReactionByEmoji(
   client: GraphQLClient,
-  input: { commentId: string; emoji: string },
+  input: { commentId: UUID; emoji: string },
 ): Promise<DeleteDiscussionReactionResult> {
   await assertDiscussionCommentExists(client, input.commentId, "issue");
 
@@ -550,7 +551,7 @@ export async function deleteDiscussionCommentReactionById(
 
 export async function deleteIssueDiscussionCommentReactionById(
   client: GraphQLClient,
-  input: { commentId: string; reactionId: string },
+  input: { commentId: UUID; reactionId: UUID },
 ): Promise<DeleteDiscussionReactionResult> {
   await assertDiscussionCommentExists(client, input.commentId, "issue");
 
@@ -563,7 +564,7 @@ export async function deleteIssueDiscussionCommentReactionById(
 
 export async function listDiscussionsForIssue(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
@@ -585,7 +586,7 @@ export async function listDiscussionsForIssue(
 
 export async function listDiscussionsForIssueWithReactions(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
@@ -610,7 +611,7 @@ export async function listDiscussionsForIssueWithReactions(
 
 export async function listDiscussionsForProject(
   client: GraphQLClient,
-  projectId: string,
+  projectId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
@@ -632,7 +633,7 @@ export async function listDiscussionsForProject(
 
 export async function listDiscussionsForProjectWithReactions(
   client: GraphQLClient,
-  projectId: string,
+  projectId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
@@ -657,7 +658,7 @@ export async function listDiscussionsForProjectWithReactions(
 
 export async function listDiscussionsForInitiative(
   client: GraphQLClient,
-  initiativeId: string,
+  initiativeId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
@@ -680,7 +681,7 @@ export async function listDiscussionsForInitiative(
 
 export async function listDiscussionsForInitiativeWithReactions(
   client: GraphQLClient,
-  initiativeId: string,
+  initiativeId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
@@ -706,7 +707,7 @@ export async function listDiscussionsForInitiativeWithReactions(
 
 export async function listDiscussionReplies(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   options: PaginationOptions = {},
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<PaginatedResult<DiscussionCommentFieldsFragment>> {
@@ -724,7 +725,7 @@ export async function listDiscussionReplies(
 
 export async function listDiscussionRepliesWithReactions(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   options: PaginationOptions = {},
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
@@ -745,14 +746,14 @@ export async function listDiscussionRepliesWithReactions(
 
 export async function startIssueDiscussion(
   client: GraphQLClient,
-  input: { issueId: string; body: string },
+  input: { issueId: UUID; body: string },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   return startDiscussion(client, { issueId: input.issueId, body: input.body });
 }
 
 export async function startProjectDiscussion(
   client: GraphQLClient,
-  input: { projectId: string; body: string },
+  input: { projectId: UUID; body: string },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   return startDiscussion(client, {
     projectId: input.projectId,
@@ -762,7 +763,7 @@ export async function startProjectDiscussion(
 
 export async function startInitiativeDiscussion(
   client: GraphQLClient,
-  input: { initiativeId: string; body: string },
+  input: { initiativeId: UUID; body: string },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   return startDiscussion(client, {
     initiativeId: input.initiativeId,
@@ -772,7 +773,7 @@ export async function startInitiativeDiscussion(
 
 export async function replyToDiscussion(
   client: GraphQLClient,
-  input: { threadId: string; body: string; entityKind?: DiscussionEntityKind },
+  input: { threadId: UUID; body: string; entityKind?: DiscussionEntityKind },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   const thread = await assertRootDiscussionThread(
     client,
@@ -804,7 +805,7 @@ export async function replyToDiscussion(
 
 export async function editDiscussionReply(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: CommentUpdateInput,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<EditDiscussionReplyMutation["commentUpdate"]["comment"]> {
@@ -824,7 +825,7 @@ export async function editDiscussionReply(
 
 export async function deleteDiscussionReply(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<{ id: string; success: true }> {
   await assertReplyComment(client, id, expectedEntityKind);
@@ -844,7 +845,7 @@ export async function deleteDiscussionReply(
 
 export async function editDiscussionComment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: CommentUpdateInput,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<EditDiscussionReplyMutation["commentUpdate"]["comment"]> {
@@ -864,7 +865,7 @@ export async function editDiscussionComment(
 
 export async function deleteDiscussionComment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<{ id: string; success: true }> {
   await assertDiscussionCommentExists(client, id, expectedEntityKind);
@@ -885,8 +886,8 @@ export async function deleteDiscussionComment(
 export async function resolveDiscussion(
   client: GraphQLClient,
   input: {
-    threadId: string;
-    resolvingCommentId?: string;
+    threadId: UUID;
+    resolvingCommentId?: UUID;
     entityKind?: DiscussionEntityKind;
   },
 ): Promise<ResolveDiscussionMutation["commentResolve"]["comment"]> {
@@ -906,7 +907,7 @@ export async function resolveDiscussion(
 
 export async function unresolveDiscussion(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<UnresolveDiscussionMutation["commentUnresolve"]["comment"]> {
   await assertRootDiscussionThread(client, threadId, expectedEntityKind);

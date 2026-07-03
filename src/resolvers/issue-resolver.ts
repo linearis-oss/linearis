@@ -1,7 +1,12 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
 import { firstOrThrow } from "../common/array.js";
 import { notFoundError } from "../common/errors.js";
-import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
+import {
+  asUuid,
+  isUuid,
+  parseIssueIdentifier,
+  type UUID,
+} from "../common/identifier.js";
 import { omitUndefined } from "../common/object.js";
 import {
   resolveTeamEstimateContext,
@@ -77,7 +82,7 @@ async function getIssueTeamLookup(
 }
 
 export interface IssueEstimateContext {
-  issueId: string;
+  issueId: UUID;
   team: TeamEstimateContext;
 }
 
@@ -94,8 +99,8 @@ export interface IssueEstimateContext {
 export async function resolveIssueId(
   client: LinearSdkClient,
   issueIdOrIdentifier: string,
-): Promise<string> {
-  if (isUuid(issueIdOrIdentifier)) return issueIdOrIdentifier;
+): Promise<UUID> {
+  if (isUuid(issueIdOrIdentifier)) return asUuid(issueIdOrIdentifier);
 
   const { teamKey, issueNumber } = parseIssueIdentifier(issueIdOrIdentifier);
 
@@ -107,9 +112,11 @@ export async function resolveIssueId(
     first: 1,
   });
 
-  return firstOrThrow(issues.nodes, () =>
-    notFoundError("Issue", issueIdOrIdentifier),
-  ).id;
+  return asUuid(
+    firstOrThrow(issues.nodes, () =>
+      notFoundError("Issue", issueIdOrIdentifier),
+    ).id,
+  );
 }
 
 export async function resolveIssueEstimateContext(
@@ -152,7 +159,7 @@ export async function resolveIssueEstimateContext(
   }
 
   return {
-    issueId: projection.id,
+    issueId: asUuid(projection.id),
     team: await resolveTeamEstimateContext(client, teamLookup),
   };
 }

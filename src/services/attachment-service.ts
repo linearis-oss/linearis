@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
@@ -20,9 +21,12 @@ export type CreatedAttachment =
   AttachmentCreateMutation["attachmentCreate"]["attachment"];
 
 // Service-owned input type (UUIDs pre-resolved by the command).
-export type CreateAttachmentInput = Pick<
-  AttachmentCreateInput,
-  "issueId" | "title" | "url" | "subtitle" | "commentBody" | "iconUrl"
+export type CreateAttachmentInput = BrandUuidFields<
+  Pick<
+    AttachmentCreateInput,
+    "issueId" | "title" | "url" | "subtitle" | "commentBody" | "iconUrl"
+  >,
+  "issueId"
 >;
 
 export interface AttachmentFilterOptions {
@@ -73,7 +77,7 @@ export async function createAttachment(
 
 export async function deleteAttachment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<{ id: string; success: boolean }> {
   const result = await client.request(AttachmentDeleteDocument, { id });
 
@@ -87,7 +91,7 @@ export async function deleteAttachment(
 
 export async function listAttachments(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
   filter?: AttachmentFilter,
 ): Promise<AttachmentListItem[]> {
   const result = await client.request(ListAttachmentsDocument, {

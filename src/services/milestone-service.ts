@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
@@ -28,9 +29,12 @@ export type UpdatedMilestone = NonNullable<
 >;
 
 // Service-owned input types (UUIDs pre-resolved by the command).
-export type CreateMilestoneInput = Pick<
-  ProjectMilestoneCreateInput,
-  "projectId" | "name" | "description" | "targetDate"
+export type CreateMilestoneInput = BrandUuidFields<
+  Pick<
+    ProjectMilestoneCreateInput,
+    "projectId" | "name" | "description" | "targetDate"
+  >,
+  "projectId"
 >;
 export type UpdateMilestoneInput = Pick<
   ProjectMilestoneUpdateInput,
@@ -39,7 +43,7 @@ export type UpdateMilestoneInput = Pick<
 
 export async function listMilestones(
   client: GraphQLClient,
-  projectId: string,
+  projectId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<MilestoneListItem>> {
   const { limit = 50, after } = options;
@@ -60,7 +64,7 @@ export async function listMilestones(
 
 export async function getMilestone(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   issuesLimit?: number,
 ): Promise<MilestoneDetail> {
   const result = await client.request(GetProjectMilestoneByIdDocument, {
@@ -93,7 +97,7 @@ export async function createMilestone(
 
 export async function updateMilestone(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: UpdateMilestoneInput,
 ): Promise<UpdatedMilestone> {
   const gqlInput: ProjectMilestoneUpdateInput = input;
