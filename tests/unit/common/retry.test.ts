@@ -33,6 +33,15 @@ describe("isRetryable", () => {
   it("returns false for generic errors", () => {
     expect(isRetryable(new Error("Entity not found"))).toBe(false);
   });
+
+  it("returns true for native fetch transport failures", () => {
+    expect(isRetryable(new TypeError("fetch failed"))).toBe(true);
+  });
+
+  it("returns true when a retryable code is only on the cause chain", () => {
+    const cause = new Error("read ECONNRESET");
+    expect(isRetryable(new TypeError("fetch failed", { cause }))).toBe(true);
+  });
 });
 
 describe("withRetry", () => {
