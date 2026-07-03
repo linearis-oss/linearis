@@ -9,22 +9,40 @@ interface RetryableError {
   };
 }
 
+/**
+ * Collect the lowercased messages of an error and its `cause` chain. Native
+ * `fetch` (undici) rejects transport failures as `TypeError: fetch failed` and
+ * carries the real error (e.g. `ECONNRESET`) on `cause`, so the top-level
+ * message alone is not enough to classify the failure.
+ */
+function collectErrorMessages(error: unknown): string {
+  const messages: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    messages.push(current.message);
+    current = current.cause;
+  }
+  return messages.join(" ").toLowerCase();
+}
+
 export function isRetryable(error: unknown): boolean {
   const err = error as RetryableError;
   const status = err?.response?.status;
   if (typeof status === "number") {
     return status === 429 || (status >= 500 && status < 600);
   }
-  // network-level errors (ECONNRESET, ETIMEDOUT, etc.)
-  if (error instanceof Error) {
-    const msg = error.message.toLowerCase();
-    return (
-      msg.includes("timed out") ||
-      msg.includes("econnreset") ||
-      msg.includes("network")
-    );
-  }
-  return false;
+  // network-level errors (ECONNRESET, ETIMEDOUT, etc.). `fetch failed` is
+  // undici's generic wrapper for transport failures with no HTTP status.
+  const msg = collectErrorMessages(error);
+  return (
+    msg.includes("timed out") ||
+    msg.includes("etimedout") ||
+    msg.includes("econnreset") ||
+    msg.includes("network") ||
+    msg.includes("fetch failed")
+  );
 }
 
 export async function withRetry<T>(
