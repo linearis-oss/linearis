@@ -8,14 +8,13 @@ A reference of every file in the Linearis codebase, organized by architectural l
 
 ## Client Layer (`src/client/`)
 
-Thin wrappers around the Linear API. No business logic.
+Thin wrapper around the Linear API. No business logic.
 
 - **graphql-client.ts** -- `GraphQLClient` class with a typed `request<TResult>(document: DocumentNode, variables?: Record<string, unknown>)` method for direct GraphQL execution.
-- **linear-client.ts** -- `LinearSdkClient` wrapper exposing a readonly `sdk: LinearClient` property for SDK-based lookups.
 
 ## Resolver Layer (`src/resolvers/`)
 
-Each resolver converts a human-friendly identifier (name, key, or slug) into a UUID. Resolvers use `LinearSdkClient` exclusively.
+Each resolver converts a human-friendly identifier (name, key, or slug) into a UUID. Resolvers use `GraphQLClient` with lean filter-based lookup queries.
 
 - **team-resolver.ts** -- `resolveTeamId(client, keyOrNameOrId)`
 - **project-resolver.ts** -- `resolveProjectId(client, nameOrId)`
@@ -61,7 +60,7 @@ CLI orchestration. Each file registers a command group via a `setup*Commands(pro
 
 Shared utilities used across all layers.
 
-- **context.ts** -- `CommandContext` interface and `createContext()` factory that produces both `GraphQLClient` and `LinearSdkClient`.
+- **context.ts** -- `CommandContext` interface and `createContext()` factory that produces the `GraphQLClient` (`ctx.gql`).
 - **auth.ts** -- `resolveApiToken()` with multi-source lookup: `--api-token` flag, `LINEAR_API_TOKEN` env var, `~/.linearis/token` (encrypted), `~/.linear_api_token` (deprecated).
 - **token-storage.ts** -- `saveToken()`, `getStoredToken()`, `clearToken()` for encrypted token storage in `~/.linearis/token`.
 - **encryption.ts** -- AES-256-CBC encryption for token storage.
@@ -103,7 +102,7 @@ Source `.graphql` files that feed into code generation.
 
 ## Tests (`tests/`)
 
-Unit tests mirror the source structure. Resolver tests mock the SDK client; service tests mock the GraphQL client; common tests require no mocks.
+Unit tests mirror the source structure. Resolver and service tests both mock the `GraphQLClient` (`request`); common tests require no mocks.
 
 ```
 tests/unit/
@@ -138,7 +137,7 @@ tests/unit/
 ```
 CLI Input --> Command --> Resolver --> Service --> JSON Output
                 |            |            |
-           createContext()   SDK       GraphQL
+           createContext() GraphQL     GraphQL
                           (name->UUID)  (CRUD)
 ```
 

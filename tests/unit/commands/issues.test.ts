@@ -8,7 +8,6 @@ import { asUuid } from "../../../src/common/identifier.js";
 vi.mock("../../../src/common/context.js", () => ({
   createContext: vi.fn(() => ({
     gql: { request: vi.fn() },
-    sdk: { sdk: {} },
   })),
   getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));

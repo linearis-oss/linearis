@@ -61,17 +61,16 @@ Each architectural layer uses a different mock target. The rule is simple: mock 
 
 ### Resolver Tests
 
-Resolvers depend on `LinearSdkClient`. Mock the SDK methods it calls:
+Resolvers depend on `GraphQLClient`. Mock the `request` method it calls:
 
 ```typescript
-import type { LinearSdkClient } from "../../src/client/linear-client.js";
+import type { GraphQLClient } from "../../src/client/graphql-client.js";
 
-const mockSdk = {
-  teams: vi.fn().mockResolvedValue({
-    nodes: [{ id: "uuid-123", key: "ABC" }],
+const client = {
+  request: vi.fn().mockResolvedValue({
+    teams: { nodes: [{ id: "uuid-123", key: "ABC" }] },
   }),
-};
-const client = { sdk: mockSdk } as unknown as LinearSdkClient;
+} as unknown as GraphQLClient;
 ```
 
 ### Service Tests
@@ -100,10 +99,11 @@ expect(isUuid("ABC-123")).toBe(false);
 
 ### Client Tests
 
-Client tests mock the underlying network layer:
+Client tests mock the underlying network layer by stubbing global `fetch`:
 
 ```typescript
-const mockClient = { rawRequest: vi.fn() };
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
 ```
 
 ## Writing a New Test
@@ -116,34 +116,32 @@ Example resolver test:
 
 ```typescript
 import { describe, expect, it, vi } from "vitest";
-import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 
+// Queue one `{ teams: { nodes } }` response per expected request.
+function mockGqlClient(...results: Array<{ nodes: Array<{ id: string; key?: string; name?: string }> }>) {
+  const request = vi.fn();
+  for (const teams of results) request.mockResolvedValueOnce({ teams });
+  return { request } as unknown as GraphQLClient;
+}
+
 describe("resolveTeamId", () => {
-  it("should return UUID as-is", async () => {
-    const client = { sdk: {} } as unknown as LinearSdkClient;
+  it("should return UUID as-is without querying", async () => {
+    const client = mockGqlClient();
     const result = await resolveTeamId(client, "550e8400-e29b-41d4-a716-446655440000");
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(client.request).not.toHaveBeenCalled();
   });
 
   it("should resolve team by key", async () => {
-    const mockSdk = {
-      teams: vi.fn().mockResolvedValue({
-        nodes: [{ id: "uuid-456", key: "ENG" }],
-      }),
-    };
-    const client = { sdk: mockSdk } as unknown as LinearSdkClient;
-
+    const client = mockGqlClient({ nodes: [{ id: "uuid-456", key: "ENG" }] });
     const result = await resolveTeamId(client, "ENG");
     expect(result).toBe("uuid-456");
   });
 
   it("should throw when team is not found", async () => {
-    const mockSdk = {
-      teams: vi.fn().mockResolvedValue({ nodes: [] }),
-    };
-    const client = { sdk: mockSdk } as unknown as LinearSdkClient;
-
+    const client = mockGqlClient({ nodes: [] }, { nodes: [] });
     await expect(resolveTeamId(client, "NOPE")).rejects.toThrow();
   });
 });

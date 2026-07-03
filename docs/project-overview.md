@@ -10,10 +10,10 @@ The codebase follows a five-layer architecture. Each layer has a specific respon
 
 | Layer | Directory | Responsibility | Client |
 |-------|-----------|---------------|--------|
-| Client | `src/client/` | Low-level API wrappers | -- |
-| Resolver | `src/resolvers/` | Human ID to UUID conversion | LinearSdkClient |
+| Client | `src/client/` | Low-level API wrapper | -- |
+| Resolver | `src/resolvers/` | Human ID to UUID conversion | GraphQLClient |
 | Service | `src/services/` | Business logic and CRUD operations | GraphQLClient |
-| Command | `src/commands/` | CLI orchestration via Commander.js | Both (via `createContext()`) |
+| Command | `src/commands/` | CLI orchestration via Commander.js | GraphQLClient (via `createContext()`) |
 | Common | `src/common/` | Shared utilities, types, error handling | -- |
 
 Data flows in one direction:
@@ -29,7 +29,7 @@ Commands receive user input, resolve any identifiers to UUIDs through the resolv
 - **TypeScript** with strict mode enabled and no `any` types
 - **Node.js** >= 22.0.0, ES modules throughout
 - **Commander.js** v14.0.0 for CLI structure
-- **Linear SDK** v58.1.0 for the SDK client used in resolvers
+- **GraphQL** for the typed client backing every layer (resolvers and services)
 - **GraphQL Codegen** for type-safe query and mutation documents
 - **Vitest** for unit testing
 - **tsx** for development execution

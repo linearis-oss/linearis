@@ -42,16 +42,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full commit types table and examp
 ```
 CLI Input → Command → Resolver → Service → JSON Output
                │         │          │
-           createContext  SDK     GraphQL
+           createContext GraphQL  GraphQL
                         (UUID)   (data)
 ```
 
 | Layer | Directory | Client | Responsibility |
 |-----------|-----------------|---------------------|--------------------------------------|
 | Client | `src/client/` | — | Thin API wrappers, no logic |
-| Resolver | `src/resolvers/` | `LinearSdkClient` | Human ID → UUID conversion |
+| Resolver | `src/resolvers/` | `GraphQLClient` | Human ID → UUID conversion |
 | Service | `src/services/` | `GraphQLClient` | Business logic, CRUD via GraphQL |
-| Command | `src/commands/` | Both via `createContext()` | CLI orchestration only |
+| Command | `src/commands/` | `GraphQLClient` via `createContext()` | CLI orchestration only |
 | Common | `src/common/` | — | Shared types, errors, output, auth |
 
 ### Invariants (P0 — violations fail CI/review)
@@ -59,12 +59,12 @@ CLI Input → Command → Resolver → Service → JSON Output
 1. **No `any` types.** Use `unknown`, codegen types, or explicit interfaces.
 2. **Strict layer separation.** No cross-layer imports:
    - Resolvers must not import services (or vice versa).
-   - Commands must not import `GraphQLClient` directly.
+   - Commands must not construct `GraphQLClient` directly — use `createContext()`.
 3. **Client-layer contract:**
-   - Resolvers → `LinearSdkClient` by default.
-   - Services → `GraphQLClient` only.
-   - Commands → both, via `createContext()`.
-   - **Narrow exceptions allowed only when SDK lacks required capability**, with explicit `ARCHITECTURAL EXCEPTION` docstring in code (current examples: milestone/project-status lookups, initiative relation/link ID lookup helpers).
+   - Resolvers → `GraphQLClient` (via lean filter-based lookup queries).
+   - Services → `GraphQLClient`.
+   - Commands → `GraphQLClient` via `createContext()` (`ctx.gql`).
+   - Resolvers should prefer the lean lookup fragments; when the Linear API exposes no lean lookup for an entity, a resolver may query it directly with an explicit `ARCHITECTURAL EXCEPTION` docstring (current examples: milestone/project-status lookups, initiative relation/link ID lookup helpers).
 4. **ID resolution happens once**, in resolvers only. Services accept UUIDs.
 5. **All commands** use `handleCommand()` wrapper and `outputSuccess()` for output.
 6. **Explicit return types** on all exported functions.
@@ -84,9 +84,9 @@ Need a new GraphQL operation?
 
 Need to resolve a human-friendly ID?
   → Add/edit src/resolvers/*-resolver.ts
-  → Prefer LinearSdkClient, return UUID string
-  → Pattern: UUID passthrough → SDK lookup → notFoundError()
-  → If SDK cannot express lookup, use GraphQL as documented ARCHITECTURAL EXCEPTION (include rationale in resolver docstring)
+  → Use GraphQLClient with a lean lookup query, return UUID string
+  → Pattern: UUID passthrough → GraphQL filter lookup → notFoundError()
+  → If no lean lookup fragment exists, query directly as a documented ARCHITECTURAL EXCEPTION (include rationale in resolver docstring)
 
 Need business logic / CRUD?
   → Add/edit src/services/*-service.ts
@@ -110,7 +110,7 @@ Tests mirror `src/` structure under `tests/unit/`. Mock the dependency one layer
 
 | Test target | Mock | Example |
 |-------------|------|---------|
-| Resolver | `LinearSdkClient` (mock `sdk.*`) | `{ sdk: { teams: vi.fn() } } as unknown as LinearSdkClient` |
+| Resolver | `GraphQLClient` (mock `request`) | `{ request: vi.fn() } as unknown as GraphQLClient` |
 | Service | `GraphQLClient` (mock `request`) | `{ request: vi.fn() } as unknown as GraphQLClient` |
 | Common | No mocks (pure functions) | Direct import + assert |
 
@@ -136,12 +136,14 @@ async function createIssue(client: GraphQLClient, teamName: string) {
 async function createIssue(client: GraphQLClient, input: { teamId: string }) { ... }
 ```
 
-**Wrong client in layer:**
+**ID resolution in command:**
 ```typescript
-// WRONG: resolver uses GraphQLClient
-async function resolveTeamId(client: GraphQLClient) { ... }
-// RIGHT: resolver uses LinearSdkClient
-async function resolveTeamId(client: LinearSdkClient) { ... }
+// WRONG: command builds a raw mutation instead of delegating
+async function resolveTeamId(client: GraphQLClient, teamName: string) {
+  const teamId = /* inline lookup in the command */;
+}
+// RIGHT: resolvers own ID resolution, services own CRUD
+async function resolveTeamId(client: GraphQLClient, teamName: string): Promise<UUID> { ... }
 ```
 
 **Business logic in command:**
@@ -152,7 +154,7 @@ async function resolveTeamId(client: LinearSdkClient) { ... }
 }))
 // RIGHT: command delegates
 .action(handleCommand(async (title, opts) => {
-  const teamId = await resolveTeamId(ctx.sdk, opts.team);
+  const teamId = await resolveTeamId(ctx.gql, opts.team);
   const result = await createIssue(ctx.gql, { title, teamId });
   outputSuccess(result);
 }))
@@ -195,7 +197,7 @@ Registration checklist:
 ```
 src/
   main.ts              # entry point, command registration
-  client/              # GraphQLClient, LinearSdkClient
+  client/              # GraphQLClient
   resolvers/           # ID resolution (human → UUID)
   services/            # business logic (GraphQL CRUD)
   commands/            # CLI definitions (Commander.js)
