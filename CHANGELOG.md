@@ -1,3 +1,9 @@
+## [2026.6.0-next.9](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.8...v2026.6.0-next.9) (2026-07-03)
+
+### Bug Fixes
+
+* **retry:** retry native fetch transport failures ([6fc8e64](https://github.com/linearis-oss/linearis/commit/6fc8e64ea83b45ee316307dd14701cb3df696300)), closes [#207](https://github.com/linearis-oss/linearis/issues/207)
+
 ## [2026.6.0-next.8](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.7...v2026.6.0-next.8) (2026-07-02)
 
 ### Features
