@@ -10,7 +10,7 @@ description: >-
   Linear issues and projects.
 license: MIT
 compatibility: Requires the linearis CLI (npm i -g linearis), Node >=22, and a Linear API token.
-allowed-tools: Bash(linearis:*) Bash(linear:*) Bash(jq:*)
+allowed-tools: Bash(linearis:*), Bash(linear:*), Bash(jq:*)
 metadata:
   author: linearis-oss
   version: "1.0.0"
