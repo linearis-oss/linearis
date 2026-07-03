@@ -24,6 +24,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:commands": "tsx tests/command-coverage.ts",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "generate": "graphql-codegen --config codegen.config.ts",
     "generate:usage": "tsx src/main.ts usage --all > USAGE.md",
     "format": "biome format --write .",

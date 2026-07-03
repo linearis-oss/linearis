@@ -72,7 +72,7 @@ describe("listInitiatives", () => {
       after: "cursor-1",
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
-      orderBy: { createdAt: "Asc" },
+      orderBy: "createdAt",
     });
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
@@ -80,7 +80,7 @@ describe("listInitiatives", () => {
       after: "cursor-1",
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
-      orderBy: { createdAt: "Asc" },
+      orderBy: "createdAt",
       sort: undefined,
     });
   });

@@ -367,7 +367,7 @@ describe("getIssueByIdentifierWithComments", () => {
     });
     const result = await getIssueByIdentifierWithComments(client, "ENG", 42);
 
-    expect(result.comments.nodes[0].user.displayName).toBe("Ada");
+    expect(result.comments.nodes[0].user?.displayName).toBe("Ada");
     expect(client.request).toHaveBeenCalledWith(
       GetIssueByIdentifierWithCommentsDocument,
       {

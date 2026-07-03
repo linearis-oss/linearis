@@ -1,6 +1,20 @@
+import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { AuthenticationError } from "../../../src/common/errors.js";
+
+// A stand-in document for the error-path tests. Typing its variables as
+// `Record<string, never>` makes `request`'s variables argument optional, so
+// these calls can invoke it without variables.
+function fakeDocument<TResult = unknown>(): TypedDocumentNode<
+  TResult,
+  Record<string, never>
+> {
+  return { kind: "Document", definitions: [] } as unknown as TypedDocumentNode<
+    TResult,
+    Record<string, never>
+  >;
+}
 
 // We test the error handling logic by mocking the underlying rawRequest
 // The constructor creates a real LinearClient, so we mock at module level
@@ -49,9 +63,7 @@ describe("GraphQLClient", () => {
       });
 
       const client = new GraphQLClient("bad-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-        typeof client.request
-      >[0];
+      const fakeDoc = fakeDocument();
 
       await expect(client.request(fakeDoc)).rejects.toThrow(
         AuthenticationError,
@@ -66,9 +78,7 @@ describe("GraphQLClient", () => {
       });
 
       const client = new GraphQLClient("bad-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-        typeof client.request
-      >[0];
+      const fakeDoc = fakeDocument();
 
       await expect(client.request(fakeDoc)).rejects.toThrow(
         AuthenticationError,
@@ -83,9 +93,7 @@ describe("GraphQLClient", () => {
       });
 
       const client = new GraphQLClient("good-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-        typeof client.request
-      >[0];
+      const fakeDoc = fakeDocument();
 
       try {
         await client.request(fakeDoc);
@@ -101,9 +109,7 @@ describe("GraphQLClient", () => {
       mockRawRequest.mockResolvedValueOnce({ data: undefined });
 
       const client = new GraphQLClient("good-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-        typeof client.request
-      >[0];
+      const fakeDoc = fakeDocument();
 
       await expect(client.request(fakeDoc)).rejects.toThrow(
         "GraphQL response contained no data",
@@ -116,11 +122,9 @@ describe("GraphQLClient", () => {
         mockRawRequest.mockResolvedValueOnce({ data: { ok: true } });
 
         const client = new GraphQLClient("good-token");
-        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-          typeof client.request
-        >[0];
+        const fakeDoc = fakeDocument<{ ok: boolean }>();
 
-        const result = await client.request<{ ok: boolean }>(fakeDoc);
+        const result = await client.request(fakeDoc);
 
         expect(result).toEqual({ ok: true });
         expect(vi.getTimerCount()).toBe(0);
@@ -139,9 +143,7 @@ describe("GraphQLClient", () => {
         });
 
         const client = new GraphQLClient("good-token");
-        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-          typeof client.request
-        >[0];
+        const fakeDoc = fakeDocument();
 
         await expect(client.request(fakeDoc)).rejects.toThrow(
           "Entity not found",
@@ -165,9 +167,7 @@ describe("GraphQLClient", () => {
         });
 
         const client = new GraphQLClient("good-token");
-        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-          typeof client.request
-        >[0];
+        const fakeDoc = fakeDocument();
 
         const promise = client.request(fakeDoc);
         const rejection = expect(promise).rejects.toThrow("Request timed out");
@@ -188,9 +188,7 @@ describe("GraphQLClient", () => {
         .mockResolvedValueOnce({ data: { foo: "bar" } });
 
       const client = new GraphQLClient("good-token");
-      const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-        typeof client.request
-      >[0];
+      const fakeDoc = fakeDocument();
 
       vi.useFakeTimers();
       try {
@@ -215,9 +213,7 @@ describe("GraphQLClient", () => {
           .mockResolvedValueOnce({ data: { foo: "bar" } });
 
         const client = new GraphQLClient("good-token");
-        const fakeDoc = { kind: "Document", definitions: [] } as Parameters<
-          typeof client.request
-        >[0];
+        const fakeDoc = fakeDocument();
 
         const promise = client.request(fakeDoc);
 
