@@ -8,6 +8,7 @@
 [![Node version](https://img.shields.io/node/v/linearis.svg)](https://nodejs.org)
 [![CI](https://github.com/linearis-oss/linearis/actions/workflows/ci.yml/badge.svg)](https://github.com/linearis-oss/linearis/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+[![skills.sh](https://skills.sh/b/linearis-oss/linearis)](https://skills.sh/linearis-oss/linearis)
 
 </div>
 
