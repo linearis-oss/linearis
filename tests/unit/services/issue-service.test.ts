@@ -114,7 +114,7 @@ describe("listIssues", () => {
     });
     const result = await listIssues(client, { limit: 10 });
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("1");
+    expect(result.nodes[0]?.id).toBe("1");
     expect(result.pageInfo).toEqual({
       hasNextPage: false,
       endCursor: "cursor1",
@@ -367,7 +367,7 @@ describe("getIssueByIdentifierWithComments", () => {
     });
     const result = await getIssueByIdentifierWithComments(client, "ENG", 42);
 
-    expect(result.comments.nodes[0].user?.displayName).toBe("Ada");
+    expect(result.comments.nodes[0]?.user?.displayName).toBe("Ada");
     expect(client.request).toHaveBeenCalledWith(
       GetIssueByIdentifierWithCommentsDocument,
       {
@@ -434,15 +434,15 @@ describe("getIssueWithCommentThreads", () => {
     const result = await getIssueWithCommentThreads(client, "issue-1");
 
     expect(result.comments.nodes).toHaveLength(2);
-    expect(result.comments.nodes[0].id).toBe("comment-1");
-    expect(result.comments.nodes[0].replies.map((reply) => reply.id)).toEqual([
+    expect(result.comments.nodes[0]?.id).toBe("comment-1");
+    expect(result.comments.nodes[0]?.replies.map((reply) => reply.id)).toEqual([
       "comment-2",
       "comment-5",
     ]);
     expect(
-      result.comments.nodes[0].replies[0].replies.map((reply) => reply.id),
+      result.comments.nodes[0]?.replies[0]?.replies.map((reply) => reply.id),
     ).toEqual(["comment-4"]);
-    expect(result.comments.nodes[1].id).toBe("comment-3");
+    expect(result.comments.nodes[1]?.id).toBe("comment-3");
   });
 });
 
@@ -485,7 +485,7 @@ describe("getIssueByIdentifierWithCommentThreads", () => {
       42,
     );
 
-    expect(result.comments.nodes[0].replies[0].id).toBe("comment-2");
+    expect(result.comments.nodes[0]?.replies[0]?.id).toBe("comment-2");
     expect(client.request).toHaveBeenCalledWith(
       GetIssueByIdentifierWithCommentsDocument,
       {
@@ -762,7 +762,7 @@ describe("searchIssues", () => {
     });
     const result = await searchIssues(client, "test", { limit: 10 });
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("1");
+    expect(result.nodes[0]?.id).toBe("1");
     expect(result.pageInfo).toEqual({
       hasNextPage: false,
       endCursor: "cursor1",

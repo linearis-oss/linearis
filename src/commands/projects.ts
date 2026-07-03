@@ -4,6 +4,7 @@ import { type Priority, parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
   resolveProjectId,
@@ -263,9 +264,10 @@ export function setupProjectsCommands(program: Command): void {
       commandAction<[ListOptions, Command]>(async (options, command) => {
         const ctx = createContext(getRootOpts(command));
         const result = await listProjects(ctx.gql, {
-          limit: parseLimit(options.limit),
-          after: options.after,
-          includeArchived: options.includeArchived,
+          ...buildPaginationOptions(parseLimit(options.limit), options.after),
+          ...(options.includeArchived !== undefined
+            ? { includeArchived: options.includeArchived }
+            : {}),
         });
         outputSuccess(result);
       }),
@@ -340,10 +342,10 @@ export function setupProjectsCommands(program: Command): void {
           const ctx = createContext(getRootOpts(command));
 
           const projectId = await resolveProjectId(ctx.sdk, project);
-          const paginationOptions = {
-            limit: parseLimit(options.limit || "25"),
-            after: options.after,
-          };
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "25"),
+            options.after,
+          );
           const result = options.withReactions
             ? await listDiscussionsForProjectWithReactions(
                 ctx.gql,
@@ -377,10 +379,10 @@ export function setupProjectsCommands(program: Command): void {
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const paginationOptions = {
-            limit: parseLimit(options.limit || "50"),
-            after: options.after,
-          };
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          );
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
@@ -528,7 +530,9 @@ export function setupProjectsCommands(program: Command): void {
 
           const result = await resolveDiscussion(ctx.gql, {
             threadId: thread,
-            resolvingCommentId: options.withComment,
+            ...(options.withComment !== undefined
+              ? { resolvingCommentId: options.withComment }
+              : {}),
             entityKind: "project",
           });
 

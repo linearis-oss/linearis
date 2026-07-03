@@ -345,8 +345,8 @@ describe("listLabels", () => {
 
     const result = await listLabels(client);
 
-    expect(result.nodes[0].description).toBeUndefined();
-    expect(result.nodes[0].type).toBe("issue");
+    expect(result.nodes[0]?.description).toBeUndefined();
+    expect(result.nodes[0]?.type).toBe("issue");
   });
 });
 
@@ -429,7 +429,7 @@ describe("listProjectLabels", () => {
 
     const result = await listProjectLabels(client);
 
-    expect(result.nodes[0].description).toBeUndefined();
-    expect(result.nodes[0].type).toBe("project");
+    expect(result.nodes[0]?.description).toBeUndefined();
+    expect(result.nodes[0]?.type).toBe("project");
   });
 });

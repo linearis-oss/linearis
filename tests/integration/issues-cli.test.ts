@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 const execAsync = promisify(exec);
 const CLI_PATH = "./dist/main.js";
-const hasApiToken = !!process.env.LINEAR_API_TOKEN;
+const hasApiToken = !!process.env["LINEAR_API_TOKEN"];
 
 interface CliResult {
   stdout: string;
@@ -47,7 +47,7 @@ describe("Issues CLI lifecycle", () => {
       );
 
       expect(teams.nodes.length).toBeGreaterThan(0);
-      const teamKey = teams.nodes[0].key;
+      const teamKey = teams.nodes[0]?.key;
 
       const title = `issue-lifecycle-e2e-${Date.now()}`;
       const createdResult = await runCli(

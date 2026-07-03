@@ -180,7 +180,8 @@ describe("pickFields", () => {
     const result = pickFields(input, [["__proto__", "x"], ["a"]]);
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
     expect((result as { a: number }).a).toBe(1);
-    expect((result as Record<string, { x: number }>).__proto__.x).toBe(9);
+    const ownProto = Object.getOwnPropertyDescriptor(result, "__proto__");
+    expect((ownProto?.value as { x: number }).x).toBe(9);
   });
 });
 
@@ -243,7 +244,7 @@ describe("handleCommand with AuthenticationError", () => {
 
     await handler();
 
-    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+    const output = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string);
     expect(output.error).toBe("AUTHENTICATION_REQUIRED");
     expect(exitSpy).toHaveBeenCalledWith(42);
 
@@ -284,7 +285,7 @@ describe("outputAuthError", () => {
     const err = new AuthenticationError("Token expired");
     outputAuthError(err);
 
-    const output = JSON.parse(consoleSpy.mock.calls[0][0] as string);
+    const output = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string);
     expect(output.error).toBe("AUTHENTICATION_REQUIRED");
     expect(output.message).toBe("Linear API authentication failed.");
     expect(output.details).toBe("Token expired");

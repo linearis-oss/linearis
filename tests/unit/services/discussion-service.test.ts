@@ -346,7 +346,7 @@ describe("listDiscussionsForIssue", () => {
       { limit: 10 },
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -409,7 +409,7 @@ describe("listDiscussionsForProject", () => {
       { limit: 10 },
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -467,7 +467,7 @@ describe("listDiscussionsForInitiative", () => {
       { limit: 10 },
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -635,7 +635,7 @@ describe("listDiscussionReplies", () => {
       "issue",
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,

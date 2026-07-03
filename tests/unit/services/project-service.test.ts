@@ -146,11 +146,11 @@ describe("listProjects", () => {
     });
     const result = await listProjects(client);
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("proj-1");
-    expect(result.nodes[0].name).toBe("Project Alpha");
-    expect(result.nodes[0].state).toBe("started");
-    expect(result.nodes[0].status.name).toBe("Started");
-    expect(result.nodes[0].slugId).toBe("alpha");
+    expect(result.nodes[0]?.id).toBe("proj-1");
+    expect(result.nodes[0]?.name).toBe("Project Alpha");
+    expect(result.nodes[0]?.state).toBe("started");
+    expect(result.nodes[0]?.status.name).toBe("Started");
+    expect(result.nodes[0]?.slugId).toBe("alpha");
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: "c1" });
   });
 
@@ -238,7 +238,7 @@ describe("listProjects", () => {
       },
     });
     const result = await listProjects(client);
-    expect(result.nodes[0].targetDate).toBeNull();
+    expect(result.nodes[0]?.targetDate).toBeNull();
   });
 });
 

@@ -1,6 +1,8 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
+import { omitUndefined } from "../common/object.js";
 
 export interface ResolveProjectIdOptions {
   includeArchived?: boolean;
@@ -13,11 +15,13 @@ export async function resolveProjectId(
 ): Promise<string> {
   if (isUuid(nameOrId)) return nameOrId;
 
-  const result = await client.sdk.projects({
-    filter: { name: { eqIgnoreCase: nameOrId } },
-    first: 2,
-    includeArchived: options.includeArchived,
-  });
+  const result = await client.sdk.projects(
+    omitUndefined({
+      filter: { name: { eqIgnoreCase: nameOrId } },
+      first: 2,
+      includeArchived: options.includeArchived,
+    }),
+  );
 
   if (result.nodes.length === 0) {
     throw notFoundError("Project", nameOrId);
@@ -32,7 +36,8 @@ export async function resolveProjectId(
     );
   }
 
-  return result.nodes[0].id;
+  return firstOrThrow(result.nodes, () => notFoundError("Project", nameOrId))
+    .id;
 }
 
 export async function resolveProjectLabelId(
@@ -46,11 +51,9 @@ export async function resolveProjectLabelId(
     first: 1,
   });
 
-  if (result.nodes.length === 0) {
-    throw notFoundError("Project label", nameOrId);
-  }
-
-  return result.nodes[0].id;
+  return firstOrThrow(result.nodes, () =>
+    notFoundError("Project label", nameOrId),
+  ).id;
 }
 
 export async function resolveProjectLabelIds(

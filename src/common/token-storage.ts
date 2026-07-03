@@ -9,7 +9,7 @@ const TOKEN_FILE = "token";
 
 export function getTokenDir(): string {
   if (process.platform === "linux") {
-    const xdgConfig = process.env.XDG_CONFIG_HOME;
+    const xdgConfig = process.env["XDG_CONFIG_HOME"];
     if (xdgConfig && path.isAbsolute(xdgConfig)) {
       return path.join(xdgConfig, DIR_NAME);
     }

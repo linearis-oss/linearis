@@ -36,7 +36,7 @@ export class GraphQLClient {
   ): InstanceType<typeof LinearClient>["client"] {
     const linearClient = new LinearClient({
       apiKey: this.apiToken,
-      signal,
+      ...(signal ? { signal } : {}),
       headers: {
         // Request 1-hour signed URLs for file downloads (see file-service.ts)
         "public-file-urls-expire-in": "3600",

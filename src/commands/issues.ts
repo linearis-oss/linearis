@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { firstOrThrow } from "../common/array.js";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
 import { parseLabelMode } from "../common/domain-values.js";
@@ -17,6 +18,7 @@ import {
 } from "../common/number-options.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { IssueRelationType } from "../gql/graphql.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
@@ -383,17 +385,14 @@ function parseRelationAddOptions(options: RelationAddOptions): {
     options.similar ? "similar" : null,
   ].filter((type): type is keyof RelationAddOptions => type !== null);
 
-  if (typeFlags.length === 0) {
-    throw new Error(
-      "Must specify one of --blocks, --related, --duplicate, or --similar",
-    );
-  }
-
   if (typeFlags.length > 1) {
     throw new Error("Cannot specify multiple relation types");
   }
 
-  const type = typeFlags[0];
+  const type = firstOrThrow(
+    typeFlags,
+    "Must specify one of --blocks, --related, --duplicate, or --similar",
+  );
   const rawTargets = options[type] ?? "";
   const targets = [
     ...new Set(
@@ -599,10 +598,10 @@ export function setupIssuesCommands(program: Command): void {
     commandAction<[FilterOptions, Command]>(async (options, command) => {
       const ctx = createContext(getRootOpts(command));
 
-      const paginationOptions = {
-        limit: parseLimit(options.limit),
-        after: options.after,
-      };
+      const paginationOptions = buildPaginationOptions(
+        parseLimit(options.limit),
+        options.after,
+      );
 
       const filterOptions = await resolveFilterOptions(ctx, options);
       const filter = buildIssueFilter(filterOptions);
@@ -634,10 +633,10 @@ export function setupIssuesCommands(program: Command): void {
       async (query, options, command) => {
         const ctx = createContext(getRootOpts(command));
 
-        const paginationOptions = {
-          limit: parseLimit(options.limit),
-          after: options.after,
-        };
+        const paginationOptions = buildPaginationOptions(
+          parseLimit(options.limit),
+          options.after,
+        );
 
         const filterOptions = await resolveFilterOptions(ctx, options);
         const filter = buildIssueFilter(filterOptions);
@@ -866,10 +865,10 @@ export function setupIssuesCommands(program: Command): void {
           const ctx = createContext(getRootOpts(command));
 
           const issueId = await resolveIssueId(ctx.sdk, issue);
-          const paginationOptions = {
-            limit: parseLimit(options.limit || "25"),
-            after: options.after,
-          };
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "25"),
+            options.after,
+          );
           const result = options.withReactions
             ? await listDiscussionsForIssueWithReactions(
                 ctx.gql,
@@ -903,10 +902,10 @@ export function setupIssuesCommands(program: Command): void {
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          const paginationOptions = {
-            limit: parseLimit(options.limit || "50"),
-            after: options.after,
-          };
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          );
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
@@ -1054,7 +1053,9 @@ export function setupIssuesCommands(program: Command): void {
 
           const result = await resolveDiscussion(ctx.gql, {
             threadId: thread,
-            resolvingCommentId: options.withComment,
+            ...(options.withComment !== undefined
+              ? { resolvingCommentId: options.withComment }
+              : {}),
             entityKind: "issue",
           });
 

@@ -14,7 +14,8 @@ export async function resolveUserId(
     first: 10,
   });
 
-  if (byName.nodes.length === 1) return byName.nodes[0].id;
+  const [byNameMatch] = byName.nodes;
+  if (byName.nodes.length === 1 && byNameMatch) return byNameMatch.id;
 
   if (byName.nodes.length > 1) {
     throw multipleMatchesError(
@@ -31,7 +32,8 @@ export async function resolveUserId(
     first: 1,
   });
 
-  if (byEmail.nodes.length > 0) return byEmail.nodes[0].id;
+  const [byEmailMatch] = byEmail.nodes;
+  if (byEmailMatch) return byEmailMatch.id;
 
   throw notFoundError("User", nameOrEmailOrId);
 }

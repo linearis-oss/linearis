@@ -437,7 +437,10 @@ function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
     }
 
     for (let i = children.length - 1; i >= 0; i -= 1) {
-      stack.push(children[i]);
+      const child = children[i];
+      if (child !== undefined) {
+        stack.push(child);
+      }
     }
   }
 

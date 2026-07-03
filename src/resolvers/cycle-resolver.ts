@@ -54,13 +54,15 @@ export async function resolveCycleId(
       id: cycle.id,
       name: cycle.name ?? "",
       number: cycle.number,
-      startsAt: cycle.startsAt
-        ? new Date(cycle.startsAt).toISOString()
-        : undefined,
       isActive: cycle.isActive,
       isNext: cycle.isNext,
       isPrevious: cycle.isPrevious,
-      team: team ? { id: team.id, key: team.key, name: team.name } : undefined,
+      ...(cycle.startsAt
+        ? { startsAt: new Date(cycle.startsAt).toISOString() }
+        : {}),
+      ...(team
+        ? { team: { id: team.id, key: team.key, name: team.name } }
+        : {}),
     });
   }
 

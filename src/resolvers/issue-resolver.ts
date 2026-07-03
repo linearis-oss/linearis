@@ -1,6 +1,8 @@
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { notFoundError } from "../common/errors.js";
 import { isUuid, parseIssueIdentifier } from "../common/identifier.js";
+import { omitUndefined } from "../common/object.js";
 import {
   resolveTeamEstimateContext,
   type TeamEstimateContext,
@@ -39,14 +41,14 @@ function toIssueTeamProjection(
   node: unknown,
   ref: string,
 ): IssueTeamProjection {
-  if (!isRecord(node) || typeof node.id !== "string") {
+  if (!isRecord(node) || typeof node["id"] !== "string") {
     throw new Error(`Issue "${ref}" is missing required team context`);
   }
 
   return {
-    id: node.id,
-    teamId: typeof node.teamId === "string" ? node.teamId : undefined,
-    team: node.team,
+    id: node["id"],
+    team: node["team"],
+    ...(typeof node["teamId"] === "string" ? { teamId: node["teamId"] } : {}),
   };
 }
 
@@ -55,10 +57,10 @@ function toTeamLookupProjection(
 ): TeamLookupProjection | undefined {
   if (!isRecord(team)) return undefined;
 
-  return {
-    id: typeof team.id === "string" ? team.id : undefined,
-    key: typeof team.key === "string" ? team.key : undefined,
-  };
+  return omitUndefined({
+    id: typeof team["id"] === "string" ? team["id"] : undefined,
+    key: typeof team["key"] === "string" ? team["key"] : undefined,
+  });
 }
 
 function getTeamLookupFromRelation(team: unknown): string | undefined {
@@ -105,11 +107,9 @@ export async function resolveIssueId(
     first: 1,
   });
 
-  if (issues.nodes.length === 0) {
-    throw notFoundError("Issue", issueIdOrIdentifier);
-  }
-
-  return issues.nodes[0].id;
+  return firstOrThrow(issues.nodes, () =>
+    notFoundError("Issue", issueIdOrIdentifier),
+  ).id;
 }
 
 export async function resolveIssueEstimateContext(

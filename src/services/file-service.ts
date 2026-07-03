@@ -195,7 +195,7 @@ export class FileService {
       // Make HTTP request (with Bearer token only if not a signed URL)
       const headers: Record<string, string> = {};
       if (!isSignedUrl) {
-        headers.Authorization = `Bearer ${this.apiToken}`;
+        headers["Authorization"] = `Bearer ${this.apiToken}`;
       }
 
       const response = await fetch(url, {

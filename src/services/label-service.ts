@@ -53,8 +53,8 @@ function mapIssueLabel(label: {
     id: label.id,
     name: label.name,
     color: label.color,
-    description: label.description ?? undefined,
     type: "issue",
+    ...(label.description != null ? { description: label.description } : {}),
   };
 }
 
@@ -177,13 +177,17 @@ export async function listProjectLabels(
   });
 
   return {
-    nodes: result.projectLabels.nodes.map((label) => ({
-      id: label.id,
-      name: label.name,
-      color: label.color,
-      description: label.description ?? undefined,
-      type: "project",
-    })),
+    nodes: result.projectLabels.nodes.map(
+      (label): Label => ({
+        id: label.id,
+        name: label.name,
+        color: label.color,
+        type: "project",
+        ...(label.description != null
+          ? { description: label.description }
+          : {}),
+      }),
+    ),
     pageInfo: result.projectLabels.pageInfo,
   };
 }

@@ -5,6 +5,7 @@ import {
   getRootOpts,
 } from "../common/context.js";
 import { invalidParameterError } from "../common/errors.js";
+import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
@@ -103,10 +104,14 @@ async function resolveIssueLabelLookup(
   const teamId = options.team
     ? await resolveTeamId(ctx.sdk, options.team)
     : undefined;
-  const labelId = await resolveLabelId(ctx.sdk, label, {
-    teamId,
-    scope: scope as LabelResolverScope | undefined,
-  });
+  const labelId = await resolveLabelId(
+    ctx.sdk,
+    label,
+    omitUndefined({
+      teamId,
+      scope: scope as LabelResolverScope | undefined,
+    }),
+  );
 
   return { ctx, labelId };
 }
@@ -179,11 +184,11 @@ export function setupLabelsCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
         const type = parseLabelType(options.type);
         const scope = parseLabelScope(options.scope);
-        const pagination = {
+        const pagination = omitUndefined({
           limit: parseLimit(options.limit),
           after: options.after,
           scope,
-        };
+        });
 
         if (type === "project") {
           if (options.team) {

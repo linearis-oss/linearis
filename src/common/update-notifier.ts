@@ -70,8 +70,8 @@ export function writeCache(data: UpdateCacheData): void {
  * A release (no prerelease) outranks a prerelease sharing the same core.
  */
 export function compareVersions(a: string, b: string): number {
-  const [coreA, preA = ""] = a.split("-");
-  const [coreB, preB = ""] = b.split("-");
+  const [coreA = "", preA = ""] = a.split("-");
+  const [coreB = "", preB = ""] = b.split("-");
   const numsA = coreA.split(".").map((n) => Number.parseInt(n, 10) || 0);
   const numsB = coreB.split(".").map((n) => Number.parseInt(n, 10) || 0);
   const len = Math.max(numsA.length, numsB.length);
@@ -115,7 +115,7 @@ export function updateChecksDisabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   return Boolean(
-    env.NO_UPDATE_NOTIFIER || env.LINEARIS_NO_UPDATE_CHECK || env.CI,
+    env["NO_UPDATE_NOTIFIER"] || env["LINEARIS_NO_UPDATE_CHECK"] || env["CI"],
   );
 }
 

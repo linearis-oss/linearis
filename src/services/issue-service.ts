@@ -1,4 +1,5 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { requireMutationEntity } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
@@ -317,12 +318,10 @@ export async function getIssueByIdentifier(
     teamKey,
     number: issueNumber,
   });
-  if (!result.issues.nodes.length) {
-    throw new Error(
-      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return result.issues.nodes[0];
+  return firstOrThrow(
+    result.issues.nodes,
+    `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+  );
 }
 
 export async function getIssueByIdentifierWithComments(
@@ -334,12 +333,10 @@ export async function getIssueByIdentifierWithComments(
     GetIssueByIdentifierWithCommentsDocument,
     { teamKey, number: issueNumber },
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
-      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return result.issues.nodes[0];
+  return firstOrThrow(
+    result.issues.nodes,
+    `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+  );
 }
 
 export async function getIssueByIdentifierWithCommentThreads(
@@ -377,12 +374,12 @@ export async function getIssueByIdentifierWithReactions(
     GetIssueByIdentifierWithReactionsDocument,
     { teamKey, number: issueNumber },
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
+  return normalizeIssueReactions(
+    firstOrThrow(
+      result.issues.nodes,
       `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return normalizeIssueReactions(result.issues.nodes[0]);
+    ),
+  );
 }
 
 export async function getIssueWithAttachments(
@@ -407,12 +404,10 @@ export async function getIssueByIdentifierWithAttachments(
     GetIssueByIdentifierWithAttachmentsDocument,
     { teamKey, number: issueNumber },
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
-      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return result.issues.nodes[0];
+  return firstOrThrow(
+    result.issues.nodes,
+    `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+  );
 }
 
 export async function searchIssues(

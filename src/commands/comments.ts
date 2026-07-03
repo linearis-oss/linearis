@@ -7,6 +7,7 @@ import {
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
@@ -97,10 +98,11 @@ export function setupCommentsCommands(program: Command): void {
 
         const limit = parseLimit(options.limit || "25");
         const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await listDiscussionsForIssue(ctx.gql, resolvedIssueId, {
-          limit,
-          after: options.after,
-        });
+        const result = await listDiscussionsForIssue(
+          ctx.gql,
+          resolvedIssueId,
+          buildPaginationOptions(limit, options.after),
+        );
 
         outputSuccess(result);
       }),

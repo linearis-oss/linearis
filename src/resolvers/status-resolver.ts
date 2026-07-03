@@ -1,5 +1,6 @@
 import type { LinearDocument } from "@linear/sdk";
 import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { notFoundError } from "../common/errors.js";
 import { isUuid } from "../common/identifier.js";
 
@@ -23,10 +24,11 @@ export async function resolveStatusId(
     first: 1,
   });
 
-  if (result.nodes.length === 0) {
-    const context = teamId ? `for team ${teamId}` : undefined;
-    throw notFoundError("Status", nameOrId, context);
-  }
-
-  return result.nodes[0].id;
+  return firstOrThrow(result.nodes, () =>
+    notFoundError(
+      "Status",
+      nameOrId,
+      teamId ? `for team ${teamId}` : undefined,
+    ),
+  ).id;
 }
