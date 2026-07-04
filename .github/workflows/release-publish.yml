@@ -97,26 +97,18 @@ jobs:
           git config user.name "${{ steps.app-bot.outputs.name }}"
           git config user.email "${{ steps.app-bot.outputs.email }}"
 
-      # No `registry-url`: passing it makes setup-node write a
-      # `_authToken=${NODE_AUTH_TOKEN}` line into .npmrc, which shadows OIDC.
-      # npm defaults to the official registry, and auth is OIDC trusted
-      # publishing (no token) — see the "Run semantic-release" step.
+      # No registry-url: it writes _authToken into .npmrc, shadowing OIDC.
       - name: Setup, install and build
         uses: ./.github/actions/setup
 
-      # OIDC trusted publishing requires npm >= 11.5.1; .nvmrc pins only the
-      # Node major, so the bundled npm minor is not guaranteed. Pin a floor
-      # (not @latest, which would inject an unreviewed npm into the publish path).
+      # OIDC trusted publishing needs npm >= 11.5.1; .nvmrc pins only Node major.
       - name: Ensure npm supports trusted publishing
         shell: bash
         run: |
           npm install -g npm@^11.5.1
           npm --version
 
-      # Auth is npm OIDC trusted publishing: no NODE_AUTH_TOKEN is set, so the
-      # npm CLI performs the OIDC exchange (id-token: write + npmjs trusted
-      # publisher for this workflow/environment). GH_TOKEN/GITHUB_TOKEN are the
-      # linearis-bot App token, used only for the GitHub release + git push.
+      # Publishes via OIDC (no NODE_AUTH_TOKEN); GH_TOKEN is only for the release + push.
       - name: Run semantic-release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

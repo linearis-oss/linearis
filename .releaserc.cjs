@@ -35,22 +35,18 @@ module.exports = {
     [
       "@semantic-release/exec",
       {
-        // Publish in two explicit stages so a failed `npm publish` FAILS the
-        // release. `clean-publish --without-publish` only strips the configured
-        // package.json fields into a deterministic `.clean-pkg` dir (it swallows
-        // exit codes, so it must NOT own the publish); the real `npm publish`
-        // then runs directly, and its non-zero exit propagates to this plugin.
-        // Auth is npm OIDC trusted publishing (no NODE_AUTH_TOKEN in CI).
-        // Runs under `/bin/sh -c` (POSIX) via @semantic-release/exec shell:true.
+        // Two stages so a failed publish fails the release: clean-publish
+        // swallows exit codes, so it only stages .clean-pkg (--without-publish)
+        // and the real `npm publish` runs separately and can propagate failure.
         publishCmd: [
           "set -e",
           "npx clean-publish --without-publish --temp-dir .clean-pkg",
           'VERSION="$(node -p "require(\'./.clean-pkg/package.json\').version")"',
           'TAG="$([ "$GITHUB_REF_NAME" = next ] && echo next || echo latest)"',
           'npm publish ./.clean-pkg --provenance --access public --tag "$TAG"',
-          // Read-back guard: the original outage was a publish that "succeeded"
-          // while nothing reached the registry. Fail loudly if the version is
-          // not actually visible (retry for read-after-write lag).
+          // Read-back guard: fail if the version is not visible on the
+          // registry (the outage was a publish that "succeeded" but published
+          // nothing); retry for read-after-write lag.
           "for i in $(seq 1 6); do",
           '  if npm view "linearis@$VERSION" version; then FOUND=1; break; fi',
           '  echo "waiting for registry to reflect $VERSION ($i/6)"; sleep 5',
