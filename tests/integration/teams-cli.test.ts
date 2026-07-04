@@ -34,6 +34,38 @@ describe("Teams CLI Commands", () => {
       expect(stdout).toContain("Team operations");
       expect(stdout).toContain("list");
     });
+
+    it("should list the management subcommands", async () => {
+      const { stdout } = await execAsync(`node ${CLI_PATH} teams --help`);
+
+      expect(stdout).toContain("create");
+      expect(stdout).toContain("update");
+      expect(stdout).toContain("members");
+      expect(stdout).toContain("add-member");
+      expect(stdout).toContain("remove-member");
+    });
+  });
+
+  describe("teams create --help", () => {
+    it("should document create flags", async () => {
+      const { stdout } = await execAsync(
+        `node ${CLI_PATH} teams create --help`,
+      );
+
+      expect(stdout).toContain("--key");
+      expect(stdout).toContain("--estimation-type");
+      expect(stdout).toContain("--parent");
+    });
+  });
+
+  describe("teams add-member --help", () => {
+    it("should document the --user flag", async () => {
+      const { stdout } = await execAsync(
+        `node ${CLI_PATH} teams add-member --help`,
+      );
+
+      expect(stdout).toContain("--user");
+    });
   });
 
   describe("teams list", () => {

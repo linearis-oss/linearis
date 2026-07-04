@@ -4,11 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
+  addTeamMember,
+  createTeam,
   getTeam,
+  listTeamMembers,
   listTeams,
+  removeTeamMember,
   type TeamDetail,
   type TeamEstimateOption,
   type TeamEstimationSource,
+  updateTeam,
 } from "../../../src/services/team-service.js";
 
 const assertTeamDetailShape = (value: TeamDetail): TeamDetail => value;
@@ -398,5 +403,250 @@ describe("getTeam", () => {
       { value: 6, label: "6" },
       { value: 7, label: "7" },
     ]);
+  });
+});
+
+describe("createTeam", () => {
+  it("returns the created team", async () => {
+    const client = mockGqlClient({
+      teamCreate: {
+        success: true,
+        team: { id: "team-new", key: "NEW", name: "New Team" },
+      },
+    });
+
+    const result = await createTeam(client, { name: "New Team", key: "NEW" });
+
+    expect(result.id).toBe("team-new");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      input: { name: "New Team", key: "NEW" },
+    });
+  });
+
+  it("throws when the mutation fails", async () => {
+    const client = mockGqlClient({
+      teamCreate: { success: false, team: null },
+    });
+
+    await expect(createTeam(client, { name: "Fail" })).rejects.toThrow(
+      'Failed to create team "Fail"',
+    );
+  });
+});
+
+describe("updateTeam", () => {
+  it("returns the updated team", async () => {
+    const client = mockGqlClient({
+      teamUpdate: {
+        success: true,
+        team: { id: "team-1", key: "ENG", name: "Renamed" },
+      },
+    });
+
+    const result = await updateTeam(client, asUuid("team-1"), {
+      name: "Renamed",
+    });
+
+    expect(result.name).toBe("Renamed");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "team-1",
+      input: { name: "Renamed" },
+    });
+  });
+
+  it("throws when the mutation fails", async () => {
+    const client = mockGqlClient({
+      teamUpdate: { success: false, team: null },
+    });
+
+    await expect(
+      updateTeam(client, asUuid("team-1"), { name: "Renamed" }),
+    ).rejects.toThrow('Failed to update team "team-1"');
+  });
+});
+
+describe("listTeamMembers", () => {
+  it("returns the team's memberships", async () => {
+    const client = mockGqlClient({
+      team: {
+        id: "team-1",
+        key: "ENG",
+        name: "Engineering",
+        memberships: {
+          nodes: [
+            { id: "m1", owner: true, user: { id: "user-1", name: "Alice" } },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    });
+
+    const result = await listTeamMembers(client, { id: asUuid("team-1") });
+
+    expect(result.nodes).toHaveLength(1);
+    expect(result.nodes[0]?.id).toBe("m1");
+  });
+
+  it("paginates until all members are fetched", async () => {
+    const client = mockGqlClientWithSequence([
+      {
+        team: {
+          id: "team-1",
+          key: "ENG",
+          name: "Engineering",
+          memberships: {
+            nodes: [
+              { id: "m1", owner: true, user: { id: "user-1", name: "Alice" } },
+            ],
+            pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+          },
+        },
+      },
+      {
+        team: {
+          id: "team-1",
+          key: "ENG",
+          name: "Engineering",
+          memberships: {
+            nodes: [
+              { id: "m2", owner: false, user: { id: "user-2", name: "Bob" } },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      },
+    ]);
+
+    const result = await listTeamMembers(client, { id: asUuid("team-1") });
+
+    expect(result.nodes.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(client.request).toHaveBeenNthCalledWith(2, expect.anything(), {
+      id: "team-1",
+      after: "cursor-1",
+    });
+  });
+
+  it("throws when the team is not found", async () => {
+    const client = mockGqlClient({ team: null });
+
+    await expect(
+      listTeamMembers(client, { id: asUuid("missing") }),
+    ).rejects.toThrow('Team "missing" not found');
+  });
+});
+
+describe("addTeamMember", () => {
+  it("returns the created membership", async () => {
+    const client = mockGqlClient({
+      teamMembershipCreate: {
+        success: true,
+        teamMembership: {
+          id: "m1",
+          owner: false,
+          user: { id: "user-1", name: "Alice" },
+        },
+      },
+    });
+
+    const result = await addTeamMember(client, {
+      teamId: asUuid("team-1"),
+      userId: asUuid("user-1"),
+    });
+
+    expect(result.id).toBe("m1");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      input: { teamId: "team-1", userId: "user-1" },
+    });
+  });
+
+  it("passes owner when provided", async () => {
+    const client = mockGqlClient({
+      teamMembershipCreate: {
+        success: true,
+        teamMembership: {
+          id: "m1",
+          owner: true,
+          user: { id: "user-1", name: "Alice" },
+        },
+      },
+    });
+
+    await addTeamMember(client, {
+      teamId: asUuid("team-1"),
+      userId: asUuid("user-1"),
+      owner: true,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      input: { teamId: "team-1", userId: "user-1", owner: true },
+    });
+  });
+
+  it("throws when the mutation fails", async () => {
+    const client = mockGqlClient({
+      teamMembershipCreate: { success: false, teamMembership: null },
+    });
+
+    await expect(
+      addTeamMember(client, {
+        teamId: asUuid("team-1"),
+        userId: asUuid("user-1"),
+      }),
+    ).rejects.toThrow('Failed to add user "user-1" to team "team-1"');
+  });
+});
+
+describe("removeTeamMember", () => {
+  it("resolves the membership id and deletes it", async () => {
+    const client = mockGqlClientWithSequence([
+      {
+        team: {
+          id: "team-1",
+          key: "ENG",
+          name: "Engineering",
+          memberships: {
+            nodes: [
+              { id: "m1", owner: false, user: { id: "user-1", name: "Alice" } },
+              { id: "m2", owner: false, user: { id: "user-2", name: "Bob" } },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      },
+      { teamMembershipDelete: { success: true, entityId: "m2" } },
+    ]);
+
+    const result = await removeTeamMember(client, {
+      teamId: asUuid("team-1"),
+      userId: asUuid("user-2"),
+    });
+
+    expect(result).toEqual({ id: "m2", success: true });
+    expect(client.request).toHaveBeenNthCalledWith(2, expect.anything(), {
+      id: "m2",
+    });
+  });
+
+  it("throws when the user is not a team member", async () => {
+    const client = mockGqlClient({
+      team: {
+        id: "team-1",
+        key: "ENG",
+        name: "Engineering",
+        memberships: {
+          nodes: [
+            { id: "m1", owner: false, user: { id: "user-1", name: "Alice" } },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      },
+    });
+
+    await expect(
+      removeTeamMember(client, {
+        teamId: asUuid("team-1"),
+        userId: asUuid("user-9"),
+      }),
+    ).rejects.toThrow('Team member "user-9" on team "team-1" not found');
   });
 });
