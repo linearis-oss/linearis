@@ -1,3 +1,9 @@
+## [2026.6.0-next.13](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.12...v2026.6.0-next.13) (2026-07-04)
+
+### Features
+
+* **teams:** add team create, update, and membership management ([c89208b](https://github.com/linearis-oss/linearis/commit/c89208bc7a14514da62caec25364207fa29fbb18)), closes [#142](https://github.com/linearis-oss/linearis/issues/142)
+
 ## [2026.6.0-next.12](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.11...v2026.6.0-next.12) (2026-07-04)
 
 ### Features
