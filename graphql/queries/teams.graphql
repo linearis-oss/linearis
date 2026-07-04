@@ -105,3 +105,38 @@ query FindTeams($filter: TeamFilter, $first: Int = 1) {
     }
   }
 }
+
+# Team membership fields fragment
+#
+# A membership joins a user to a team. The membership id is required to
+# delete the membership; owner marks a team admin.
+fragment TeamMembershipFields on TeamMembership {
+  id
+  owner
+  user {
+    id
+    name
+    email
+    displayName
+  }
+}
+
+# List a team's memberships
+#
+# Used by `teams members` and to resolve a membership id from a
+# team + user pair for `teams remove-member`. Paginated by the service
+# layer so all members are fetched regardless of team size.
+query GetTeamMemberships($id: String!, $first: Int = 250, $after: String) {
+  team(id: $id) {
+    id
+    memberships(first: $first, after: $after) {
+      nodes {
+        ...TeamMembershipFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}

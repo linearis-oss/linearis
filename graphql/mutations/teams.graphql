@@ -1,0 +1,59 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear team operations
+#
+# Creates and updates teams, and manages team membership. Team
+# mutations return the same TeamDetailFields fragment that `teams read`
+# queries, so the entity shape matches (the read command additionally
+# derives valid estimate options on top of these fields). Membership
+# mutations use Linear's TeamMembership entity: a membership joins a
+# user to a team and is deleted by its own id.
+# ------------------------------------------------------------
+
+# Create a new team
+#
+# Requires at minimum a name. The key is auto-derived from the name
+# when omitted. Returns complete detail fields.
+mutation CreateTeam($input: TeamCreateInput!) {
+  teamCreate(input: $input) {
+    success
+    team {
+      ...TeamDetailFields
+    }
+  }
+}
+
+# Update an existing team
+#
+# Updates mutable team metadata and settings, returning detail fields.
+mutation UpdateTeam($id: String!, $input: TeamUpdateInput!) {
+  teamUpdate(id: $id, input: $input) {
+    success
+    team {
+      ...TeamDetailFields
+    }
+  }
+}
+
+# Add a user to a team
+#
+# Creates a TeamMembership joining the user to the team. Set owner to
+# grant team-admin rights.
+mutation AddTeamMember($input: TeamMembershipCreateInput!) {
+  teamMembershipCreate(input: $input) {
+    success
+    teamMembership {
+      ...TeamMembershipFields
+    }
+  }
+}
+
+# Remove a user from a team
+#
+# Deletes a TeamMembership by its id (resolved from team + user by the
+# service layer).
+mutation RemoveTeamMember($id: String!) {
+  teamMembershipDelete(id: $id) {
+    success
+    entityId
+  }
+}
