@@ -4,7 +4,11 @@ import {
   requireMutationEntity,
   requireMutationSuccess,
 } from "../common/mutation-payload.js";
-import type { PaginatedResult, PaginationOptions } from "../common/types.js";
+import {
+  collectConnection,
+  type PaginatedResult,
+  type PaginationOptions,
+} from "../common/types.js";
 import {
   type CommentCreateInput,
   type CommentUpdateInput,
@@ -115,7 +119,7 @@ function normalizeDiscussionCommentReactions<
   };
 }
 
-function normalizeDiscussionCommentsReactions<
+export function normalizeDiscussionCommentsReactions<
   T extends { reactions: Parameters<typeof normalizeReactions>[0] },
 >(
   comments: readonly T[],
@@ -402,10 +406,53 @@ async function listDiscussionReplyCandidatesWithReactions(
   );
 }
 
-function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
-  comments: readonly T[],
-  threadId: UUID,
-): T[] {
+/**
+ * Fetch every reply candidate (comments with a parent) for an issue directly by
+ * issue UUID, looping until the connection is exhausted. Used by the activity
+ * timeline, which resolves the issue up front and does not have a thread context.
+ */
+export async function fetchAllIssueDiscussionReplyCandidates(
+  client: GraphQLClient,
+  issueId: UUID,
+): Promise<DiscussionCommentFieldsFragment[]> {
+  const nodes = await collectConnection(async (after) => {
+    const result = await client.request(
+      ListIssueDiscussionReplyCandidatesDocument,
+      { issueId, first: DISCUSSION_REPLY_FETCH_LIMIT, after },
+    );
+
+    return result.comments;
+  });
+
+  return nodes.sort(compareDiscussionCommentsChronologically);
+}
+
+export async function fetchAllIssueDiscussionReplyCandidatesWithReactions(
+  client: GraphQLClient,
+  issueId: UUID,
+): Promise<DiscussionThreadWithReactions[]> {
+  const nodes = await collectConnection(async (after) => {
+    const result = await client.request(
+      ListIssueDiscussionReplyCandidatesWithReactionsDocument,
+      { issueId, first: DISCUSSION_REPLY_FETCH_LIMIT, after },
+    );
+
+    return result.comments;
+  });
+
+  return normalizeDiscussionCommentsReactions(
+    nodes.sort(compareDiscussionCommentsChronologically),
+  );
+}
+
+/**
+ * Index reply candidates by their `parentId`, with each sibling list sorted
+ * chronologically. Building this once lets callers extract many threads'
+ * replies without rescanning the full candidate list per thread.
+ */
+export function buildThreadRepliesIndex<
+  T extends DiscussionCommentFieldsFragment,
+>(comments: readonly T[]): Map<string, T[]> {
   const childrenByParentId = new Map<string, T[]>();
 
   for (const comment of comments) {
@@ -419,6 +466,14 @@ function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
     childrenByParentId.set(comment.parentId, siblings);
   }
 
+  return childrenByParentId;
+}
+
+/** Walk a pre-built reply index depth-first to collect a thread's replies. */
+export function collectThreadReplies<T extends DiscussionCommentFieldsFragment>(
+  childrenByParentId: ReadonlyMap<string, T[]>,
+  threadId: UUID,
+): T[] {
   const replies: T[] = [];
   const stack = [...(childrenByParentId.get(threadId) ?? [])].reverse();
 
@@ -446,6 +501,13 @@ function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
   }
 
   return replies;
+}
+
+function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
+  comments: readonly T[],
+  threadId: UUID,
+): T[] {
+  return collectThreadReplies(buildThreadRepliesIndex(comments), threadId);
 }
 
 function paginateDiscussionReplies<T extends DiscussionCommentFieldsFragment>(

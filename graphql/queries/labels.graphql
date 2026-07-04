@@ -44,8 +44,19 @@ query GetIssueLabel($id: String!) {
 # Variables:
 #   $first: Maximum number of labels to return (default: 50)
 #   $filter: Optional filter (e.g., { team: { id: { eq: "team-uuid" } } })
-query GetLabels($first: Int = 50, $after: String, $filter: IssueLabelFilter) {
-  issueLabels(first: $first, after: $after, filter: $filter) {
+#   $includeArchived: Include archived labels (default: false)
+query GetLabels(
+  $first: Int = 50
+  $after: String
+  $filter: IssueLabelFilter
+  $includeArchived: Boolean = false
+) {
+  issueLabels(
+    first: $first
+    after: $after
+    filter: $filter
+    includeArchived: $includeArchived
+  ) {
     nodes {
       ...LabelFields
     }

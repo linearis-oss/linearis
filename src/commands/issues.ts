@@ -35,6 +35,7 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
+import { getIssueActivity } from "../services/activity-service.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -171,6 +172,13 @@ interface DiscussionsOptions {
   withReactions?: boolean;
 }
 
+interface ActivityOptions {
+  limit: string;
+  after?: string;
+  commentsOnly?: boolean;
+  withReactions?: boolean;
+}
+
 interface DiscussionBodyOptions {
   body?: string;
 }
@@ -265,6 +273,7 @@ export const ISSUES_META: DomainMeta = {
     query: "full-text search term",
   },
   seeAlso: [
+    "issues activity <issue>",
     "comments create <issue>",
     "documents list --issue <issue>",
     "attachments list <issue>",
@@ -842,6 +851,40 @@ export function setupIssuesCommands(program: Command): void {
           const result = await startIssueDiscussion(ctx.gql, {
             issueId,
             body: options.body,
+          });
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("activity <issue>")
+    .description(
+      "chronological activity timeline: comment threads plus history events",
+    )
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("-l, --limit <n>", "max timeline items", "50")
+    .option("--after <cursor>", "cursor for next page")
+    .option("--comments-only", "exclude non-comment history events")
+    .option("--with-reactions", "include normalized comment reactions")
+    .action(
+      commandAction<[string, ActivityOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit),
+            options.after,
+          );
+          const result = await getIssueActivity(ctx.gql, issueId, {
+            ...paginationOptions,
+            commentsOnly: Boolean(options.commentsOnly),
+            withReactions: Boolean(options.withReactions),
           });
 
           outputSuccess(result);
