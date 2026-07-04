@@ -4,10 +4,7 @@ import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
 import { parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
-import {
-  InteractiveCancelledError,
-  invalidParameterError,
-} from "../common/errors.js";
+import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
 import {
   asUuid,
@@ -31,7 +28,8 @@ import {
 } from "../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../common/interactive/engine.js";
 import { shouldPrompt } from "../common/interactive/gating.js";
-import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
+import { makeChoicePicker } from "../common/interactive/pickers.js";
+import type { PromptSpec } from "../common/interactive/types.js";
 import type { RawFilterFlags } from "../common/issue-filter.js";
 import {
   parseEstimateOption,
@@ -185,16 +183,6 @@ type UpdateWizardOptions = UpdateOptions & {
   team?: string;
 } & Record<string, unknown>;
 
-function validateDueDate(value: string): string | undefined {
-  if (!value) return undefined;
-  try {
-    parseDueDate(value);
-    return undefined;
-  } catch (error) {
-    return error instanceof Error ? error.message : "invalid date";
-  }
-}
-
 /**
  * Interactive wizard for `issues create`. Fields are ordered so cross-field
  * deps resolve (team before cycle/status; project before milestone). Entity
@@ -277,9 +265,8 @@ export const issueCreateSpec: PromptSpec<CreateWizardOptions> = {
     },
     {
       name: "dueDate",
-      kind: "text",
-      message: "Due date (YYYY-MM-DD)",
-      validate: validateDueDate,
+      kind: "date",
+      message: "Due date",
     },
   ],
 };
@@ -299,13 +286,11 @@ export const issueUpdateSpec: PromptSpec<UpdateWizardOptions> = {
       name: "title",
       kind: "text",
       message: "Title",
-      default: (draft) => draft.title,
     },
     {
       name: "description",
       kind: "multiline",
       message: "Description",
-      default: (draft) => draft.description,
     },
     {
       name: "assignee",
@@ -370,13 +355,53 @@ export const issueUpdateSpec: PromptSpec<UpdateWizardOptions> = {
     },
     {
       name: "dueDate",
-      kind: "text",
-      message: "Due date (YYYY-MM-DD)",
-      validate: validateDueDate,
-      default: (draft) => draft.dueDate,
+      kind: "date",
+      message: "Due date",
     },
   ],
 };
+
+/** Wizard shape for the discussion body prompt: a single required `--body`. */
+type BodyWizardOptions = { body?: string } & Record<string, unknown>;
+
+/**
+ * Shared body wizard for the discussion subcommands (`discuss`, `reply`,
+ * `edit`, `edit-reply`). A single required multiline `body` field, mirroring the
+ * `comments` domain. When `--body` is absent and interactive gating passes the
+ * user is prompted; the non-interactive/agent path keeps the existing
+ * "--body is required" throw.
+ */
+const discussionBodySpec: PromptSpec<BodyWizardOptions> = {
+  intro: "Enter the comment body",
+  fields: [
+    { name: "body", kind: "multiline", message: "Body", required: true },
+  ],
+};
+
+/**
+ * Collect the discussion `--body` interactively when it is missing and gating
+ * allows, else preserve the "--body is required" error for agents/pipes.
+ */
+async function resolveDiscussionBody(
+  ctx: CommandContext,
+  command: Command,
+  options: DiscussionBodyOptions,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<BodyWizardOptions, never>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: discussionBodySpec,
+      options: options as BodyWizardOptions,
+      missingRequired: options.body === undefined,
+    },
+  );
+  const body = filled.options.body;
+  if (body === undefined) {
+    throw invalidParameterError("--body", "is required");
+  }
+  return body;
+}
 
 /**
  * The `labels` multiselect yields a `string[]` of UUIDs, but the command body
@@ -400,32 +425,13 @@ function normalizeWizardLabels<O extends { labels?: unknown }>(filled: O): O {
  * Entity picker for an absent `<issue>` positional. Lists recent open issues
  * and returns the selected issue's identifier (which the resolver accepts).
  */
-async function issuePicker(ctx: CommandContext, io: PromptIO): Promise<string> {
-  const options = await issueChoices(ctx);
-  const answer = await io.select({ message: "Issue", options });
-  if (io.isCancel(answer)) {
-    throw new InteractiveCancelledError();
-  }
-  return answer as string;
-}
+const issuePicker = makeChoicePicker("Issue", issueChoices);
 
 /**
  * Emoji picker for an absent `[emoji]` positional. Returns the emoji glyph,
  * which flows into `resolveReactionEmojiInput` unchanged as the positional.
  */
-async function emojiPicker(
-  _ctx: CommandContext,
-  io: PromptIO,
-): Promise<string> {
-  const answer = await io.select({
-    message: "Reaction",
-    options: emojiChoices(),
-  });
-  if (io.isCancel(answer)) {
-    throw new InteractiveCancelledError();
-  }
-  return answer as string;
-}
+const emojiPicker = makeChoicePicker("Reaction", async () => emojiChoices());
 
 const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
 
@@ -1196,15 +1202,12 @@ export function setupIssuesCommands(program: Command): void {
         async (issueArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
-
           const issue = await resolveIssuePositional(ctx, command, issueArg);
+          const body = await resolveDiscussionBody(ctx, command, options);
           const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await startIssueDiscussion(ctx.gql, {
             issueId,
-            body: options.body,
+            body,
           });
 
           outputSuccess(result);
@@ -1213,7 +1216,7 @@ export function setupIssuesCommands(program: Command): void {
     );
 
   issues
-    .command("activity <issue>")
+    .command("activity [issue]")
     .description(
       "chronological activity timeline: comment threads plus history events",
     )
@@ -1226,10 +1229,11 @@ export function setupIssuesCommands(program: Command): void {
     .option("--comments-only", "exclude non-comment history events")
     .option("--with-reactions", "include normalized comment reactions")
     .action(
-      commandAction<[string, ActivityOptions, Command]>(
-        async (issue, options, command) => {
+      commandAction<[string | undefined, ActivityOptions, Command]>(
+        async (issueArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const issue = await resolveIssuePositional(ctx, command, issueArg);
           const issueId = await resolveIssueId(ctx.gql, issue);
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit),
@@ -1337,13 +1341,11 @@ export function setupIssuesCommands(program: Command): void {
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await replyToDiscussion(ctx.gql, {
             threadId: asUuid(thread),
-            body: options.body,
+            body,
             entityKind: "issue",
           });
 
@@ -1361,15 +1363,13 @@ export function setupIssuesCommands(program: Command): void {
         async (comment, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await editDiscussionComment(
             ctx.gql,
             asUuid(comment),
             {
-              body: options.body,
+              body,
             },
             "issue",
           );
@@ -1388,15 +1388,13 @@ export function setupIssuesCommands(program: Command): void {
         async (reply, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await editDiscussionReply(
             ctx.gql,
             asUuid(reply),
             {
-              body: options.body,
+              body,
             },
             "issue",
           );

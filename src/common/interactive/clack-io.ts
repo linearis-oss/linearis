@@ -2,6 +2,7 @@ import {
   autocomplete as clackAutocomplete,
   autocompleteMultiselect as clackAutocompleteMultiselect,
   confirm as clackConfirm,
+  date as clackDate,
   isCancel as clackIsCancel,
   multiline as clackMultiline,
   multiselect as clackMultiselect,
@@ -10,6 +11,7 @@ import {
 } from "@clack/prompts";
 import type {
   ConfirmPromptOptions,
+  DatePromptOptions,
   MultiLinePromptOptions,
   MultiSelectPromptOptions,
   PromptIO,
@@ -24,6 +26,12 @@ import type {
  * console.log.
  */
 export const clackIO: PromptIO = {
+  intro(message: string): void {
+    // Routed to stderr like every other primitive so stdout stays reserved for
+    // the final JSON payload.
+    process.stderr.write(`${message}\n`);
+  },
+
   text(options: TextPromptOptions): Promise<string | symbol> {
     return clackText({
       message: options.message,
@@ -139,6 +147,16 @@ export const clackIO: PromptIO = {
 
   confirm(options: ConfirmPromptOptions): Promise<boolean | symbol> {
     return clackConfirm({
+      message: options.message,
+      output: process.stderr,
+      ...(options.initialValue !== undefined
+        ? { initialValue: options.initialValue }
+        : {}),
+    });
+  },
+
+  date(options: DatePromptOptions): Promise<Date | symbol> {
+    return clackDate({
       message: options.message,
       output: process.stderr,
       ...(options.initialValue !== undefined

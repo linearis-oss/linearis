@@ -45,8 +45,9 @@ describe("issueUpdateSpec", () => {
     expect(issueUpdateSpec.fields.every((f) => !f.required)).toBe(true);
   });
 
-  it("seeds defaults from current option values", () => {
-    const title = issueUpdateSpec.fields.find((f) => f.name === "title");
-    expect(title?.default?.({ title: "cur" })).toBe("cur");
+  it("carries no dead default accessors (fields fill from prompts only)", () => {
+    for (const field of issueUpdateSpec.fields) {
+      expect(field.default).toBeUndefined();
+    }
   });
 });

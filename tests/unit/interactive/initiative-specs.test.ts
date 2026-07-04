@@ -29,8 +29,9 @@ describe("initiativeUpdateSpec", () => {
     expect(initiativeUpdateSpec.fields.every((f) => !f.required)).toBe(true);
   });
 
-  it("seeds defaults from current option values", () => {
-    const name = initiativeUpdateSpec.fields.find((f) => f.name === "name");
-    expect(name?.default?.({ name: "cur" })).toBe("cur");
+  it("carries no dead default accessors (fields fill from prompts only)", () => {
+    for (const field of initiativeUpdateSpec.fields) {
+      expect(field.default).toBeUndefined();
+    }
   });
 });

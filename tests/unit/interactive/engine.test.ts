@@ -20,10 +20,12 @@ const ctx = {} as CommandContext;
  * possible.
  */
 function fakeIO(
-  answers: Record<string, string | string[] | boolean | symbol>,
+  answers: Record<string, string | string[] | boolean | Date | symbol>,
   calls: string[] = [],
+  intro?: (message: string) => void,
 ): PromptIO {
   return {
+    ...(intro !== undefined ? { intro } : {}),
     text: async (o) => {
       calls.push(`text:${o.message}`);
       return (answers[o.message] as string | symbol) ?? "";
@@ -51,6 +53,10 @@ function fakeIO(
     confirm: async (o) => {
       calls.push(`confirm:${o.message}`);
       return (answers[o.message] as boolean | symbol) ?? false;
+    },
+    date: async (o) => {
+      calls.push(`date:${o.message}`);
+      return (answers[o.message] as Date | symbol) ?? "";
     },
     isCancel: (v) => v === CANCEL,
   };
@@ -212,6 +218,36 @@ describe("collectInteractive", () => {
     expect("team" in result).toBe(false);
   });
 
+  it("renders spec.intro exactly once, before the first field that prompts", async () => {
+    const intro = vi.fn();
+    const io = fakeIO({ Title: "hello" }, [], intro);
+    const spec: PromptSpec<Opts> = {
+      intro: "Create a new issue",
+      fields: [
+        { name: "title", kind: "text", message: "Title" },
+        { name: "project", kind: "text", message: "Project" },
+      ],
+    };
+
+    await collectInteractive(ctx, spec, {}, io);
+
+    expect(intro).toHaveBeenCalledTimes(1);
+    expect(intro).toHaveBeenCalledWith("Create a new issue");
+  });
+
+  it("does not render spec.intro when every field is skipped/provided", async () => {
+    const intro = vi.fn();
+    const io = fakeIO({}, [], intro);
+    const spec: PromptSpec<Opts> = {
+      intro: "Create a new issue",
+      fields: [{ name: "title", kind: "text", message: "Title" }],
+    };
+
+    await collectInteractive(ctx, spec, { title: "from-flag" }, io);
+
+    expect(intro).not.toHaveBeenCalled();
+  });
+
   it("seeds the initial value from default(draft)", async () => {
     let seenInitial: string | undefined;
     const io: PromptIO = {
@@ -236,6 +272,57 @@ describe("collectInteractive", () => {
 
     expect(seenInitial).toBe("re: ENG");
     expect(result.title).toBe("re: ENG");
+  });
+
+  it("optional date: confirm gate accepted → picker value formatted to local YYYY-MM-DD", async () => {
+    // March 5 2024, local time. Local getters must produce 2024-03-05
+    // regardless of the runner's timezone (a naive toISOString could shift it).
+    const picked = new Date(2024, 2, 5, 12, 0, 0);
+    const calls: string[] = [];
+    const io = fakeIO({ "Set a due date?": true, "Due date": picked }, calls);
+    const spec: PromptSpec<Opts & { dueDate?: string }> = {
+      fields: [{ name: "dueDate", kind: "date", message: "Due date" }],
+    };
+
+    const result = await collectInteractive(ctx, spec, {}, io);
+
+    expect(result.dueDate).toBe("2024-03-05");
+    expect(calls).toEqual(["confirm:Set a due date?", "date:Due date"]);
+  });
+
+  it("optional date: confirm gate declined → field left unset, picker never shown", async () => {
+    const calls: string[] = [];
+    const io = fakeIO({ "Set a due date?": false }, calls);
+    const spec: PromptSpec<Opts & { dueDate?: string }> = {
+      fields: [{ name: "dueDate", kind: "date", message: "Due date" }],
+    };
+
+    const result = await collectInteractive(ctx, spec, {}, io);
+
+    expect("dueDate" in result).toBe(false);
+    expect(calls).toEqual(["confirm:Set a due date?"]);
+  });
+
+  it("date: cancel in the picker throws InteractiveCancelledError", async () => {
+    const io = fakeIO({ "Set a due date?": true, "Due date": CANCEL });
+    const spec: PromptSpec<Opts & { dueDate?: string }> = {
+      fields: [{ name: "dueDate", kind: "date", message: "Due date" }],
+    };
+
+    await expect(collectInteractive(ctx, spec, {}, io)).rejects.toBeInstanceOf(
+      InteractiveCancelledError,
+    );
+  });
+
+  it("date: cancel in the confirm gate throws InteractiveCancelledError", async () => {
+    const io = fakeIO({ "Set a due date?": CANCEL });
+    const spec: PromptSpec<Opts & { dueDate?: string }> = {
+      fields: [{ name: "dueDate", kind: "date", message: "Due date" }],
+    };
+
+    await expect(collectInteractive(ctx, spec, {}, io)).rejects.toBeInstanceOf(
+      InteractiveCancelledError,
+    );
   });
 });
 

@@ -1,7 +1,13 @@
 import type { CommandContext } from "../context.js";
 
 /** Field prompt kinds supported by the interactive engine. */
-type PromptKind = "text" | "multiline" | "select" | "multiselect" | "confirm";
+type PromptKind =
+  | "text"
+  | "multiline"
+  | "select"
+  | "multiselect"
+  | "confirm"
+  | "date";
 
 /** A single selectable option shown in a select/multiselect prompt. */
 export interface Choice {
@@ -57,11 +63,28 @@ export interface ConfirmPromptOptions {
 }
 
 /**
+ * Options for the segmented date picker. Modelled on clack's `DateOptions`,
+ * but deliberately minimal: only `message` and an optional seed value. No
+ * min/max is exposed because the non-interactive CLI enforces no date range,
+ * and the interactive path must stay semantically identical (see the engine's
+ * `date` case).
+ */
+export interface DatePromptOptions {
+  message: string;
+  initialValue?: Date;
+}
+
+/**
  * Injectable IO primitives. Each returns either a resolved value or a cancel
  * `symbol` (mirroring clack's `symbol` cancellation contract). Tests supply a
  * scripted fake so CI never blocks on a TTY.
  */
 export interface PromptIO {
+  /**
+   * Render an intro line above the first prompt. Optional so scripted test
+   * fakes need not implement it.
+   */
+  intro?(message: string): void;
   text(options: TextPromptOptions): Promise<string | symbol>;
   multiline(options: MultiLinePromptOptions): Promise<string | symbol>;
   select(options: SelectPromptOptions): Promise<string | symbol>;
@@ -73,6 +96,8 @@ export interface PromptIO {
     options: MultiSelectPromptOptions,
   ): Promise<string[] | symbol>;
   confirm(options: ConfirmPromptOptions): Promise<boolean | symbol>;
+  /** Segmented date picker returning a `Date` (or a cancel `symbol`). */
+  date(options: DatePromptOptions): Promise<Date | symbol>;
   isCancel(value: unknown): boolean;
 }
 

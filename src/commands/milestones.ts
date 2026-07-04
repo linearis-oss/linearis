@@ -76,7 +76,7 @@ export const milestoneCreateSpec: PromptSpec<MilestoneCreateWizardOptions> = {
     },
     { name: "name", kind: "text", message: "Name", required: true },
     { name: "description", kind: "multiline", message: "Description" },
-    { name: "targetDate", kind: "text", message: "Target date (YYYY-MM-DD)" },
+    { name: "targetDate", kind: "date", message: "Target date" },
   ],
 };
 
@@ -92,19 +92,16 @@ export const milestoneUpdateSpec: PromptSpec<MilestoneCreateWizardOptions> = {
       name: "name",
       kind: "text",
       message: "Name",
-      default: (draft) => draft.name as string | undefined,
     },
     {
       name: "description",
       kind: "multiline",
       message: "Description",
-      default: (draft) => draft.description as string | undefined,
     },
     {
       name: "targetDate",
-      kind: "text",
-      message: "Target date (YYYY-MM-DD)",
-      default: (draft) => draft.targetDate as string | undefined,
+      kind: "date",
+      message: "Target date",
     },
   ],
 };

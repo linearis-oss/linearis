@@ -38,12 +38,9 @@ describe("projectUpdateSpec", () => {
     expect(projectUpdateSpec.fields.every((f) => !f.required)).toBe(true);
   });
 
-  it("seeds defaults from current option values", () => {
-    const name = projectUpdateSpec.fields.find((f) => f.name === "name");
-    expect(name?.default?.({ name: "cur" })).toBe("cur");
-    const target = projectUpdateSpec.fields.find(
-      (f) => f.name === "targetDate",
-    );
-    expect(target?.default?.({ targetDate: "2026-01-01" })).toBe("2026-01-01");
+  it("carries no dead default accessors (fields fill from prompts only)", () => {
+    for (const field of projectUpdateSpec.fields) {
+      expect(field.default).toBeUndefined();
+    }
   });
 });

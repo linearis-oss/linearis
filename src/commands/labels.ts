@@ -122,13 +122,11 @@ export const labelUpdateSpec: PromptSpec<UpdateLabelWizardOptions> = {
       name: "name",
       kind: "text",
       message: "Name",
-      default: (draft) => draft.name as string | undefined,
     },
     {
       name: "color",
       kind: "text",
       message: "Color (hex, e.g. #B45309)",
-      default: (draft) => draft.color as string | undefined,
       validate: (value) =>
         value === "" || /^#[0-9a-fA-F]{6}$/.test(value)
           ? undefined
@@ -138,7 +136,6 @@ export const labelUpdateSpec: PromptSpec<UpdateLabelWizardOptions> = {
       name: "description",
       kind: "multiline",
       message: "Description",
-      default: (draft) => draft.description as string | undefined,
     },
   ],
 };

@@ -243,8 +243,8 @@ export const projectCreateSpec: PromptSpec<CreateWizardOptions> = {
       required: false,
       choices: labelChoices,
     },
-    { name: "startDate", kind: "text", message: "Start date (YYYY-MM-DD)" },
-    { name: "targetDate", kind: "text", message: "Target date (YYYY-MM-DD)" },
+    { name: "startDate", kind: "date", message: "Start date" },
+    { name: "targetDate", kind: "date", message: "Target date" },
   ],
 };
 
@@ -260,19 +260,16 @@ export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
       name: "name",
       kind: "text",
       message: "Name",
-      default: (draft) => draft.name,
     },
     {
       name: "description",
       kind: "multiline",
       message: "Description",
-      default: (draft) => draft.description,
     },
     {
       name: "content",
       kind: "multiline",
       message: "Content (markdown)",
-      default: (draft) => draft.content,
     },
     {
       name: "lead",
@@ -307,15 +304,13 @@ export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
     },
     {
       name: "startDate",
-      kind: "text",
-      message: "Start date (YYYY-MM-DD)",
-      default: (draft) => draft.startDate,
+      kind: "date",
+      message: "Start date",
     },
     {
       name: "targetDate",
-      kind: "text",
-      message: "Target date (YYYY-MM-DD)",
-      default: (draft) => draft.targetDate,
+      kind: "date",
+      message: "Target date",
     },
   ],
 };

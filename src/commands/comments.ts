@@ -13,6 +13,7 @@ import {
 import { asUuid } from "../common/identifier.js";
 import { emojiChoices, issueChoices } from "../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import { makeChoicePicker } from "../common/interactive/pickers.js";
 import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
@@ -88,14 +89,7 @@ export const commentEditSpec: PromptSpec<BodyWizardOptions> = {
  * issue's identifier (which `resolveIssueId` accepts). Shared loader in
  * choices.ts keeps it in sync with the issues domain.
  */
-async function issuePicker(ctx: CommandContext, io: PromptIO): Promise<string> {
-  const options = await issueChoices(ctx);
-  const answer = await io.select({ message: "Issue", options });
-  if (io.isCancel(answer)) {
-    throw new InteractiveCancelledError();
-  }
-  return answer as string;
-}
+const issuePicker = makeChoicePicker("Issue", issueChoices);
 
 /**
  * Cross-field picker for an absent comment/thread positional. First picks the
@@ -130,19 +124,7 @@ async function commentPicker(
 }
 
 /** Emoji picker for an absent `[emoji]` positional. */
-async function emojiPicker(
-  _ctx: CommandContext,
-  io: PromptIO,
-): Promise<string> {
-  const answer = await io.select({
-    message: "Reaction",
-    options: emojiChoices(),
-  });
-  if (io.isCancel(answer)) {
-    throw new InteractiveCancelledError();
-  }
-  return answer as string;
-}
+const emojiPicker = makeChoicePicker("Reaction", async () => emojiChoices());
 
 const EMPTY_SPEC: PromptSpec<Record<string, never>> = { fields: [] };
 

@@ -36,11 +36,10 @@ describe("labelUpdateSpec", () => {
     expect(labelUpdateSpec.fields.every((f) => !f.required)).toBe(true);
   });
 
-  it("seeds defaults from current option values", () => {
-    const name = labelUpdateSpec.fields.find((f) => f.name === "name");
-    expect(name?.default?.({ name: "bug" })).toBe("bug");
-    const color = labelUpdateSpec.fields.find((f) => f.name === "color");
-    expect(color?.default?.({ color: "#111111" })).toBe("#111111");
+  it("carries no dead default accessors (fields fill from prompts only)", () => {
+    for (const field of labelUpdateSpec.fields) {
+      expect(field.default).toBeUndefined();
+    }
   });
 
   it("validates color the same way as create", () => {

@@ -11,6 +11,7 @@ import {
 import { asUuid } from "../common/identifier.js";
 import { issueChoices } from "../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import { makeChoicePicker } from "../common/interactive/pickers.js";
 import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -76,14 +77,7 @@ export const attachmentCreateSpec: PromptSpec<CreateWizardOptions> = {
 };
 
 /** Entity picker for an absent `[issue]` positional (shared loader). */
-async function issuePicker(ctx: CommandContext, io: PromptIO): Promise<string> {
-  const options = await issueChoices(ctx);
-  const answer = await io.select({ message: "Issue", options });
-  if (io.isCancel(answer)) {
-    throw new InteractiveCancelledError();
-  }
-  return answer as string;
-}
+const issuePicker = makeChoicePicker("Issue", issueChoices);
 
 /**
  * Cross-field picker for an absent attachment `<id>`. First picks the parent

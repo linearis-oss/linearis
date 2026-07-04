@@ -29,6 +29,7 @@ export async function collectInteractive<O extends Record<string, unknown>>(
   io: PromptIO = clackIO,
 ): Promise<O> {
   const draft: Record<string, unknown> = { ...provided };
+  let introRendered = false;
 
   for (const field of spec.fields) {
     const partial = draft as Partial<O>;
@@ -38,8 +39,26 @@ export async function collectInteractive<O extends Record<string, unknown>>(
     const skipIfProvided = field.skipIfProvided !== false;
     if (skipIfProvided && draft[field.name] !== undefined) continue;
 
+    // Render the intro lazily, exactly once, immediately before the first field
+    // that actually prompts — never when every field is skipped/provided (and
+    // not for a select/multiselect whose choices resolve empty, which
+    // promptField treats as an empty submission rather than a real prompt).
+    const renderIntro = (): void => {
+      if (!introRendered && spec.intro !== undefined) {
+        io.intro?.(spec.intro);
+        introRendered = true;
+      }
+    };
+
     const initial = field.default?.(partial);
-    const answer = await promptField(ctx, field, partial, io, initial);
+    const answer = await promptField(
+      ctx,
+      field,
+      partial,
+      io,
+      initial,
+      renderIntro,
+    );
 
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();
@@ -63,15 +82,18 @@ async function promptField<O>(
   draft: Partial<O>,
   io: PromptIO,
   initial: string | undefined,
+  onPrompt: () => void,
 ): Promise<string | string[] | boolean | symbol> {
   switch (field.kind) {
     case "text":
+      onPrompt();
       return io.text({
         message: field.message,
         ...(initial !== undefined ? { initialValue: initial } : {}),
         ...(field.validate !== undefined ? { validate: field.validate } : {}),
       });
     case "multiline":
+      onPrompt();
       return io.multiline({
         message: field.message,
         // Enter inserts a newline; a visible, Tab-focusable [ submit ] button
@@ -86,6 +108,7 @@ async function promptField<O>(
       // current/future cycles): treat as an empty submission so the field is
       // left unset instead of rendering an unusable empty picker.
       if (options.length === 0) return "";
+      onPrompt();
       const args = {
         message: field.message,
         options,
@@ -96,6 +119,7 @@ async function promptField<O>(
     case "multiselect": {
       const options = (await field.choices?.(ctx, draft)) ?? [];
       if (options.length === 0) return "";
+      onPrompt();
       const args = {
         message: field.message,
         options,
@@ -107,11 +131,74 @@ async function promptField<O>(
         : io.multiselect(args);
     }
     case "confirm":
+      onPrompt();
       return io.confirm({
         message: field.message,
         ...(initial !== undefined ? { initialValue: initial === "true" } : {}),
       });
+    case "date": {
+      // No min/max is passed to the picker: the non-interactive CLI enforces no
+      // date range (it allows backdated due dates and does not require
+      // targetDate >= startDate), so constraining the interactive path would
+      // reject inputs the CLI otherwise accepts. This is a pure input-ergonomics
+      // swap — semantics stay identical.
+      onPrompt();
+
+      // A segmented date picker cannot produce an empty value (its only escape
+      // is Esc = cancel). For optional fields we gate the picker behind a
+      // confirm so "leave unset / leave unchanged" (return "") stays reachable.
+      if (field.required !== true) {
+        const proceed = await io.confirm({
+          message: `Set a ${field.message.toLowerCase()}?`,
+          initialValue: false,
+        });
+        if (io.isCancel(proceed)) return proceed;
+        if (!proceed) return "";
+      }
+
+      const seed =
+        initial !== undefined ? parseDatePromptInitial(initial) : undefined;
+      const answer = await io.date({
+        message: field.message,
+        ...(seed !== undefined ? { initialValue: seed } : {}),
+      });
+      if (io.isCancel(answer)) return answer as symbol;
+      return formatLocalDate(answer as Date);
+    }
   }
+}
+
+/**
+ * Parse a `YYYY-MM-DD` seed string into a local `Date` for the picker's initial
+ * value. Returns undefined when the string is not a parseable date so the
+ * picker simply opens on today.
+ */
+function parseDatePromptInitial(value: string): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return undefined;
+  }
+  return date;
+}
+
+/**
+ * Format a `Date` as a local `YYYY-MM-DD` string. Uses local getters (not
+ * `toISOString`, which is UTC) so the day never shifts across timezones.
+ */
+function formatLocalDate(date: Date): string {
+  const year = String(date.getFullYear()).padStart(4, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 /**
