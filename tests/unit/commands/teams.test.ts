@@ -180,6 +180,18 @@ describe("teams create", () => {
     expect(createTeam).not.toHaveBeenCalled();
     expect(process.exit).toHaveBeenCalledWith(1);
   });
+
+  it("errors (does not hang) when name is missing and not on a TTY", async () => {
+    // `create [name]` dropped Commander's required-positional guard; without a
+    // TTY the wizard never runs (gating suppresses it), so the action itself
+    // must reject the missing name as JSON rather than block on a prompt.
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "teams", "create"]);
+
+    expect(createTeam).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
 });
 
 describe("teams update", () => {
@@ -257,6 +269,17 @@ describe("teams add-member", () => {
       userId: "resolved-user-uuid",
       owner: true,
     });
+  });
+
+  it("errors (does not hang) when --user is missing and not on a TTY", async () => {
+    // --user was demoted from requiredOption to option so the picker can fill it
+    // interactively; without a TTY the action must still reject a missing user.
+    const program = createProgram();
+
+    await program.parseAsync(["node", "test", "teams", "add-member", "ENG"]);
+
+    expect(addTeamMember).not.toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 });
 

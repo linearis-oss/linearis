@@ -8,7 +8,7 @@ import {
   InteractiveCancelledError,
   invalidParameterError,
 } from "../common/errors.js";
-import { teamChoices } from "../common/interactive/choices.js";
+import { teamChoices, userChoices } from "../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../common/interactive/engine.js";
 import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
@@ -36,7 +36,9 @@ export const TEAMS_META: DomainMeta = {
     "labels. teams are identified by a short key (e.g. ENG), name, or UUID.",
     "teams can be created and updated, and their membership managed with",
     "add-member/remove-member. boolean settings take an explicit true|false",
-    "value so scripts can set or unset them unambiguously.",
+    "value so scripts can set or unset them unambiguously. run create/update/",
+    "add-member/remove-member with -i (or omit a required value on a TTY) to",
+    "fill missing input interactively; piped/--no-interactive usage stays JSON.",
   ].join("\n"),
   arguments: {
     team: "team identifier (key, name, or UUID)",
@@ -131,6 +133,47 @@ interface TeamFieldOptions {
   autoClosePeriod?: string;
   autoArchivePeriod?: string;
 }
+
+/**
+ * Wizard shape for `teams create`/`update`: the promptable core fields only.
+ * `name` is the create positional / update `--name`; `key` and `description`
+ * are shared. The index signature carries the untouched advanced flag settings
+ * through the engine so they reach {@link buildTeamFields} unchanged.
+ */
+interface TeamWizardOptions extends Record<string, unknown> {
+  name?: string;
+  key?: string;
+  description?: string;
+}
+
+// IMPORTANT: keep these specs to string-valued `text` fields only. The ~20
+// advanced settings (private, cyclesEnabled, triage, estimation…) are parsed
+// from strings via parseBooleanOption, which `.trim()`s its input and therefore
+// throws on a real boolean. The engine's `confirm` kind returns a boolean, so
+// adding a boolean setting here as a `confirm` field would crash
+// buildTeamFields. They stay flag-only unless buildTeamFields is first taught to
+// accept booleans.
+export const teamCreateSpec: PromptSpec<TeamWizardOptions> = {
+  intro: "Create a new team",
+  fields: [
+    { name: "name", kind: "text", message: "Name", required: true },
+    {
+      name: "key",
+      kind: "text",
+      message: "Key (uppercase; auto-derived from name if blank)",
+    },
+    { name: "description", kind: "multiline", message: "Description" },
+  ],
+};
+
+export const teamUpdateSpec: PromptSpec<TeamWizardOptions> = {
+  intro: "Update a team",
+  fields: [
+    { name: "name", kind: "text", message: "Name" },
+    { name: "key", kind: "text", message: "Key" },
+    { name: "description", kind: "multiline", message: "Description" },
+  ],
+};
 
 // Build the shared mutable field set once, resolving the parent team to a
 // UUID. Only fields the user provided are included, so `update` never
@@ -276,6 +319,70 @@ function addTeamSettingFlags(command: Command): Command {
     .option("--auto-archive-period <months>", "auto-archive period in months");
 }
 
+/**
+ * Fill an absent `[team]` positional via the team picker when gating allows,
+ * otherwise error. Returns the team identifier (or picked UUID) for the
+ * resolver.
+ */
+async function resolveTeamPositional(
+  ctx: CommandContext,
+  command: Command,
+  team: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: team === undefined,
+      positional: { name: "team", value: team, picker: teamPicker },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("team", "is required");
+  }
+  return filled.positional;
+}
+
+/**
+ * Entity picker for an absent `--user` on the membership commands. Returns the
+ * selected user's UUID, which `resolveUserId` passes through via `isUuid(...)`.
+ */
+async function userPicker(ctx: CommandContext, io: PromptIO): Promise<string> {
+  const options = await userChoices(ctx);
+  const answer = await io.select({ message: "User", options });
+  if (io.isCancel(answer)) {
+    throw new InteractiveCancelledError();
+  }
+  return answer as string;
+}
+
+/**
+ * Fill an absent `--user` value via the user picker when gating allows,
+ * otherwise error. Returns the user identifier (or picked UUID) for the resolver.
+ */
+async function resolveUserOption(
+  ctx: CommandContext,
+  command: Command,
+  user: string | undefined,
+): Promise<string> {
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: user === undefined,
+      positional: { name: "user", value: user, picker: userPicker },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("--user", "is required");
+  }
+  return filled.positional;
+}
+
 export function setupTeamsCommands(program: Command): void {
   const teams = program.command("teams").description("Team operations");
 
@@ -310,20 +417,8 @@ export function setupTeamsCommands(program: Command): void {
         const command = args.at(-1) as Command;
         const ctx = createContext(getRootOpts(command));
 
-        const filled = await maybeCollectInteractive<
-          Record<string, never>,
-          string
-        >(ctx, getRootOpts(command), {
-          spec: EMPTY_SPEC,
-          options: {},
-          missingRequired: teamArg === undefined,
-          positional: { name: "team", value: teamArg, picker: teamPicker },
-        });
-        if (filled.positional === undefined) {
-          throw invalidParameterError("team", "is required");
-        }
-
-        const teamId = await resolveTeamId(ctx.gql, filled.positional);
+        const team = await resolveTeamPositional(ctx, command, teamArg);
+        const teamId = await resolveTeamId(ctx.gql, team);
         const result = await getTeam(ctx.gql, { id: teamId });
         outputSuccess(result);
       }),
@@ -331,7 +426,7 @@ export function setupTeamsCommands(program: Command): void {
 
   addTeamSettingFlags(
     teams
-      .command("create <name>")
+      .command("create [name]")
       .description("create a new team")
       .option(
         "--key <key>",
@@ -339,12 +434,31 @@ export function setupTeamsCommands(program: Command): void {
       ),
   ).action(
     handleCommand(async (...args: unknown[]) => {
-      const [name, options, command] = args as [
-        string,
+      const [nameArg, rawOptions, command] = args as [
+        string | undefined,
         TeamFieldOptions,
         Command,
       ];
       const ctx = createContext(getRootOpts(command));
+
+      const filled = await maybeCollectInteractive<TeamWizardOptions, never>(
+        ctx,
+        getRootOpts(command),
+        {
+          spec: teamCreateSpec,
+          options: {
+            ...rawOptions,
+            ...(nameArg !== undefined ? { name: nameArg } : {}),
+          } as TeamWizardOptions,
+          missingRequired: nameArg === undefined,
+        },
+      );
+      const options = filled.options as unknown as TeamFieldOptions;
+      const name = (filled.options.name as string | undefined) ?? nameArg;
+      if (name === undefined) {
+        throw invalidParameterError("name", "is required");
+      }
+
       const fields = await buildTeamFields(ctx, options);
       const input: CreateTeamInput = { ...fields, name };
       const result = await createTeam(ctx.gql, input);
@@ -354,18 +468,39 @@ export function setupTeamsCommands(program: Command): void {
 
   addTeamSettingFlags(
     teams
-      .command("update <team>")
+      .command("update [team]")
       .description("update an existing team")
       .option("--name <name>", "new team name")
       .option("--key <key>", "new team key"),
   ).action(
     handleCommand(async (...args: unknown[]) => {
-      const [team, options, command] = args as [
-        string,
+      const [teamArg, rawOptions, command] = args as [
+        string | undefined,
         TeamFieldOptions & { name?: string },
         Command,
       ];
       const ctx = createContext(getRootOpts(command));
+
+      // Wizard first: it picks the `[team]` positional AND fills name/key/
+      // description, so the "at least one field" guard below sees prompted input
+      // rather than firing before the user is asked.
+      const filled = await maybeCollectInteractive<TeamWizardOptions, string>(
+        ctx,
+        getRootOpts(command),
+        {
+          spec: teamUpdateSpec,
+          options: { ...rawOptions } as TeamWizardOptions,
+          missingRequired: teamArg === undefined,
+          positional: { name: "team", value: teamArg, picker: teamPicker },
+        },
+      );
+      if (filled.positional === undefined) {
+        throw invalidParameterError("team", "is required");
+      }
+      const options = filled.options as unknown as TeamFieldOptions & {
+        name?: string;
+      };
+
       const input = await buildTeamFields(ctx, options);
       if (options.name !== undefined) input.name = options.name;
 
@@ -376,20 +511,21 @@ export function setupTeamsCommands(program: Command): void {
         );
       }
 
-      const teamId = await resolveTeamId(ctx.gql, team);
+      const teamId = await resolveTeamId(ctx.gql, filled.positional);
       const result = await updateTeam(ctx.gql, teamId, input);
       outputSuccess(result);
     }),
   );
 
   teams
-    .command("members <team>")
+    .command("members [team]")
     .description("list a team's members")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const team = args[0] as string;
+        const teamArg = args[0] as string | undefined;
         const command = args.at(-1) as Command;
         const ctx = createContext(getRootOpts(command));
+        const team = await resolveTeamPositional(ctx, command, teamArg);
         const teamId = await resolveTeamId(ctx.gql, team);
         const result = await listTeamMembers(ctx.gql, { id: teamId });
         outputSuccess(result);
@@ -397,21 +533,23 @@ export function setupTeamsCommands(program: Command): void {
     );
 
   teams
-    .command("add-member <team>")
+    .command("add-member [team]")
     .description("add a user to a team")
-    .requiredOption("--user <user>", "user display name, email, or UUID")
+    .option("--user <user>", "user display name, email, or UUID")
     .option("--owner <true|false>", "grant team-admin (owner) rights")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [team, options, command] = args as [
-          string,
-          { user: string; owner?: string },
+        const [teamArg, options, command] = args as [
+          string | undefined,
+          { user?: string; owner?: string },
           Command,
         ];
         const ctx = createContext(getRootOpts(command));
+        const team = await resolveTeamPositional(ctx, command, teamArg);
+        const user = await resolveUserOption(ctx, command, options.user);
         const [teamId, userId] = await Promise.all([
           resolveTeamId(ctx.gql, team),
-          resolveUserId(ctx.gql, options.user),
+          resolveUserId(ctx.gql, user),
         ]);
         const result = await addTeamMember(ctx.gql, {
           teamId,
@@ -425,20 +563,22 @@ export function setupTeamsCommands(program: Command): void {
     );
 
   teams
-    .command("remove-member <team>")
+    .command("remove-member [team]")
     .description("remove a user from a team")
-    .requiredOption("--user <user>", "user display name, email, or UUID")
+    .option("--user <user>", "user display name, email, or UUID")
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [team, options, command] = args as [
-          string,
-          { user: string },
+        const [teamArg, options, command] = args as [
+          string | undefined,
+          { user?: string },
           Command,
         ];
         const ctx = createContext(getRootOpts(command));
+        const team = await resolveTeamPositional(ctx, command, teamArg);
+        const user = await resolveUserOption(ctx, command, options.user);
         const [teamId, userId] = await Promise.all([
           resolveTeamId(ctx.gql, team),
-          resolveUserId(ctx.gql, options.user),
+          resolveUserId(ctx.gql, user),
         ]);
         const result = await removeTeamMember(ctx.gql, { teamId, userId });
         outputSuccess(result);

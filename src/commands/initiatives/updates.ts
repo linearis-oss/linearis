@@ -6,9 +6,16 @@ import {
   invalidParameterError,
 } from "../../common/errors.js";
 import { asUuid } from "../../common/identifier.js";
-import { initiativeChoices } from "../../common/interactive/choices.js";
+import {
+  initiativeChoices,
+  withNoneChoice,
+} from "../../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../../common/interactive/engine.js";
-import type { PromptIO } from "../../common/interactive/types.js";
+import type {
+  Choice,
+  PromptIO,
+  PromptSpec,
+} from "../../common/interactive/types.js";
 import {
   handleCommand,
   outputSuccess,
@@ -136,6 +143,74 @@ interface InitiativeUpdatesUpdateOptions {
   health?: string;
 }
 
+/** Create-wizard shape: the initiative to post under, plus body/health. */
+interface InitiativeUpdateCreateWizardOptions extends Record<string, unknown> {
+  initiative?: string;
+  body?: string;
+  health?: string;
+}
+
+/** Update-wizard shape: the editable fields (body/health). */
+interface InitiativeUpdateUpdateWizardOptions extends Record<string, unknown> {
+  body?: string;
+  health?: string;
+}
+
+const HEALTH_VALUES = ["onTrack", "atRisk", "offTrack"] as const;
+
+/**
+ * Static health picker with a leading "none" sentinel so the field can be left
+ * unset (the engine treats the empty value as "leave unset", matching an absent
+ * `--health` flag). Values feed the existing {@link parseHealth} unchanged.
+ */
+function healthChoices(): Choice[] {
+  return withNoneChoice(
+    HEALTH_VALUES.map((value) => ({ value, label: value })),
+    "None (leave unset)",
+  );
+}
+
+/**
+ * Interactive wizard for `initiatives updates create`. Prompts the initiative
+ * (required; UUID value passed through by the resolver) then the update body and
+ * health, mirroring the body-centric `commentCreateSpec`.
+ */
+export const initiativeUpdateCreateSpec: PromptSpec<InitiativeUpdateCreateWizardOptions> =
+  {
+    intro: "Create an initiative update",
+    fields: [
+      {
+        name: "initiative",
+        kind: "select",
+        message: "Initiative",
+        required: true,
+        choices: initiativeChoices,
+      },
+      { name: "body", kind: "multiline", message: "Body (markdown)" },
+      {
+        name: "health",
+        kind: "select",
+        message: "Health",
+        choices: async () => healthChoices(),
+      },
+    ],
+  };
+
+/** Interactive wizard for `initiatives updates update`. All fields optional. */
+export const initiativeUpdateUpdateSpec: PromptSpec<InitiativeUpdateUpdateWizardOptions> =
+  {
+    intro: "Update an initiative update",
+    fields: [
+      { name: "body", kind: "multiline", message: "Body (markdown)" },
+      {
+        name: "health",
+        kind: "select",
+        message: "Health",
+        choices: async () => healthChoices(),
+      },
+    ],
+  };
+
 export function setupInitiativeUpdateCommands(initiatives: Command): void {
   const updates = initiatives
     .command("updates")
@@ -209,11 +284,22 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const initiative = await resolveInitiativeOption(
-          ctx,
-          command,
-          options.initiative,
-        );
+        const filled = await maybeCollectInteractive<
+          InitiativeUpdateCreateWizardOptions,
+          never
+        >(ctx, getRootOpts(command), {
+          spec: initiativeUpdateCreateSpec,
+          options: {
+            ...(options.initiative !== undefined
+              ? { initiative: options.initiative }
+              : {}),
+            ...(options.body !== undefined ? { body: options.body } : {}),
+            ...(options.health !== undefined ? { health: options.health } : {}),
+          },
+          missingRequired: options.initiative === undefined,
+        });
+
+        const initiative = filled.options.initiative;
         if (initiative === undefined) {
           throw invalidParameterError("--initiative", "is required");
         }
@@ -221,11 +307,11 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
 
         const input: CreateInitiativeUpdateInput = { initiativeId };
 
-        if (options.body !== undefined) {
-          input.body = options.body;
+        if (filled.options.body !== undefined) {
+          input.body = filled.options.body;
         }
 
-        const health = parseHealth(options.health);
+        const health = parseHealth(filled.options.health);
         if (health) {
           input.health = health;
         }
@@ -248,15 +334,38 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           Command,
         ];
         const ctx = createContext(getRootOpts(command));
-        const updateId = await resolveUpdatePositional(ctx, command, updateArg);
+
+        // Wizard first: it picks the `[update]` positional AND fills body/health,
+        // so the "at least one option" guard below sees prompted input rather
+        // than firing before the user is asked.
+        const filled = await maybeCollectInteractive<
+          InitiativeUpdateUpdateWizardOptions,
+          string
+        >(ctx, getRootOpts(command), {
+          spec: initiativeUpdateUpdateSpec,
+          options: {
+            ...(options.body !== undefined ? { body: options.body } : {}),
+            ...(options.health !== undefined ? { health: options.health } : {}),
+          },
+          missingRequired: updateArg === undefined,
+          positional: {
+            name: "update",
+            value: updateArg,
+            picker: updatePicker,
+          },
+        });
+        if (filled.positional === undefined) {
+          throw invalidParameterError("update", "is required");
+        }
+        const updateId = filled.positional;
 
         const input: UpdateInitiativeUpdateInput = {};
 
-        if (options.body !== undefined) {
-          input.body = options.body;
+        if (filled.options.body !== undefined) {
+          input.body = filled.options.body;
         }
 
-        const health = parseHealth(options.health);
+        const health = parseHealth(filled.options.health);
         if (health) {
           input.health = health;
         }

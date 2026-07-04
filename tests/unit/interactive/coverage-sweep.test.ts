@@ -86,15 +86,27 @@ describe("interactive coverage sweep", () => {
     perFile.set(file, readFileSync(join(COMMANDS_DIR, file), "utf-8"));
   }
 
-  it("every create/update command wires a wizard via maybeCollectInteractive", () => {
+  it("every create/update command references a matching field wizard spec", () => {
+    // A bare `maybeCollectInteractive` string is insufficient — a file can wire
+    // it for an entity/positional picker over an EMPTY_SPEC while leaving the
+    // create/update fields un-prompted (this is exactly how the teams and
+    // initiative-updates drift gaps hid). Require the file to reference a
+    // verb-matched `*CreateSpec` / `*UpdateSpec`, which only exists when a real
+    // field wizard was declared for that command.
     const offenders: string[] = [];
     for (const [file, content] of perFile) {
-      const hasCreateOrUpdate = extractCommands(content, file).some(
-        (c) => c.verb === "create" || c.verb === "update",
-      );
-      if (!hasCreateOrUpdate) continue;
-      if (!content.includes("maybeCollectInteractive")) {
-        offenders.push(file);
+      const cmds = extractCommands(content, file);
+      if (
+        cmds.some((c) => c.verb === "create") &&
+        !/spec:\s*\w*CreateSpec\b/.test(content)
+      ) {
+        offenders.push(`${file} (create)`);
+      }
+      if (
+        cmds.some((c) => c.verb === "update") &&
+        !/spec:\s*\w*UpdateSpec\b/.test(content)
+      ) {
+        offenders.push(`${file} (update)`);
       }
     }
     expect(offenders).toEqual([]);
@@ -122,5 +134,16 @@ describe("interactive coverage sweep", () => {
     expect(documents.documentCreateSpec).toBeDefined();
     expect(documents.documentUpdateSpec).toBeDefined();
     expect(attachments.attachmentCreateSpec).toBeDefined();
+  });
+
+  it("drift-added write domains export their wizard specs", async () => {
+    const teams = await import("../../../src/commands/teams.js");
+    const initiativeUpdates = await import(
+      "../../../src/commands/initiatives/updates.js"
+    );
+    expect(teams.teamCreateSpec).toBeDefined();
+    expect(teams.teamUpdateSpec).toBeDefined();
+    expect(initiativeUpdates.initiativeUpdateCreateSpec).toBeDefined();
+    expect(initiativeUpdates.initiativeUpdateUpdateSpec).toBeDefined();
   });
 });
