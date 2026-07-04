@@ -35,8 +35,29 @@ module.exports = {
     [
       "@semantic-release/exec",
       {
-        publishCmd:
-          'npx clean-publish --access public --tag $( [ "$GITHUB_REF_NAME" = "next" ] && echo next || echo latest ) -- --provenance',
+        // Publish in two explicit stages so a failed `npm publish` FAILS the
+        // release. `clean-publish --without-publish` only strips the configured
+        // package.json fields into a deterministic `.clean-pkg` dir (it swallows
+        // exit codes, so it must NOT own the publish); the real `npm publish`
+        // then runs directly, and its non-zero exit propagates to this plugin.
+        // Auth is npm OIDC trusted publishing (no NODE_AUTH_TOKEN in CI).
+        // Runs under `/bin/sh -c` (POSIX) via @semantic-release/exec shell:true.
+        publishCmd: [
+          "set -e",
+          "npx clean-publish --without-publish --temp-dir .clean-pkg",
+          'VERSION="$(node -p "require(\'./.clean-pkg/package.json\').version")"',
+          'TAG="$([ "$GITHUB_REF_NAME" = next ] && echo next || echo latest)"',
+          'npm publish ./.clean-pkg --provenance --access public --tag "$TAG"',
+          // Read-back guard: the original outage was a publish that "succeeded"
+          // while nothing reached the registry. Fail loudly if the version is
+          // not actually visible (retry for read-after-write lag).
+          "for i in $(seq 1 6); do",
+          '  if npm view "linearis@$VERSION" version; then FOUND=1; break; fi',
+          '  echo "waiting for registry to reflect $VERSION ($i/6)"; sleep 5',
+          "done",
+          '[ "$FOUND" = 1 ] || { echo "publish verification failed: linearis@$VERSION not on registry"; exit 1; }',
+          "rm -rf .clean-pkg",
+        ].join("\n"),
       },
     ],
     ["@semantic-release/github", { successComment: false, failComment: false }],

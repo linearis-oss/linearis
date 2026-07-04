@@ -36,7 +36,7 @@
     "knip": "knip --no-config-hints",
     "knip:ci": "knip --no-config-hints --reporter markdown",
     "verify:packed-binaries": "node scripts/verify-packed-binaries.mjs",
-    "release": "npm test && npm run build && npm run verify:packed-binaries && npx clean-publish --access public",
+    "release": "npm test && npm run build && npm run verify:packed-binaries && npx clean-publish --without-publish --temp-dir .clean-pkg && npm publish ./.clean-pkg --access public && rm -rf .clean-pkg",
     "prestart": "npm run generate",
     "predev": "npm run generate",
     "prebuild": "npm run generate && npm run generate:usage",
