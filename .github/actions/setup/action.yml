@@ -1,0 +1,47 @@
+name: Setup Node and install
+description: >-
+  Sets up Node (version from .nvmrc), restores the npm cache, runs `npm ci`, and
+  optionally builds the project. Centralizes the checkout-adjacent boilerplate
+  shared by every CI job. The caller must run actions/checkout first so this
+  local action and .nvmrc are present on disk.
+
+inputs:
+  build:
+    description: Whether to run `npm run build` after install (runs codegen + tsc + usage).
+    required: false
+    default: "true"
+  node-version:
+    description: >-
+      Explicit Node version to use, overriding .nvmrc. Leave empty to use the
+      project default from .nvmrc. Set by matrix jobs that test multiple versions.
+    required: false
+    default: ""
+  registry-url:
+    description: Optional npm registry URL to configure for publishing (leave empty for CI-only jobs).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # node-version (when set by a matrix job) takes precedence over
+    # node-version-file; an empty node-version falls back to .nvmrc.
+    - name: Setup Node
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        node-version-file: .nvmrc
+        cache: npm
+        registry-url: ${{ inputs.registry-url }}
+
+    # `npm ci` runs `prepare`, which is CI-guarded (scripts/prepare.mjs) so it
+    # does NOT hit the live Linear GraphQL schema here. Jobs needing generated
+    # types must run the build step below (or `npm pack`).
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Build project
+      if: ${{ inputs.build == 'true' }}
+      shell: bash
+      run: npm run build

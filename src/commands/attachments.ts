@@ -1,10 +1,13 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
+import { invalidParameterError } from "../common/errors.js";
+import { asUuid } from "../common/identifier.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { AttachmentFilter } from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
+  buildAttachmentFilter,
+  type CreateAttachmentInput,
   createAttachment,
   deleteAttachment,
   listAttachments,
@@ -28,6 +31,7 @@ export const ATTACHMENTS_META: DomainMeta = {
 };
 
 interface ListOptions {
+  issue?: string;
   sourceType?: string;
   title?: string;
   createdAfter?: string;
@@ -35,32 +39,31 @@ interface ListOptions {
 }
 
 interface CreateOptions {
+  issue?: string;
   title: string;
   url: string;
   subtitle?: string;
+  comment?: string;
+  iconUrl?: string;
 }
 
-function buildAttachmentFilter(
-  options: ListOptions,
-): AttachmentFilter | undefined {
-  const filters: AttachmentFilter[] = [];
-
-  if (options.sourceType) {
-    filters.push({ sourceType: { eq: options.sourceType } });
-  }
-  if (options.title) {
-    filters.push({ title: { eqIgnoreCase: options.title } });
-  }
-  if (options.createdAfter) {
-    filters.push({ createdAt: { gte: options.createdAfter } });
-  }
-  if (options.createdBefore) {
-    filters.push({ createdAt: { lt: options.createdBefore } });
+function resolveIssueArgument(
+  positionalIssue: string | undefined,
+  optionIssue: string | undefined,
+): string {
+  if (positionalIssue && optionIssue) {
+    throw invalidParameterError(
+      "--issue",
+      "cannot be combined with positional issue",
+    );
   }
 
-  if (filters.length === 0) return undefined;
-  if (filters.length === 1) return filters[0];
-  return { and: filters };
+  const issue = positionalIssue ?? optionIssue;
+  if (!issue) {
+    throw invalidParameterError("issue", "is required");
+  }
+
+  return issue;
 }
 
 export function setupAttachmentsCommands(program: Command): void {
@@ -71,8 +74,9 @@ export function setupAttachmentsCommands(program: Command): void {
   attachments.action(() => attachments.help());
 
   attachments
-    .command("list <issue>")
+    .command("list [issue]")
     .description("list attachments on an issue")
+    .option("--issue <issue>", "issue identifier (alias for positional issue)")
     .option(
       "--source-type <type>",
       "filter by source type (e.g. github, slack)",
@@ -83,12 +87,13 @@ export function setupAttachmentsCommands(program: Command): void {
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, options, command] = args as [
-          string,
+          string | undefined,
           ListOptions,
           Command,
         ];
+        const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
+        const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
         const filter = buildAttachmentFilter(options);
         const result = await listAttachments(ctx.gql, issueId, filter);
         outputSuccess(result);
@@ -96,26 +101,33 @@ export function setupAttachmentsCommands(program: Command): void {
     );
 
   attachments
-    .command("create <issue>")
+    .command("create [issue]")
     .description("create an attachment on an issue")
+    .option("--issue <issue>", "issue identifier (alias for positional issue)")
     .requiredOption("--title <title>", "attachment title")
     .requiredOption("--url <url>", "attachment URL")
     .option("--subtitle <text>", "attachment subtitle")
+    .option("--comment <text>", "comment body to create with the attachment")
+    .option("--icon-url <url>", "attachment icon URL")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [issue, options, command] = args as [
-          string,
+          string | undefined,
           CreateOptions,
           Command,
         ];
+        const issueIdentifier = resolveIssueArgument(issue, options.issue);
         const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await createAttachment(ctx.gql, {
+        const issueId = await resolveIssueId(ctx.gql, issueIdentifier);
+        const input: CreateAttachmentInput = {
           issueId,
           title: options.title,
           url: options.url,
           ...(options.subtitle && { subtitle: options.subtitle }),
-        });
+          ...(options.comment && { commentBody: options.comment }),
+          ...(options.iconUrl && { iconUrl: options.iconUrl }),
+        };
+        const result = await createAttachment(ctx.gql, input);
         outputSuccess(result);
       }),
     );
@@ -127,7 +139,7 @@ export function setupAttachmentsCommands(program: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [id, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await deleteAttachment(ctx.gql, id);
+        const result = await deleteAttachment(ctx.gql, asUuid(id));
         outputSuccess(result);
       }),
     );

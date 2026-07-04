@@ -1,6 +1,8 @@
 // tests/unit/services/cycle-service.test.ts
+
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import { getCycle, listCycles } from "../../../src/services/cycle-service.js";
 
 function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
@@ -30,12 +32,12 @@ describe("listCycles", () => {
     });
     const result = await listCycles(client);
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("cyc-1");
-    expect(result.nodes[0].number).toBe(1);
-    expect(result.nodes[0].name).toBe("Sprint 1");
-    expect(result.nodes[0].startsAt).toBe("2025-01-01");
-    expect(result.nodes[0].endsAt).toBe("2025-01-14");
-    expect(result.nodes[0].isActive).toBe(true);
+    expect(result.nodes[0]?.id).toBe("cyc-1");
+    expect(result.nodes[0]?.number).toBe(1);
+    expect(result.nodes[0]?.name).toBe("Sprint 1");
+    expect(result.nodes[0]?.startsAt).toBe("2025-01-01");
+    expect(result.nodes[0]?.endsAt).toBe("2025-01-14");
+    expect(result.nodes[0]?.isActive).toBe(true);
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: "c1" });
   });
 
@@ -88,7 +90,7 @@ describe("listCycles", () => {
         pageInfo: { hasNextPage: false, endCursor: null },
       },
     });
-    await listCycles(client, "team-1");
+    await listCycles(client, asUuid("team-1"));
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: undefined,
@@ -130,7 +132,7 @@ describe("listCycles", () => {
       },
     });
     const result = await listCycles(client);
-    expect(result.nodes[0].name).toBe("Cycle 3");
+    expect(result.nodes[0]?.name).toBe("Cycle 3");
   });
 });
 
@@ -158,16 +160,18 @@ describe("getCycle", () => {
         },
       },
     });
-    const result = await getCycle(client, "cyc-1");
+    const result = await getCycle(client, asUuid("cyc-1"));
     expect(result.id).toBe("cyc-1");
     expect(result.name).toBe("Sprint 1");
     expect(result.issues).toHaveLength(1);
-    expect(result.issues[0].identifier).toBe("ENG-1");
-    expect(result.issues[0].state.name).toBe("In Progress");
+    expect(result.issues[0]?.identifier).toBe("ENG-1");
+    expect(result.issues[0]?.state.name).toBe("In Progress");
   });
 
   it("throws when cycle not found", async () => {
     const client = mockGqlClient({ cycle: null });
-    await expect(getCycle(client, "missing-id")).rejects.toThrow("not found");
+    await expect(getCycle(client, asUuid("missing-id"))).rejects.toThrow(
+      "not found",
+    );
   });
 });

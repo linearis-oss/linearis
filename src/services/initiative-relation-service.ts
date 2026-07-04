@@ -1,8 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  DeletedInitiativeRelation,
-  InitiativeRelation,
-} from "../common/types.js";
+import type { UUID } from "../common/identifier.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import {
   CreateInitiativeRelationDocument,
   type CreateInitiativeRelationMutation,
@@ -10,50 +8,49 @@ import {
   type DeleteInitiativeRelationMutation,
 } from "../gql/graphql.js";
 
+// Initiative relation projection types
+export type InitiativeRelation = NonNullable<
+  CreateInitiativeRelationMutation["initiativeRelationCreate"]["initiativeRelation"]
+>;
+export type DeletedInitiativeRelation = {
+  id: NonNullable<
+    DeleteInitiativeRelationMutation["initiativeRelationDelete"]["entityId"]
+  >;
+  success: true;
+};
+
 export async function createInitiativeRelation(
   client: GraphQLClient,
-  input: { parentId: string; childId: string },
+  input: { parentId: UUID; childId: UUID },
 ): Promise<InitiativeRelation> {
-  const result = await client.request<CreateInitiativeRelationMutation>(
-    CreateInitiativeRelationDocument,
-    {
-      input: {
-        initiativeId: input.parentId,
-        relatedInitiativeId: input.childId,
-      },
+  const result = await client.request(CreateInitiativeRelationDocument, {
+    input: {
+      initiativeId: input.parentId,
+      relatedInitiativeId: input.childId,
     },
+  });
+
+  return requireMutationEntity(
+    result.initiativeRelationCreate,
+    "initiativeRelation",
+    `Failed to create initiative relation from "${input.parentId}" to "${input.childId}"`,
   );
-
-  if (
-    !result.initiativeRelationCreate.success ||
-    !result.initiativeRelationCreate.initiativeRelation
-  ) {
-    throw new Error(
-      `Failed to create initiative relation from "${input.parentId}" to "${input.childId}"`,
-    );
-  }
-
-  return result.initiativeRelationCreate.initiativeRelation;
 }
 
 export async function deleteInitiativeRelation(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedInitiativeRelation> {
-  const result = await client.request<DeleteInitiativeRelationMutation>(
-    DeleteInitiativeRelationDocument,
-    { id },
+  const result = await client.request(DeleteInitiativeRelationDocument, { id });
+
+  const entityId = requireMutationEntity(
+    result.initiativeRelationDelete,
+    "entityId",
+    `Failed to delete initiative relation "${id}"`,
   );
 
-  if (
-    !result.initiativeRelationDelete.success ||
-    !result.initiativeRelationDelete.entityId
-  ) {
-    throw new Error(`Failed to delete initiative relation "${id}"`);
-  }
-
   return {
-    id: result.initiativeRelationDelete.entityId,
+    id: entityId,
     success: true,
   };
 }

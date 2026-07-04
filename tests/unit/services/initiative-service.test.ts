@@ -1,6 +1,7 @@
 import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import { GetInitiativeDocument } from "../../../src/gql/graphql.js";
 import {
   archiveInitiative,
@@ -72,7 +73,7 @@ describe("listInitiatives", () => {
       after: "cursor-1",
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
-      orderBy: { createdAt: "Asc" },
+      orderBy: "createdAt",
     });
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
@@ -80,7 +81,7 @@ describe("listInitiatives", () => {
       after: "cursor-1",
       includeArchived: true,
       filter: { name: { eqIgnoreCase: "Growth" } },
-      orderBy: { createdAt: "Asc" },
+      orderBy: "createdAt",
       sort: undefined,
     });
   });
@@ -104,7 +105,7 @@ describe("getInitiative", () => {
       },
     });
 
-    await expect(getInitiative(client, "init-1")).resolves.toEqual({
+    await expect(getInitiative(client, asUuid("init-1"))).resolves.toEqual({
       id: "init-1",
       name: "Growth",
     });
@@ -113,7 +114,7 @@ describe("getInitiative", () => {
   it("throws when initiative is not found", async () => {
     const client = mockGqlClient({ initiative: null });
 
-    await expect(getInitiative(client, "missing")).rejects.toThrow(
+    await expect(getInitiative(client, asUuid("missing"))).rejects.toThrow(
       'Initiative with ID "missing" not found',
     );
   });
@@ -151,7 +152,9 @@ describe("updateInitiative", () => {
   it("rejects empty update input", async () => {
     const client = mockGqlClient({});
 
-    await expect(updateInitiative(client, "init-1", {})).rejects.toThrow(
+    await expect(
+      updateInitiative(client, asUuid("init-1"), {}),
+    ).rejects.toThrow(
       "Invalid update options: at least one update field must be provided",
     );
   });
@@ -165,7 +168,7 @@ describe("updateInitiative", () => {
     });
 
     await expect(
-      updateInitiative(client, "init-1", { name: "Updated" }),
+      updateInitiative(client, asUuid("init-1"), { name: "Updated" }),
     ).resolves.toEqual({
       id: "init-1",
       name: "Updated",
@@ -178,7 +181,7 @@ describe("updateInitiative", () => {
     });
 
     await expect(
-      updateInitiative(client, "init-1", { name: "Updated" }),
+      updateInitiative(client, asUuid("init-1"), { name: "Updated" }),
     ).rejects.toThrow('Failed to update initiative "init-1"');
   });
 });
@@ -192,7 +195,7 @@ describe("archiveInitiative", () => {
       },
     });
 
-    await expect(archiveInitiative(client, "init-1")).resolves.toEqual({
+    await expect(archiveInitiative(client, asUuid("init-1"))).resolves.toEqual({
       id: "init-1",
       name: "Growth",
     });
@@ -203,7 +206,7 @@ describe("archiveInitiative", () => {
       initiativeArchive: { success: false, entity: null },
     });
 
-    await expect(archiveInitiative(client, "init-1")).rejects.toThrow(
+    await expect(archiveInitiative(client, asUuid("init-1"))).rejects.toThrow(
       'Failed to archive initiative "init-1"',
     );
   });
@@ -218,7 +221,9 @@ describe("unarchiveInitiative", () => {
       },
     });
 
-    await expect(unarchiveInitiative(client, "init-1")).resolves.toEqual({
+    await expect(
+      unarchiveInitiative(client, asUuid("init-1")),
+    ).resolves.toEqual({
       id: "init-1",
       name: "Growth",
     });
@@ -229,7 +234,7 @@ describe("unarchiveInitiative", () => {
       initiativeUnarchive: { success: false, entity: null },
     });
 
-    await expect(unarchiveInitiative(client, "init-1")).rejects.toThrow(
+    await expect(unarchiveInitiative(client, asUuid("init-1"))).rejects.toThrow(
       'Failed to unarchive initiative "init-1"',
     );
   });
@@ -241,7 +246,7 @@ describe("deleteInitiative", () => {
       initiativeDelete: { success: true, entityId: "init-1" },
     });
 
-    await expect(deleteInitiative(client, "init-1")).resolves.toEqual({
+    await expect(deleteInitiative(client, asUuid("init-1"))).resolves.toEqual({
       id: "init-1",
       success: true,
     });
@@ -252,7 +257,7 @@ describe("deleteInitiative", () => {
       initiativeDelete: { success: false, entityId: null },
     });
 
-    await expect(deleteInitiative(client, "init-1")).rejects.toThrow(
+    await expect(deleteInitiative(client, asUuid("init-1"))).rejects.toThrow(
       'Failed to delete initiative "init-1"',
     );
   });

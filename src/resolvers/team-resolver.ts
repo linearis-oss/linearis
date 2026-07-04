@@ -1,6 +1,7 @@
-import type { LinearSdkClient } from "../client/linear-client.js";
+import type { GraphQLClient } from "../client/graphql-client.js";
 import { notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
+import { FindTeamsDocument } from "../gql/graphql.js";
 
 type TeamEstimationType =
   | "notUsed"
@@ -10,7 +11,7 @@ type TeamEstimationType =
   | "tShirt";
 
 export interface TeamEstimateContext {
-  teamId: string;
+  teamId: UUID;
   teamKey: string;
   teamName: string;
   issueEstimationType: TeamEstimationType;
@@ -51,12 +52,12 @@ function toTeamEstimateNode(
     );
   }
 
-  const id = node.id;
-  const key = node.key;
-  const name = node.name;
-  const issueEstimationType = node.issueEstimationType;
-  const issueEstimationExtended = node.issueEstimationExtended;
-  const issueEstimationAllowZero = node.issueEstimationAllowZero;
+  const id = node["id"];
+  const key = node["key"];
+  const name = node["name"];
+  const issueEstimationType = node["issueEstimationType"];
+  const issueEstimationExtended = node["issueEstimationExtended"];
+  const issueEstimationAllowZero = node["issueEstimationAllowZero"];
 
   if (
     typeof id !== "string" ||
@@ -85,7 +86,7 @@ function mapTeamNodeToEstimateContext(
   node: TeamEstimateNode,
 ): TeamEstimateContext {
   return {
-    teamId: node.id,
+    teamId: asUuid(node.id),
     teamKey: node.key,
     teamName: node.name,
     issueEstimationType: node.issueEstimationType,
@@ -95,39 +96,39 @@ function mapTeamNodeToEstimateContext(
 }
 
 export async function resolveTeamEstimateContext(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   keyOrNameOrId: string,
 ): Promise<TeamEstimateContext> {
   if (isUuid(keyOrNameOrId)) {
-    const byId = await client.sdk.teams({
+    const { teams } = await client.request(FindTeamsDocument, {
       filter: { id: { eq: keyOrNameOrId } },
       first: 1,
     });
-    if (byId.nodes.length > 0) {
+    if (teams.nodes.length > 0) {
       return mapTeamNodeToEstimateContext(
-        toTeamEstimateNode(byId.nodes[0], keyOrNameOrId),
+        toTeamEstimateNode(teams.nodes[0], keyOrNameOrId),
       );
     }
     throw notFoundError("Team", keyOrNameOrId);
   }
 
-  const byKey = await client.sdk.teams({
+  const byKey = await client.request(FindTeamsDocument, {
     filter: { key: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byKey.nodes.length > 0) {
+  if (byKey.teams.nodes.length > 0) {
     return mapTeamNodeToEstimateContext(
-      toTeamEstimateNode(byKey.nodes[0], keyOrNameOrId),
+      toTeamEstimateNode(byKey.teams.nodes[0], keyOrNameOrId),
     );
   }
 
-  const byName = await client.sdk.teams({
+  const byName = await client.request(FindTeamsDocument, {
     filter: { name: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byName.nodes.length > 0) {
+  if (byName.teams.nodes.length > 0) {
     return mapTeamNodeToEstimateContext(
-      toTeamEstimateNode(byName.nodes[0], keyOrNameOrId),
+      toTeamEstimateNode(byName.teams.nodes[0], keyOrNameOrId),
     );
   }
 
@@ -135,24 +136,26 @@ export async function resolveTeamEstimateContext(
 }
 
 export async function resolveTeamId(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   keyOrNameOrId: string,
-): Promise<string> {
-  if (isUuid(keyOrNameOrId)) return keyOrNameOrId;
+): Promise<UUID> {
+  if (isUuid(keyOrNameOrId)) return asUuid(keyOrNameOrId);
 
   // Try by key first
-  const byKey = await client.sdk.teams({
+  const byKey = await client.request(FindTeamsDocument, {
     filter: { key: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byKey.nodes.length > 0) return byKey.nodes[0].id;
+  const [byKeyMatch] = byKey.teams.nodes;
+  if (byKeyMatch) return asUuid(byKeyMatch.id);
 
   // Fall back to name
-  const byName = await client.sdk.teams({
+  const byName = await client.request(FindTeamsDocument, {
     filter: { name: { eq: keyOrNameOrId } },
     first: 1,
   });
-  if (byName.nodes.length > 0) return byName.nodes[0].id;
+  const [byNameMatch] = byName.teams.nodes;
+  if (byNameMatch) return asUuid(byNameMatch.id);
 
   throw notFoundError("Team", keyOrNameOrId);
 }

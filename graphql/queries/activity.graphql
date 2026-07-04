@@ -1,0 +1,74 @@
+fragment IssueHistoryFields on IssueHistory {
+  id
+  createdAt
+  actor {
+    id
+    displayName
+  }
+  botActor {
+    id
+    name
+  }
+  fromState {
+    id
+    name
+  }
+  toState {
+    id
+    name
+  }
+  fromAssignee {
+    id
+    displayName
+  }
+  toAssignee {
+    id
+    displayName
+  }
+  fromPriority
+  toPriority
+  fromProject {
+    id
+    name
+  }
+  toProject {
+    id
+    name
+  }
+  fromCycle {
+    id
+    number
+  }
+  toCycle {
+    id
+    number
+  }
+  fromTitle
+  toTitle
+  fromEstimate
+  toEstimate
+  addedLabelIds
+  removedLabelIds
+  archived
+}
+
+query GetIssueActivityRef($id: String!) {
+  issue(id: $id) {
+    id
+    identifier
+  }
+}
+
+query ListIssueActivityHistory($issueId: String!, $first: Int, $after: String) {
+  issue(id: $issueId) {
+    history(first: $first, after: $after) {
+      nodes {
+        ...IssueHistoryFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}

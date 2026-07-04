@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   CreateInitiativeRelationDocument,
   DeleteInitiativeRelationDocument,
@@ -38,8 +39,8 @@ describe("createInitiativeRelation", () => {
 
     await expect(
       createInitiativeRelation(client, {
-        parentId: "init-parent",
-        childId: "init-child",
+        parentId: asUuid("init-parent"),
+        childId: asUuid("init-child"),
       }),
     ).resolves.toEqual(relation);
 
@@ -63,8 +64,8 @@ describe("createInitiativeRelation", () => {
 
     await expect(
       createInitiativeRelation(client, {
-        parentId: "init-parent",
-        childId: "init-child",
+        parentId: asUuid("init-parent"),
+        childId: asUuid("init-child"),
       }),
     ).rejects.toThrow(
       'Failed to create initiative relation from "init-parent" to "init-child"',
@@ -81,8 +82,8 @@ describe("createInitiativeRelation", () => {
 
     await expect(
       createInitiativeRelation(client, {
-        parentId: "init-parent",
-        childId: "init-child",
+        parentId: asUuid("init-parent"),
+        childId: asUuid("init-child"),
       }),
     ).rejects.toThrow(
       'Failed to create initiative relation from "init-parent" to "init-child"',
@@ -99,7 +100,9 @@ describe("deleteInitiativeRelation", () => {
       },
     });
 
-    await expect(deleteInitiativeRelation(client, "rel-1")).resolves.toEqual({
+    await expect(
+      deleteInitiativeRelation(client, asUuid("rel-1")),
+    ).resolves.toEqual({
       id: "rel-1",
       success: true,
     });
@@ -117,9 +120,9 @@ describe("deleteInitiativeRelation", () => {
       },
     });
 
-    await expect(deleteInitiativeRelation(client, "rel-1")).rejects.toThrow(
-      'Failed to delete initiative relation "rel-1"',
-    );
+    await expect(
+      deleteInitiativeRelation(client, asUuid("rel-1")),
+    ).rejects.toThrow('Failed to delete initiative relation "rel-1"');
   });
 
   it("throws when payload is missing", async () => {
@@ -130,8 +133,8 @@ describe("deleteInitiativeRelation", () => {
       },
     });
 
-    await expect(deleteInitiativeRelation(client, "rel-1")).rejects.toThrow(
-      'Failed to delete initiative relation "rel-1"',
-    );
+    await expect(
+      deleteInitiativeRelation(client, asUuid("rel-1")),
+    ).rejects.toThrow('Failed to delete initiative relation "rel-1"');
   });
 });

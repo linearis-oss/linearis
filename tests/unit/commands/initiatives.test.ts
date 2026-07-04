@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../src/common/context.js", () => ({
   createContext: vi.fn(() => ({
     gql: { request: vi.fn() },
-    sdk: { sdk: {} },
   })),
   getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
@@ -40,28 +39,40 @@ vi.mock("../../../src/resolvers/user-resolver.js", () => ({
   resolveUserId: vi.fn().mockResolvedValue("resolved-user-uuid"),
 }));
 
-vi.mock("../../../src/services/initiative-service.js", () => ({
-  listInitiatives: vi.fn().mockResolvedValue({
-    nodes: [],
-    pageInfo: { hasNextPage: false, endCursor: null },
-  }),
-  getInitiative: vi.fn().mockResolvedValue({ id: "resolved-initiative-uuid" }),
-  createInitiative: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-initiative-uuid" }),
-  updateInitiative: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-initiative-uuid" }),
-  archiveInitiative: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-initiative-uuid" }),
-  unarchiveInitiative: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-initiative-uuid" }),
-  deleteInitiative: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-initiative-uuid", success: true }),
-}));
+vi.mock(
+  "../../../src/services/initiative-service.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../src/services/initiative-service.js")
+      >();
+    return {
+      ...actual,
+      listInitiatives: vi.fn().mockResolvedValue({
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      }),
+      getInitiative: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-initiative-uuid" }),
+      createInitiative: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-initiative-uuid" }),
+      updateInitiative: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-initiative-uuid" }),
+      archiveInitiative: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-initiative-uuid" }),
+      unarchiveInitiative: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-initiative-uuid" }),
+      deleteInitiative: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-initiative-uuid", success: true }),
+    };
+  },
+);
 
 vi.mock("../../../src/services/initiative-relation-service.js", () => ({
   createInitiativeRelation: vi
@@ -81,27 +92,37 @@ vi.mock("../../../src/services/initiative-project-service.js", () => ({
     .mockResolvedValue({ id: "resolved-link-uuid", success: true }),
 }));
 
-vi.mock("../../../src/services/initiative-update-service.js", () => ({
-  listInitiativeUpdates: vi.fn().mockResolvedValue({
-    nodes: [],
-    pageInfo: { hasNextPage: false, endCursor: null },
-  }),
-  getInitiativeUpdate: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-update-uuid" }),
-  createInitiativeUpdate: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-update-uuid" }),
-  updateInitiativeUpdate: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-update-uuid" }),
-  archiveInitiativeUpdate: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-update-uuid" }),
-  unarchiveInitiativeUpdate: vi
-    .fn()
-    .mockResolvedValue({ id: "resolved-update-uuid" }),
-}));
+vi.mock(
+  "../../../src/services/initiative-update-service.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../src/services/initiative-update-service.js")
+      >();
+    return {
+      ...actual,
+      listInitiativeUpdates: vi.fn().mockResolvedValue({
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      }),
+      getInitiativeUpdate: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-update-uuid" }),
+      createInitiativeUpdate: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-update-uuid" }),
+      updateInitiativeUpdate: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-update-uuid" }),
+      archiveInitiativeUpdate: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-update-uuid" }),
+      unarchiveInitiativeUpdate: vi
+        .fn()
+        .mockResolvedValue({ id: "resolved-update-uuid" }),
+    };
+  },
+);
 
 vi.mock("../../../src/services/discussion-service.js", () => ({
   startInitiativeDiscussion: vi

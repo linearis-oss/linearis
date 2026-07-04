@@ -12,6 +12,7 @@ import {
   validateFilterDependencies,
   validatePriority,
 } from "./issue-filter.js";
+import { omitUndefined } from "./object.js";
 
 /**
  * Resolves raw CLI filter flags into validated IssueFilterOptions with UUIDs.
@@ -19,7 +20,7 @@ import {
  * Validation order: format → dependency → date ranges → ID resolution.
  * Fails fast before making any API calls when input is invalid.
  *
- * @param ctx - Command context with SDK and GraphQL clients
+ * @param ctx - Command context with the GraphQL client
  * @param opts - Raw filter flags from CLI options
  * @returns Resolved filter options with UUIDs ready for buildIssueFilter()
  */
@@ -106,23 +107,26 @@ export async function resolveFilterOptions(
     opts.parent !== undefined;
 
   const batchResolved = hasResolvableFilters
-    ? await resolveSearchFilterIds(ctx.sdk, {
-        team: opts.team,
-        assignee: opts.assignee,
-        creator: opts.creator,
-        project: opts.project,
-        statusNames: parsedStatusNames,
-        labelNames: parsedLabelNames,
-        cycle: opts.cycle,
-        parent: opts.parent,
-      })
+    ? await resolveSearchFilterIds(
+        ctx.gql,
+        omitUndefined({
+          team: opts.team,
+          assignee: opts.assignee,
+          creator: opts.creator,
+          project: opts.project,
+          statusNames: parsedStatusNames,
+          labelNames: parsedLabelNames,
+          cycle: opts.cycle,
+          parent: opts.parent,
+        }),
+      )
     : {};
 
   const milestoneId = opts.milestone
-    ? await resolveMilestoneId(ctx.gql, ctx.sdk, opts.milestone, opts.project)
+    ? await resolveMilestoneId(ctx.gql, opts.milestone, opts.project)
     : undefined;
 
-  const resolved: IssueFilterOptions = {
+  const resolved: IssueFilterOptions = omitUndefined({
     ...batchResolved,
     milestoneId,
     priority: parsedPriority,
@@ -137,7 +141,7 @@ export async function resolveFilterOptions(
     updatedBefore: opts.updatedBefore,
     hasBlockers: opts.hasBlockers,
     isBlocking: opts.isBlocking,
-  };
+  });
 
   return resolved;
 }

@@ -1,3 +1,108 @@
+## [2026.6.0-next.13](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.12...v2026.6.0-next.13) (2026-07-04)
+
+### Features
+
+* **teams:** add team create, update, and membership management ([c89208b](https://github.com/linearis-oss/linearis/commit/c89208bc7a14514da62caec25364207fa29fbb18)), closes [#142](https://github.com/linearis-oss/linearis/issues/142)
+
+## [2026.6.0-next.12](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.11...v2026.6.0-next.12) (2026-07-04)
+
+### Features
+
+* **issues:** add activity command with threaded discussion timeline ([38a3ea3](https://github.com/linearis-oss/linearis/commit/38a3ea3379a7c92eba728d0d5ee7537dbd2a452b)), closes [#144](https://github.com/linearis-oss/linearis/issues/144)
+
+## [2026.6.0-next.12](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.11...v2026.6.0-next.12) (2026-07-04)
+
+### Features
+
+* **issues:** add activity command with threaded discussion timeline ([38a3ea3](https://github.com/linearis-oss/linearis/commit/38a3ea3379a7c92eba728d0d5ee7537dbd2a452b)), closes [#144](https://github.com/linearis-oss/linearis/issues/144)
+
+## [2026.6.0-next.11](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.10...v2026.6.0-next.11) (2026-07-03)
+
+### Features
+
+* **skill:** add agent skill and Claude Code plugin for the CLI ([1233ad9](https://github.com/linearis-oss/linearis/commit/1233ad995e858ee61b925ac580e4b231c6dfa1c8))
+
+### Bug Fixes
+
+* **skill:** comma-separate allowed-tools in SKILL.md frontmatter ([66db248](https://github.com/linearis-oss/linearis/commit/66db24863e1669ac2dad88aa9fc60ca0cfdd0e31))
+
+## [2026.6.0-next.10](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.9...v2026.6.0-next.10) (2026-07-03)
+
+### Bug Fixes
+
+* **resolvers:** restore global cycle fallback in search without team ([c0cbc95](https://github.com/linearis-oss/linearis/commit/c0cbc95889c4b7aaafe7e3281e9c8458bb71fefe)), closes [#126](https://github.com/linearis-oss/linearis/issues/126)
+
+### Performance Improvements
+
+* **issues:** batch-resolve assignee and IDs in create/update ([819c045](https://github.com/linearis-oss/linearis/commit/819c0451c909bbe2c5d297b6b584ce4da1358391)), closes [#126](https://github.com/linearis-oss/linearis/issues/126)
+
+## [2026.6.0-next.9](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.8...v2026.6.0-next.9) (2026-07-03)
+
+### Bug Fixes
+
+* **retry:** retry native fetch transport failures ([6fc8e64](https://github.com/linearis-oss/linearis/commit/6fc8e64ea83b45ee316307dd14701cb3df696300)), closes [#207](https://github.com/linearis-oss/linearis/issues/207)
+
+## [2026.6.0-next.8](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.7...v2026.6.0-next.8) (2026-07-02)
+
+### Features
+
+* **labels:** add issue label CRUD commands ([5fca207](https://github.com/linearis-oss/linearis/commit/5fca207d96e597ef0e755bb0e1eb0135deeae47e))
+* **labels:** support label removal modes ([c6cfa62](https://github.com/linearis-oss/linearis/commit/c6cfa627972f825868b8868c50057d7c15e906a6))
+
+### Bug Fixes
+
+* **labels:** allow clearing label description with empty string ([9a28108](https://github.com/linearis-oss/linearis/commit/9a2810813753f5f3a3e836f5a02d0ceed2eee433))
+
+## [2026.6.0-next.7](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.6...v2026.6.0-next.7) (2026-07-02)
+
+### Features
+
+* **cli:** add passive update notifier and version command ([6ca3952](https://github.com/linearis-oss/linearis/commit/6ca39522a0845cb84af0ed14cdfd5ba5de23677e))
+
+## [2026.6.0-next.6](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.5...v2026.6.0-next.6) (2026-07-02)
+
+### Features
+
+* **projects:** restore project workflow options ([1f35779](https://github.com/linearis-oss/linearis/commit/1f35779fb07b42beb30d13a9e96917aa2d63d03e))
+
+### Bug Fixes
+
+* **ci:** skip PR comment posting for fork pull requests ([390dd38](https://github.com/linearis-oss/linearis/commit/390dd385cded3c3249e3ab9ad13864b1d377b810))
+
+## [2026.6.0-next.5](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.4...v2026.6.0-next.5) (2026-07-02)
+
+### Features
+
+* restore document attachment compatibility ([f096add](https://github.com/linearis-oss/linearis/commit/f096adda7aa20c946a25c7c06fefec56d9684975))
+
+## [2026.6.0-next.4](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.3...v2026.6.0-next.4) (2026-07-02)
+
+### Features
+
+* **output:** add --compact and --fields flags for token-efficient output ([682bde9](https://github.com/linearis-oss/linearis/commit/682bde9489176b4dffa26f3e4fd40bdb633fe77c)), closes [#220](https://github.com/linearis-oss/linearis/issues/220)
+
+### Bug Fixes
+
+* **output:** harden pickFields against prototype-chain keys ([a624313](https://github.com/linearis-oss/linearis/commit/a624313e0d1cb74ed77ddbf1f87a24c3262cdc72)), closes [#220](https://github.com/linearis-oss/linearis/issues/220)
+
+## [2026.6.0-next.3](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.2...v2026.6.0-next.3) (2026-07-02)
+
+### Bug Fixes
+
+* **milestones:** use $input convention for milestone mutations ([309aaab](https://github.com/linearis-oss/linearis/commit/309aaab662ab0dc79731f2c288f97d7b75d74caf)), closes [#223](https://github.com/linearis-oss/linearis/issues/223)
+
+## [2026.6.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.1...v2026.6.0-next.2) (2026-07-02)
+
+### Features
+
+* **issues:** restore relation commands ([e0f880c](https://github.com/linearis-oss/linearis/commit/e0f880c8e700b889b0565cae787675c62b3c3eb8))
+
+## [2026.6.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.5.0...v2026.6.0-next.1) (2026-06-16)
+
+### Bug Fixes
+
+* **discussions:** forward parent entity id when replying to a thread ([745ca56](https://github.com/linearis-oss/linearis/commit/745ca56465e51f2981740a1153eedc01a40e0431)), closes [#226](https://github.com/linearis-oss/linearis/issues/226)
+
 ## [2026.5.0](https://github.com/linearis-oss/linearis/compare/v2026.4.9...v2026.5.0) (2026-06-16)
 
 ### Bug Fixes

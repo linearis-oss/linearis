@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import type { LinearSdkClient } from "../../../src/client/linear-client.js";
 import type { CommandContext } from "../../../src/common/context.js";
 import { resolveFilterOptions } from "../../../src/common/resolve-filters.js";
 import { resolveSearchFilterIds } from "../../../src/resolvers/issue-filter-resolver.js";
@@ -26,7 +25,6 @@ vi.mock("../../../src/resolvers/milestone-resolver.js", () => ({
 function mockContext(): CommandContext {
   return {
     gql: {} as unknown as GraphQLClient,
-    sdk: {} as unknown as LinearSdkClient,
   };
 }
 
@@ -83,7 +81,6 @@ describe("resolveFilterOptions", () => {
       parent: "ENG-123",
     });
     expect(resolveMilestoneId).toHaveBeenCalledWith(
-      expect.anything(),
       expect.anything(),
       "v1.0",
       "Backend",
@@ -187,7 +184,6 @@ describe("resolveFilterOptions", () => {
 
     expect(resolveSearchFilterIds).not.toHaveBeenCalled();
     expect(resolveMilestoneId).toHaveBeenCalledWith(
-      expect.anything(),
       expect.anything(),
       "550e8400-e29b-41d4-a716-446655440002",
       undefined,

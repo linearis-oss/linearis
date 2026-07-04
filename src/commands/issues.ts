@@ -1,41 +1,41 @@
 import type { Command } from "commander";
+import { firstOrThrow } from "../common/array.js";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
+import { parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
 import {
+  asUuid,
   isUuid,
   parseDueDate,
   parseIssueIdentifier,
+  type UUID,
 } from "../common/identifier.js";
 import type { RawFilterFlags } from "../common/issue-filter.js";
 import {
   parseEstimateOption,
   parsePriorityOption,
 } from "../common/number-options.js";
-import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
+import type { IssueRelationType } from "../gql/graphql.js";
 import {
-  type IssueCreateInput,
-  IssueRelationType,
-  type IssueUpdateInput,
-} from "../gql/graphql.js";
-import { resolveCycleId } from "../resolvers/cycle-resolver.js";
+  type ResolveCreateIssueIdsInput,
+  type ResolvedUpdateIssueIds,
+  type ResolveUpdateIssueIdsInput,
+  resolveCreateIssueIds,
+  resolveUpdateIssueIds,
+  type UpdateIssueContext,
+} from "../resolvers/issue-mutation-resolver.js";
 import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
-import { resolveLabelIds } from "../resolvers/label-resolver.js";
-import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
-import { resolveProjectId } from "../resolvers/project-resolver.js";
-import { resolveStatusId } from "../resolvers/status-resolver.js";
-import {
-  resolveTeamEstimateContext,
-  resolveTeamId,
-} from "../resolvers/team-resolver.js";
-import { resolveUserId } from "../resolvers/user-resolver.js";
+import { getIssueActivity } from "../services/activity-service.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -58,9 +58,11 @@ import {
   createIssueRelation,
   deleteIssueRelation,
   findIssueRelation,
+  listIssueRelations,
 } from "../services/issue-relation-service.js";
 import {
   archiveIssue,
+  type CreateIssueInput,
   createIssue,
   deleteIssue,
   getIssue,
@@ -75,6 +77,7 @@ import {
   getIssueWithReactions,
   listIssues,
   searchIssues,
+  type UpdateIssueInput,
   unarchiveIssue,
   updateIssue,
 } from "../services/issue-service.js";
@@ -107,6 +110,7 @@ interface CreateOptions {
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
+  similarTo?: string;
 }
 
 interface UpdateOptions {
@@ -133,6 +137,7 @@ interface UpdateOptions {
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
+  similarTo?: string;
   removeRelation?: string;
 }
 
@@ -167,6 +172,13 @@ interface DiscussionsOptions {
   withReactions?: boolean;
 }
 
+interface ActivityOptions {
+  limit: string;
+  after?: string;
+  commentsOnly?: boolean;
+  withReactions?: boolean;
+}
+
 interface DiscussionBodyOptions {
   body?: string;
 }
@@ -184,23 +196,19 @@ function addCommentReactionCommands(
     .description(`add a reaction to a discussion ${noun}`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await createDiscussionCommentReaction(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "issue",
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (commentId, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await createDiscussionCommentReaction(ctx.gql, {
+            commentId: asUuid(commentId),
+            target: noun,
+            expectedEntityKind: "issue",
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   parent
@@ -208,23 +216,19 @@ function addCommentReactionCommands(
     .description(`remove your reaction from a discussion ${noun} by emoji`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "issue",
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (commentId, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+            commentId: asUuid(commentId),
+            target: noun,
+            expectedEntityKind: "issue",
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   parent
@@ -233,23 +237,19 @@ function addCommentReactionCommands(
       `remove your reaction from a discussion ${noun} by reaction ID`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, reactionId, , command] = args as [
-          string,
-          string,
-          unknown,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await deleteDiscussionCommentReactionById(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "issue",
-          reactionId,
-        });
+      commandAction<[string, string, unknown, Command]>(
+        async (commentId, reactionId, _unused2, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteDiscussionCommentReactionById(ctx.gql, {
+            commentId: asUuid(commentId),
+            target: noun,
+            expectedEntityKind: "issue",
+            reactionId: asUuid(reactionId),
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 }
 
@@ -273,6 +273,7 @@ export const ISSUES_META: DomainMeta = {
     query: "full-text search term",
   },
   seeAlso: [
+    "issues activity <issue>",
     "comments create <issue>",
     "documents list --issue <issue>",
     "attachments list <issue>",
@@ -284,8 +285,21 @@ export const ISSUES_META: DomainMeta = {
 };
 
 interface RelationAction {
-  type: "blocks" | "blockedBy" | "relatesTo" | "duplicateOf" | "remove";
+  type:
+    | "blocks"
+    | "blockedBy"
+    | "relatesTo"
+    | "duplicateOf"
+    | "similarTo"
+    | "remove";
   targets: string[];
+}
+
+interface RelationAddOptions {
+  blocks?: string;
+  related?: string;
+  duplicate?: string;
+  similar?: string;
 }
 
 function parseRelationFlags(flags: {
@@ -293,6 +307,7 @@ function parseRelationFlags(flags: {
   blockedBy?: string;
   relatesTo?: string;
   duplicateOf?: string;
+  similarTo?: string;
   removeRelation?: string;
 }): RelationAction[] {
   const entries: Array<{
@@ -303,6 +318,7 @@ function parseRelationFlags(flags: {
     { type: "blockedBy", raw: flags.blockedBy },
     { type: "relatesTo", raw: flags.relatesTo },
     { type: "duplicateOf", raw: flags.duplicateOf },
+    { type: "similarTo", raw: flags.similarTo },
     { type: "remove", raw: flags.removeRelation },
   ];
 
@@ -327,7 +343,7 @@ function parseRelationFlags(flags: {
     ];
     if (targets.length === 0) {
       throw new Error(
-        `Relation flag --${type === "remove" ? "remove-relation" : type} must not be empty`,
+        `Relation flag ${relationFlagName(type)} must not be empty`,
       );
     }
     actions.push({ type, targets });
@@ -340,30 +356,83 @@ function parseRelationFlags(flags: {
       const prev = seen.get(target);
       if (prev) {
         throw new Error(
-          `${target} appears in multiple relation flags (${prev} and --${action.type === "remove" ? "remove-relation" : action.type})`,
+          `${target} appears in multiple relation flags (${prev} and ${relationFlagName(action.type)})`,
         );
       }
-      seen.set(
-        target,
-        `--${action.type === "remove" ? "remove-relation" : action.type}`,
-      );
+      seen.set(target, relationFlagName(action.type));
     }
   }
 
   return actions;
 }
 
+function relationFlagName(type: RelationAction["type"]): string {
+  switch (type) {
+    case "blocks":
+      return "--blocks";
+    case "blockedBy":
+      return "--blocked-by";
+    case "relatesTo":
+      return "--relates-to";
+    case "duplicateOf":
+      return "--duplicate-of";
+    case "similarTo":
+      return "--similar-to";
+    case "remove":
+      return "--remove-relation";
+  }
+}
+
+function parseRelationAddOptions(options: RelationAddOptions): {
+  type: IssueRelationType;
+  targets: string[];
+} {
+  const typeFlags = [
+    options.blocks ? "blocks" : null,
+    options.related ? "related" : null,
+    options.duplicate ? "duplicate" : null,
+    options.similar ? "similar" : null,
+  ].filter((type): type is keyof RelationAddOptions => type !== null);
+
+  if (typeFlags.length > 1) {
+    throw new Error("Cannot specify multiple relation types");
+  }
+
+  const type = firstOrThrow(
+    typeFlags,
+    "Must specify one of --blocks, --related, --duplicate, or --similar",
+  );
+  const rawTargets = options[type] ?? "";
+  const targets = [
+    ...new Set(
+      rawTargets
+        .split(",")
+        .map((target) => target.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (targets.length === 0) {
+    throw new Error("At least one related issue ID must be provided");
+  }
+
+  return {
+    type,
+    targets,
+  };
+}
+
 async function resolveAndApplyRelations(
   ctx: CommandContext,
-  issueId: string,
+  issueId: UUID,
   actions: RelationAction[],
 ): Promise<void> {
   // Resolve all unique targets to UUIDs
   const uniqueTargets = new Set(actions.flatMap((a) => a.targets));
-  const resolved = new Map<string, string>();
+  const resolved = new Map<string, UUID>();
   await Promise.all(
     [...uniqueTargets].map(async (target) => {
-      resolved.set(target, await resolveIssueId(ctx.sdk, target));
+      resolved.set(target, await resolveIssueId(ctx.gql, target));
     }),
   );
 
@@ -376,28 +445,35 @@ async function resolveAndApplyRelations(
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Blocks,
+            type: "blocks",
           });
           break;
         case "blockedBy":
           await createIssueRelation(ctx.gql, {
             issueId: targetId,
             relatedIssueId: issueId,
-            type: IssueRelationType.Blocks,
+            type: "blocks",
           });
           break;
         case "relatesTo":
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Related,
+            type: "related",
           });
           break;
         case "duplicateOf":
           await createIssueRelation(ctx.gql, {
             issueId,
             relatedIssueId: targetId,
-            type: IssueRelationType.Duplicate,
+            type: "duplicate",
+          });
+          break;
+        case "similarTo":
+          await createIssueRelation(ctx.gql, {
+            issueId,
+            relatedIssueId: targetId,
+            type: "similar",
           });
           break;
         case "remove": {
@@ -450,6 +526,76 @@ export function setupIssuesCommands(program: Command): void {
 
   issues.action(() => issues.help());
 
+  const relations = issues
+    .command("relations")
+    .description("Issue relation operations");
+
+  relations.action(() => relations.help());
+
+  relations
+    .command("list <issue>")
+    .description("list relations for an issue")
+    .action(
+      commandAction<[string, unknown, Command]>(
+        async (issue, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await listIssueRelations(ctx.gql, issueId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  relations
+    .command("add <issue>")
+    .description("add relation(s) to an issue")
+    .option("--blocks <issues>", "issues this issue blocks (comma-separated)")
+    .option("--related <issues>", "related issues (comma-separated)")
+    .option(
+      "--duplicate <issues>",
+      "issues this is a duplicate of (comma-separated)",
+    )
+    .option("--similar <issues>", "similar issues (comma-separated)")
+    .action(
+      commandAction<[string, RelationAddOptions, Command]>(
+        async (issue, options, command) => {
+          const relation = parseRelationAddOptions(options);
+          const ctx = createContext(getRootOpts(command));
+          const sourceIssueId = await resolveIssueId(ctx.gql, issue);
+          const targetIds = await Promise.all(
+            relation.targets.map((target) => resolveIssueId(ctx.gql, target)),
+          );
+
+          const created = await Promise.all(
+            targetIds.map((targetId) =>
+              createIssueRelation(ctx.gql, {
+                issueId: sourceIssueId,
+                relatedIssueId: targetId,
+                type: relation.type,
+              }),
+            ),
+          );
+
+          outputSuccess(created);
+        },
+      ),
+    );
+
+  relations
+    .command("remove <relation>")
+    .description("remove a relation by UUID")
+    .action(
+      commandAction<[string, unknown, Command]>(
+        async (relation, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteIssueRelation(ctx.gql, asUuid(relation));
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
   addFilterOptions(
     issues
       .command("list")
@@ -458,14 +604,13 @@ export function setupIssuesCommands(program: Command): void {
       .option("-l, --limit <n>", "max results", "50")
       .option("--after <cursor>", "cursor for next page"),
   ).action(
-    handleCommand(async (...args: unknown[]) => {
-      const [options, command] = args as [FilterOptions, Command];
+    commandAction<[FilterOptions, Command]>(async (options, command) => {
       const ctx = createContext(getRootOpts(command));
 
-      const paginationOptions = {
-        limit: parseLimit(options.limit),
-        after: options.after,
-      };
+      const paginationOptions = buildPaginationOptions(
+        parseLimit(options.limit),
+        options.after,
+      );
 
       const filterOptions = await resolveFilterOptions(ctx, options);
       const filter = buildIssueFilter(filterOptions);
@@ -493,29 +638,26 @@ export function setupIssuesCommands(program: Command): void {
       .option("-l, --limit <n>", "max results", "50")
       .option("--after <cursor>", "cursor for next page"),
   ).action(
-    handleCommand(async (...args: unknown[]) => {
-      const [query, options, command] = args as [
-        string,
-        FilterOptions,
-        Command,
-      ];
-      const ctx = createContext(getRootOpts(command));
+    commandAction<[string, FilterOptions, Command]>(
+      async (query, options, command) => {
+        const ctx = createContext(getRootOpts(command));
 
-      const paginationOptions = {
-        limit: parseLimit(options.limit),
-        after: options.after,
-      };
+        const paginationOptions = buildPaginationOptions(
+          parseLimit(options.limit),
+          options.after,
+        );
 
-      const filterOptions = await resolveFilterOptions(ctx, options);
-      const filter = buildIssueFilter(filterOptions);
-      const result = await searchIssues(
-        ctx.gql,
-        query,
-        paginationOptions,
-        filter,
-      );
-      outputSuccess(result);
-    }),
+        const filterOptions = await resolveFilterOptions(ctx, options);
+        const filter = buildIssueFilter(filterOptions);
+        const result = await searchIssues(
+          ctx.gql,
+          query,
+          paginationOptions,
+          filter,
+        );
+        outputSuccess(result);
+      },
+    ),
   );
 
   issues
@@ -533,92 +675,89 @@ export function setupIssuesCommands(program: Command): void {
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, options, command] = args as [
-          string,
-          ReadOptions,
-          Command,
-        ];
-        validateReadOptions(options);
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, ReadOptions, Command]>(
+        async (issue, options, command) => {
+          validateReadOptions(options);
+          const ctx = createContext(getRootOpts(command));
 
-        if (options.withAttachments) {
+          if (options.withAttachments) {
+            if (isUuid(issue)) {
+              const result = await getIssueWithAttachments(ctx.gql, issue);
+              outputSuccess(result);
+            } else {
+              const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+              const result = await getIssueByIdentifierWithAttachments(
+                ctx.gql,
+                teamKey,
+                issueNumber,
+              );
+              outputSuccess(result);
+            }
+            return;
+          }
+
+          if (options.withCommentThreads) {
+            if (isUuid(issue)) {
+              const result = await getIssueWithCommentThreads(ctx.gql, issue);
+              outputSuccess(result);
+            } else {
+              const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+              const result = await getIssueByIdentifierWithCommentThreads(
+                ctx.gql,
+                teamKey,
+                issueNumber,
+              );
+              outputSuccess(result);
+            }
+            return;
+          }
+
+          if (options.withComments) {
+            if (isUuid(issue)) {
+              const result = await getIssueWithComments(ctx.gql, issue);
+              outputSuccess(result);
+            } else {
+              const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+              const result = await getIssueByIdentifierWithComments(
+                ctx.gql,
+                teamKey,
+                issueNumber,
+              );
+              outputSuccess(result);
+            }
+            return;
+          }
+
+          if (options.withReactions) {
+            if (isUuid(issue)) {
+              const result = await getIssueWithReactions(ctx.gql, issue);
+              outputSuccess(result);
+            } else {
+              const { teamKey, issueNumber } = parseIssueIdentifier(issue);
+              const result = await getIssueByIdentifierWithReactions(
+                ctx.gql,
+                teamKey,
+                issueNumber,
+              );
+              outputSuccess(result);
+            }
+            return;
+          }
+
           if (isUuid(issue)) {
-            const result = await getIssueWithAttachments(ctx.gql, issue);
+            const result = await getIssue(ctx.gql, issue);
             outputSuccess(result);
           } else {
             const { teamKey, issueNumber } = parseIssueIdentifier(issue);
-            const result = await getIssueByIdentifierWithAttachments(
+            const result = await getIssueByIdentifier(
               ctx.gql,
               teamKey,
               issueNumber,
             );
             outputSuccess(result);
           }
-          return;
-        }
-
-        if (options.withCommentThreads) {
-          if (isUuid(issue)) {
-            const result = await getIssueWithCommentThreads(ctx.gql, issue);
-            outputSuccess(result);
-          } else {
-            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
-            const result = await getIssueByIdentifierWithCommentThreads(
-              ctx.gql,
-              teamKey,
-              issueNumber,
-            );
-            outputSuccess(result);
-          }
-          return;
-        }
-
-        if (options.withComments) {
-          if (isUuid(issue)) {
-            const result = await getIssueWithComments(ctx.gql, issue);
-            outputSuccess(result);
-          } else {
-            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
-            const result = await getIssueByIdentifierWithComments(
-              ctx.gql,
-              teamKey,
-              issueNumber,
-            );
-            outputSuccess(result);
-          }
-          return;
-        }
-
-        if (options.withReactions) {
-          if (isUuid(issue)) {
-            const result = await getIssueWithReactions(ctx.gql, issue);
-            outputSuccess(result);
-          } else {
-            const { teamKey, issueNumber } = parseIssueIdentifier(issue);
-            const result = await getIssueByIdentifierWithReactions(
-              ctx.gql,
-              teamKey,
-              issueNumber,
-            );
-            outputSuccess(result);
-          }
-          return;
-        }
-
-        if (isUuid(issue)) {
-          const result = await getIssue(ctx.gql, issue);
-          outputSuccess(result);
-        } else {
-          const { teamKey, issueNumber } = parseIssueIdentifier(issue);
-          const result = await getIssueByIdentifier(
-            ctx.gql,
-            teamKey,
-            issueNumber,
-          );
-          outputSuccess(result);
-        }
-      }),
+        },
+      ),
     );
 
   issues
@@ -630,22 +769,18 @@ export function setupIssuesCommands(program: Command): void {
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await createReactionForIssue(ctx.gql, {
-          issueId,
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (issue, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await createReactionForIssue(ctx.gql, {
+            issueId,
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -657,23 +792,19 @@ export function setupIssuesCommands(program: Command): void {
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await deleteOwnReactionByEmoji(ctx.gql, {
-          kind: "issue",
-          id: issueId,
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (issue, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await deleteOwnReactionByEmoji(ctx.gql, {
+            kind: "issue",
+            id: issueId,
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -684,23 +815,19 @@ export function setupIssuesCommands(program: Command): void {
       `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, reactionId, , command] = args as [
-          string,
-          string,
-          unknown,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await deleteOwnReactionById(ctx.gql, {
-          kind: "issue",
-          id: issueId,
-          reactionId,
-        });
+      commandAction<[string, string, unknown, Command]>(
+        async (issue, reactionId, _unused2, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await deleteOwnReactionById(ctx.gql, {
+            kind: "issue",
+            id: issueId,
+            reactionId: asUuid(reactionId),
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -712,26 +839,57 @@ export function setupIssuesCommands(program: Command): void {
     )
     .option("--body <text>", "discussion body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await startIssueDiscussion(ctx.gql, {
-          issueId,
-          body: options.body,
-        });
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await startIssueDiscussion(ctx.gql, {
+            issueId,
+            body: options.body,
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("activity <issue>")
+    .description(
+      "chronological activity timeline: comment threads plus history events",
+    )
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("-l, --limit <n>", "max timeline items", "50")
+    .option("--after <cursor>", "cursor for next page")
+    .option("--comments-only", "exclude non-comment history events")
+    .option("--with-reactions", "include normalized comment reactions")
+    .action(
+      commandAction<[string, ActivityOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit),
+            options.after,
+          );
+          const result = await getIssueActivity(ctx.gql, issueId, {
+            ...paginationOptions,
+            commentsOnly: Boolean(options.commentsOnly),
+            withReactions: Boolean(options.withReactions),
+          });
+
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -745,29 +903,30 @@ export function setupIssuesCommands(program: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, options, command] = args as [
-          string,
-          DiscussionsOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionsOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const paginationOptions = {
-          limit: parseLimit(options.limit || "25"),
-          after: options.after,
-        };
-        const result = options.withReactions
-          ? await listDiscussionsForIssueWithReactions(
-              ctx.gql,
-              issueId,
-              paginationOptions,
-            )
-          : await listDiscussionsForIssue(ctx.gql, issueId, paginationOptions);
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "25"),
+            options.after,
+          );
+          const result = options.withReactions
+            ? await listDiscussionsForIssueWithReactions(
+                ctx.gql,
+                issueId,
+                paginationOptions,
+              )
+            : await listDiscussionsForIssue(
+                ctx.gql,
+                issueId,
+                paginationOptions,
+              );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   const issueThreads = issues
@@ -782,34 +941,31 @@ export function setupIssuesCommands(program: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          DiscussionsOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionsOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const paginationOptions = {
-          limit: parseLimit(options.limit || "50"),
-          after: options.after,
-        };
-        const result = options.withReactions
-          ? await listDiscussionRepliesWithReactions(
-              ctx.gql,
-              thread,
-              paginationOptions,
-              "issue",
-            )
-          : await listDiscussionReplies(
-              ctx.gql,
-              thread,
-              paginationOptions,
-              "issue",
-            );
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          );
+          const result = options.withReactions
+            ? await listDiscussionRepliesWithReactions(
+                ctx.gql,
+                asUuid(thread),
+                paginationOptions,
+                "issue",
+              )
+            : await listDiscussionReplies(
+                ctx.gql,
+                asUuid(thread),
+                paginationOptions,
+                "issue",
+              );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
   addCommentReactionCommands(issueReplies, "reply");
 
@@ -822,26 +978,23 @@ export function setupIssuesCommands(program: Command): void {
     )
     .option("--body <text>", "reply body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await replyToDiscussion(ctx.gql, {
-          threadId: thread,
-          body: options.body,
-          entityKind: "issue",
-        });
+          const result = await replyToDiscussion(ctx.gql, {
+            threadId: asUuid(thread),
+            body: options.body,
+            entityKind: "issue",
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -849,29 +1002,26 @@ export function setupIssuesCommands(program: Command): void {
     .description("edit a root discussion or reply comment")
     .option("--body <text>", "new comment body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [comment, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (comment, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await editDiscussionComment(
-          ctx.gql,
-          comment,
-          {
-            body: options.body,
-          },
-          "issue",
-        );
+          const result = await editDiscussionComment(
+            ctx.gql,
+            asUuid(comment),
+            {
+              body: options.body,
+            },
+            "issue",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -879,57 +1029,64 @@ export function setupIssuesCommands(program: Command): void {
     .description("edit a discussion reply")
     .option("--body <text>", "new reply body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [reply, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (reply, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await editDiscussionReply(
-          ctx.gql,
-          reply,
-          {
-            body: options.body,
-          },
-          "issue",
-        );
+          const result = await editDiscussionReply(
+            ctx.gql,
+            asUuid(reply),
+            {
+              body: options.body,
+            },
+            "issue",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
     .command("delete-comment <comment>")
     .description("delete a root discussion or reply comment")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [comment, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (comment, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionComment(ctx.gql, comment, "issue");
+          const result = await deleteDiscussionComment(
+            ctx.gql,
+            asUuid(comment),
+            "issue",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
     .command("delete-reply <reply>")
     .description("delete a discussion reply")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [reply, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (reply, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionReply(ctx.gql, reply, "issue");
+          const result = await deleteDiscussionReply(
+            ctx.gql,
+            asUuid(reply),
+            "issue",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -937,36 +1094,40 @@ export function setupIssuesCommands(program: Command): void {
     .description("resolve a discussion thread")
     .option("--with-comment <comment>", "comment to mark as resolving comment")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          ResolveDiscussionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, ResolveDiscussionOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await resolveDiscussion(ctx.gql, {
-          threadId: thread,
-          resolvingCommentId: options.withComment,
-          entityKind: "issue",
-        });
+          const result = await resolveDiscussion(ctx.gql, {
+            threadId: asUuid(thread),
+            ...(options.withComment !== undefined
+              ? { resolvingCommentId: asUuid(options.withComment) }
+              : {}),
+            entityKind: "issue",
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
     .command("unresolve <thread>")
     .description("unresolve a discussion thread")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (thread, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await unresolveDiscussion(ctx.gql, thread, "issue");
+          const result = await unresolveDiscussion(
+            ctx.gql,
+            asUuid(thread),
+            "issue",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -988,126 +1149,125 @@ export function setupIssuesCommands(program: Command): void {
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
     .option("--relates-to <issue>", "this issue relates to <issue>")
     .option("--duplicate-of <issue>", "this issue duplicates <issue>")
+    .option("--similar-to <issue>", "this issue is similar to <issue>")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [title, options, command] = args as [
-          string,
-          CreateOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, CreateOptions, Command]>(
+        async (title, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const relationActions = parseRelationFlags(options);
+          const relationActions = parseRelationFlags(options);
 
-        const parsedPriority =
-          options.priority !== undefined
-            ? parsePriorityOption(options.priority)
-            : undefined;
-        const parsedEstimate =
-          options.estimate !== undefined
-            ? parseEstimateOption(options.estimate)
-            : undefined;
+          const parsedPriority =
+            options.priority !== undefined
+              ? parsePriorityOption(options.priority)
+              : undefined;
+          const parsedEstimate =
+            options.estimate !== undefined
+              ? parseEstimateOption(options.estimate)
+              : undefined;
 
-        if (!options.team) {
-          throw new Error("--team is required");
-        }
+          if (!options.team) {
+            throw new Error("--team is required");
+          }
 
-        const teamEstimateContext =
-          parsedEstimate !== undefined
-            ? await resolveTeamEstimateContext(ctx.sdk, options.team)
-            : undefined;
-
-        const teamId = teamEstimateContext
-          ? teamEstimateContext.teamId
-          : await resolveTeamId(ctx.sdk, options.team);
-
-        if (parsedEstimate !== undefined && teamEstimateContext) {
-          validateEstimateAgainstTeamConfig(parsedEstimate, {
-            teamKey: teamEstimateContext.teamKey,
-            issueEstimationType: teamEstimateContext.issueEstimationType,
-            issueEstimationExtended:
-              teamEstimateContext.issueEstimationExtended,
-            issueEstimationAllowZero:
-              teamEstimateContext.issueEstimationAllowZero,
-          });
-        }
-
-        const input: IssueCreateInput = {
-          title,
-          teamId,
-        };
-
-        if (options.description) {
-          input.description = options.description;
-        }
-
-        if (options.assignee) {
-          input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
-        }
-
-        if (parsedPriority !== undefined) {
-          input.priority = parsedPriority;
-        }
-
-        if (parsedEstimate !== undefined) {
-          input.estimate = parsedEstimate;
-        }
-
-        if (options.project) {
-          input.projectId = await resolveProjectId(ctx.sdk, options.project);
-        }
-
-        if (options.labels) {
-          const labelNames = options.labels.split(",").map((l) => l.trim());
-          input.labelIds = await resolveLabelIds(ctx.sdk, labelNames);
-        }
-
-        if (options.projectMilestone) {
-          if (!options.project) {
+          if (options.projectMilestone && !options.project) {
             throw new Error(
               "--project-milestone requires --project to be specified",
             );
           }
-          input.projectMilestoneId = await resolveMilestoneId(
-            ctx.gql,
-            ctx.sdk,
-            options.projectMilestone,
-            options.project,
-          );
-        }
 
-        if (options.cycle) {
-          input.cycleId = await resolveCycleId(
-            ctx.sdk,
-            options.cycle,
-            options.team,
-          );
-        }
+          const idsInput: ResolveCreateIssueIdsInput = {
+            team: options.team,
+            withEstimateContext: parsedEstimate !== undefined,
+          };
+          if (options.assignee) idsInput.assignee = options.assignee;
+          if (options.project) idsInput.project = options.project;
+          if (options.labels) {
+            idsInput.labels = options.labels.split(",").map((l) => l.trim());
+          }
+          if (options.projectMilestone) {
+            idsInput.projectMilestone = options.projectMilestone;
+          }
+          if (options.cycle) idsInput.cycle = options.cycle;
+          if (options.status) idsInput.status = options.status;
+          if (options.parentTicket)
+            idsInput.parentTicket = options.parentTicket;
 
-        if (options.status) {
-          input.stateId = await resolveStatusId(
-            ctx.sdk,
-            options.status,
-            teamId,
-          );
-        }
+          const ids = await resolveCreateIssueIds(ctx.gql, idsInput);
 
-        if (options.parentTicket) {
-          input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
-        }
+          if (parsedEstimate !== undefined && ids.estimateContext) {
+            validateEstimateAgainstTeamConfig(parsedEstimate, {
+              teamKey: ids.estimateContext.teamKey,
+              issueEstimationType: ids.estimateContext.issueEstimationType,
+              issueEstimationExtended:
+                ids.estimateContext.issueEstimationExtended,
+              issueEstimationAllowZero:
+                ids.estimateContext.issueEstimationAllowZero,
+            });
+          }
 
-        if (options.dueDate) {
-          input.dueDate = parseDueDate(options.dueDate);
-        }
+          const input: CreateIssueInput = {
+            title,
+            teamId: ids.teamId,
+          };
 
-        const result = await createIssue(ctx.gql, input);
+          if (options.description) {
+            input.description = options.description;
+          }
 
-        if (relationActions.length > 0) {
-          await resolveAndApplyRelations(ctx, result.id, relationActions);
-        }
+          if (ids.assigneeId) {
+            input.assigneeId = ids.assigneeId;
+          }
 
-        outputSuccess(result);
-      }),
+          if (parsedPriority !== undefined) {
+            input.priority = parsedPriority;
+          }
+
+          if (parsedEstimate !== undefined) {
+            input.estimate = parsedEstimate;
+          }
+
+          if (ids.projectId) {
+            input.projectId = ids.projectId;
+          }
+
+          if (ids.labelIds) {
+            input.labelIds = ids.labelIds;
+          }
+
+          if (ids.projectMilestoneId) {
+            input.projectMilestoneId = ids.projectMilestoneId;
+          }
+
+          if (ids.cycleId) {
+            input.cycleId = ids.cycleId;
+          }
+
+          if (ids.stateId) {
+            input.stateId = ids.stateId;
+          }
+
+          if (ids.parentId) {
+            input.parentId = ids.parentId;
+          }
+
+          if (options.dueDate) {
+            input.dueDate = parseDueDate(options.dueDate);
+          }
+
+          const result = await createIssue(ctx.gql, input);
+
+          if (relationActions.length > 0) {
+            await resolveAndApplyRelations(
+              ctx,
+              asUuid(result.id),
+              relationActions,
+            );
+          }
+
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
@@ -1124,7 +1284,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--assignee <user>", "new assignee")
     .option("--project <project>", "new project")
     .option("--labels <labels>", "labels to apply (comma-separated)")
-    .option("--label-mode <mode>", "add | overwrite")
+    .option("--label-mode <mode>", "add | remove | overwrite")
     .option("--clear-labels", "remove all labels")
     .option("--parent-ticket <issue>", "set parent issue")
     .option("--clear-parent-ticket", "clear parent")
@@ -1140,248 +1300,274 @@ export function setupIssuesCommands(program: Command): void {
     .option("--blocked-by <issue>", "add blocked-by relation")
     .option("--relates-to <issue>", "add relates-to relation")
     .option("--duplicate-of <issue>", "add duplicate relation")
+    .option("--similar-to <issue>", "add similar relation")
     .option("--remove-relation <issue>", "remove relation with <issue>")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, options, command] = args as [
-          string,
-          UpdateOptions,
-          Command,
-        ];
-        if (options.parentTicket && options.clearParentTicket) {
-          throw new Error(
-            "Cannot use --parent-ticket and --clear-parent-ticket together",
-          );
-        }
+      commandAction<[string, UpdateOptions, Command]>(
+        async (issue, options, command) => {
+          if (options.parentTicket && options.clearParentTicket) {
+            throw new Error(
+              "Cannot use --parent-ticket and --clear-parent-ticket together",
+            );
+          }
 
-        if (options.projectMilestone && options.clearProjectMilestone) {
-          throw new Error(
-            "Cannot use --project-milestone and --clear-project-milestone together",
-          );
-        }
+          if (options.projectMilestone && options.clearProjectMilestone) {
+            throw new Error(
+              "Cannot use --project-milestone and --clear-project-milestone together",
+            );
+          }
 
-        if (options.estimate !== undefined && options.clearEstimate) {
-          throw new Error(
-            "Cannot use --estimate and --clear-estimate together",
-          );
-        }
+          if (options.estimate !== undefined && options.clearEstimate) {
+            throw new Error(
+              "Cannot use --estimate and --clear-estimate together",
+            );
+          }
 
-        if (options.cycle && options.clearCycle) {
-          throw new Error("Cannot use --cycle and --clear-cycle together");
-        }
+          if (options.cycle && options.clearCycle) {
+            throw new Error("Cannot use --cycle and --clear-cycle together");
+          }
 
-        if (options.dueDate && options.clearDueDate) {
-          throw new Error(
-            "Cannot use --due-date and --clear-due-date together",
-          );
-        }
+          if (options.dueDate && options.clearDueDate) {
+            throw new Error(
+              "Cannot use --due-date and --clear-due-date together",
+            );
+          }
 
-        if (options.labelMode && !options.labels) {
-          throw new Error("--label-mode requires --labels to be specified");
-        }
+          if (options.labelMode && !options.labels) {
+            throw new Error("--label-mode requires --labels to be specified");
+          }
 
-        if (options.clearLabels && options.labels) {
-          throw new Error("--clear-labels cannot be used with --labels");
-        }
+          if (options.clearLabels && options.labels) {
+            throw new Error("--clear-labels cannot be used with --labels");
+          }
 
-        if (options.clearLabels && options.labelMode) {
-          throw new Error("--clear-labels cannot be used with --label-mode");
-        }
+          if (options.clearLabels && options.labelMode) {
+            throw new Error("--clear-labels cannot be used with --label-mode");
+          }
 
-        if (
-          options.labelMode &&
-          !["add", "overwrite"].includes(options.labelMode)
-        ) {
-          throw new Error("--label-mode must be either 'add' or 'overwrite'");
-        }
+          const labelMode = parseLabelMode(options.labelMode);
 
-        const parsedPriority =
-          options.priority !== undefined
-            ? parsePriorityOption(options.priority)
-            : undefined;
-        const parsedEstimate =
-          options.estimate !== undefined
-            ? parseEstimateOption(options.estimate)
-            : undefined;
-
-        const relationActions = parseRelationFlags(options);
-
-        const ctx = createContext(getRootOpts(command));
-
-        const issueEstimateContext =
-          parsedEstimate !== undefined
-            ? await resolveIssueEstimateContext(ctx.sdk, issue)
-            : undefined;
-
-        const resolvedIssueId = issueEstimateContext
-          ? issueEstimateContext.issueId
-          : await resolveIssueId(ctx.sdk, issue);
-
-        if (parsedEstimate !== undefined && issueEstimateContext) {
-          validateEstimateAgainstTeamConfig(parsedEstimate, {
-            teamKey: issueEstimateContext.team.teamKey,
-            issueEstimationType: issueEstimateContext.team.issueEstimationType,
-            issueEstimationExtended:
-              issueEstimateContext.team.issueEstimationExtended,
-            issueEstimationAllowZero:
-              issueEstimateContext.team.issueEstimationAllowZero,
-          });
-        }
-
-        const needsContext =
-          options.status ||
-          options.projectMilestone ||
-          options.cycle ||
-          (options.labels && options.labelMode === "add");
-        const issueContext = needsContext
-          ? await getIssue(ctx.gql, resolvedIssueId)
-          : undefined;
-
-        const input: IssueUpdateInput = {};
-
-        if (options.title) {
-          input.title = options.title;
-        }
-
-        if (options.description) {
-          input.description = options.description;
-        }
-
-        if (options.status) {
-          const teamId =
-            issueContext && "team" in issueContext && issueContext.team
-              ? issueContext.team.id
+          const parsedPriority =
+            options.priority !== undefined
+              ? parsePriorityOption(options.priority)
               : undefined;
-          input.stateId = await resolveStatusId(
-            ctx.sdk,
-            options.status,
-            teamId,
-          );
-        }
+          const parsedEstimate =
+            options.estimate !== undefined
+              ? parseEstimateOption(options.estimate)
+              : undefined;
 
-        if (parsedPriority !== undefined) {
-          input.priority = parsedPriority;
-        }
+          const relationActions = parseRelationFlags(options);
 
-        if (options.clearEstimate) {
-          input.estimate = null;
-        } else if (parsedEstimate !== undefined) {
-          input.estimate = parsedEstimate;
-        }
+          const ctx = createContext(getRootOpts(command));
 
-        if (options.assignee) {
-          input.assigneeId = await resolveUserId(ctx.sdk, options.assignee);
-        }
+          const issueEstimateContext =
+            parsedEstimate !== undefined
+              ? await resolveIssueEstimateContext(ctx.gql, issue)
+              : undefined;
 
-        if (options.project) {
-          input.projectId = await resolveProjectId(ctx.sdk, options.project);
-        }
+          const resolvedIssueId = issueEstimateContext
+            ? issueEstimateContext.issueId
+            : await resolveIssueId(ctx.gql, issue);
 
-        if (options.clearLabels) {
-          input.labelIds = [];
-        } else if (options.labels) {
-          const labelNames = options.labels.split(",").map((l) => l.trim());
-          const labelIds = await resolveLabelIds(ctx.sdk, labelNames);
+          if (parsedEstimate !== undefined && issueEstimateContext) {
+            validateEstimateAgainstTeamConfig(parsedEstimate, {
+              teamKey: issueEstimateContext.team.teamKey,
+              issueEstimationType:
+                issueEstimateContext.team.issueEstimationType,
+              issueEstimationExtended:
+                issueEstimateContext.team.issueEstimationExtended,
+              issueEstimationAllowZero:
+                issueEstimateContext.team.issueEstimationAllowZero,
+            });
+          }
 
-          if (options.labelMode === "add") {
+          const needsContext =
+            options.status ||
+            options.projectMilestone ||
+            options.cycle ||
+            (options.labels && (labelMode === "add" || labelMode === "remove"));
+          const issueContext = needsContext
+            ? await getIssue(ctx.gql, resolvedIssueId)
+            : undefined;
+
+          const updContext: UpdateIssueContext = {};
+          if (issueContext && "team" in issueContext && issueContext.team) {
+            updContext.teamId = asUuid(issueContext.team.id);
+            if (issueContext.team.key) {
+              updContext.teamKey = issueContext.team.key;
+            }
+          }
+          if (
+            issueContext &&
+            "project" in issueContext &&
+            issueContext.project?.name
+          ) {
+            updContext.projectName = issueContext.project.name;
+          }
+
+          const updIdsInput: ResolveUpdateIssueIdsInput = {};
+          if (options.assignee) updIdsInput.assignee = options.assignee;
+          if (options.project) updIdsInput.project = options.project;
+          if (!options.clearLabels && options.labels) {
+            updIdsInput.labels = options.labels.split(",").map((l) => l.trim());
+          }
+          if (!options.clearProjectMilestone && options.projectMilestone) {
+            updIdsInput.projectMilestone = options.projectMilestone;
+          }
+          if (!options.clearCycle && options.cycle) {
+            updIdsInput.cycle = options.cycle;
+          }
+          if (options.status) updIdsInput.status = options.status;
+          if (!options.clearParentTicket && options.parentTicket) {
+            updIdsInput.parentTicket = options.parentTicket;
+          }
+
+          const needsResolution =
+            updIdsInput.assignee !== undefined ||
+            updIdsInput.project !== undefined ||
+            updIdsInput.labels !== undefined ||
+            updIdsInput.projectMilestone !== undefined ||
+            updIdsInput.cycle !== undefined ||
+            updIdsInput.status !== undefined ||
+            updIdsInput.parentTicket !== undefined;
+
+          const ids: ResolvedUpdateIssueIds = needsResolution
+            ? await resolveUpdateIssueIds(ctx.gql, updIdsInput, updContext)
+            : {};
+
+          const input: UpdateIssueInput = {};
+
+          if (options.title) {
+            input.title = options.title;
+          }
+
+          if (options.description) {
+            input.description = options.description;
+          }
+
+          if (ids.stateId) {
+            input.stateId = ids.stateId;
+          }
+
+          if (parsedPriority !== undefined) {
+            input.priority = parsedPriority;
+          }
+
+          if (options.clearEstimate) {
+            input.estimate = null;
+          } else if (parsedEstimate !== undefined) {
+            input.estimate = parsedEstimate;
+          }
+
+          if (ids.assigneeId) {
+            input.assigneeId = ids.assigneeId;
+          }
+
+          if (ids.projectId) {
+            input.projectId = ids.projectId;
+          }
+
+          if (options.clearLabels) {
+            input.labelIds = [];
+          } else if (options.labels && ids.labelIds) {
+            const labelIds = ids.labelIds;
             const currentLabels =
               issueContext &&
               "labels" in issueContext &&
               issueContext.labels?.nodes
-                ? issueContext.labels.nodes.map((l) => l.id)
+                ? issueContext.labels.nodes.map((l) => asUuid(l.id))
                 : [];
-            input.labelIds = [...new Set([...currentLabels, ...labelIds])];
-          } else {
-            input.labelIds = labelIds;
+
+            if (labelMode === "add") {
+              input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+            } else if (labelMode === "remove") {
+              input.labelIds = currentLabels.filter(
+                (id) => !labelIds.includes(id),
+              );
+            } else {
+              input.labelIds = labelIds;
+            }
           }
-        }
 
-        if (options.clearParentTicket) {
-          input.parentId = null;
-        } else if (options.parentTicket) {
-          input.parentId = await resolveIssueId(ctx.sdk, options.parentTicket);
-        }
+          if (options.clearParentTicket) {
+            input.parentId = null;
+          } else if (ids.parentId) {
+            input.parentId = ids.parentId;
+          }
 
-        if (options.clearProjectMilestone) {
-          input.projectMilestoneId = null;
-        } else if (options.projectMilestone) {
-          const projectName =
-            issueContext &&
-            "project" in issueContext &&
-            issueContext.project?.name
-              ? issueContext.project.name
-              : undefined;
-          input.projectMilestoneId = await resolveMilestoneId(
-            ctx.gql,
-            ctx.sdk,
-            options.projectMilestone,
-            projectName,
-          );
-        }
+          if (options.clearProjectMilestone) {
+            input.projectMilestoneId = null;
+          } else if (ids.projectMilestoneId) {
+            input.projectMilestoneId = ids.projectMilestoneId;
+          }
 
-        if (options.clearCycle) {
-          input.cycleId = null;
-        } else if (options.cycle) {
-          const teamKey =
-            issueContext && "team" in issueContext && issueContext.team?.key
-              ? issueContext.team.key
-              : undefined;
-          input.cycleId = await resolveCycleId(ctx.sdk, options.cycle, teamKey);
-        }
+          if (options.clearCycle) {
+            input.cycleId = null;
+          } else if (ids.cycleId) {
+            input.cycleId = ids.cycleId;
+          }
 
-        if (options.clearDueDate) {
-          input.dueDate = null;
-        } else if (options.dueDate) {
-          input.dueDate = parseDueDate(options.dueDate);
-        }
+          if (options.clearDueDate) {
+            input.dueDate = null;
+          } else if (options.dueDate) {
+            input.dueDate = parseDueDate(options.dueDate);
+          }
 
-        const result = await updateIssue(ctx.gql, resolvedIssueId, input);
+          const result = await updateIssue(ctx.gql, resolvedIssueId, input);
 
-        if (relationActions.length > 0) {
-          await resolveAndApplyRelations(ctx, resolvedIssueId, relationActions);
-        }
+          if (relationActions.length > 0) {
+            await resolveAndApplyRelations(
+              ctx,
+              resolvedIssueId,
+              relationActions,
+            );
+          }
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
     .command("archive <issue>")
     .description("archive an issue")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await archiveIssue(ctx.gql, issueId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (issue, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await archiveIssue(ctx.gql, issueId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
     .command("unarchive <issue>")
     .description("unarchive an issue")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await unarchiveIssue(ctx.gql, issueId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (issue, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await unarchiveIssue(ctx.gql, issueId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues
     .command("delete <issue>")
     .description("delete an issue")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [issue, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const issueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await deleteIssue(ctx.gql, issueId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (issue, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await deleteIssue(ctx.gql, issueId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   issues

@@ -1,7 +1,9 @@
 // tests/unit/services/project-service.test.ts
+
 import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveProjectDocument,
   GetProjectDocument,
@@ -146,11 +148,11 @@ describe("listProjects", () => {
     });
     const result = await listProjects(client);
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].id).toBe("proj-1");
-    expect(result.nodes[0].name).toBe("Project Alpha");
-    expect(result.nodes[0].state).toBe("started");
-    expect(result.nodes[0].status.name).toBe("Started");
-    expect(result.nodes[0].slugId).toBe("alpha");
+    expect(result.nodes[0]?.id).toBe("proj-1");
+    expect(result.nodes[0]?.name).toBe("Project Alpha");
+    expect(result.nodes[0]?.state).toBe("started");
+    expect(result.nodes[0]?.status.name).toBe("Started");
+    expect(result.nodes[0]?.slugId).toBe("alpha");
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: "c1" });
   });
 
@@ -177,6 +179,7 @@ describe("listProjects", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: "cur1",
+      includeArchived: undefined,
     });
   });
 
@@ -191,6 +194,22 @@ describe("listProjects", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 50,
       after: undefined,
+      includeArchived: undefined,
+    });
+  });
+
+  it("passes includeArchived when requested", async () => {
+    const client = mockGqlClient({
+      projects: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+    await listProjects(client, { includeArchived: true });
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 50,
+      after: undefined,
+      includeArchived: true,
     });
   });
 
@@ -221,7 +240,7 @@ describe("listProjects", () => {
       },
     });
     const result = await listProjects(client);
-    expect(result.nodes[0].targetDate).toBeNull();
+    expect(result.nodes[0]?.targetDate).toBeNull();
   });
 });
 
@@ -261,17 +280,68 @@ describe("getProject", () => {
         initiatives: { nodes: [{ id: "init-1", name: "Growth" }] },
       },
     });
-    const result = await getProject(client, "proj-1");
+    const result = await getProject(client, asUuid("proj-1"));
     expect(result.id).toBe("proj-1");
     expect(result.name).toBe("Project Alpha");
     expect(result.status.name).toBe("Started");
     expect(result.content).toBe("# Project Alpha\nDetailed content here.");
     expect(result.members.nodes).toHaveLength(1);
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      milestonesFirst: 25,
+      skipMilestones: false,
+      issuesFirst: 50,
+      skipIssues: false,
+    });
+  });
+
+  it("supports bounded detail expansion and zero skips", async () => {
+    const client = mockGqlClient({
+      project: {
+        id: "proj-1",
+        name: "Project Alpha",
+      },
+    });
+
+    await getProject(client, asUuid("proj-1"), {
+      milestonesFirst: 0,
+      issuesFirst: 0,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      milestonesFirst: 1,
+      skipMilestones: true,
+      issuesFirst: 1,
+      skipIssues: true,
+    });
+  });
+
+  it("passes custom milestone and issue limits", async () => {
+    const client = mockGqlClient({
+      project: {
+        id: "proj-1",
+        name: "Project Alpha",
+      },
+    });
+
+    await getProject(client, asUuid("proj-1"), {
+      milestonesFirst: 5,
+      issuesFirst: 10,
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      milestonesFirst: 5,
+      skipMilestones: false,
+      issuesFirst: 10,
+      skipIssues: false,
+    });
   });
 
   it("throws when project not found", async () => {
     const client = mockGqlClient({ project: null });
-    await expect(getProject(client, "nonexistent")).rejects.toThrow(
+    await expect(getProject(client, asUuid("nonexistent"))).rejects.toThrow(
       'Project with ID "nonexistent" not found',
     );
   });
@@ -316,7 +386,7 @@ describe("createProject", () => {
     });
     const result = await createProject(client, {
       name: "New Project",
-      teamIds: ["team-1"],
+      teamIds: [asUuid("team-1")],
     });
     expect(result.id).toBe("proj-new");
     expect(result.name).toBe("New Project");
@@ -327,7 +397,7 @@ describe("createProject", () => {
       projectCreate: { success: false, project: null },
     });
     await expect(
-      createProject(client, { name: "Fail", teamIds: ["team-1"] }),
+      createProject(client, { name: "Fail", teamIds: [asUuid("team-1")] }),
     ).rejects.toThrow('Failed to create project "Fail"');
   });
 });
@@ -369,7 +439,7 @@ describe("updateProject", () => {
         },
       },
     });
-    const result = await updateProject(client, "proj-1", {
+    const result = await updateProject(client, asUuid("proj-1"), {
       name: "Updated Name",
     });
     expect(result.id).toBe("proj-1");
@@ -382,7 +452,7 @@ describe("updateProject", () => {
       projectUpdate: { success: false, project: null },
     });
     await expect(
-      updateProject(client, "proj-1", { name: "Fail" }),
+      updateProject(client, asUuid("proj-1"), { name: "Fail" }),
     ).rejects.toThrow('Failed to update project "proj-1"');
   });
 });
@@ -396,7 +466,7 @@ describe("archiveProject", () => {
       },
     });
 
-    await expect(archiveProject(client, "proj-1")).resolves.toEqual({
+    await expect(archiveProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       name: "Archived Project",
     });
@@ -411,7 +481,7 @@ describe("archiveProject", () => {
       projectArchive: { success: false, entity: null },
     });
 
-    await expect(archiveProject(client, "proj-1")).rejects.toThrow(
+    await expect(archiveProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to archive project "proj-1"',
     );
   });
@@ -426,7 +496,7 @@ describe("unarchiveProject", () => {
       },
     });
 
-    await expect(unarchiveProject(client, "proj-1")).resolves.toEqual({
+    await expect(unarchiveProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       name: "Active Project",
     });
@@ -441,7 +511,7 @@ describe("unarchiveProject", () => {
       projectUnarchive: { success: false, entity: null },
     });
 
-    await expect(unarchiveProject(client, "proj-1")).rejects.toThrow(
+    await expect(unarchiveProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to unarchive project "proj-1"',
     );
   });
@@ -453,7 +523,7 @@ describe("deleteProject", () => {
       projectDelete: { success: true, entity: { id: "proj-1" } },
     });
 
-    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+    await expect(deleteProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       success: true,
     });
@@ -468,7 +538,7 @@ describe("deleteProject", () => {
       projectDelete: { success: true, entity: null },
     });
 
-    await expect(deleteProject(client, "proj-1")).resolves.toEqual({
+    await expect(deleteProject(client, asUuid("proj-1"))).resolves.toEqual({
       id: "proj-1",
       success: true,
     });
@@ -479,7 +549,7 @@ describe("deleteProject", () => {
       projectDelete: { success: false, entity: null },
     });
 
-    await expect(deleteProject(client, "proj-1")).rejects.toThrow(
+    await expect(deleteProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to delete project "proj-1"',
     );
   });

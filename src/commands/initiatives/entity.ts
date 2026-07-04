@@ -1,23 +1,16 @@
 import type { Command } from "commander";
-import type { LinearSdkClient } from "../../client/linear-client.js";
+import type { GraphQLClient } from "../../client/graphql-client.js";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { resolveReactionEmojiInput } from "../../common/emoji.js";
 import { invalidParameterError } from "../../common/errors.js";
+import { asUuid } from "../../common/identifier.js";
+import { omitUndefined } from "../../common/object.js";
 import {
-  handleCommand,
+  commandAction,
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
-import {
-  type InitiativeCreateInput,
-  type InitiativeSortInput,
-  InitiativeStatus,
-  type InitiativeUpdateInput,
-  type ListInitiativesQueryVariables,
-  PaginationNulls,
-  PaginationOrderBy,
-  PaginationSortOrder,
-} from "../../gql/graphql.js";
+import { buildPaginationOptions } from "../../common/types.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import { resolveTeamId } from "../../resolvers/team-resolver.js";
 import { resolveUserId } from "../../resolvers/user-resolver.js";
@@ -40,10 +33,18 @@ import {
 } from "../../services/discussion-service.js";
 import {
   archiveInitiative,
+  buildInitiativeFilter,
+  type CreateInitiativeInput,
   createInitiative,
   deleteInitiative,
   getInitiative,
+  type InitiativeFilterInput,
+  type InitiativeSortBy,
   listInitiatives,
+  mapSortByToInitiativeSort,
+  mapSortByToPaginationOrderBy,
+  parseInitiativeStatus,
+  type UpdateInitiativeInput,
   unarchiveInitiative,
   updateInitiative,
 } from "../../services/initiative-service.js";
@@ -116,22 +117,18 @@ function addCommentReactionCommands(
     .description(`add a reaction to a discussion ${noun}`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await createDiscussionCommentReaction(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "initiative",
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (commentId, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await createDiscussionCommentReaction(ctx.gql, {
+            commentId: asUuid(commentId),
+            target: noun,
+            expectedEntityKind: "initiative",
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 
   parent
@@ -139,22 +136,18 @@ function addCommentReactionCommands(
     .description(`remove your reaction from a discussion ${noun} by emoji`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, emoji, options, command] = args as [
-          string,
-          string | undefined,
-          ReactionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "initiative",
-          emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, string | undefined, ReactionOptions, Command]>(
+        async (commentId, emoji, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+            commentId: asUuid(commentId),
+            target: noun,
+            expectedEntityKind: "initiative",
+            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 
   parent
@@ -163,22 +156,18 @@ function addCommentReactionCommands(
       `remove your reaction from a discussion ${noun} by reaction ID`,
     )
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [commentId, reactionId, , command] = args as [
-          string,
-          string,
-          unknown,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const result = await deleteDiscussionCommentReactionById(ctx.gql, {
-          commentId,
-          target: noun,
-          expectedEntityKind: "initiative",
-          reactionId,
-        });
-        outputSuccess(result);
-      }),
+      commandAction<[string, string, unknown, Command]>(
+        async (commentId, reactionId, _unused2, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const result = await deleteDiscussionCommentReactionById(ctx.gql, {
+            commentId: asUuid(commentId),
+            target: noun,
+            expectedEntityKind: "initiative",
+            reactionId: asUuid(reactionId),
+          });
+          outputSuccess(result);
+        },
+      ),
     );
 }
 
@@ -200,16 +189,6 @@ interface InitiativeUpdateOptions {
   targetDate?: string;
   sortOrder?: string;
 }
-
-type InitiativeSortBy =
-  | "name"
-  | "createdAt"
-  | "updatedAt"
-  | "targetDate"
-  | "health"
-  | "healthUpdatedAt"
-  | "manual"
-  | "owner";
 
 function parseSortOrder(value?: string): "asc" | "desc" | undefined {
   if (!value) return undefined;
@@ -240,64 +219,6 @@ function parseSortBy(value?: string): InitiativeSortBy | undefined {
   );
 }
 
-function mapSortByToPaginationOrderBy(
-  sortBy?: InitiativeSortBy,
-): PaginationOrderBy | undefined {
-  if (sortBy === "createdAt") return PaginationOrderBy.CreatedAt;
-  if (sortBy === "updatedAt") return PaginationOrderBy.UpdatedAt;
-  return undefined;
-}
-
-function mapSortByToInitiativeSort(
-  sortBy?: InitiativeSortBy,
-  sortOrder?: "asc" | "desc",
-): ListInitiativesQueryVariables["sort"] | undefined {
-  if (!sortBy) return undefined;
-
-  const order =
-    sortOrder === "desc"
-      ? PaginationSortOrder.Descending
-      : PaginationSortOrder.Ascending;
-
-  const withNulls = {
-    order,
-    nulls: PaginationNulls.Last,
-  };
-
-  const sortEntry: InitiativeSortInput =
-    sortBy === "manual"
-      ? { manual: withNulls }
-      : sortBy === "name"
-        ? { name: withNulls }
-        : sortBy === "createdAt"
-          ? { createdAt: withNulls }
-          : sortBy === "updatedAt"
-            ? { updatedAt: withNulls }
-            : sortBy === "targetDate"
-              ? { targetDate: withNulls }
-              : sortBy === "health"
-                ? { health: withNulls }
-                : sortBy === "healthUpdatedAt"
-                  ? { healthUpdatedAt: withNulls }
-                  : { owner: withNulls };
-
-  return [sortEntry];
-}
-
-function parseInitiativeStatus(value?: string): InitiativeStatus | undefined {
-  if (!value) return undefined;
-
-  const normalized = value.toLowerCase();
-  if (normalized === "planned") return InitiativeStatus.Planned;
-  if (normalized === "active") return InitiativeStatus.Active;
-  if (normalized === "completed") return InitiativeStatus.Completed;
-
-  throw invalidParameterError(
-    "--status",
-    'must be one of: "Planned", "Active", "Completed"',
-  );
-}
-
 function parseSortOrderNumber(value?: string): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number.parseFloat(value);
@@ -308,19 +229,6 @@ function parseSortOrderNumber(value?: string): number | undefined {
     );
   }
   return parsed;
-}
-
-function applyNullableDateRange(
-  target: { gte?: string; lte?: string },
-  after?: string,
-  before?: string,
-): void {
-  if (after !== undefined) {
-    target.gte = after;
-  }
-  if (before !== undefined) {
-    target.lte = before;
-  }
 }
 
 function getExpandFlags(options: InitiativeExpandOptions): string[] {
@@ -337,102 +245,10 @@ function getExpandFlags(options: InitiativeExpandOptions): string[] {
   return map.filter(([enabled]) => enabled).map(([, flag]) => flag);
 }
 
-async function buildInitiativeFilter(
-  sdk: LinearSdkClient,
+async function resolveInitiativeFilterInput(
+  gql: GraphQLClient,
   options: InitiativeListOptions,
-): Promise<ListInitiativesQueryVariables["filter"] | undefined> {
-  const filter: NonNullable<ListInitiativesQueryVariables["filter"]> = {};
-
-  if (options.id) {
-    filter.id = { eq: options.id };
-  }
-
-  if (options.slug) {
-    filter.slugId = { eqIgnoreCase: options.slug };
-  }
-
-  if (options.name) {
-    filter.name = { eqIgnoreCase: options.name };
-  }
-
-  const status = parseInitiativeStatus(options.status);
-  if (status) {
-    filter.status = { eq: status };
-  }
-
-  if (options.health) {
-    filter.health = { eq: options.health };
-  }
-
-  if (options.healthWithAge) {
-    filter.healthWithAge = { eq: options.healthWithAge };
-  }
-
-  if (options.owner) {
-    const ownerId = await resolveUserId(sdk, options.owner);
-    filter.owner = { id: { eq: ownerId } };
-  }
-
-  if (options.creator) {
-    const creatorId = await resolveUserId(sdk, options.creator);
-    filter.creator = { id: { eq: creatorId } };
-  }
-
-  if (options.team) {
-    const teamId = await resolveTeamId(sdk, options.team);
-    filter.teams = { some: { id: { eq: teamId } } };
-  }
-
-  if (options.targetAfter || options.targetBefore) {
-    filter.targetDate = {};
-    applyNullableDateRange(
-      filter.targetDate,
-      options.targetAfter,
-      options.targetBefore,
-    );
-  }
-
-  if (options.startedAfter || options.startedBefore) {
-    filter.startedAt = {};
-    applyNullableDateRange(
-      filter.startedAt,
-      options.startedAfter,
-      options.startedBefore,
-    );
-  }
-
-  if (options.completedAfter || options.completedBefore) {
-    filter.completedAt = {};
-    applyNullableDateRange(
-      filter.completedAt,
-      options.completedAfter,
-      options.completedBefore,
-    );
-  }
-
-  if (options.createdAfter || options.createdBefore) {
-    filter.createdAt = {};
-    applyNullableDateRange(
-      filter.createdAt,
-      options.createdAfter,
-      options.createdBefore,
-    );
-  }
-
-  if (options.updatedAfter || options.updatedBefore) {
-    filter.updatedAt = {};
-    applyNullableDateRange(
-      filter.updatedAt,
-      options.updatedAfter,
-      options.updatedBefore,
-    );
-  }
-
-  if (options.ancestor) {
-    const ancestorId = await resolveInitiativeId(sdk, options.ancestor);
-    filter.ancestors = { some: { id: { eq: ancestorId } } };
-  }
-
+): Promise<InitiativeFilterInput> {
   if (options.parent) {
     throw invalidParameterError(
       "--parent",
@@ -440,7 +256,42 @@ async function buildInitiativeFilter(
     );
   }
 
-  return Object.keys(filter).length > 0 ? filter : undefined;
+  const input: InitiativeFilterInput = omitUndefined({
+    id: options.id,
+    slug: options.slug,
+    name: options.name,
+    status: parseInitiativeStatus(options.status),
+    health: options.health,
+    healthWithAge: options.healthWithAge,
+    targetAfter: options.targetAfter,
+    targetBefore: options.targetBefore,
+    startedAfter: options.startedAfter,
+    startedBefore: options.startedBefore,
+    completedAfter: options.completedAfter,
+    completedBefore: options.completedBefore,
+    createdAfter: options.createdAfter,
+    createdBefore: options.createdBefore,
+    updatedAfter: options.updatedAfter,
+    updatedBefore: options.updatedBefore,
+  });
+
+  if (options.owner) {
+    input.ownerId = await resolveUserId(gql, options.owner);
+  }
+
+  if (options.creator) {
+    input.creatorId = await resolveUserId(gql, options.creator);
+  }
+
+  if (options.team) {
+    input.teamId = await resolveTeamId(gql, options.team);
+  }
+
+  if (options.ancestor) {
+    input.ancestorId = await resolveInitiativeId(gql, options.ancestor);
+  }
+
+  return input;
 }
 
 export function setupInitiativeEntityCommands(initiatives: Command): void {
@@ -490,44 +341,52 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--with-history", "include history in list output")
     .option("--with-documents", "include documents in list output")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [InitiativeListOptions, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[InitiativeListOptions, Command]>(
+        async (options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const sortOrder = parseSortOrder(options.sortOrder);
-        const sortBy = parseSortBy(options.sortBy);
+          const sortOrder = parseSortOrder(options.sortOrder);
+          const sortBy = parseSortBy(options.sortBy);
 
-        const expandFlags = getExpandFlags(options);
-        if (expandFlags.length > 0) {
-          throw invalidParameterError(
-            "expand flags",
-            `${expandFlags.join(", ")} are not supported for initiatives list yet`,
+          const expandFlags = getExpandFlags(options);
+          if (expandFlags.length > 0) {
+            throw invalidParameterError(
+              "expand flags",
+              `${expandFlags.join(", ")} are not supported for initiatives list yet`,
+            );
+          }
+
+          if (sortOrder && !sortBy) {
+            throw invalidParameterError(
+              "--sort-order",
+              "requires --sort-by to be specified",
+            );
+          }
+
+          const orderBy = mapSortByToPaginationOrderBy(sortBy);
+          const sort = mapSortByToInitiativeSort(sortBy, sortOrder);
+
+          const filterInput = await resolveInitiativeFilterInput(
+            ctx.gql,
+            options,
           );
-        }
+          const filter = buildInitiativeFilter(filterInput);
 
-        if (sortOrder && !sortBy) {
-          throw invalidParameterError(
-            "--sort-order",
-            "requires --sort-by to be specified",
+          const result = await listInitiatives(
+            ctx.gql,
+            omitUndefined({
+              limit: parseLimit(options.limit),
+              after: options.after,
+              includeArchived: options.includeArchived ?? false,
+              filter,
+              orderBy,
+              sort,
+            }),
           );
-        }
 
-        const orderBy = mapSortByToPaginationOrderBy(sortBy);
-        const sort = mapSortByToInitiativeSort(sortBy, sortOrder);
-
-        const filter = await buildInitiativeFilter(ctx.sdk, options);
-
-        const result = await listInitiatives(ctx.gql, {
-          limit: parseLimit(options.limit),
-          after: options.after,
-          includeArchived: options.includeArchived ?? false,
-          filter,
-          orderBy,
-          sort,
-        });
-
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -547,22 +406,19 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--with-history", "include history in read output")
     .option("--with-documents", "include documents in read output")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, options, command] = args as [
-          string,
-          InitiativeReadOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+      commandAction<[string, InitiativeReadOptions, Command]>(
+        async (initiative, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
-        // Read query already returns expanded fields. Keep flags accepted for
-        // CLI contract compatibility until conditional field selection is added.
-        void getExpandFlags(options);
+          // Read query already returns expanded fields. Keep flags accepted for
+          // CLI contract compatibility until conditional field selection is added.
+          void getExpandFlags(options);
 
-        const result = await getInitiative(ctx.gql, initiativeId);
-        outputSuccess(result);
-      }),
+          const result = await getInitiative(ctx.gql, initiativeId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -570,26 +426,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .description("start a discussion thread on an initiative")
     .option("--body <text>", "discussion body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (initiative, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const result = await startInitiativeDiscussion(ctx.gql, {
-          initiativeId,
-          body: options.body,
-        });
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+          const result = await startInitiativeDiscussion(ctx.gql, {
+            initiativeId,
+            body: options.body,
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -599,33 +452,30 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, options, command] = args as [
-          string,
-          DiscussionsOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionsOptions, Command]>(
+        async (initiative, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const paginationOptions = {
-          limit: parseLimit(options.limit || "25"),
-          after: options.after,
-        };
-        const result = options.withReactions
-          ? await listDiscussionsForInitiativeWithReactions(
-              ctx.gql,
-              initiativeId,
-              paginationOptions,
-            )
-          : await listDiscussionsForInitiative(
-              ctx.gql,
-              initiativeId,
-              paginationOptions,
-            );
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "25"),
+            options.after,
+          );
+          const result = options.withReactions
+            ? await listDiscussionsForInitiativeWithReactions(
+                ctx.gql,
+                initiativeId,
+                paginationOptions,
+              )
+            : await listDiscussionsForInitiative(
+                ctx.gql,
+                initiativeId,
+                paginationOptions,
+              );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   const initiativeThreads = initiatives
@@ -640,34 +490,31 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          DiscussionsOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionsOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const paginationOptions = {
-          limit: parseLimit(options.limit || "50"),
-          after: options.after,
-        };
-        const result = options.withReactions
-          ? await listDiscussionRepliesWithReactions(
-              ctx.gql,
-              thread,
-              paginationOptions,
-              "initiative",
-            )
-          : await listDiscussionReplies(
-              ctx.gql,
-              thread,
-              paginationOptions,
-              "initiative",
-            );
+          const paginationOptions = buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          );
+          const result = options.withReactions
+            ? await listDiscussionRepliesWithReactions(
+                ctx.gql,
+                asUuid(thread),
+                paginationOptions,
+                "initiative",
+              )
+            : await listDiscussionReplies(
+                ctx.gql,
+                asUuid(thread),
+                paginationOptions,
+                "initiative",
+              );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
   addCommentReactionCommands(initiativeReplies, "reply");
 
@@ -680,26 +527,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     )
     .option("--body <text>", "reply body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await replyToDiscussion(ctx.gql, {
-          threadId: thread,
-          body: options.body,
-          entityKind: "initiative",
-        });
+          const result = await replyToDiscussion(ctx.gql, {
+            threadId: asUuid(thread),
+            body: options.body,
+            entityKind: "initiative",
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -707,29 +551,26 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .description("edit a root discussion or reply comment")
     .option("--body <text>", "new comment body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [comment, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (comment, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await editDiscussionComment(
-          ctx.gql,
-          comment,
-          {
-            body: options.body,
-          },
-          "initiative",
-        );
+          const result = await editDiscussionComment(
+            ctx.gql,
+            asUuid(comment),
+            {
+              body: options.body,
+            },
+            "initiative",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -737,65 +578,64 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .description("edit a discussion reply")
     .option("--body <text>", "new reply body (required, markdown supported)")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [reply, options, command] = args as [
-          string,
-          DiscussionBodyOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, DiscussionBodyOptions, Command]>(
+        async (reply, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        if (!options.body) {
-          throw invalidParameterError("--body", "is required");
-        }
+          if (!options.body) {
+            throw invalidParameterError("--body", "is required");
+          }
 
-        const result = await editDiscussionReply(
-          ctx.gql,
-          reply,
-          {
-            body: options.body,
-          },
-          "initiative",
-        );
+          const result = await editDiscussionReply(
+            ctx.gql,
+            asUuid(reply),
+            {
+              body: options.body,
+            },
+            "initiative",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
     .command("delete-comment <comment>")
     .description("delete a root discussion or reply comment")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [comment, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (comment, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionComment(
-          ctx.gql,
-          comment,
-          "initiative",
-        );
+          const result = await deleteDiscussionComment(
+            ctx.gql,
+            asUuid(comment),
+            "initiative",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
     .command("delete-reply <reply>")
     .description("delete a discussion reply")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [reply, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (reply, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionReply(
-          ctx.gql,
-          reply,
-          "initiative",
-        );
+          const result = await deleteDiscussionReply(
+            ctx.gql,
+            asUuid(reply),
+            "initiative",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -803,36 +643,40 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .description("resolve a discussion thread")
     .option("--with-comment <comment>", "comment to mark as resolving comment")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, options, command] = args as [
-          string,
-          ResolveDiscussionOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, ResolveDiscussionOptions, Command]>(
+        async (thread, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await resolveDiscussion(ctx.gql, {
-          threadId: thread,
-          resolvingCommentId: options.withComment,
-          entityKind: "initiative",
-        });
+          const result = await resolveDiscussion(ctx.gql, {
+            threadId: asUuid(thread),
+            ...(options.withComment !== undefined
+              ? { resolvingCommentId: asUuid(options.withComment) }
+              : {}),
+            entityKind: "initiative",
+          });
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
     .command("unresolve <thread>")
     .description("unresolve a discussion thread")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [thread, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, unknown, Command]>(
+        async (thread, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const result = await unresolveDiscussion(ctx.gql, thread, "initiative");
+          const result = await unresolveDiscussion(
+            ctx.gql,
+            asUuid(thread),
+            "initiative",
+          );
 
-        outputSuccess(result);
-      }),
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -845,45 +689,42 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--target-date <date>", "target date (YYYY-MM-DD)")
     .option("--sort-order <n>", "display sort order")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [name, options, command] = args as [
-          string,
-          InitiativeCreateOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
+      commandAction<[string, InitiativeCreateOptions, Command]>(
+        async (name, options, command) => {
+          const ctx = createContext(getRootOpts(command));
 
-        const input: InitiativeCreateInput = { name };
+          const input: CreateInitiativeInput = { name };
 
-        if (options.description !== undefined) {
-          input.description = options.description;
-        }
+          if (options.description !== undefined) {
+            input.description = options.description;
+          }
 
-        if (options.content !== undefined) {
-          input.content = options.content;
-        }
+          if (options.content !== undefined) {
+            input.content = options.content;
+          }
 
-        if (options.owner) {
-          input.ownerId = await resolveUserId(ctx.sdk, options.owner);
-        }
+          if (options.owner) {
+            input.ownerId = await resolveUserId(ctx.gql, options.owner);
+          }
 
-        const status = parseInitiativeStatus(options.status);
-        if (status) {
-          input.status = status;
-        }
+          const status = parseInitiativeStatus(options.status);
+          if (status) {
+            input.status = status;
+          }
 
-        if (options.targetDate !== undefined) {
-          input.targetDate = options.targetDate;
-        }
+          if (options.targetDate !== undefined) {
+            input.targetDate = options.targetDate;
+          }
 
-        const sortOrder = parseSortOrderNumber(options.sortOrder);
-        if (sortOrder !== undefined) {
-          input.sortOrder = sortOrder;
-        }
+          const sortOrder = parseSortOrderNumber(options.sortOrder);
+          if (sortOrder !== undefined) {
+            input.sortOrder = sortOrder;
+          }
 
-        const result = await createInitiative(ctx.gql, input);
-        outputSuccess(result);
-      }),
+          const result = await createInitiative(ctx.gql, input);
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
@@ -897,95 +738,95 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--target-date <date>", "new target date (YYYY-MM-DD)")
     .option("--sort-order <n>", "new display sort order")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, options, command] = args as [
-          string,
-          InitiativeUpdateOptions,
-          Command,
-        ];
-        const ctx = createContext(getRootOpts(command));
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
+      commandAction<[string, InitiativeUpdateOptions, Command]>(
+        async (initiative, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
-        const input: InitiativeUpdateInput = {};
+          const input: UpdateInitiativeInput = {};
 
-        if (options.name !== undefined) {
-          input.name = options.name;
-        }
+          if (options.name !== undefined) {
+            input.name = options.name;
+          }
 
-        if (options.description !== undefined) {
-          input.description = options.description;
-        }
+          if (options.description !== undefined) {
+            input.description = options.description;
+          }
 
-        if (options.content !== undefined) {
-          input.content = options.content;
-        }
+          if (options.content !== undefined) {
+            input.content = options.content;
+          }
 
-        if (options.owner) {
-          input.ownerId = await resolveUserId(ctx.sdk, options.owner);
-        }
+          if (options.owner) {
+            input.ownerId = await resolveUserId(ctx.gql, options.owner);
+          }
 
-        const status = parseInitiativeStatus(options.status);
-        if (status) {
-          input.status = status;
-        }
+          const status = parseInitiativeStatus(options.status);
+          if (status) {
+            input.status = status;
+          }
 
-        if (options.targetDate !== undefined) {
-          input.targetDate = options.targetDate;
-        }
+          if (options.targetDate !== undefined) {
+            input.targetDate = options.targetDate;
+          }
 
-        const sortOrder = parseSortOrderNumber(options.sortOrder);
-        if (sortOrder !== undefined) {
-          input.sortOrder = sortOrder;
-        }
+          const sortOrder = parseSortOrderNumber(options.sortOrder);
+          if (sortOrder !== undefined) {
+            input.sortOrder = sortOrder;
+          }
 
-        if (Object.keys(input).length === 0) {
-          throw invalidParameterError(
-            "update options",
-            "at least one option must be provided",
-          );
-        }
+          if (Object.keys(input).length === 0) {
+            throw invalidParameterError(
+              "update options",
+              "at least one option must be provided",
+            );
+          }
 
-        const result = await updateInitiative(ctx.gql, initiativeId, input);
-        outputSuccess(result);
-      }),
+          const result = await updateInitiative(ctx.gql, initiativeId, input);
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
     .command("archive <initiative>")
     .description("archive an initiative")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const result = await archiveInitiative(ctx.gql, initiativeId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (initiative, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+          const result = await archiveInitiative(ctx.gql, initiativeId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
     .command("unarchive <initiative>")
     .description("unarchive an initiative")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const result = await unarchiveInitiative(ctx.gql, initiativeId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (initiative, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+          const result = await unarchiveInitiative(ctx.gql, initiativeId);
+          outputSuccess(result);
+        },
+      ),
     );
 
   initiatives
     .command("delete <initiative>")
     .description("delete an initiative")
     .action(
-      handleCommand(async (...args: unknown[]) => {
-        const [initiative, , command] = args as [string, unknown, Command];
-        const ctx = createContext(getRootOpts(command));
-        const initiativeId = await resolveInitiativeId(ctx.sdk, initiative);
-        const result = await deleteInitiative(ctx.gql, initiativeId);
-        outputSuccess(result);
-      }),
+      commandAction<[string, unknown, Command]>(
+        async (initiative, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
+          const result = await deleteInitiative(ctx.gql, initiativeId);
+          outputSuccess(result);
+        },
+      ),
     );
 }

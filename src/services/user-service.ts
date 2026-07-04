@@ -1,6 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
-import { GetUsersDocument, type GetUsersQuery } from "../gql/graphql.js";
+import { GetUsersDocument } from "../gql/graphql.js";
 
 export interface User {
   id: string;
@@ -16,7 +16,7 @@ export async function listUsers(
 ): Promise<PaginatedResult<User>> {
   const { limit = 50, after } = options;
   const filter = activeOnly ? { active: { eq: true } } : undefined;
-  const result = await client.request<GetUsersQuery>(GetUsersDocument, {
+  const result = await client.request(GetUsersDocument, {
     first: limit,
     after,
     filter,

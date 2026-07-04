@@ -1,21 +1,22 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
+import { invalidParameterError } from "../common/errors.js";
+import { asUuid, type UUID } from "../common/identifier.js";
+import { omitUndefined } from "../common/object.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { DocumentUpdateInput } from "../gql/graphql.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
+import { listAttachments } from "../services/attachment-service.js";
 import {
-  createAttachment,
-  listAttachments,
-} from "../services/attachment-service.js";
-import {
+  buildIssueDocumentFilter,
+  buildProjectDocumentFilter,
   createDocument,
   deleteDocument,
   getDocument,
   listDocuments,
-  listDocumentsBySlugIds,
+  type UpdateDocumentInput,
   updateDocument,
 } from "../services/document-service.js";
 
@@ -27,6 +28,7 @@ interface DocumentCreateOptions {
   icon?: string;
   color?: string;
   issue?: string;
+  attachTo?: string;
 }
 
 interface DocumentUpdateOptions {
@@ -45,7 +47,7 @@ interface DocumentListOptions {
 }
 
 /** Extracts slug ID from a Linear document URL (e.g. /workspace/document/title-slug-abc123 -> abc123). */
-export function extractDocumentIdFromUrl(url: string): string | null {
+function extractDocumentIdFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (!parsed.hostname.includes("linear.app")) {
@@ -59,6 +61,9 @@ export function extractDocumentIdFromUrl(url: string): string | null {
     }
 
     const docSlug = pathParts[docIndex + 1];
+    if (docSlug === undefined) {
+      return null;
+    }
     const lastHyphenIndex = docSlug.lastIndexOf("-");
     if (lastHyphenIndex === -1) {
       return docSlug || null;
@@ -66,7 +71,7 @@ export function extractDocumentIdFromUrl(url: string): string | null {
 
     return docSlug.substring(lastHyphenIndex + 1) || null;
   } catch {
-    // URL constructor throws on malformed input — treat as unresolvable
+    // URL constructor throws on malformed input — treat as unresolvable.
     return null;
   }
 }
@@ -115,49 +120,39 @@ export function setupDocumentsCommands(program: Command): void {
 
         const limit = parseLimit(options.limit || "50");
 
-        if (options.issue) {
-          const issueId = await resolveIssueId(ctx.sdk, options.issue);
-          const attachments = await listAttachments(ctx.gql, issueId);
+        let projectId: UUID | undefined;
+        if (options.project) {
+          projectId = await resolveProjectId(ctx.gql, options.project);
+        }
 
-          const documentSlugIds = [
+        let issueId: UUID | undefined;
+        if (options.issue) {
+          issueId = await resolveIssueId(ctx.gql, options.issue);
+        }
+
+        let filter: ReturnType<typeof buildIssueDocumentFilter> | undefined;
+        if (projectId) {
+          filter = buildProjectDocumentFilter(projectId);
+        } else if (issueId) {
+          const attachments = await listAttachments(ctx.gql, issueId);
+          const legacyDocumentSlugIds = [
             ...new Set(
               attachments
                 .map((att) => extractDocumentIdFromUrl(att.url))
                 .filter((id): id is string => id !== null),
             ),
           ];
-
-          if (documentSlugIds.length === 0) {
-            outputSuccess({
-              nodes: [],
-              pageInfo: { hasNextPage: false, endCursor: null },
-            });
-            return;
-          }
-
-          const documents = await listDocumentsBySlugIds(
-            ctx.gql,
-            documentSlugIds,
-          );
-          outputSuccess({
-            nodes: documents,
-            pageInfo: { hasNextPage: false, endCursor: null },
-          });
-          return;
+          filter = buildIssueDocumentFilter(issueId, legacyDocumentSlugIds);
         }
 
-        let projectId: string | undefined;
-        if (options.project) {
-          projectId = await resolveProjectId(ctx.sdk, options.project);
-        }
-
-        const documents = await listDocuments(ctx.gql, {
-          limit,
-          after: options.after,
-          filter: projectId
-            ? { project: { id: { eq: projectId } } }
-            : undefined,
-        });
+        const documents = await listDocuments(
+          ctx.gql,
+          omitUndefined({
+            limit,
+            after: options.after,
+            filter,
+          }),
+        );
 
         outputSuccess(documents);
       }),
@@ -172,7 +167,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
-        const documentResult = await getDocument(ctx.gql, document);
+        const documentResult = await getDocument(ctx.gql, asUuid(document));
         outputSuccess(documentResult);
       }),
     );
@@ -187,17 +182,29 @@ export function setupDocumentsCommands(program: Command): void {
     .option("--icon <icon>", "document icon")
     .option("--color <color>", "icon color")
     .option("--issue <issue>", "also attach document to issue (e.g., ABC-123)")
+    .option("--attach-to <issue>", "alias for --issue")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [options, command] = args as [DocumentCreateOptions, Command];
+        if (options.issue && options.attachTo) {
+          throw invalidParameterError(
+            "--attach-to",
+            "cannot be combined with --issue",
+          );
+        }
+
+        const issueIdentifier = options.issue ?? options.attachTo;
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
         const projectId = options.project
-          ? await resolveProjectId(ctx.sdk, options.project)
+          ? await resolveProjectId(ctx.gql, options.project)
           : undefined;
         const teamId = options.team
-          ? await resolveTeamId(ctx.sdk, options.team)
+          ? await resolveTeamId(ctx.gql, options.team)
+          : undefined;
+        const issueId = issueIdentifier
+          ? await resolveIssueId(ctx.gql, issueIdentifier)
           : undefined;
 
         const document = await createDocument(ctx.gql, {
@@ -205,29 +212,10 @@ export function setupDocumentsCommands(program: Command): void {
           content: options.content,
           projectId,
           teamId,
+          issueId,
           icon: options.icon,
           color: options.color,
         });
-
-        if (options.issue) {
-          const issueId = await resolveIssueId(ctx.sdk, options.issue);
-
-          try {
-            await createAttachment(ctx.gql, {
-              issueId,
-              url: document.url,
-              title: document.title,
-            });
-          } catch (attachError) {
-            const errorMessage =
-              attachError instanceof Error
-                ? attachError.message
-                : String(attachError);
-            throw new Error(
-              `Document created (${document.id}) but failed to attach to issue "${options.issue}": ${errorMessage}.`,
-            );
-          }
-        }
 
         outputSuccess(document);
       }),
@@ -251,16 +239,20 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
-        const input: DocumentUpdateInput = {};
+        const input: UpdateDocumentInput = {};
         if (options.title) input.title = options.title;
         if (options.content) input.content = options.content;
         if (options.project) {
-          input.projectId = await resolveProjectId(ctx.sdk, options.project);
+          input.projectId = await resolveProjectId(ctx.gql, options.project);
         }
         if (options.icon) input.icon = options.icon;
         if (options.color) input.color = options.color;
 
-        const updatedDocument = await updateDocument(ctx.gql, document, input);
+        const updatedDocument = await updateDocument(
+          ctx.gql,
+          asUuid(document),
+          input,
+        );
         outputSuccess(updatedDocument);
       }),
     );
@@ -274,7 +266,7 @@ export function setupDocumentsCommands(program: Command): void {
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 
-        const result = await deleteDocument(ctx.gql, document);
+        const result = await deleteDocument(ctx.gql, asUuid(document));
         outputSuccess(result);
       }),
     );

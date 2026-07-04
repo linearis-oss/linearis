@@ -42,3 +42,18 @@ query GetUsers($first: Int = 50, $after: String, $filter: UserFilter) {
     }
   }
 }
+
+# Find users by a dynamic filter for ID resolution
+#
+# The filter is supplied by the caller so the resolver can preserve its
+# display-name-first (first: 10) then email-fallback (first: 1) lookup order.
+# name/email are selected so the resolver can report ambiguous matches.
+query FindUsers($filter: UserFilter, $first: Int = 1) {
+  users(filter: $filter, first: $first) {
+    nodes {
+      id
+      name
+      email
+    }
+  }
+}

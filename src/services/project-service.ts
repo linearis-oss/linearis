@@ -1,22 +1,16 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  ArchivedProject,
-  CreatedProject,
-  DeletedProject,
-  PaginatedResult,
-  PaginationOptions,
-  ProjectDetail,
-  ProjectListItem,
-  UnarchivedProject,
-  UpdatedProject,
-} from "../common/types.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveProjectDocument,
   type ArchiveProjectMutation,
   CreateProjectDocument,
   type CreateProjectMutation,
   DeleteProjectDocument,
-  type DeleteProjectMutation,
   GetProjectDocument,
   type GetProjectQuery,
   GetProjectsDocument,
@@ -29,14 +23,91 @@ import {
   type UpdateProjectMutation,
 } from "../gql/graphql.js";
 
+// Project projection types
+export type ProjectListItem = GetProjectsQuery["projects"]["nodes"][0];
+export type ProjectDetail = NonNullable<GetProjectQuery["project"]>;
+export type CreatedProject = NonNullable<
+  CreateProjectMutation["projectCreate"]["project"]
+>;
+export type UpdatedProject = NonNullable<
+  UpdateProjectMutation["projectUpdate"]["project"]
+>;
+export type ArchivedProject = NonNullable<
+  ArchiveProjectMutation["projectArchive"]["entity"]
+>;
+export type UnarchivedProject = NonNullable<
+  UnarchiveProjectMutation["projectUnarchive"]["entity"]
+>;
+export type DeletedProject = {
+  id: string;
+  success: true;
+};
+
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateProjectInput = BrandUuidFields<
+  Pick<
+    ProjectCreateInput,
+    | "name"
+    | "teamIds"
+    | "description"
+    | "content"
+    | "icon"
+    | "color"
+    | "leadId"
+    | "memberIds"
+    | "priority"
+    | "statusId"
+    | "startDate"
+    | "targetDate"
+    | "labelIds"
+  >,
+  "teamIds" | "leadId" | "memberIds" | "statusId" | "labelIds"
+>;
+export type UpdateProjectInput = BrandUuidFields<
+  Pick<
+    ProjectUpdateInput,
+    | "name"
+    | "description"
+    | "content"
+    | "icon"
+    | "color"
+    | "leadId"
+    | "memberIds"
+    | "priority"
+    | "statusId"
+    | "startDate"
+    | "targetDate"
+    | "teamIds"
+    | "labelIds"
+  >,
+  "teamIds" | "leadId" | "memberIds" | "statusId" | "labelIds"
+>;
+
+export interface ProjectListOptions extends PaginationOptions {
+  includeArchived?: boolean;
+}
+
+export interface ProjectDetailOptions {
+  milestonesFirst?: number;
+  issuesFirst?: number;
+}
+
+const DEFAULT_PROJECT_MILESTONES_FIRST = 25;
+const DEFAULT_PROJECT_ISSUES_FIRST = 50;
+
+function connectionFirstOrOneWhenSkipped(value: number): number {
+  return value === 0 ? 1 : value;
+}
+
 export async function listProjects(
   client: GraphQLClient,
-  options: PaginationOptions = {},
+  options: ProjectListOptions = {},
 ): Promise<PaginatedResult<ProjectListItem>> {
-  const { limit = 50, after } = options;
-  const result = await client.request<GetProjectsQuery>(GetProjectsDocument, {
+  const { limit = 50, after, includeArchived } = options;
+  const result = await client.request(GetProjectsDocument, {
     first: limit,
     after,
+    includeArchived,
   });
 
   return {
@@ -47,10 +118,19 @@ export async function listProjects(
 
 export async function getProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
+  options: ProjectDetailOptions = {},
 ): Promise<ProjectDetail> {
-  const result = await client.request<GetProjectQuery>(GetProjectDocument, {
+  const milestonesFirst =
+    options.milestonesFirst ?? DEFAULT_PROJECT_MILESTONES_FIRST;
+  const issuesFirst = options.issuesFirst ?? DEFAULT_PROJECT_ISSUES_FIRST;
+
+  const result = await client.request(GetProjectDocument, {
     id,
+    milestonesFirst: connectionFirstOrOneWhenSkipped(milestonesFirst),
+    skipMilestones: milestonesFirst === 0,
+    issuesFirst: connectionFirstOrOneWhenSkipped(issuesFirst),
+    skipIssues: issuesFirst === 0,
   });
 
   if (!result.project) {
@@ -62,81 +142,74 @@ export async function getProject(
 
 export async function createProject(
   client: GraphQLClient,
-  input: ProjectCreateInput,
+  input: CreateProjectInput,
 ): Promise<CreatedProject> {
-  const result = await client.request<CreateProjectMutation>(
-    CreateProjectDocument,
-    { input },
+  const gqlInput: ProjectCreateInput = input;
+  const result = await client.request(CreateProjectDocument, {
+    input: gqlInput,
+  });
+
+  return requireMutationEntity(
+    result.projectCreate,
+    "project",
+    `Failed to create project "${input.name}"`,
   );
-
-  if (!result.projectCreate.success || !result.projectCreate.project) {
-    throw new Error(`Failed to create project "${input.name}"`);
-  }
-
-  return result.projectCreate.project;
 }
 
 export async function updateProject(
   client: GraphQLClient,
-  id: string,
-  input: ProjectUpdateInput,
+  id: UUID,
+  input: UpdateProjectInput,
 ): Promise<UpdatedProject> {
-  const result = await client.request<UpdateProjectMutation>(
-    UpdateProjectDocument,
-    { id, input },
+  const gqlInput: ProjectUpdateInput = input;
+  const result = await client.request(UpdateProjectDocument, {
+    id,
+    input: gqlInput,
+  });
+
+  return requireMutationEntity(
+    result.projectUpdate,
+    "project",
+    `Failed to update project "${id}"`,
   );
-
-  if (!result.projectUpdate.success || !result.projectUpdate.project) {
-    throw new Error(`Failed to update project "${id}"`);
-  }
-
-  return result.projectUpdate.project;
 }
 
 export async function archiveProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<ArchivedProject> {
-  const result = await client.request<ArchiveProjectMutation>(
-    ArchiveProjectDocument,
-    { id },
+  const result = await client.request(ArchiveProjectDocument, { id });
+
+  return requireMutationEntity(
+    result.projectArchive,
+    "entity",
+    `Failed to archive project "${id}"`,
   );
-
-  if (!result.projectArchive.success || !result.projectArchive.entity) {
-    throw new Error(`Failed to archive project "${id}"`);
-  }
-
-  return result.projectArchive.entity;
 }
 
 export async function unarchiveProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<UnarchivedProject> {
-  const result = await client.request<UnarchiveProjectMutation>(
-    UnarchiveProjectDocument,
-    { id },
+  const result = await client.request(UnarchiveProjectDocument, { id });
+
+  return requireMutationEntity(
+    result.projectUnarchive,
+    "entity",
+    `Failed to unarchive project "${id}"`,
   );
-
-  if (!result.projectUnarchive.success || !result.projectUnarchive.entity) {
-    throw new Error(`Failed to unarchive project "${id}"`);
-  }
-
-  return result.projectUnarchive.entity;
 }
 
 export async function deleteProject(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedProject> {
-  const result = await client.request<DeleteProjectMutation>(
-    DeleteProjectDocument,
-    { id },
-  );
+  const result = await client.request(DeleteProjectDocument, { id });
 
-  if (!result.projectDelete.success) {
-    throw new Error(`Failed to delete project "${id}"`);
-  }
+  requireMutationSuccess(
+    result.projectDelete,
+    `Failed to delete project "${id}"`,
+  );
 
   return {
     id: result.projectDelete.entity?.id ?? id,

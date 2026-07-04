@@ -24,8 +24,8 @@ export function setupInitiativeRelationCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const parentId = await resolveInitiativeId(ctx.sdk, parent);
-        const childId = await resolveInitiativeId(ctx.sdk, child);
+        const parentId = await resolveInitiativeId(ctx.gql, parent);
+        const childId = await resolveInitiativeId(ctx.gql, child);
 
         const result = await createInitiativeRelation(ctx.gql, {
           parentId,
@@ -49,8 +49,8 @@ export function setupInitiativeRelationCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const parentId = await resolveInitiativeId(ctx.sdk, parent);
-        const childId = await resolveInitiativeId(ctx.sdk, child);
+        const parentId = await resolveInitiativeId(ctx.gql, parent);
+        const childId = await resolveInitiativeId(ctx.gql, child);
 
         const relationId = await resolveInitiativeRelationId(
           ctx.gql,

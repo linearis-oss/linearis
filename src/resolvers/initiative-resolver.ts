@@ -1,56 +1,66 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { LinearSdkClient } from "../client/linear-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
-import { isUuid } from "../common/identifier.js";
+import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import {
   FindInitiativeProjectLinkByPairDocument,
-  type FindInitiativeProjectLinkByPairQuery,
   FindInitiativeRelationByPairDocument,
-  type FindInitiativeRelationByPairQuery,
+  FindInitiativesDocument,
+  type InitiativeFilter,
 } from "../gql/graphql.js";
 
 export interface InitiativeResolveScope {
-  teamId?: string;
-  ownerId?: string;
+  teamId?: UUID;
+  ownerId?: UUID;
 }
 
 export async function resolveInitiativeId(
-  client: LinearSdkClient,
+  client: GraphQLClient,
   nameOrId: string,
   scope: InitiativeResolveScope = {},
-): Promise<string> {
+): Promise<UUID> {
   if (isUuid(nameOrId)) {
-    return nameOrId;
+    return asUuid(nameOrId);
   }
 
-  const clauses: Array<Record<string, unknown>> = [
-    { name: { eqIgnoreCase: nameOrId } },
-  ];
+  const nameClause: InitiativeFilter = {
+    name: { eqIgnoreCase: nameOrId },
+  };
+  const scopeClauses: InitiativeFilter[] = [];
 
   if (scope.teamId) {
-    clauses.push({ teams: { some: { id: { eq: scope.teamId } } } });
+    scopeClauses.push({ teams: { some: { id: { eq: scope.teamId } } } });
   }
 
   if (scope.ownerId) {
-    clauses.push({ owner: { id: { eq: scope.ownerId } } });
+    scopeClauses.push({ owner: { id: { eq: scope.ownerId } } });
   }
 
-  const filter = clauses.length === 1 ? clauses[0] : { and: clauses };
+  const filter: InitiativeFilter =
+    scopeClauses.length === 0
+      ? nameClause
+      : { and: [nameClause, ...scopeClauses] };
 
-  const result = await client.sdk.initiatives({
+  const { initiatives } = await client.request(FindInitiativesDocument, {
     filter,
     first: 20,
   });
 
-  if (result.nodes.length === 0) {
+  if (initiatives.nodes.length === 0) {
     throw notFoundError("Initiative", nameOrId);
   }
 
-  if (result.nodes.length === 1) {
-    return result.nodes[0].id;
+  if (initiatives.nodes.length === 1) {
+    return asUuid(
+      firstOrThrow(initiatives.nodes, () =>
+        notFoundError("Initiative", nameOrId),
+      ).id,
+    );
   }
 
-  const candidates = result.nodes.map((node) => `${node.name} (${node.id})`);
+  const candidates = initiatives.nodes.map(
+    (node) => `${node.name} (${node.id})`,
+  );
 
   throw multipleMatchesError(
     "initiative",
@@ -64,16 +74,17 @@ export async function resolveInitiativeId(
 
 export async function resolveInitiativeRelationId(
   client: GraphQLClient,
-  parentId: string,
-  childId: string,
-): Promise<string> {
+  parentId: UUID,
+  childId: UUID,
+): Promise<UUID> {
   let after: string | undefined;
 
   while (true) {
-    const result = await client.request<FindInitiativeRelationByPairQuery>(
-      FindInitiativeRelationByPairDocument,
-      { parentId, childId, after },
-    );
+    const result = await client.request(FindInitiativeRelationByPairDocument, {
+      parentId,
+      childId,
+      after,
+    });
 
     const relation = result.initiativeRelations.nodes.find(
       (node) =>
@@ -82,7 +93,7 @@ export async function resolveInitiativeRelationId(
     );
 
     if (relation) {
-      return relation.id;
+      return asUuid(relation.id);
     }
 
     if (!result.initiativeRelations.pageInfo.hasNextPage) {
@@ -100,13 +111,13 @@ export async function resolveInitiativeRelationId(
 
 export async function resolveInitiativeProjectLinkId(
   client: GraphQLClient,
-  initiativeId: string,
-  projectId: string,
-): Promise<string> {
+  initiativeId: UUID,
+  projectId: UUID,
+): Promise<UUID> {
   let after: string | undefined;
 
   while (true) {
-    const result = await client.request<FindInitiativeProjectLinkByPairQuery>(
+    const result = await client.request(
       FindInitiativeProjectLinkByPairDocument,
       { initiativeId, projectId, after },
     );
@@ -117,7 +128,7 @@ export async function resolveInitiativeProjectLinkId(
     );
 
     if (link) {
-      return link.id;
+      return asUuid(link.id);
     }
 
     if (!result.initiativeToProjects.pageInfo.hasNextPage) {

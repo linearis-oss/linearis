@@ -1,12 +1,7 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CreatedMilestone,
-  MilestoneDetail,
-  MilestoneListItem,
-  PaginatedResult,
-  PaginationOptions,
-  UpdatedMilestone,
-} from "../common/types.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   CreateProjectMilestoneDocument,
   type CreateProjectMilestoneMutation,
@@ -20,16 +15,43 @@ import {
   type UpdateProjectMilestoneMutation,
 } from "../gql/graphql.js";
 
+// Milestone projection types
+export type MilestoneDetail = NonNullable<
+  GetProjectMilestoneByIdQuery["projectMilestone"]
+>;
+export type MilestoneListItem =
+  ListProjectMilestonesQuery["project"]["projectMilestones"]["nodes"][0];
+export type CreatedMilestone = NonNullable<
+  CreateProjectMilestoneMutation["projectMilestoneCreate"]["projectMilestone"]
+>;
+export type UpdatedMilestone = NonNullable<
+  UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
+>;
+
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateMilestoneInput = BrandUuidFields<
+  Pick<
+    ProjectMilestoneCreateInput,
+    "projectId" | "name" | "description" | "targetDate"
+  >,
+  "projectId"
+>;
+export type UpdateMilestoneInput = Pick<
+  ProjectMilestoneUpdateInput,
+  "name" | "description" | "targetDate" | "sortOrder"
+>;
+
 export async function listMilestones(
   client: GraphQLClient,
-  projectId: string,
+  projectId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<MilestoneListItem>> {
   const { limit = 50, after } = options;
-  const result = await client.request<ListProjectMilestonesQuery>(
-    ListProjectMilestonesDocument,
-    { projectId, first: limit, after },
-  );
+  const result = await client.request(ListProjectMilestonesDocument, {
+    projectId,
+    first: limit,
+    after,
+  });
 
   return {
     nodes: result.project?.projectMilestones?.nodes ?? [],
@@ -42,13 +64,13 @@ export async function listMilestones(
 
 export async function getMilestone(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   issuesLimit?: number,
 ): Promise<MilestoneDetail> {
-  const result = await client.request<GetProjectMilestoneByIdQuery>(
-    GetProjectMilestoneByIdDocument,
-    { id, issuesFirst: issuesLimit },
-  );
+  const result = await client.request(GetProjectMilestoneByIdDocument, {
+    id,
+    issuesFirst: issuesLimit,
+  });
 
   if (!result.projectMilestone) {
     throw new Error(`Milestone with ID "${id}" not found`);
@@ -59,39 +81,34 @@ export async function getMilestone(
 
 export async function createMilestone(
   client: GraphQLClient,
-  input: ProjectMilestoneCreateInput,
+  input: CreateMilestoneInput,
 ): Promise<CreatedMilestone> {
-  const result = await client.request<CreateProjectMilestoneMutation>(
-    CreateProjectMilestoneDocument,
-    input,
+  const gqlInput: ProjectMilestoneCreateInput = input;
+  const result = await client.request(CreateProjectMilestoneDocument, {
+    input: gqlInput,
+  });
+
+  return requireMutationEntity(
+    result.projectMilestoneCreate,
+    "projectMilestone",
+    "Failed to create milestone",
   );
-
-  if (
-    !result.projectMilestoneCreate.success ||
-    !result.projectMilestoneCreate.projectMilestone
-  ) {
-    throw new Error("Failed to create milestone");
-  }
-
-  return result.projectMilestoneCreate.projectMilestone;
 }
 
 export async function updateMilestone(
   client: GraphQLClient,
-  id: string,
-  input: ProjectMilestoneUpdateInput,
+  id: UUID,
+  input: UpdateMilestoneInput,
 ): Promise<UpdatedMilestone> {
-  const result = await client.request<UpdateProjectMilestoneMutation>(
-    UpdateProjectMilestoneDocument,
-    { id, ...input },
+  const gqlInput: ProjectMilestoneUpdateInput = input;
+  const result = await client.request(UpdateProjectMilestoneDocument, {
+    id,
+    input: gqlInput,
+  });
+
+  return requireMutationEntity(
+    result.projectMilestoneUpdate,
+    "projectMilestone",
+    "Failed to update milestone",
   );
-
-  if (
-    !result.projectMilestoneUpdate.success ||
-    !result.projectMilestoneUpdate.projectMilestone
-  ) {
-    throw new Error("Failed to update milestone");
-  }
-
-  return result.projectMilestoneUpdate.projectMilestone;
 }

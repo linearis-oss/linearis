@@ -1,17 +1,15 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CreatedDocument,
-  Document,
-  DocumentListItem,
-  PaginatedResult,
-  UpdatedDocument,
-} from "../common/types.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
+import type { PaginatedResult } from "../common/types.js";
 import {
   DocumentCreateDocument,
   type DocumentCreateInput,
   type DocumentCreateMutation,
   DocumentDeleteDocument,
-  type DocumentDeleteMutation,
   type DocumentFilter,
   DocumentUpdateDocument,
   type DocumentUpdateInput,
@@ -22,11 +20,58 @@ import {
   type ListDocumentsQuery,
 } from "../gql/graphql.js";
 
+// Document projection types
+export type DocumentDetail = NonNullable<GetDocumentQuery["document"]>;
+export type DocumentListItem = ListDocumentsQuery["documents"]["nodes"][0];
+export type CreatedDocument =
+  DocumentCreateMutation["documentCreate"]["document"];
+export type UpdatedDocument =
+  DocumentUpdateMutation["documentUpdate"]["document"];
+
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateDocumentInput = BrandUuidFields<
+  Pick<
+    DocumentCreateInput,
+    "title" | "content" | "projectId" | "teamId" | "issueId" | "icon" | "color"
+  >,
+  "projectId" | "teamId" | "issueId"
+>;
+export type UpdateDocumentInput = BrandUuidFields<
+  Pick<
+    DocumentUpdateInput,
+    "title" | "content" | "projectId" | "icon" | "color"
+  >,
+  "projectId"
+>;
+
+export function buildProjectDocumentFilter(projectId: UUID): DocumentFilter {
+  return { project: { id: { eq: projectId } } };
+}
+
+export function buildIssueDocumentFilter(
+  issueId: UUID,
+  legacyDocumentSlugIds: string[],
+): DocumentFilter {
+  const issueFilter: DocumentFilter = { issue: { id: { eq: issueId } } };
+  if (legacyDocumentSlugIds.length === 0) {
+    return issueFilter;
+  }
+
+  return {
+    or: [
+      issueFilter,
+      ...legacyDocumentSlugIds.map((slugId) => ({
+        slugId: { eq: slugId },
+      })),
+    ],
+  };
+}
+
 export async function getDocument(
   client: GraphQLClient,
-  id: string,
-): Promise<Document> {
-  const result = await client.request<GetDocumentQuery>(GetDocumentDocument, {
+  id: UUID,
+): Promise<DocumentDetail> {
+  const result = await client.request(GetDocumentDocument, {
     id,
   });
 
@@ -39,35 +84,36 @@ export async function getDocument(
 
 export async function createDocument(
   client: GraphQLClient,
-  input: DocumentCreateInput,
+  input: CreateDocumentInput,
 ): Promise<CreatedDocument> {
-  const result = await client.request<DocumentCreateMutation>(
-    DocumentCreateDocument,
-    { input },
+  const gqlInput: DocumentCreateInput = input;
+  const result = await client.request(DocumentCreateDocument, {
+    input: gqlInput,
+  });
+
+  return requireMutationEntity(
+    result.documentCreate,
+    "document",
+    "Failed to create document",
   );
-
-  if (!result.documentCreate.success || !result.documentCreate.document) {
-    throw new Error("Failed to create document");
-  }
-
-  return result.documentCreate.document;
 }
 
 export async function updateDocument(
   client: GraphQLClient,
-  id: string,
-  input: DocumentUpdateInput,
+  id: UUID,
+  input: UpdateDocumentInput,
 ): Promise<UpdatedDocument> {
-  const result = await client.request<DocumentUpdateMutation>(
-    DocumentUpdateDocument,
-    { id, input },
+  const gqlInput: DocumentUpdateInput = input;
+  const result = await client.request(DocumentUpdateDocument, {
+    id,
+    input: gqlInput,
+  });
+
+  return requireMutationEntity(
+    result.documentUpdate,
+    "document",
+    "Failed to update document",
   );
-
-  if (!result.documentUpdate.success || !result.documentUpdate.document) {
-    throw new Error("Failed to update document");
-  }
-
-  return result.documentUpdate.document;
 }
 
 export async function listDocuments(
@@ -78,14 +124,11 @@ export async function listDocuments(
     filter?: DocumentFilter;
   },
 ): Promise<PaginatedResult<DocumentListItem>> {
-  const result = await client.request<ListDocumentsQuery>(
-    ListDocumentsDocument,
-    {
-      first: options?.limit ?? 25,
-      after: options?.after,
-      filter: options?.filter,
-    },
-  );
+  const result = await client.request(ListDocumentsDocument, {
+    first: options?.limit ?? 25,
+    after: options?.after,
+    filter: options?.filter,
+  });
 
   return {
     nodes: result.documents?.nodes ?? [],
@@ -96,39 +139,13 @@ export async function listDocuments(
   };
 }
 
-export async function listDocumentsBySlugIds(
-  client: GraphQLClient,
-  slugIds: string[],
-): Promise<DocumentListItem[]> {
-  if (slugIds.length === 0) {
-    return [];
-  }
-
-  const result = await client.request<ListDocumentsQuery>(
-    ListDocumentsDocument,
-    {
-      first: slugIds.length,
-      filter: {
-        slugId: { in: slugIds },
-      },
-    },
-  );
-
-  return result.documents?.nodes ?? [];
-}
-
 export async function deleteDocument(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<{ id: string; success: boolean }> {
-  const result = await client.request<DocumentDeleteMutation>(
-    DocumentDeleteDocument,
-    { id },
-  );
+  const result = await client.request(DocumentDeleteDocument, { id });
 
-  if (!result.documentDelete.success) {
-    throw new Error("Failed to delete document");
-  }
+  requireMutationSuccess(result.documentDelete, "Failed to delete document");
 
   return { id: result.documentDelete.entity?.id ?? id, success: true };
 }

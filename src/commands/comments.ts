@@ -6,7 +6,9 @@ import {
 } from "../common/context.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
+import { asUuid } from "../common/identifier.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveIssueId } from "../resolvers/issue-resolver.js";
 import {
@@ -96,11 +98,12 @@ export function setupCommentsCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const limit = parseLimit(options.limit || "25");
-        const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
-        const result = await listDiscussionsForIssue(ctx.gql, resolvedIssueId, {
-          limit,
-          after: options.after,
-        });
+        const resolvedIssueId = await resolveIssueId(ctx.gql, issue);
+        const result = await listDiscussionsForIssue(
+          ctx.gql,
+          resolvedIssueId,
+          buildPaginationOptions(limit, options.after),
+        );
 
         outputSuccess(result);
       }),
@@ -130,7 +133,7 @@ export function setupCommentsCommands(program: Command): void {
           throw invalidParameterError("--body", "is required");
         }
 
-        const resolvedIssueId = await resolveIssueId(ctx.sdk, issue);
+        const resolvedIssueId = await resolveIssueId(ctx.gql, issue);
         const result = await startIssueDiscussion(ctx.gql, {
           issueId: resolvedIssueId,
           body: options.body,
@@ -169,7 +172,7 @@ export function setupCommentsCommands(program: Command): void {
         }
 
         const result = await replyToDiscussion(ctx.gql, {
-          threadId: thread,
+          threadId: asUuid(thread),
           body: options.body,
           entityKind: "issue",
         });
@@ -198,7 +201,7 @@ export function setupCommentsCommands(program: Command): void {
           throw invalidParameterError("--body", "is required");
         }
 
-        const result = await editDiscussionComment(ctx.gql, comment, {
+        const result = await editDiscussionComment(ctx.gql, asUuid(comment), {
           body: options.body,
         });
 
@@ -217,7 +220,7 @@ export function setupCommentsCommands(program: Command): void {
         const [comment, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
 
-        const result = await deleteDiscussionComment(ctx.gql, comment);
+        const result = await deleteDiscussionComment(ctx.gql, asUuid(comment));
 
         outputSuccess(result);
       }),
@@ -244,7 +247,7 @@ export function setupCommentsCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const result = await createIssueDiscussionCommentReaction(ctx.gql, {
-          commentId: comment,
+          commentId: asUuid(comment),
           emoji: resolveReactionEmojiInput(emoji, options.shortcode),
         });
 
@@ -275,7 +278,7 @@ export function setupCommentsCommands(program: Command): void {
         const result = await deleteIssueDiscussionCommentReactionByEmoji(
           ctx.gql,
           {
-            commentId: comment,
+            commentId: asUuid(comment),
             emoji: resolveReactionEmojiInput(emoji, options.shortcode),
           },
         );
@@ -304,8 +307,8 @@ export function setupCommentsCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const result = await deleteIssueDiscussionCommentReactionById(ctx.gql, {
-          commentId: comment,
-          reactionId,
+          commentId: asUuid(comment),
+          reactionId: asUuid(reactionId),
         });
 
         outputSuccess(result);

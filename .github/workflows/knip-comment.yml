@@ -1,0 +1,54 @@
+name: Post Knip Comment
+
+# Runs after "Validate CI" completes, in the base repo's context (so it gets
+# a writable GITHUB_TOKEN even for fork PRs) instead of running with the
+# PR's own code. See the knip job in ci-validate.yml for the untrusted half
+# of this split — it builds/runs the PR's code with a read-only token and
+# uploads the rendered comment as an artifact for this workflow to post.
+on:
+  workflow_run:
+    workflows:
+      - Validate CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  comment:
+    name: Post / Update Knip PR Comment
+    runs-on: ubuntu-latest
+    # Run for PR builds regardless of pass/fail: the knip job intentionally
+    # fails "Validate CI" when it finds dead code, and that's exactly when the
+    # comment matters most. The artifact is uploaded with `if: always()` before
+    # that failing step, so it exists on both success and failure. Only skip
+    # `cancelled` runs (e.g. superseded by cancel-in-progress concurrency),
+    # which may never reach the upload step and thus have no artifact.
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion != 'cancelled'
+    permissions:
+      # actions: read is required for download-artifact to fetch the artifact
+      # from a different workflow run (via run-id); pull-requests: write is for
+      # posting the comment.
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download knip comment artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: knip-comment
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read PR number
+        id: pr
+        run: echo "number=$(cat pr-number.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Post / update PR comment
+        uses: marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0 # v3.0.4
+        with:
+          header: knip-dead-code
+          path: knip-comment.md
+          number: ${{ steps.pr.outputs.number }}

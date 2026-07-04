@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import { IssueRelationType } from "../../../src/gql/graphql.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createIssueRelation,
   deleteIssueRelation,
   findIssueRelation,
+  listIssueRelations,
 } from "../../../src/services/issue-relation-service.js";
 
 function mockGqlClient(response: Record<string, unknown>): GraphQLClient {
@@ -17,7 +18,7 @@ describe("createIssueRelation", () => {
   it("creates a relation and returns it", async () => {
     const relation = {
       id: "rel-1",
-      type: IssueRelationType.Blocks,
+      type: "blocks",
       relatedIssue: { id: "issue-2", identifier: "ENG-2" },
     };
     const client = mockGqlClient({
@@ -25,9 +26,9 @@ describe("createIssueRelation", () => {
     });
 
     const result = await createIssueRelation(client, {
-      issueId: "issue-1",
-      relatedIssueId: "issue-2",
-      type: IssueRelationType.Blocks,
+      issueId: asUuid("issue-1"),
+      relatedIssueId: asUuid("issue-2"),
+      type: "blocks",
     });
 
     expect(result).toEqual(relation);
@@ -41,9 +42,9 @@ describe("createIssueRelation", () => {
 
     await expect(
       createIssueRelation(client, {
-        issueId: "issue-1",
-        relatedIssueId: "issue-2",
-        type: IssueRelationType.Blocks,
+        issueId: asUuid("issue-1"),
+        relatedIssueId: asUuid("issue-2"),
+        type: "blocks",
       }),
     ).rejects.toThrow("Failed to create issue relation");
   });
@@ -57,7 +58,7 @@ describe("findIssueRelation", () => {
           nodes: [
             {
               id: "rel-1",
-              type: IssueRelationType.Blocks,
+              type: "blocks",
               relatedIssue: { id: "target-id", identifier: "ENG-2" },
             },
           ],
@@ -66,7 +67,11 @@ describe("findIssueRelation", () => {
       },
     });
 
-    const result = await findIssueRelation(client, "source-id", "target-id");
+    const result = await findIssueRelation(
+      client,
+      asUuid("source-id"),
+      asUuid("target-id"),
+    );
     expect(result).toBe("rel-1");
   });
 
@@ -78,7 +83,7 @@ describe("findIssueRelation", () => {
           nodes: [
             {
               id: "rel-2",
-              type: IssueRelationType.Blocks,
+              type: "blocks",
               issue: { id: "target-id", identifier: "ENG-1" },
             },
           ],
@@ -86,7 +91,11 @@ describe("findIssueRelation", () => {
       },
     });
 
-    const result = await findIssueRelation(client, "source-id", "target-id");
+    const result = await findIssueRelation(
+      client,
+      asUuid("source-id"),
+      asUuid("target-id"),
+    );
     expect(result).toBe("rel-2");
   });
 
@@ -94,7 +103,7 @@ describe("findIssueRelation", () => {
     const client = mockGqlClient({ issue: null });
 
     await expect(
-      findIssueRelation(client, "non-existent-id", "target-id"),
+      findIssueRelation(client, asUuid("non-existent-id"), asUuid("target-id")),
     ).rejects.toThrow("not found");
   });
 
@@ -107,8 +116,64 @@ describe("findIssueRelation", () => {
     });
 
     await expect(
-      findIssueRelation(client, "source-id", "target-id"),
+      findIssueRelation(client, asUuid("source-id"), asUuid("target-id")),
     ).rejects.toThrow("not found");
+  });
+});
+
+describe("listIssueRelations", () => {
+  it("returns issue metadata with forward and inverse relations", async () => {
+    const client = mockGqlClient({
+      issue: {
+        id: "source-id",
+        identifier: "ENG-1",
+        relations: {
+          nodes: [
+            {
+              id: "rel-1",
+              type: "blocks",
+              relatedIssue: { id: "target-id", identifier: "ENG-2" },
+            },
+          ],
+        },
+        inverseRelations: {
+          nodes: [
+            {
+              id: "rel-2",
+              type: "related",
+              issue: { id: "other-id", identifier: "ENG-3" },
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await listIssueRelations(client, asUuid("source-id"));
+
+    expect(result).toEqual({
+      issueId: "source-id",
+      identifier: "ENG-1",
+      relations: [
+        {
+          id: "rel-1",
+          type: "blocks",
+          relatedIssue: { id: "target-id", identifier: "ENG-2" },
+        },
+        {
+          id: "rel-2",
+          type: "related",
+          issue: { id: "other-id", identifier: "ENG-3" },
+        },
+      ],
+    });
+  });
+
+  it("throws when issue is not found", async () => {
+    const client = mockGqlClient({ issue: null });
+
+    await expect(listIssueRelations(client, asUuid("missing"))).rejects.toThrow(
+      "not found",
+    );
   });
 });
 
@@ -118,7 +183,7 @@ describe("deleteIssueRelation", () => {
       issueRelationDelete: { success: true, entityId: "rel-1" },
     });
 
-    const result = await deleteIssueRelation(client, "rel-1");
+    const result = await deleteIssueRelation(client, asUuid("rel-1"));
     expect(result).toEqual({ id: "rel-1", success: true });
   });
 
@@ -127,7 +192,7 @@ describe("deleteIssueRelation", () => {
       issueRelationDelete: { success: false },
     });
 
-    await expect(deleteIssueRelation(client, "rel-1")).rejects.toThrow(
+    await expect(deleteIssueRelation(client, asUuid("rel-1"))).rejects.toThrow(
       "Failed to delete issue relation",
     );
   });

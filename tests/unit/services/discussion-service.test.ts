@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   GetDiscussionCommentContextDocument,
   type ListIssueDiscussionRootsQuery,
+  StartDiscussionDocument,
 } from "../../../src/gql/graphql.js";
 
 vi.mock("../../../src/services/reaction-service.js", async (importOriginal) => {
@@ -109,7 +111,7 @@ describe("discussion comment reactions", () => {
 
     await expect(
       createDiscussionCommentReaction(client, {
-        commentId: "thread-1",
+        commentId: asUuid("thread-1"),
         target: "thread",
         expectedEntityKind: "issue",
         emoji: "👍",
@@ -139,7 +141,7 @@ describe("discussion comment reactions", () => {
 
     await expect(
       createDiscussionCommentReaction(client, {
-        commentId: "reply-1",
+        commentId: asUuid("reply-1"),
         target: "thread",
         expectedEntityKind: "issue",
         emoji: "👍",
@@ -164,7 +166,7 @@ describe("discussion comment reactions", () => {
 
     await expect(
       deleteDiscussionCommentReactionByEmoji(client, {
-        commentId: "reply-1",
+        commentId: asUuid("reply-1"),
         target: "reply",
         expectedEntityKind: "issue",
         emoji: "👍",
@@ -189,10 +191,10 @@ describe("discussion comment reactions", () => {
 
     await expect(
       deleteDiscussionCommentReactionById(client, {
-        commentId: "reply-1",
+        commentId: asUuid("reply-1"),
         target: "reply",
         expectedEntityKind: "initiative",
-        reactionId: "reaction-1",
+        reactionId: asUuid("reaction-1"),
       }),
     ).resolves.toEqual({ id: "reaction-1", success: true });
 
@@ -216,7 +218,7 @@ describe("discussion comment reactions", () => {
 
     await expect(
       createIssueDiscussionCommentReaction(client, {
-        commentId: "comment-1",
+        commentId: asUuid("comment-1"),
         emoji: "👍",
       }),
     ).resolves.toEqual({ id: "reaction-1" });
@@ -240,7 +242,7 @@ describe("discussion comment reactions", () => {
 
     await expect(
       createIssueDiscussionCommentReaction(client, {
-        commentId: "comment-1",
+        commentId: asUuid("comment-1"),
         emoji: "👍",
       }),
     ).rejects.toThrow(
@@ -256,7 +258,7 @@ describe("discussion comment reactions", () => {
 
     await expect(
       deleteIssueDiscussionCommentReactionByEmoji(client, {
-        commentId: "comment-1",
+        commentId: asUuid("comment-1"),
         emoji: "👍",
       }),
     ).rejects.toThrow('Discussion comment ID "comment-1" not found');
@@ -277,8 +279,8 @@ describe("discussion comment reactions", () => {
 
     await expect(
       deleteIssueDiscussionCommentReactionById(client, {
-        commentId: "comment-1",
-        reactionId: "reaction-1",
+        commentId: asUuid("comment-1"),
+        reactionId: asUuid("reaction-1"),
       }),
     ).resolves.toEqual({ id: "reaction-1", success: true });
 
@@ -302,7 +304,7 @@ describe("listDiscussionsForIssue", () => {
       },
     } satisfies ListIssueDiscussionRootsQuery);
 
-    const result = await listDiscussionsForIssue(client, "issue-1", {
+    const result = await listDiscussionsForIssue(client, asUuid("issue-1"), {
       limit: 2,
       after: "root-cursor-0",
     });
@@ -324,7 +326,7 @@ describe("listDiscussionsForIssue", () => {
     vi.mocked(client.request).mockResolvedValue({ issue: null });
 
     await expect(
-      listDiscussionsForIssue(client, "issue-missing"),
+      listDiscussionsForIssue(client, asUuid("issue-missing")),
     ).rejects.toThrow('Issue with ID "issue-missing" not found');
   });
 
@@ -341,11 +343,11 @@ describe("listDiscussionsForIssue", () => {
 
     const result = await listDiscussionsForIssueWithReactions(
       client,
-      "issue-1",
+      asUuid("issue-1"),
       { limit: 10 },
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -368,10 +370,14 @@ describe("listDiscussionsForProject", () => {
       },
     });
 
-    const result = await listDiscussionsForProject(client, "project-1", {
-      limit: 10,
-      after: "cur-0",
-    });
+    const result = await listDiscussionsForProject(
+      client,
+      asUuid("project-1"),
+      {
+        limit: 10,
+        after: "cur-0",
+      },
+    );
 
     expect(result.nodes).toHaveLength(1);
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: null });
@@ -387,7 +393,7 @@ describe("listDiscussionsForProject", () => {
     vi.mocked(client.request).mockResolvedValue({ project: null });
 
     await expect(
-      listDiscussionsForProject(client, "project-missing"),
+      listDiscussionsForProject(client, asUuid("project-missing")),
     ).rejects.toThrow('Project with ID "project-missing" not found');
   });
 
@@ -404,11 +410,11 @@ describe("listDiscussionsForProject", () => {
 
     const result = await listDiscussionsForProjectWithReactions(
       client,
-      "project-1",
+      asUuid("project-1"),
       { limit: 10 },
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -430,7 +436,10 @@ describe("listDiscussionsForInitiative", () => {
       },
     });
 
-    const result = await listDiscussionsForInitiative(client, "initiative-1");
+    const result = await listDiscussionsForInitiative(
+      client,
+      asUuid("initiative-1"),
+    );
 
     expect(result.nodes).toHaveLength(1);
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
@@ -446,7 +455,7 @@ describe("listDiscussionsForInitiative", () => {
     vi.mocked(client.request).mockResolvedValue({ initiative: null });
 
     await expect(
-      listDiscussionsForInitiative(client, "initiative-missing"),
+      listDiscussionsForInitiative(client, asUuid("initiative-missing")),
     ).rejects.toThrow('Initiative with ID "initiative-missing" not found');
   });
 
@@ -462,11 +471,11 @@ describe("listDiscussionsForInitiative", () => {
 
     const result = await listDiscussionsForInitiativeWithReactions(
       client,
-      "initiative-1",
+      asUuid("initiative-1"),
       { limit: 10 },
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -502,7 +511,7 @@ describe("listDiscussionReplies", () => {
         },
       });
 
-    const result = await listDiscussionReplies(client, "root-1", {
+    const result = await listDiscussionReplies(client, asUuid("root-1"), {
       limit: 5,
     });
 
@@ -542,7 +551,7 @@ describe("listDiscussionReplies", () => {
         },
       });
 
-    const result = await listDiscussionReplies(client, "root-1", {
+    const result = await listDiscussionReplies(client, asUuid("root-1"), {
       limit: 1,
       after: "reply-1",
     });
@@ -581,7 +590,9 @@ describe("listDiscussionReplies", () => {
         },
       });
 
-    const result = await listDiscussionReplies(client, "root-1", { limit: 10 });
+    const result = await listDiscussionReplies(client, asUuid("root-1"), {
+      limit: 10,
+    });
 
     expect(result.nodes.map((node) => node.id)).toEqual([
       "z-parent",
@@ -594,7 +605,7 @@ describe("listDiscussionReplies", () => {
     vi.mocked(client.request).mockResolvedValueOnce({ comment: null });
 
     await expect(
-      listDiscussionReplies(client, "missing-thread"),
+      listDiscussionReplies(client, asUuid("missing-thread")),
     ).rejects.toThrow('Discussion thread ID "missing-thread" not found');
   });
 
@@ -604,7 +615,9 @@ describe("listDiscussionReplies", () => {
       comment: comment("reply-1", "root-1"),
     });
 
-    await expect(listDiscussionReplies(client, "reply-1")).rejects.toThrow(
+    await expect(
+      listDiscussionReplies(client, asUuid("reply-1")),
+    ).rejects.toThrow(
       'Discussion thread ID "reply-1" must reference a root comment',
     );
   });
@@ -629,12 +642,12 @@ describe("listDiscussionReplies", () => {
 
     const result = await listDiscussionRepliesWithReactions(
       client,
-      "root-1",
+      asUuid("root-1"),
       { limit: 10 },
       "issue",
     );
 
-    expect(result.nodes[0].reactions).toEqual([
+    expect(result.nodes[0]?.reactions).toEqual([
       {
         emoji: "👍",
         count: 1,
@@ -651,7 +664,10 @@ describe("replyToDiscussion", () => {
     vi.mocked(client.request).mockResolvedValueOnce({ comment: null });
 
     await expect(
-      replyToDiscussion(client, { threadId: "missing-thread", body: "nested" }),
+      replyToDiscussion(client, {
+        threadId: asUuid("missing-thread"),
+        body: "nested",
+      }),
     ).rejects.toThrow('Discussion thread ID "missing-thread" not found');
   });
 
@@ -667,7 +683,10 @@ describe("replyToDiscussion", () => {
     });
 
     await expect(
-      replyToDiscussion(client, { threadId: "reply-2", body: "nested reply" }),
+      replyToDiscussion(client, {
+        threadId: asUuid("reply-2"),
+        body: "nested reply",
+      }),
     ).rejects.toThrow(
       'Discussion thread ID "reply-2" must reference a root comment',
     );
@@ -694,7 +713,7 @@ describe("replyToDiscussion", () => {
 
     await expect(
       replyToDiscussion(client, {
-        threadId: "root-1",
+        threadId: asUuid("root-1"),
         body: "nested reply",
         entityKind: "issue",
       }),
@@ -703,10 +722,17 @@ describe("replyToDiscussion", () => {
     );
   });
 
-  it("creates a reply for root thread", async () => {
+  it("creates a reply for root thread and forwards the parent entity id", async () => {
     const client = createClientMock();
     vi.mocked(client.request)
-      .mockResolvedValueOnce({ comment: comment("root-1") })
+      .mockResolvedValueOnce({
+        comment: {
+          ...comment("root-1"),
+          issueId: "issue-1",
+          projectId: null,
+          initiativeId: null,
+        },
+      })
       .mockResolvedValueOnce({
         commentCreate: {
           success: true,
@@ -715,12 +741,19 @@ describe("replyToDiscussion", () => {
       });
 
     const result = await replyToDiscussion(client, {
-      threadId: "root-1",
+      threadId: asUuid("root-1"),
       body: "hello",
     });
 
     expect(result.id).toBe("reply-1");
     expect(result.parentId).toBe("root-1");
+    expect(client.request).toHaveBeenNthCalledWith(2, StartDiscussionDocument, {
+      input: {
+        parentId: "root-1",
+        issueId: "issue-1",
+        body: "hello",
+      },
+    });
   });
 });
 
@@ -739,17 +772,20 @@ describe("discussion mutation flows", () => {
       });
 
     await expect(
-      startIssueDiscussion(client, { issueId: "issue-1", body: "issue body" }),
+      startIssueDiscussion(client, {
+        issueId: asUuid("issue-1"),
+        body: "issue body",
+      }),
     ).resolves.toMatchObject({ id: "c-issue" });
     await expect(
       startProjectDiscussion(client, {
-        projectId: "project-1",
+        projectId: asUuid("project-1"),
         body: "project body",
       }),
     ).resolves.toMatchObject({ id: "c-project" });
     await expect(
       startInitiativeDiscussion(client, {
-        initiativeId: "initiative-1",
+        initiativeId: asUuid("initiative-1"),
         body: "initiative body",
       }),
     ).resolves.toMatchObject({ id: "c-initiative" });
@@ -762,7 +798,10 @@ describe("discussion mutation flows", () => {
     });
 
     await expect(
-      startIssueDiscussion(client, { issueId: "issue-1", body: "issue body" }),
+      startIssueDiscussion(client, {
+        issueId: asUuid("issue-1"),
+        body: "issue body",
+      }),
     ).rejects.toThrow("Failed to start discussion");
   });
 
@@ -782,9 +821,11 @@ describe("discussion mutation flows", () => {
       });
 
     await expect(
-      editDiscussionReply(client, "reply-1", { body: "updated" }),
+      editDiscussionReply(client, asUuid("reply-1"), { body: "updated" }),
     ).resolves.toMatchObject({ id: "reply-1", body: "updated" });
-    await expect(deleteDiscussionReply(client, "reply-1")).resolves.toEqual({
+    await expect(
+      deleteDiscussionReply(client, asUuid("reply-1")),
+    ).resolves.toEqual({
       id: "reply-1",
       success: true,
     });
@@ -797,7 +838,7 @@ describe("discussion mutation flows", () => {
     });
 
     await expect(
-      editDiscussionReply(client, "root-1", { body: "updated" }),
+      editDiscussionReply(client, asUuid("root-1"), { body: "updated" }),
     ).rejects.toThrow(
       'Discussion reply ID "root-1" must reference a reply comment',
     );
@@ -809,7 +850,9 @@ describe("discussion mutation flows", () => {
       comment: comment("root-1"),
     });
 
-    await expect(deleteDiscussionReply(client, "root-1")).rejects.toThrow(
+    await expect(
+      deleteDiscussionReply(client, asUuid("root-1")),
+    ).rejects.toThrow(
       'Discussion reply ID "root-1" must reference a reply comment',
     );
   });
@@ -830,9 +873,11 @@ describe("discussion mutation flows", () => {
       });
 
     await expect(
-      editDiscussionComment(client, "root-1", { body: "updated" }),
+      editDiscussionComment(client, asUuid("root-1"), { body: "updated" }),
     ).resolves.toMatchObject({ id: "root-1", body: "updated" });
-    await expect(deleteDiscussionComment(client, "root-1")).resolves.toEqual({
+    await expect(
+      deleteDiscussionComment(client, asUuid("root-1")),
+    ).resolves.toEqual({
       id: "root-1",
       success: true,
     });
@@ -850,7 +895,12 @@ describe("discussion mutation flows", () => {
     });
 
     await expect(
-      editDiscussionReply(client, "reply-1", { body: "updated" }, "issue"),
+      editDiscussionReply(
+        client,
+        asUuid("reply-1"),
+        { body: "updated" },
+        "issue",
+      ),
     ).rejects.toThrow(
       'Discussion reply ID "reply-1" belongs to project, not issue',
     );
@@ -872,9 +922,11 @@ describe("discussion mutation flows", () => {
       });
 
     await expect(
-      editDiscussionComment(client, "reply-1", { body: "updated" }),
+      editDiscussionComment(client, asUuid("reply-1"), { body: "updated" }),
     ).resolves.toMatchObject({ id: "reply-1", body: "updated" });
-    await expect(deleteDiscussionComment(client, "reply-1")).resolves.toEqual({
+    await expect(
+      deleteDiscussionComment(client, asUuid("reply-1")),
+    ).resolves.toEqual({
       id: "reply-1",
       success: true,
     });
@@ -885,7 +937,7 @@ describe("discussion mutation flows", () => {
     vi.mocked(client.request).mockResolvedValueOnce({ comment: null });
 
     await expect(
-      editDiscussionComment(client, "missing", { body: "updated" }),
+      editDiscussionComment(client, asUuid("missing"), { body: "updated" }),
     ).rejects.toThrow('Discussion comment ID "missing" not found');
   });
 
@@ -898,7 +950,7 @@ describe("discussion mutation flows", () => {
       });
 
     await expect(
-      editDiscussionComment(client, "root-1", { body: "updated" }),
+      editDiscussionComment(client, asUuid("root-1"), { body: "updated" }),
     ).rejects.toThrow("Failed to edit discussion comment");
   });
 
@@ -910,9 +962,9 @@ describe("discussion mutation flows", () => {
         commentDelete: { success: false, entityId: "root-1" },
       });
 
-    await expect(deleteDiscussionComment(client, "root-1")).rejects.toThrow(
-      "Failed to delete discussion comment",
-    );
+    await expect(
+      deleteDiscussionComment(client, asUuid("root-1")),
+    ).rejects.toThrow("Failed to delete discussion comment");
   });
 
   it("resolves and unresolves root discussion", async () => {
@@ -938,11 +990,13 @@ describe("discussion mutation flows", () => {
 
     await expect(
       resolveDiscussion(client, {
-        threadId: "root-1",
-        resolvingCommentId: "reply-1",
+        threadId: asUuid("root-1"),
+        resolvingCommentId: asUuid("reply-1"),
       }),
     ).resolves.toMatchObject({ id: "root-1" });
-    await expect(unresolveDiscussion(client, "root-1")).resolves.toMatchObject({
+    await expect(
+      unresolveDiscussion(client, asUuid("root-1")),
+    ).resolves.toMatchObject({
       id: "root-1",
     });
   });

@@ -1,8 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  DeletedInitiativeProjectLink,
-  InitiativeProjectLink,
-} from "../common/types.js";
+import type { UUID } from "../common/identifier.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
 import {
   CreateInitiativeToProjectDocument,
   type CreateInitiativeToProjectMutation,
@@ -10,47 +8,48 @@ import {
   type DeleteInitiativeToProjectMutation,
 } from "../gql/graphql.js";
 
+// Initiative-project link projection types
+export type InitiativeProjectLink = NonNullable<
+  CreateInitiativeToProjectMutation["initiativeToProjectCreate"]["initiativeToProject"]
+>;
+export type DeletedInitiativeProjectLink = {
+  id: NonNullable<
+    DeleteInitiativeToProjectMutation["initiativeToProjectDelete"]["entityId"]
+  >;
+  success: true;
+};
+
 export async function createInitiativeProjectLink(
   client: GraphQLClient,
-  input: { initiativeId: string; projectId: string },
+  input: { initiativeId: UUID; projectId: UUID },
 ): Promise<InitiativeProjectLink> {
-  const result = await client.request<CreateInitiativeToProjectMutation>(
-    CreateInitiativeToProjectDocument,
-    {
-      input,
-    },
+  const result = await client.request(CreateInitiativeToProjectDocument, {
+    input,
+  });
+
+  return requireMutationEntity(
+    result.initiativeToProjectCreate,
+    "initiativeToProject",
+    `Failed to create initiative-project link for initiative "${input.initiativeId}" and project "${input.projectId}"`,
   );
-
-  if (
-    !result.initiativeToProjectCreate.success ||
-    !result.initiativeToProjectCreate.initiativeToProject
-  ) {
-    throw new Error(
-      `Failed to create initiative-project link for initiative "${input.initiativeId}" and project "${input.projectId}"`,
-    );
-  }
-
-  return result.initiativeToProjectCreate.initiativeToProject;
 }
 
 export async function deleteInitiativeProjectLink(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<DeletedInitiativeProjectLink> {
-  const result = await client.request<DeleteInitiativeToProjectMutation>(
-    DeleteInitiativeToProjectDocument,
-    { id },
+  const result = await client.request(DeleteInitiativeToProjectDocument, {
+    id,
+  });
+
+  const entityId = requireMutationEntity(
+    result.initiativeToProjectDelete,
+    "entityId",
+    `Failed to delete initiative-project link "${id}"`,
   );
 
-  if (
-    !result.initiativeToProjectDelete.success ||
-    !result.initiativeToProjectDelete.entityId
-  ) {
-    throw new Error(`Failed to delete initiative-project link "${id}"`);
-  }
-
   return {
-    id: result.initiativeToProjectDelete.entityId,
+    id: entityId,
     success: true,
   };
 }

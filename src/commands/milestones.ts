@@ -1,14 +1,15 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../common/context.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { ProjectMilestoneUpdateInput } from "../gql/graphql.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
 import { resolveProjectId } from "../resolvers/project-resolver.js";
 import {
   createMilestone,
   getMilestone,
   listMilestones,
+  type UpdateMilestoneInput,
   updateMilestone,
 } from "../services/milestone-service.js";
 
@@ -75,12 +76,16 @@ export function setupMilestonesCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         // Resolve project ID
-        const projectId = await resolveProjectId(ctx.sdk, options.project);
+        const projectId = await resolveProjectId(ctx.gql, options.project);
 
-        const milestones = await listMilestones(ctx.gql, projectId, {
-          limit: parseLimit(options.limit || "50"),
-          after: options.after,
-        });
+        const milestones = await listMilestones(
+          ctx.gql,
+          projectId,
+          buildPaginationOptions(
+            parseLimit(options.limit || "50"),
+            options.after,
+          ),
+        );
 
         outputSuccess(milestones);
       }),
@@ -103,7 +108,6 @@ export function setupMilestonesCommands(program: Command): void {
 
         const milestoneId = await resolveMilestoneId(
           ctx.gql,
-          ctx.sdk,
           milestone,
           options.project,
         );
@@ -135,7 +139,7 @@ export function setupMilestonesCommands(program: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         // Resolve project ID
-        const projectId = await resolveProjectId(ctx.sdk, options.project);
+        const projectId = await resolveProjectId(ctx.gql, options.project);
 
         const milestone = await createMilestone(ctx.gql, {
           projectId,
@@ -171,13 +175,12 @@ export function setupMilestonesCommands(program: Command): void {
 
         const milestoneId = await resolveMilestoneId(
           ctx.gql,
-          ctx.sdk,
           milestone,
           options.project,
         );
 
         // Build update input (only include provided fields)
-        const updateInput: ProjectMilestoneUpdateInput = {};
+        const updateInput: UpdateMilestoneInput = {};
         if (options.name !== undefined) updateInput.name = options.name;
         if (options.description !== undefined) {
           updateInput.description = options.description;

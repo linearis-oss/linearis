@@ -32,6 +32,7 @@ function extractCommands(commandsDir: string): Command[] {
     if (!mainCommandMatch) continue;
 
     const commandName = mainCommandMatch[1];
+    if (commandName === undefined) continue;
     const subcommands: string[] = [];
 
     // Extract subcommands
@@ -41,10 +42,12 @@ function extractCommands(commandsDir: string): Command[] {
     for (const match of subcommandMatches) {
       const sub = match[1];
       // Skip the main command name
-      if (sub !== commandName) {
+      if (sub !== undefined && sub !== commandName) {
         // Extract just the command word, remove parameters like <id>
         const subName = sub.split(" ")[0];
-        subcommands.push(subName);
+        if (subName !== undefined) {
+          subcommands.push(subName);
+        }
       }
     }
 

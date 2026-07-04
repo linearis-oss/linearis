@@ -1,22 +1,22 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
+import { asUuid } from "../../common/identifier.js";
 import {
   handleCommand,
   outputSuccess,
   parseLimit,
 } from "../../common/output.js";
-import {
-  type InitiativeUpdateCreateInput,
-  InitiativeUpdateHealthType,
-  type InitiativeUpdateUpdateInput,
-} from "../../gql/graphql.js";
+import { buildPaginationOptions } from "../../common/types.js";
 import { resolveInitiativeId } from "../../resolvers/initiative-resolver.js";
 import {
   archiveInitiativeUpdate,
+  type CreateInitiativeUpdateInput,
   createInitiativeUpdate,
   getInitiativeUpdate,
   listInitiativeUpdates,
+  parseHealth,
+  type UpdateInitiativeUpdateInput,
   unarchiveInitiativeUpdate,
   updateInitiativeUpdate,
 } from "../../services/initiative-update-service.js";
@@ -37,20 +37,6 @@ interface InitiativeUpdatesCreateOptions {
 interface InitiativeUpdatesUpdateOptions {
   body?: string;
   health?: string;
-}
-
-function parseHealth(value?: string): InitiativeUpdateHealthType | undefined {
-  if (!value) return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "ontrack") return InitiativeUpdateHealthType.OnTrack;
-  if (normalized === "atrisk") return InitiativeUpdateHealthType.AtRisk;
-  if (normalized === "offtrack") return InitiativeUpdateHealthType.OffTrack;
-
-  throw invalidParameterError(
-    "--health",
-    'must be one of: "onTrack", "atRisk", "offTrack"',
-  );
 }
 
 export function setupInitiativeUpdateCommands(initiatives: Command): void {
@@ -76,14 +62,13 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(
-          ctx.sdk,
+          ctx.gql,
           options.initiative,
         );
 
         const result = await listInitiativeUpdates(ctx.gql, {
           initiativeId,
-          limit: parseLimit(options.limit),
-          after: options.after,
+          ...buildPaginationOptions(parseLimit(options.limit), options.after),
           includeArchived: options.includeArchived ?? false,
         });
 
@@ -98,7 +83,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await getInitiativeUpdate(ctx.gql, updateId);
+        const result = await getInitiativeUpdate(ctx.gql, asUuid(updateId));
         outputSuccess(result);
       }),
     );
@@ -118,11 +103,11 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         const ctx = createContext(getRootOpts(command));
 
         const initiativeId = await resolveInitiativeId(
-          ctx.sdk,
+          ctx.gql,
           options.initiative,
         );
 
-        const input: InitiativeUpdateCreateInput = { initiativeId };
+        const input: CreateInitiativeUpdateInput = { initiativeId };
 
         if (options.body !== undefined) {
           input.body = options.body;
@@ -152,7 +137,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const input: InitiativeUpdateUpdateInput = {};
+        const input: UpdateInitiativeUpdateInput = {};
 
         if (options.body !== undefined) {
           input.body = options.body;
@@ -170,7 +155,11 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
           );
         }
 
-        const result = await updateInitiativeUpdate(ctx.gql, updateId, input);
+        const result = await updateInitiativeUpdate(
+          ctx.gql,
+          asUuid(updateId),
+          input,
+        );
         outputSuccess(result);
       }),
     );
@@ -182,7 +171,7 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await archiveInitiativeUpdate(ctx.gql, updateId);
+        const result = await archiveInitiativeUpdate(ctx.gql, asUuid(updateId));
         outputSuccess(result);
       }),
     );
@@ -194,7 +183,10 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
       handleCommand(async (...args: unknown[]) => {
         const [updateId, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
-        const result = await unarchiveInitiativeUpdate(ctx.gql, updateId);
+        const result = await unarchiveInitiativeUpdate(
+          ctx.gql,
+          asUuid(updateId),
+        );
         outputSuccess(result);
       }),
     );

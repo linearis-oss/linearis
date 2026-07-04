@@ -385,7 +385,7 @@ query BatchResolveForUpdate(
   $assigneeQuery: String
   $projectName: String
   $projectId: ID
-  $labelNames: [String!]
+  $labelFilter: IssueLabelFilter
   $statusName: String
   $cycleName: String
   $teamKey: String
@@ -420,10 +420,7 @@ query BatchResolveForUpdate(
     nodes {
       id
       name
-      projectMilestones(
-        filter: { name: { eqIgnoreCase: $milestoneName } }
-        first: 10
-      ) {
+      projectMilestones(filter: { name: { eq: $milestoneName } }, first: 10) {
         nodes {
           id
           name
@@ -432,7 +429,7 @@ query BatchResolveForUpdate(
     }
   }
 
-  labels: issueLabels(filter: { name: { in: $labelNames } }) {
+  labels: issueLabels(filter: $labelFilter) {
     nodes {
       id
       name
@@ -519,7 +516,7 @@ query BatchResolveForCreate(
   $assigneeQuery: String
   $projectName: String
   $projectId: ID
-  $labelNames: [String!]
+  $labelFilter: IssueLabelFilter
   $statusName: String
   $cycleName: String
   $milestoneName: String
@@ -527,13 +524,22 @@ query BatchResolveForCreate(
   $parentIssueNumber: Float
 ) {
   teams(
-    filter: { or: [{ key: { eq: $teamKey } }, { name: { eq: $teamName } }] }
+    filter: {
+      or: [
+        { key: { eq: $teamKey } }
+        { name: { eq: $teamName } }
+        { id: { eq: $teamId } }
+      ]
+    }
     first: 10
   ) {
     nodes {
       id
       key
       name
+      issueEstimationType
+      issueEstimationExtended
+      issueEstimationAllowZero
     }
   }
 
@@ -563,10 +569,7 @@ query BatchResolveForCreate(
     nodes {
       id
       name
-      projectMilestones(
-        filter: { name: { eqIgnoreCase: $milestoneName } }
-        first: 10
-      ) {
+      projectMilestones(filter: { name: { eq: $milestoneName } }, first: 10) {
         nodes {
           id
           name
@@ -575,7 +578,7 @@ query BatchResolveForCreate(
     }
   }
 
-  labels: issueLabels(filter: { name: { in: $labelNames } }) {
+  labels: issueLabels(filter: $labelFilter) {
     nodes {
       id
       name
@@ -661,7 +664,7 @@ query BatchResolveForSearch(
   $creatorQuery: String
   $projectName: String
   $projectId: ID
-  $labelNames: [String!]
+  $labelFilter: IssueLabelFilter
   $cycleName: String
   $parentTeamKey: String
   $parentIssueNumber: Float
@@ -733,7 +736,7 @@ query BatchResolveForSearch(
     }
   }
 
-  labels: issueLabels(filter: { name: { in: $labelNames } }) {
+  labels: issueLabels(filter: $labelFilter) {
     nodes {
       id
       name
@@ -831,6 +834,38 @@ query BatchResolveWorkflowStatesPage($first: Int!, $after: String) {
     pageInfo {
       hasNextPage
       endCursor
+    }
+  }
+}
+
+# Find workflow states by a dynamic filter for status ID resolution
+#
+# The filter is supplied by the caller (name plus optional team scope)
+# so the unscoped case omits the team clause entirely rather than
+# filtering on a null team id. Emits the WorkflowStateFilter input type.
+query FindWorkflowStates($filter: WorkflowStateFilter, $first: Int = 1) {
+  workflowStates(filter: $filter, first: $first) {
+    nodes {
+      id
+    }
+  }
+}
+
+# Find issues by a dynamic filter for ID resolution
+#
+# The filter is supplied by the caller so the resolver can preserve both the
+# UUID lookup ({ id: { eq } }) and the identifier lookup
+# ({ number: { eq }, team: { key: { eq } } }). team { id key } is selected so
+# the estimate-context resolver can derive the owning team without a second
+# round-trip.
+query FindIssues($filter: IssueFilter, $first: Int = 1) {
+  issues(filter: $filter, first: $first) {
+    nodes {
+      id
+      team {
+        id
+        key
+      }
     }
   }
 }

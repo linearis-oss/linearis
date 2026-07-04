@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createReactionForComment,
   createReactionForIssue,
@@ -45,7 +46,10 @@ describe("createReactionForIssue", () => {
       });
 
     await expect(
-      createReactionForIssue(client, { issueId: "issue-1", emoji: "👍" }),
+      createReactionForIssue(client, {
+        issueId: asUuid("issue-1"),
+        emoji: "👍",
+      }),
     ).resolves.toEqual({
       id: "r-2",
       emoji: "👍",
@@ -78,7 +82,10 @@ describe("createReactionForIssue", () => {
       });
 
     await expect(
-      createReactionForIssue(client, { issueId: "issue-1", emoji: "👍" }),
+      createReactionForIssue(client, {
+        issueId: asUuid("issue-1"),
+        emoji: "👍",
+      }),
     ).rejects.toThrow("Already reacted with emoji 👍");
   });
 
@@ -103,7 +110,10 @@ describe("createReactionForIssue", () => {
       });
 
     await expect(
-      createReactionForIssue(client, { issueId: "issue-1", emoji: "  👍  " }),
+      createReactionForIssue(client, {
+        issueId: asUuid("issue-1"),
+        emoji: "  👍  ",
+      }),
     ).rejects.toThrow("Already reacted with emoji 👍");
     expect(client.request).toHaveBeenCalledTimes(2);
   });
@@ -118,7 +128,7 @@ describe("createReactionForIssue", () => {
 
     await expect(
       createReactionForIssue(client, {
-        issueId: "issue-missing",
+        issueId: asUuid("issue-missing"),
         emoji: "👍",
       }),
     ).rejects.toThrow('Issue with ID "issue-missing" not found');
@@ -159,7 +169,10 @@ describe("createReactionForComment", () => {
       });
 
     await expect(
-      createReactionForComment(client, { commentId: "comment-1", emoji: "👍" }),
+      createReactionForComment(client, {
+        commentId: asUuid("comment-1"),
+        emoji: "👍",
+      }),
     ).resolves.toEqual({
       id: "r-2",
       emoji: "👍",
@@ -178,7 +191,7 @@ describe("createReactionForComment", () => {
 
     await expect(
       createReactionForComment(client, {
-        commentId: "comment-missing",
+        commentId: asUuid("comment-missing"),
         emoji: "👍",
       }),
     ).rejects.toThrow('Discussion comment ID "comment-missing" not found');
@@ -213,7 +226,7 @@ describe("deleteOwnReactionByEmoji", () => {
     await expect(
       deleteOwnReactionByEmoji(client, {
         kind: "comment",
-        id: "comment-1",
+        id: asUuid("comment-1"),
         emoji: "👍",
       }),
     ).resolves.toEqual({ id: "r-1", success: true });
@@ -246,7 +259,7 @@ describe("deleteOwnReactionByEmoji", () => {
     await expect(
       deleteOwnReactionByEmoji(client, {
         kind: "comment",
-        id: "comment-1",
+        id: asUuid("comment-1"),
         emoji: "  👍  ",
       }),
     ).resolves.toEqual({ id: "r-1", success: true });
@@ -276,7 +289,7 @@ describe("deleteOwnReactionByEmoji", () => {
     await expect(
       deleteOwnReactionByEmoji(client, {
         kind: "comment",
-        id: "comment-1",
+        id: asUuid("comment-1"),
         emoji: "👍",
       }),
     ).rejects.toThrow("No own reaction found with emoji 👍");
@@ -312,7 +325,7 @@ describe("deleteOwnReactionByEmoji", () => {
     await expect(
       deleteOwnReactionByEmoji(client, {
         kind: "comment",
-        id: "comment-1",
+        id: asUuid("comment-1"),
         emoji: "👍",
       }),
     ).rejects.toThrow("Multiple own reactions found with emoji 👍");
@@ -346,8 +359,8 @@ describe("deleteOwnReactionById", () => {
     await expect(
       deleteOwnReactionById(client, {
         kind: "issue",
-        id: "issue-1",
-        reactionId: "r-1",
+        id: asUuid("issue-1"),
+        reactionId: asUuid("r-1"),
       }),
     ).resolves.toEqual({ id: "r-1", success: true });
   });
@@ -375,8 +388,8 @@ describe("deleteOwnReactionById", () => {
     await expect(
       deleteOwnReactionById(client, {
         kind: "issue",
-        id: "issue-1",
-        reactionId: "missing-reaction",
+        id: asUuid("issue-1"),
+        reactionId: asUuid("missing-reaction"),
       }),
     ).rejects.toThrow('Reaction "missing-reaction" not found');
   });
@@ -404,8 +417,8 @@ describe("deleteOwnReactionById", () => {
     await expect(
       deleteOwnReactionById(client, {
         kind: "issue",
-        id: "issue-1",
-        reactionId: "r-1",
+        id: asUuid("issue-1"),
+        reactionId: asUuid("r-1"),
       }),
     ).rejects.toThrow('Reaction "r-1" is not owned by viewer');
   });

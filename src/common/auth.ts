@@ -5,6 +5,8 @@ import { getStoredToken } from "./token-storage.js";
 
 export interface CommandOptions {
   apiToken?: string;
+  compact?: boolean;
+  fields?: string[];
 }
 
 export type TokenSource = "flag" | "env" | "stored" | "legacy";
@@ -22,8 +24,8 @@ export function resolveApiToken(options: CommandOptions): ResolvedToken {
   }
 
   // 2. Environment variable
-  if (process.env.LINEAR_API_TOKEN) {
-    return { token: process.env.LINEAR_API_TOKEN, source: "env" };
+  if (process.env["LINEAR_API_TOKEN"]) {
+    return { token: process.env["LINEAR_API_TOKEN"], source: "env" };
   }
 
   // 3. Encrypted stored token (~/.linearis/token)

@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    // Allow importing the plain-CommonJS release scripts (scripts/release/*.cjs)
+    // from their tests without a declaration file.
+    "allowJs": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "vitest.config.ts",
+    "vitest.base.config.ts",
+    "vitest.integration.config.ts"
+  ],
+  // Override the base config's exclude (which drops tests/ and *.test.ts) so
+  // the test files listed in "include" are actually type-checked here.
+  "exclude": ["node_modules", "dist"]
+}

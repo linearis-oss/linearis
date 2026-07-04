@@ -14,19 +14,19 @@ import { getApiToken } from "../../../src/common/auth.js";
 import { getStoredToken } from "../../../src/common/token-storage.js";
 
 describe("getApiToken", () => {
-  const originalEnv = process.env.LINEAR_API_TOKEN;
+  const originalEnv = process.env["LINEAR_API_TOKEN"];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.LINEAR_API_TOKEN;
+    delete process.env["LINEAR_API_TOKEN"];
     vi.mocked(os.homedir).mockReturnValue("/home/testuser");
   });
 
   afterEach(() => {
     if (originalEnv !== undefined) {
-      process.env.LINEAR_API_TOKEN = originalEnv;
+      process.env["LINEAR_API_TOKEN"] = originalEnv;
     } else {
-      delete process.env.LINEAR_API_TOKEN;
+      delete process.env["LINEAR_API_TOKEN"];
     }
   });
 
@@ -36,7 +36,7 @@ describe("getApiToken", () => {
   });
 
   it("returns LINEAR_API_TOKEN env var as second priority", () => {
-    process.env.LINEAR_API_TOKEN = "env-token";
+    process.env["LINEAR_API_TOKEN"] = "env-token";
     const token = getApiToken({});
     expect(token).toBe("env-token");
   });

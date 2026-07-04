@@ -29,6 +29,12 @@ fragment ProjectLabelFields on ProjectLabel {
   description
 }
 
+query GetIssueLabel($id: String!) {
+  issueLabel(id: $id) {
+    ...LabelFields
+  }
+}
+
 # List labels in the workspace
 #
 # Fetches a list of issue labels with optional team filtering.
@@ -38,8 +44,19 @@ fragment ProjectLabelFields on ProjectLabel {
 # Variables:
 #   $first: Maximum number of labels to return (default: 50)
 #   $filter: Optional filter (e.g., { team: { id: { eq: "team-uuid" } } })
-query GetLabels($first: Int = 50, $after: String, $filter: IssueLabelFilter) {
-  issueLabels(first: $first, after: $after, filter: $filter) {
+#   $includeArchived: Include archived labels (default: false)
+query GetLabels(
+  $first: Int = 50
+  $after: String
+  $filter: IssueLabelFilter
+  $includeArchived: Boolean = false
+) {
+  issueLabels(
+    first: $first
+    after: $after
+    filter: $filter
+    includeArchived: $includeArchived
+  ) {
     nodes {
       ...LabelFields
     }
@@ -58,6 +75,31 @@ query GetProjectLabels($first: Int = 50, $after: String) {
     pageInfo {
       hasNextPage
       endCursor
+    }
+  }
+}
+
+# Find a project label by case-insensitive name for ID resolution
+#
+# Returns the first match; project label names are treated as unique
+# for resolution purposes (no ambiguity error).
+query FindProjectLabelByName($name: String!) {
+  projectLabels(filter: { name: { eqIgnoreCase: $name } }, first: 1) {
+    nodes {
+      id
+    }
+  }
+}
+
+# Find issue labels by a dynamic filter for ID resolution
+#
+# The filter is supplied by the caller so the resolver can preserve its
+# scope-aware filter construction (workspace/team/team-scoped) rather than
+# baking the scope clauses into the query.
+query FindIssueLabels($filter: IssueLabelFilter, $first: Int = 1) {
+  issueLabels(filter: $filter, first: $first) {
+    nodes {
+      id
     }
   }
 }

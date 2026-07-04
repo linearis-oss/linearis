@@ -1,11 +1,10 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import type { UUID } from "../common/identifier.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   type CycleFilter,
   GetCycleByIdDocument,
-  type GetCycleByIdQuery,
   GetCyclesDocument,
-  type GetCyclesQuery,
 } from "../gql/graphql.js";
 
 export interface Cycle {
@@ -30,7 +29,7 @@ export interface CycleDetail extends Cycle {
 
 export async function listCycles(
   client: GraphQLClient,
-  teamId?: string,
+  teamId?: UUID,
   activeOnly: boolean = false,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<Cycle>> {
@@ -45,7 +44,7 @@ export async function listCycles(
     filter.isActive = { eq: true };
   }
 
-  const result = await client.request<GetCyclesQuery>(GetCyclesDocument, {
+  const result = await client.request(GetCyclesDocument, {
     first: limit,
     after,
     filter,
@@ -68,10 +67,10 @@ export async function listCycles(
 
 export async function getCycle(
   client: GraphQLClient,
-  cycleId: string,
+  cycleId: UUID,
   issuesLimit: number = 50,
 ): Promise<CycleDetail> {
-  const result = await client.request<GetCycleByIdQuery>(GetCycleByIdDocument, {
+  const result = await client.request(GetCycleByIdDocument, {
     id: cycleId,
     first: issuesLimit,
   });

@@ -15,24 +15,15 @@ concurrency:
 
 jobs:
   sentinel:
-    name: Post-merge sentinel (node v22)
+    name: Post-merge sentinel
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup node v22
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install deps
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
+      - name: Setup and build
+        uses: ./.github/actions/setup
 
       - name: Verify packed binaries
         run: npm run verify:packed-binaries

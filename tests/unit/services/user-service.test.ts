@@ -21,8 +21,8 @@ describe("listUsers", () => {
       },
     });
     const result = await listUsers(client);
-    expect(result.nodes[0].name).toBe("Alice");
-    expect(result.nodes[1].name).toBe("Zoe");
+    expect(result.nodes[0]?.name).toBe("Alice");
+    expect(result.nodes[1]?.name).toBe("Zoe");
   });
 
   it("returns empty result", async () => {

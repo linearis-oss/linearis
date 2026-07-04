@@ -1,6 +1,6 @@
 // tests/unit/resolvers/issue-resolver.test.ts
 import { describe, expect, it, vi } from "vitest";
-import type { LinearSdkClient } from "../../../src/client/linear-client.js";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   resolveIssueEstimateContext,
   resolveIssueId,
@@ -8,16 +8,7 @@ import {
 
 type IssueNode = {
   id: string;
-  teamId?: string;
-  team?:
-    | {
-        id?: string;
-        key?: string;
-      }
-    | Promise<{
-        id?: string;
-        key?: string;
-      }>;
+  team: { id: string; key: string };
 };
 
 type TeamNode = {
@@ -34,13 +25,14 @@ type TeamNode = {
   issueEstimationAllowZero: boolean;
 };
 
-function mockSdkClient(issueNodes: IssueNode[], teamNodes: TeamNode[] = []) {
-  return {
-    sdk: {
-      issues: vi.fn().mockResolvedValue({ nodes: issueNodes }),
-      teams: vi.fn().mockResolvedValue({ nodes: teamNodes }),
-    },
-  } as unknown as LinearSdkClient;
+// The estimate-context resolver issues two requests: FindIssues, then FindTeams
+// (via resolveTeamEstimateContext). resolveIssueId only issues the first.
+function mockGqlClient(issueNodes: IssueNode[], teamNodes: TeamNode[] = []) {
+  const request = vi
+    .fn()
+    .mockResolvedValueOnce({ issues: { nodes: issueNodes } })
+    .mockResolvedValueOnce({ teams: { nodes: teamNodes } });
+  return { request } as unknown as GraphQLClient;
 }
 
 const teamId = "550e8400-e29b-41d4-a716-446655440001";
@@ -54,24 +46,34 @@ const exponentialTeam: TeamNode = {
   issueEstimationAllowZero: false,
 };
 
+const engIssue: IssueNode = {
+  id: "issue-uuid",
+  team: { id: teamId, key: "ENG" },
+};
+
 describe("resolveIssueId", () => {
   it("returns UUID as-is", async () => {
-    const client = mockSdkClient([]);
+    const client = mockGqlClient([]);
     const result = await resolveIssueId(
       client,
       "550e8400-e29b-41d4-a716-446655440000",
     );
     expect(result).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(client.request).not.toHaveBeenCalled();
   });
 
   it("resolves ABC-123 identifier", async () => {
-    const client = mockSdkClient([{ id: "issue-uuid" }]);
+    const client = mockGqlClient([engIssue]);
     const result = await resolveIssueId(client, "ENG-42");
     expect(result).toBe("issue-uuid");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      filter: { number: { eq: 42 }, team: { key: { eq: "ENG" } } },
+      first: 1,
+    });
   });
 
   it("throws when issue not found", async () => {
-    const client = mockSdkClient([]);
+    const client = mockGqlClient([]);
     await expect(resolveIssueId(client, "ENG-999")).rejects.toThrow(
       'Issue "ENG-999" not found',
     );
@@ -79,11 +81,8 @@ describe("resolveIssueId", () => {
 });
 
 describe("resolveIssueEstimateContext", () => {
-  it("resolves identifier, extracts teamId, delegates to team estimate resolver, and returns issueId plus team context", async () => {
-    const client = mockSdkClient(
-      [{ id: "issue-uuid", teamId }],
-      [exponentialTeam],
-    );
+  it("resolves identifier, derives team from the issue, and returns issueId plus team context", async () => {
+    const client = mockGqlClient([engIssue], [exponentialTeam]);
 
     await expect(
       resolveIssueEstimateContext(client, "ENG-42"),
@@ -99,137 +98,35 @@ describe("resolveIssueEstimateContext", () => {
       },
     });
 
-    expect(client.sdk.issues).toHaveBeenCalledWith({
-      filter: {
-        number: { eq: 42 },
-        team: { key: { eq: "ENG" } },
-      },
+    expect(client.request).toHaveBeenNthCalledWith(1, expect.anything(), {
+      filter: { number: { eq: 42 }, team: { key: { eq: "ENG" } } },
       first: 1,
     });
-    expect(client.sdk.teams).toHaveBeenCalledWith({
+    expect(client.request).toHaveBeenNthCalledWith(2, expect.anything(), {
       filter: { id: { eq: teamId } },
       first: 1,
     });
   });
 
-  it("resolves by UUID and uses sdk issues filter id eq", async () => {
-    const client = mockSdkClient(
-      [{ id: "issue-uuid", teamId }],
-      [exponentialTeam],
-    );
+  it("resolves by UUID using an id eq filter", async () => {
+    const client = mockGqlClient([engIssue], [exponentialTeam]);
 
     await resolveIssueEstimateContext(
       client,
       "550e8400-e29b-41d4-a716-446655440000",
     );
 
-    expect(client.sdk.issues).toHaveBeenCalledWith({
+    expect(client.request).toHaveBeenNthCalledWith(1, expect.anything(), {
       filter: { id: { eq: "550e8400-e29b-41d4-a716-446655440000" } },
       first: 1,
     });
   });
 
-  it("resolves identifier and uses sdk issues filter number plus team key", async () => {
-    const client = mockSdkClient(
-      [{ id: "issue-uuid", teamId }],
-      [exponentialTeam],
-    );
-
-    await resolveIssueEstimateContext(client, "ENG-42");
-
-    expect(client.sdk.issues).toHaveBeenCalledWith({
-      filter: {
-        number: { eq: 42 },
-        team: { key: { eq: "ENG" } },
-      },
-      first: 1,
-    });
-  });
-
-  it("succeeds when issue node has no nested team estimation fields", async () => {
-    const client = mockSdkClient(
-      [
-        {
-          id: "issue-uuid",
-          team: {
-            id: teamId,
-            key: "ENG",
-          },
-        },
-      ],
-      [exponentialTeam],
-    );
-
-    await expect(
-      resolveIssueEstimateContext(client, "ENG-42"),
-    ).resolves.toMatchObject({
-      issueId: "issue-uuid",
-      team: {
-        teamId,
-        teamKey: "ENG",
-      },
-    });
-  });
-
-  it("falls back to async team relation id when teamId is absent", async () => {
-    const client = mockSdkClient(
-      [
-        {
-          id: "issue-uuid",
-          team: Promise.resolve({ id: teamId, key: "ENG" }),
-        },
-      ],
-      [exponentialTeam],
-    );
-
-    await expect(
-      resolveIssueEstimateContext(client, "ENG-42"),
-    ).resolves.toMatchObject({
-      issueId: "issue-uuid",
-      team: {
-        teamId,
-        teamKey: "ENG",
-      },
-    });
-
-    expect(client.sdk.teams).toHaveBeenCalledWith({
-      filter: { id: { eq: teamId } },
-      first: 1,
-    });
-  });
-
-  it("falls back to async team relation key when relation id is absent", async () => {
-    const client = mockSdkClient(
-      [
-        {
-          id: "issue-uuid",
-          team: Promise.resolve({ key: "ENG" }),
-        },
-      ],
-      [exponentialTeam],
-    );
-
-    await resolveIssueEstimateContext(client, "ENG-42");
-
-    expect(client.sdk.teams).toHaveBeenCalledWith({
-      filter: { key: { eq: "ENG" } },
-      first: 1,
-    });
-  });
-
   it("throws Issue not found", async () => {
-    const client = mockSdkClient([]);
+    const client = mockGqlClient([]);
 
     await expect(
       resolveIssueEstimateContext(client, "ENG-999"),
     ).rejects.toThrow('Issue "ENG-999" not found');
-  });
-
-  it("throws when issue team context is missing", async () => {
-    const client = mockSdkClient([{ id: "issue-uuid" }]);
-
-    await expect(resolveIssueEstimateContext(client, "ENG-42")).rejects.toThrow(
-      'Issue "ENG-42" is missing required team context',
-    );
   });
 });

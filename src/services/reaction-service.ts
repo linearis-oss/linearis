@@ -1,16 +1,15 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
+import { firstOrThrow } from "../common/array.js";
 import { normalizeReactionEmojiInput } from "../common/emoji.js";
+import type { UUID } from "../common/identifier.js";
+import { requireMutationSuccess } from "../common/mutation-payload.js";
 import {
   CreateReactionDocument,
   type CreateReactionMutation,
   DeleteReactionDocument,
-  type DeleteReactionMutation,
   GetCommentReactionsDocument,
-  type GetCommentReactionsQuery,
   GetIssueReactionsDocument,
-  type GetIssueReactionsQuery,
   GetViewerDocument,
-  type GetViewerQuery,
   type ReactionCreateInput,
   type ReactionReadFieldsFragment,
 } from "../gql/graphql.js";
@@ -32,7 +31,7 @@ interface NormalizedReactionGroup {
 
 interface ReactionLookupInput {
   kind: "issue" | "comment";
-  id: string;
+  id: UUID;
 }
 
 interface DeleteOwnReactionByEmojiInput extends ReactionLookupInput {
@@ -40,7 +39,7 @@ interface DeleteOwnReactionByEmojiInput extends ReactionLookupInput {
 }
 
 interface DeleteOwnReactionByIdInput extends ReactionLookupInput {
-  reactionId: string;
+  reactionId: UUID;
 }
 
 function compareNormalizedUsers(
@@ -85,7 +84,7 @@ function normalizeReactionUser(
 }
 
 async function getViewerId(client: GraphQLClient): Promise<string> {
-  const result = await client.request<GetViewerQuery>(GetViewerDocument);
+  const result = await client.request(GetViewerDocument);
   return result.viewer.id;
 }
 
@@ -94,10 +93,9 @@ async function getTargetReactions(
   input: ReactionLookupInput,
 ): Promise<ReactionNode[]> {
   if (input.kind === "issue") {
-    const result = await client.request<GetIssueReactionsQuery>(
-      GetIssueReactionsDocument,
-      { id: input.id },
-    );
+    const result = await client.request(GetIssueReactionsDocument, {
+      id: input.id,
+    });
 
     if (!result.issue) {
       throw new Error(`Issue with ID "${input.id}" not found`);
@@ -106,10 +104,9 @@ async function getTargetReactions(
     return result.issue.reactions;
   }
 
-  const result = await client.request<GetCommentReactionsQuery>(
-    GetCommentReactionsDocument,
-    { id: input.id },
-  );
+  const result = await client.request(GetCommentReactionsDocument, {
+    id: input.id,
+  });
 
   if (!result.comment) {
     throw new Error(`Discussion comment ID "${input.id}" not found`);
@@ -137,14 +134,11 @@ async function createReaction(
     throw new Error(`Already reacted with emoji ${normalizedEmoji}`);
   }
 
-  const result = await client.request<CreateReactionMutation>(
-    CreateReactionDocument,
-    { input: normalizedInput },
-  );
+  const result = await client.request(CreateReactionDocument, {
+    input: normalizedInput,
+  });
 
-  if (!result.reactionCreate.success) {
-    throw new Error("Failed to create reaction");
-  }
+  requireMutationSuccess(result.reactionCreate, "Failed to create reaction");
 
   return result.reactionCreate.reaction;
 }
@@ -153,14 +147,11 @@ async function deleteReaction(
   client: GraphQLClient,
   reactionId: string,
 ): Promise<{ id: string; success: boolean }> {
-  const result = await client.request<DeleteReactionMutation>(
-    DeleteReactionDocument,
-    { id: reactionId },
-  );
+  const result = await client.request(DeleteReactionDocument, {
+    id: reactionId,
+  });
 
-  if (!result.reactionDelete.success) {
-    throw new Error("Failed to delete reaction");
-  }
+  requireMutationSuccess(result.reactionDelete, "Failed to delete reaction");
 
   return { id: result.reactionDelete.entityId, success: true };
 }
@@ -215,7 +206,7 @@ export function normalizeReactions(
 export async function createReactionForIssue(
   client: GraphQLClient,
   input: {
-    issueId: string;
+    issueId: UUID;
     emoji: string;
   },
 ): Promise<CreateReactionMutation["reactionCreate"]["reaction"]> {
@@ -229,7 +220,7 @@ export async function createReactionForIssue(
 export async function createReactionForComment(
   client: GraphQLClient,
   input: {
-    commentId: string;
+    commentId: UUID;
     emoji: string;
   },
 ): Promise<CreateReactionMutation["reactionCreate"]["reaction"]> {
@@ -263,7 +254,13 @@ export async function deleteOwnReactionByEmoji(
     );
   }
 
-  return deleteReaction(client, matchingReactions[0].id);
+  return deleteReaction(
+    client,
+    firstOrThrow(
+      matchingReactions,
+      `No own reaction found with emoji ${normalizedEmoji}`,
+    ).id,
+  );
 }
 
 export async function deleteOwnReactionById(

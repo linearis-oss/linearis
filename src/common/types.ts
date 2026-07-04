@@ -1,57 +1,7 @@
-import type {
-  ArchiveInitiativeMutation,
-  ArchiveInitiativeUpdateMutation,
-  ArchiveProjectMutation,
-  AttachmentCreateMutation,
-  CreateCommentMutation,
-  CreateInitiativeMutation,
-  CreateInitiativeRelationMutation,
-  CreateInitiativeToProjectMutation,
-  CreateInitiativeUpdateMutation,
-  CreateIssueMutation,
-  CreateIssueRelationMutation,
-  CreateProjectMilestoneMutation,
-  CreateProjectMutation,
-  DeleteInitiativeMutation,
-  DeleteInitiativeRelationMutation,
-  DeleteInitiativeToProjectMutation,
-  DocumentCreateMutation,
-  DocumentUpdateMutation,
-  GetDocumentQuery,
-  GetInitiativeQuery,
-  GetInitiativeUpdateQuery,
-  GetIssueByIdentifierQuery,
-  GetIssueByIdentifierWithAttachmentsQuery,
-  GetIssueByIdentifierWithCommentsQuery,
-  GetIssueByIdQuery,
-  GetIssueByIdWithAttachmentsQuery,
-  GetIssueByIdWithCommentsQuery,
-  GetIssuesQuery,
-  GetProjectMilestoneByIdQuery,
-  GetProjectQuery,
-  GetProjectsQuery,
-  GetTeamByIdQuery,
-  GetViewerQuery,
-  ListAttachmentsQuery,
-  ListCommentsQuery,
-  ListDocumentsQuery,
-  ListInitiativesQuery,
-  ListInitiativeUpdatesQuery,
-  ListProjectMilestonesQuery,
-  SearchIssuesQuery,
-  UnarchiveInitiativeMutation,
-  UnarchiveInitiativeUpdateMutation,
-  UnarchiveProjectMutation,
-  UpdateCommentMutation,
-  UpdateInitiativeMutation,
-  UpdateInitiativeUpdateMutation,
-  UpdateIssueMutation,
-  UpdateProjectMilestoneMutation,
-  UpdateProjectMutation,
-} from "../gql/graphql.js";
+import type { GetIssuesQuery } from "../gql/graphql.js";
 
 // Pagination types
-export type PageInfo = GetIssuesQuery["issues"]["pageInfo"];
+type PageInfo = GetIssuesQuery["issues"]["pageInfo"];
 
 export interface PaginatedResult<T> {
   nodes: T[];
@@ -63,181 +13,49 @@ export interface PaginationOptions {
   after?: string;
 }
 
-// Team types
-export type TeamEstimateOption = {
-  value: number;
-  label: string;
-};
+/**
+ * Build a {@link PaginationOptions} object from raw CLI values, omitting `after`
+ * when it is undefined. Keeping the key absent (rather than set to `undefined`)
+ * is required under `exactOptionalPropertyTypes` and avoids repeating the
+ * conditional spread at every list command.
+ */
+export function buildPaginationOptions(
+  limit: number,
+  after: string | undefined,
+): PaginationOptions {
+  return after === undefined ? { limit } : { limit, after };
+}
 
-export type TeamEstimationSource = "self" | "parent" | "self_fallback";
+/** A Relay-style GraphQL connection page. */
+interface Connection<T> {
+  nodes: readonly T[];
+  pageInfo: { hasNextPage: boolean; endCursor?: string | null };
+}
 
-export type TeamDetail = NonNullable<GetTeamByIdQuery["team"]> & {
-  validEstimates: TeamEstimateOption[];
-  estimationSource: TeamEstimationSource;
-};
+/**
+ * Exhaust a cursor-paginated GraphQL connection, returning every node. The
+ * caller's `fetchPage` requests a single page for the given `after` cursor (and
+ * performs any per-page guards, e.g. asserting the parent entity exists);
+ * iteration stops once the server reports no further pages. Centralizes the
+ * fetch-until-empty loop shared by services that must materialize a whole
+ * connection before processing it.
+ */
+export async function collectConnection<TNode>(
+  fetchPage: (after: string | undefined) => Promise<Connection<TNode>>,
+): Promise<TNode[]> {
+  const nodes: TNode[] = [];
+  let after: string | undefined;
 
-// Issue types
-export type Issue = GetIssuesQuery["issues"]["nodes"][0];
-export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
-export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
-export type IssueDetailWithComments = NonNullable<
-  GetIssueByIdWithCommentsQuery["issue"]
->;
-export type IssueByIdentifierWithComments =
-  GetIssueByIdentifierWithCommentsQuery["issues"]["nodes"][0];
-export type IssueComment = NonNullable<
-  NonNullable<IssueDetailWithComments["comments"]>["nodes"][0]
->;
-export type IssueCommentThread = IssueComment & {
-  replies: IssueCommentThread[];
-};
-export type IssueDetailWithCommentThreads = Omit<
-  IssueDetailWithComments,
-  "comments"
-> & {
-  comments: { nodes: IssueCommentThread[] };
-};
-export type IssueByIdentifierWithCommentThreads = Omit<
-  IssueByIdentifierWithComments,
-  "comments"
-> & {
-  comments: { nodes: IssueCommentThread[] };
-};
-export type IssueDetailWithAttachments = NonNullable<
-  GetIssueByIdWithAttachmentsQuery["issue"]
->;
-export type IssueByIdentifierWithAttachments =
-  GetIssueByIdentifierWithAttachmentsQuery["issues"]["nodes"][0];
-export type IssueSearchResult = SearchIssuesQuery["searchIssues"]["nodes"][0];
-export type CreatedIssue = NonNullable<
-  CreateIssueMutation["issueCreate"]["issue"]
->;
-export type UpdatedIssue = NonNullable<
-  UpdateIssueMutation["issueUpdate"]["issue"]
->;
+  while (true) {
+    const connection = await fetchPage(after);
+    nodes.push(...connection.nodes);
 
-// Issue relation types
-export type CreatedIssueRelation =
-  CreateIssueRelationMutation["issueRelationCreate"]["issueRelation"];
+    if (!connection.pageInfo.hasNextPage || !connection.pageInfo.endCursor) {
+      break;
+    }
 
-// Document types
-export type Document = NonNullable<GetDocumentQuery["document"]>;
-export type DocumentListItem = ListDocumentsQuery["documents"]["nodes"][0];
-export type CreatedDocument =
-  DocumentCreateMutation["documentCreate"]["document"];
-export type UpdatedDocument =
-  DocumentUpdateMutation["documentUpdate"]["document"];
+    after = connection.pageInfo.endCursor;
+  }
 
-// Attachment types
-export type Attachment =
-  ListAttachmentsQuery["issue"]["attachments"]["nodes"][0];
-export type CreatedAttachment =
-  AttachmentCreateMutation["attachmentCreate"]["attachment"];
-
-// Project types
-export type ProjectListItem = GetProjectsQuery["projects"]["nodes"][0];
-export type ProjectDetail = NonNullable<GetProjectQuery["project"]>;
-export type CreatedProject = NonNullable<
-  CreateProjectMutation["projectCreate"]["project"]
->;
-export type UpdatedProject = NonNullable<
-  UpdateProjectMutation["projectUpdate"]["project"]
->;
-export type ArchivedProject = NonNullable<
-  ArchiveProjectMutation["projectArchive"]["entity"]
->;
-export type UnarchivedProject = NonNullable<
-  UnarchiveProjectMutation["projectUnarchive"]["entity"]
->;
-export type DeletedProject = {
-  id: string;
-  success: true;
-};
-
-// Milestone types
-export type MilestoneDetail = NonNullable<
-  GetProjectMilestoneByIdQuery["projectMilestone"]
->;
-export type MilestoneListItem =
-  ListProjectMilestonesQuery["project"]["projectMilestones"]["nodes"][0];
-export type CreatedMilestone = NonNullable<
-  CreateProjectMilestoneMutation["projectMilestoneCreate"]["projectMilestone"]
->;
-export type UpdatedMilestone = NonNullable<
-  UpdateProjectMilestoneMutation["projectMilestoneUpdate"]["projectMilestone"]
->;
-
-// Initiative types
-export type InitiativeListItem =
-  ListInitiativesQuery["initiatives"]["nodes"][0];
-export type InitiativeDetail = NonNullable<GetInitiativeQuery["initiative"]>;
-export type CreatedInitiative = NonNullable<
-  CreateInitiativeMutation["initiativeCreate"]["initiative"]
->;
-export type UpdatedInitiative = NonNullable<
-  UpdateInitiativeMutation["initiativeUpdate"]["initiative"]
->;
-export type ArchivedInitiative = NonNullable<
-  ArchiveInitiativeMutation["initiativeArchive"]["entity"]
->;
-export type UnarchivedInitiative = NonNullable<
-  UnarchiveInitiativeMutation["initiativeUnarchive"]["entity"]
->;
-
-export type InitiativeRelation = NonNullable<
-  CreateInitiativeRelationMutation["initiativeRelationCreate"]["initiativeRelation"]
->;
-
-export type InitiativeProjectLink = NonNullable<
-  CreateInitiativeToProjectMutation["initiativeToProjectCreate"]["initiativeToProject"]
->;
-
-export type DeletedInitiative = {
-  id: NonNullable<DeleteInitiativeMutation["initiativeDelete"]["entityId"]>;
-  success: true;
-};
-
-export type DeletedInitiativeRelation = {
-  id: NonNullable<
-    DeleteInitiativeRelationMutation["initiativeRelationDelete"]["entityId"]
-  >;
-  success: true;
-};
-
-export type DeletedInitiativeProjectLink = {
-  id: NonNullable<
-    DeleteInitiativeToProjectMutation["initiativeToProjectDelete"]["entityId"]
-  >;
-  success: true;
-};
-
-export type InitiativeUpdateListItem =
-  ListInitiativeUpdatesQuery["initiativeUpdates"]["nodes"][0];
-export type InitiativeUpdateDetail = NonNullable<
-  GetInitiativeUpdateQuery["initiativeUpdate"]
->;
-export type CreatedInitiativeUpdate = NonNullable<
-  CreateInitiativeUpdateMutation["initiativeUpdateCreate"]["initiativeUpdate"]
->;
-export type UpdatedInitiativeUpdate = NonNullable<
-  UpdateInitiativeUpdateMutation["initiativeUpdateUpdate"]["initiativeUpdate"]
->;
-export type ArchivedInitiativeUpdate = NonNullable<
-  ArchiveInitiativeUpdateMutation["initiativeUpdateArchive"]["entity"]
->;
-export type UnarchivedInitiativeUpdate = NonNullable<
-  UnarchiveInitiativeUpdateMutation["initiativeUpdateUnarchive"]["entity"]
->;
-
-// Comment types
-export type CreatedComment = NonNullable<
-  CreateCommentMutation["commentCreate"]["comment"]
->;
-export type UpdatedComment = NonNullable<
-  UpdateCommentMutation["commentUpdate"]["comment"]
->;
-export type CommentListItem =
-  ListCommentsQuery["issue"]["comments"]["nodes"][0];
-
-// Viewer types
-export type Viewer = GetViewerQuery["viewer"];
+  return nodes;
+}

@@ -1,10 +1,18 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { PaginatedResult, PaginationOptions } from "../common/types.js";
+import type { UUID } from "../common/identifier.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
+import {
+  collectConnection,
+  type PaginatedResult,
+  type PaginationOptions,
+} from "../common/types.js";
 import {
   type CommentCreateInput,
   type CommentUpdateInput,
   DeleteDiscussionReplyDocument,
-  type DeleteDiscussionReplyMutation,
   type DiscussionCommentFieldsFragment,
   type DiscussionCommentFieldsWithReactionsFragment,
   EditDiscussionReplyDocument,
@@ -16,25 +24,19 @@ import {
   ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
   type ListInitiativeDiscussionReplyCandidatesWithReactionsQuery,
   ListInitiativeDiscussionRootsDocument,
-  type ListInitiativeDiscussionRootsQuery,
   ListInitiativeDiscussionRootsWithReactionsDocument,
-  type ListInitiativeDiscussionRootsWithReactionsQuery,
   ListIssueDiscussionReplyCandidatesDocument,
   type ListIssueDiscussionReplyCandidatesQuery,
   ListIssueDiscussionReplyCandidatesWithReactionsDocument,
   type ListIssueDiscussionReplyCandidatesWithReactionsQuery,
   ListIssueDiscussionRootsDocument,
-  type ListIssueDiscussionRootsQuery,
   ListIssueDiscussionRootsWithReactionsDocument,
-  type ListIssueDiscussionRootsWithReactionsQuery,
   ListProjectDiscussionReplyCandidatesDocument,
   type ListProjectDiscussionReplyCandidatesQuery,
   ListProjectDiscussionReplyCandidatesWithReactionsDocument,
   type ListProjectDiscussionReplyCandidatesWithReactionsQuery,
   ListProjectDiscussionRootsDocument,
-  type ListProjectDiscussionRootsQuery,
   ListProjectDiscussionRootsWithReactionsDocument,
-  type ListProjectDiscussionRootsWithReactionsQuery,
   ResolveDiscussionDocument,
   type ResolveDiscussionMutation,
   StartDiscussionDocument,
@@ -85,7 +87,7 @@ type DeleteDiscussionReactionResult = Awaited<
 >;
 
 interface DiscussionReactionTargetInput {
-  commentId: string;
+  commentId: UUID;
   target: DiscussionReactionTarget;
   expectedEntityKind?: DiscussionEntityKind;
 }
@@ -101,7 +103,7 @@ interface DeleteDiscussionReactionByEmojiInput
 
 interface DeleteDiscussionReactionByIdInput
   extends DiscussionReactionTargetInput {
-  reactionId: string;
+  reactionId: UUID;
 }
 
 function normalizeDiscussionCommentReactions<
@@ -117,7 +119,7 @@ function normalizeDiscussionCommentReactions<
   };
 }
 
-function normalizeDiscussionCommentsReactions<
+export function normalizeDiscussionCommentsReactions<
   T extends { reactions: Parameters<typeof normalizeReactions>[0] },
 >(
   comments: readonly T[],
@@ -168,14 +170,13 @@ function assertExpectedDiscussionEntityKind(
 
 async function assertDiscussionCommentExists(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   expectedEntityKind?: DiscussionEntityKind,
   label: "comment" | "reply" = "comment",
 ): Promise<DiscussionCommentContext> {
-  const result = await client.request<GetDiscussionCommentContextQuery>(
-    GetDiscussionCommentContextDocument,
-    { id },
-  );
+  const result = await client.request(GetDiscussionCommentContextDocument, {
+    id,
+  });
 
   if (!result.comment) {
     throw new Error(`Discussion comment ID "${id}" not found`);
@@ -188,13 +189,12 @@ async function assertDiscussionCommentExists(
 
 async function assertRootDiscussionThread(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<DiscussionThreadContext> {
-  const result = await client.request<GetDiscussionCommentContextQuery>(
-    GetDiscussionCommentContextDocument,
-    { id: threadId },
-  );
+  const result = await client.request(GetDiscussionCommentContextDocument, {
+    id: threadId,
+  });
 
   if (!result.comment) {
     throw new Error(`Discussion thread ID "${threadId}" not found`);
@@ -217,7 +217,7 @@ async function assertRootDiscussionThread(
 
 async function assertReplyComment(
   client: GraphQLClient,
-  commentId: string,
+  commentId: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<DiscussionCommentContext> {
   const comment = await assertDiscussionCommentExists(
@@ -306,7 +306,7 @@ async function listDiscussionReplyCandidates(
     let result: DiscussionReplyCandidateQuery;
 
     if (entity.kind === "issue") {
-      result = await client.request<ListIssueDiscussionReplyCandidatesQuery>(
+      result = await client.request(
         ListIssueDiscussionReplyCandidatesDocument,
         {
           issueId: entity.id,
@@ -315,7 +315,7 @@ async function listDiscussionReplyCandidates(
         },
       );
     } else if (entity.kind === "project") {
-      result = await client.request<ListProjectDiscussionReplyCandidatesQuery>(
+      result = await client.request(
         ListProjectDiscussionReplyCandidatesDocument,
         {
           projectId: entity.id,
@@ -324,15 +324,14 @@ async function listDiscussionReplyCandidates(
         },
       );
     } else {
-      result =
-        await client.request<ListInitiativeDiscussionReplyCandidatesQuery>(
-          ListInitiativeDiscussionReplyCandidatesDocument,
-          {
-            initiativeId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListInitiativeDiscussionReplyCandidatesDocument,
+        {
+          initiativeId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     }
 
     nodes.push(...result.comments.nodes);
@@ -362,35 +361,32 @@ async function listDiscussionReplyCandidatesWithReactions(
     let result: DiscussionReplyCandidateWithReactionsQuery;
 
     if (entity.kind === "issue") {
-      result =
-        await client.request<ListIssueDiscussionReplyCandidatesWithReactionsQuery>(
-          ListIssueDiscussionReplyCandidatesWithReactionsDocument,
-          {
-            issueId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListIssueDiscussionReplyCandidatesWithReactionsDocument,
+        {
+          issueId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     } else if (entity.kind === "project") {
-      result =
-        await client.request<ListProjectDiscussionReplyCandidatesWithReactionsQuery>(
-          ListProjectDiscussionReplyCandidatesWithReactionsDocument,
-          {
-            projectId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListProjectDiscussionReplyCandidatesWithReactionsDocument,
+        {
+          projectId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     } else {
-      result =
-        await client.request<ListInitiativeDiscussionReplyCandidatesWithReactionsQuery>(
-          ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
-          {
-            initiativeId: entity.id,
-            first: DISCUSSION_REPLY_FETCH_LIMIT,
-            after,
-          },
-        );
+      result = await client.request(
+        ListInitiativeDiscussionReplyCandidatesWithReactionsDocument,
+        {
+          initiativeId: entity.id,
+          first: DISCUSSION_REPLY_FETCH_LIMIT,
+          after,
+        },
+      );
     }
 
     nodes.push(...result.comments.nodes);
@@ -410,10 +406,53 @@ async function listDiscussionReplyCandidatesWithReactions(
   );
 }
 
-function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
-  comments: readonly T[],
-  threadId: string,
-): T[] {
+/**
+ * Fetch every reply candidate (comments with a parent) for an issue directly by
+ * issue UUID, looping until the connection is exhausted. Used by the activity
+ * timeline, which resolves the issue up front and does not have a thread context.
+ */
+export async function fetchAllIssueDiscussionReplyCandidates(
+  client: GraphQLClient,
+  issueId: UUID,
+): Promise<DiscussionCommentFieldsFragment[]> {
+  const nodes = await collectConnection(async (after) => {
+    const result = await client.request(
+      ListIssueDiscussionReplyCandidatesDocument,
+      { issueId, first: DISCUSSION_REPLY_FETCH_LIMIT, after },
+    );
+
+    return result.comments;
+  });
+
+  return nodes.sort(compareDiscussionCommentsChronologically);
+}
+
+export async function fetchAllIssueDiscussionReplyCandidatesWithReactions(
+  client: GraphQLClient,
+  issueId: UUID,
+): Promise<DiscussionThreadWithReactions[]> {
+  const nodes = await collectConnection(async (after) => {
+    const result = await client.request(
+      ListIssueDiscussionReplyCandidatesWithReactionsDocument,
+      { issueId, first: DISCUSSION_REPLY_FETCH_LIMIT, after },
+    );
+
+    return result.comments;
+  });
+
+  return normalizeDiscussionCommentsReactions(
+    nodes.sort(compareDiscussionCommentsChronologically),
+  );
+}
+
+/**
+ * Index reply candidates by their `parentId`, with each sibling list sorted
+ * chronologically. Building this once lets callers extract many threads'
+ * replies without rescanning the full candidate list per thread.
+ */
+export function buildThreadRepliesIndex<
+  T extends DiscussionCommentFieldsFragment,
+>(comments: readonly T[]): Map<string, T[]> {
   const childrenByParentId = new Map<string, T[]>();
 
   for (const comment of comments) {
@@ -427,6 +466,14 @@ function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
     childrenByParentId.set(comment.parentId, siblings);
   }
 
+  return childrenByParentId;
+}
+
+/** Walk a pre-built reply index depth-first to collect a thread's replies. */
+export function collectThreadReplies<T extends DiscussionCommentFieldsFragment>(
+  childrenByParentId: ReadonlyMap<string, T[]>,
+  threadId: UUID,
+): T[] {
   const replies: T[] = [];
   const stack = [...(childrenByParentId.get(threadId) ?? [])].reverse();
 
@@ -446,11 +493,21 @@ function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
     }
 
     for (let i = children.length - 1; i >= 0; i -= 1) {
-      stack.push(children[i]);
+      const child = children[i];
+      if (child !== undefined) {
+        stack.push(child);
+      }
     }
   }
 
   return replies;
+}
+
+function filterThreadReplies<T extends DiscussionCommentFieldsFragment>(
+  comments: readonly T[],
+  threadId: UUID,
+): T[] {
+  return collectThreadReplies(buildThreadRepliesIndex(comments), threadId);
 }
 
 function paginateDiscussionReplies<T extends DiscussionCommentFieldsFragment>(
@@ -482,16 +539,13 @@ async function startDiscussion(
   client: GraphQLClient,
   input: CommentCreateInput,
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
-  const result = await client.request<StartDiscussionMutation>(
-    StartDiscussionDocument,
-    { input },
+  const result = await client.request(StartDiscussionDocument, { input });
+
+  return requireMutationEntity(
+    result.commentCreate,
+    "comment",
+    "Failed to start discussion",
   );
-
-  if (!result.commentCreate.success || !result.commentCreate.comment) {
-    throw new Error("Failed to start discussion");
-  }
-
-  return result.commentCreate.comment;
 }
 
 export async function createDiscussionCommentReaction(
@@ -508,7 +562,7 @@ export async function createDiscussionCommentReaction(
 
 export async function createIssueDiscussionCommentReaction(
   client: GraphQLClient,
-  input: { commentId: string; emoji: string },
+  input: { commentId: UUID; emoji: string },
 ): Promise<CreateDiscussionReactionResult> {
   await assertDiscussionCommentExists(client, input.commentId, "issue");
 
@@ -533,7 +587,7 @@ export async function deleteDiscussionCommentReactionByEmoji(
 
 export async function deleteIssueDiscussionCommentReactionByEmoji(
   client: GraphQLClient,
-  input: { commentId: string; emoji: string },
+  input: { commentId: UUID; emoji: string },
 ): Promise<DeleteDiscussionReactionResult> {
   await assertDiscussionCommentExists(client, input.commentId, "issue");
 
@@ -559,7 +613,7 @@ export async function deleteDiscussionCommentReactionById(
 
 export async function deleteIssueDiscussionCommentReactionById(
   client: GraphQLClient,
-  input: { commentId: string; reactionId: string },
+  input: { commentId: UUID; reactionId: UUID },
 ): Promise<DeleteDiscussionReactionResult> {
   await assertDiscussionCommentExists(client, input.commentId, "issue");
 
@@ -572,18 +626,15 @@ export async function deleteIssueDiscussionCommentReactionById(
 
 export async function listDiscussionsForIssue(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result = await client.request<ListIssueDiscussionRootsQuery>(
-    ListIssueDiscussionRootsDocument,
-    {
-      issueId,
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(ListIssueDiscussionRootsDocument, {
+    issueId,
+    first: limit,
+    after,
+  });
 
   if (!result.issue) {
     throw new Error(`Issue with ID "${issueId}" not found`);
@@ -597,19 +648,18 @@ export async function listDiscussionsForIssue(
 
 export async function listDiscussionsForIssueWithReactions(
   client: GraphQLClient,
-  issueId: string,
+  issueId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result =
-    await client.request<ListIssueDiscussionRootsWithReactionsQuery>(
-      ListIssueDiscussionRootsWithReactionsDocument,
-      {
-        issueId,
-        first: limit,
-        after,
-      },
-    );
+  const result = await client.request(
+    ListIssueDiscussionRootsWithReactionsDocument,
+    {
+      issueId,
+      first: limit,
+      after,
+    },
+  );
 
   if (!result.issue) {
     throw new Error(`Issue with ID "${issueId}" not found`);
@@ -623,18 +673,15 @@ export async function listDiscussionsForIssueWithReactions(
 
 export async function listDiscussionsForProject(
   client: GraphQLClient,
-  projectId: string,
+  projectId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result = await client.request<ListProjectDiscussionRootsQuery>(
-    ListProjectDiscussionRootsDocument,
-    {
-      projectId,
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(ListProjectDiscussionRootsDocument, {
+    projectId,
+    first: limit,
+    after,
+  });
 
   if (!result.project) {
     throw new Error(`Project with ID "${projectId}" not found`);
@@ -648,19 +695,18 @@ export async function listDiscussionsForProject(
 
 export async function listDiscussionsForProjectWithReactions(
   client: GraphQLClient,
-  projectId: string,
+  projectId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result =
-    await client.request<ListProjectDiscussionRootsWithReactionsQuery>(
-      ListProjectDiscussionRootsWithReactionsDocument,
-      {
-        projectId,
-        first: limit,
-        after,
-      },
-    );
+  const result = await client.request(
+    ListProjectDiscussionRootsWithReactionsDocument,
+    {
+      projectId,
+      first: limit,
+      after,
+    },
+  );
 
   if (!result.project) {
     throw new Error(`Project with ID "${projectId}" not found`);
@@ -674,19 +720,16 @@ export async function listDiscussionsForProjectWithReactions(
 
 export async function listDiscussionsForInitiative(
   client: GraphQLClient,
-  initiativeId: string,
+  initiativeId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThread>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result = await client.request<ListInitiativeDiscussionRootsQuery>(
-    ListInitiativeDiscussionRootsDocument,
-    {
-      initiativeId,
-      initiativeLookupId: initiativeId,
-      first: limit,
-      after,
-    },
-  );
+  const result = await client.request(ListInitiativeDiscussionRootsDocument, {
+    initiativeId,
+    initiativeLookupId: initiativeId,
+    first: limit,
+    after,
+  });
 
   if (!result.initiative) {
     throw new Error(`Initiative with ID "${initiativeId}" not found`);
@@ -700,20 +743,19 @@ export async function listDiscussionsForInitiative(
 
 export async function listDiscussionsForInitiativeWithReactions(
   client: GraphQLClient,
-  initiativeId: string,
+  initiativeId: UUID,
   options: PaginationOptions = {},
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
   const { limit = DEFAULT_ROOT_LIMIT, after } = options;
-  const result =
-    await client.request<ListInitiativeDiscussionRootsWithReactionsQuery>(
-      ListInitiativeDiscussionRootsWithReactionsDocument,
-      {
-        initiativeId,
-        initiativeLookupId: initiativeId,
-        first: limit,
-        after,
-      },
-    );
+  const result = await client.request(
+    ListInitiativeDiscussionRootsWithReactionsDocument,
+    {
+      initiativeId,
+      initiativeLookupId: initiativeId,
+      first: limit,
+      after,
+    },
+  );
 
   if (!result.initiative) {
     throw new Error(`Initiative with ID "${initiativeId}" not found`);
@@ -727,7 +769,7 @@ export async function listDiscussionsForInitiativeWithReactions(
 
 export async function listDiscussionReplies(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   options: PaginationOptions = {},
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<PaginatedResult<DiscussionCommentFieldsFragment>> {
@@ -745,7 +787,7 @@ export async function listDiscussionReplies(
 
 export async function listDiscussionRepliesWithReactions(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   options: PaginationOptions = {},
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<PaginatedResult<DiscussionThreadWithReactions>> {
@@ -766,14 +808,14 @@ export async function listDiscussionRepliesWithReactions(
 
 export async function startIssueDiscussion(
   client: GraphQLClient,
-  input: { issueId: string; body: string },
+  input: { issueId: UUID; body: string },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   return startDiscussion(client, { issueId: input.issueId, body: input.body });
 }
 
 export async function startProjectDiscussion(
   client: GraphQLClient,
-  input: { projectId: string; body: string },
+  input: { projectId: UUID; body: string },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   return startDiscussion(client, {
     projectId: input.projectId,
@@ -783,7 +825,7 @@ export async function startProjectDiscussion(
 
 export async function startInitiativeDiscussion(
   client: GraphQLClient,
-  input: { initiativeId: string; body: string },
+  input: { initiativeId: UUID; body: string },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
   return startDiscussion(client, {
     initiativeId: input.initiativeId,
@@ -793,62 +835,69 @@ export async function startInitiativeDiscussion(
 
 export async function replyToDiscussion(
   client: GraphQLClient,
-  input: { threadId: string; body: string; entityKind?: DiscussionEntityKind },
+  input: { threadId: UUID; body: string; entityKind?: DiscussionEntityKind },
 ): Promise<StartDiscussionMutation["commentCreate"]["comment"]> {
-  await assertRootDiscussionThread(client, input.threadId, input.entityKind);
-
-  const result = await client.request<StartDiscussionMutation>(
-    StartDiscussionDocument,
-    {
-      input: {
-        parentId: input.threadId,
-        body: input.body,
-      },
-    },
+  const thread = await assertRootDiscussionThread(
+    client,
+    input.threadId,
+    input.entityKind,
   );
+  const entity = getDiscussionThreadEntity(thread);
+  const entityField =
+    entity.kind === "issue"
+      ? { issueId: entity.id }
+      : entity.kind === "project"
+        ? { projectId: entity.id }
+        : { initiativeId: entity.id };
 
-  if (!result.commentCreate.success || !result.commentCreate.comment) {
-    throw new Error("Failed to create discussion reply");
-  }
+  const result = await client.request(StartDiscussionDocument, {
+    input: {
+      parentId: input.threadId,
+      ...entityField,
+      body: input.body,
+    },
+  });
 
-  return result.commentCreate.comment;
+  return requireMutationEntity(
+    result.commentCreate,
+    "comment",
+    "Failed to create discussion reply",
+  );
 }
 
 export async function editDiscussionReply(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: CommentUpdateInput,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<EditDiscussionReplyMutation["commentUpdate"]["comment"]> {
   await assertReplyComment(client, id, expectedEntityKind);
 
-  const result = await client.request<EditDiscussionReplyMutation>(
-    EditDiscussionReplyDocument,
-    { id, input },
+  const result = await client.request(EditDiscussionReplyDocument, {
+    id,
+    input,
+  });
+
+  return requireMutationEntity(
+    result.commentUpdate,
+    "comment",
+    "Failed to edit discussion reply",
   );
-
-  if (!result.commentUpdate.success || !result.commentUpdate.comment) {
-    throw new Error("Failed to edit discussion reply");
-  }
-
-  return result.commentUpdate.comment;
 }
 
 export async function deleteDiscussionReply(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<{ id: string; success: true }> {
   await assertReplyComment(client, id, expectedEntityKind);
 
-  const result = await client.request<DeleteDiscussionReplyMutation>(
-    DeleteDiscussionReplyDocument,
-    { id },
-  );
+  const result = await client.request(DeleteDiscussionReplyDocument, { id });
 
-  if (!result.commentDelete.success) {
-    throw new Error("Failed to delete discussion reply");
-  }
+  requireMutationSuccess(
+    result.commentDelete,
+    "Failed to delete discussion reply",
+  );
 
   return {
     id: result.commentDelete.entityId,
@@ -858,39 +907,37 @@ export async function deleteDiscussionReply(
 
 export async function editDiscussionComment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   input: CommentUpdateInput,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<EditDiscussionReplyMutation["commentUpdate"]["comment"]> {
   await assertDiscussionCommentExists(client, id, expectedEntityKind);
 
-  const result = await client.request<EditDiscussionReplyMutation>(
-    EditDiscussionReplyDocument,
-    { id, input },
+  const result = await client.request(EditDiscussionReplyDocument, {
+    id,
+    input,
+  });
+
+  return requireMutationEntity(
+    result.commentUpdate,
+    "comment",
+    "Failed to edit discussion comment",
   );
-
-  if (!result.commentUpdate.success || !result.commentUpdate.comment) {
-    throw new Error("Failed to edit discussion comment");
-  }
-
-  return result.commentUpdate.comment;
 }
 
 export async function deleteDiscussionComment(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<{ id: string; success: true }> {
   await assertDiscussionCommentExists(client, id, expectedEntityKind);
 
-  const result = await client.request<DeleteDiscussionReplyMutation>(
-    DeleteDiscussionReplyDocument,
-    { id },
-  );
+  const result = await client.request(DeleteDiscussionReplyDocument, { id });
 
-  if (!result.commentDelete.success) {
-    throw new Error("Failed to delete discussion comment");
-  }
+  requireMutationSuccess(
+    result.commentDelete,
+    "Failed to delete discussion comment",
+  );
 
   return {
     id: result.commentDelete.entityId,
@@ -901,43 +948,39 @@ export async function deleteDiscussionComment(
 export async function resolveDiscussion(
   client: GraphQLClient,
   input: {
-    threadId: string;
-    resolvingCommentId?: string;
+    threadId: UUID;
+    resolvingCommentId?: UUID;
     entityKind?: DiscussionEntityKind;
   },
 ): Promise<ResolveDiscussionMutation["commentResolve"]["comment"]> {
   await assertRootDiscussionThread(client, input.threadId, input.entityKind);
 
-  const result = await client.request<ResolveDiscussionMutation>(
-    ResolveDiscussionDocument,
-    {
-      id: input.threadId,
-      resolvingCommentId: input.resolvingCommentId,
-    },
+  const result = await client.request(ResolveDiscussionDocument, {
+    id: input.threadId,
+    resolvingCommentId: input.resolvingCommentId,
+  });
+
+  return requireMutationEntity(
+    result.commentResolve,
+    "comment",
+    "Failed to resolve discussion",
   );
-
-  if (!result.commentResolve.success || !result.commentResolve.comment) {
-    throw new Error("Failed to resolve discussion");
-  }
-
-  return result.commentResolve.comment;
 }
 
 export async function unresolveDiscussion(
   client: GraphQLClient,
-  threadId: string,
+  threadId: UUID,
   expectedEntityKind?: DiscussionEntityKind,
 ): Promise<UnresolveDiscussionMutation["commentUnresolve"]["comment"]> {
   await assertRootDiscussionThread(client, threadId, expectedEntityKind);
 
-  const result = await client.request<UnresolveDiscussionMutation>(
-    UnresolveDiscussionDocument,
-    { id: threadId },
+  const result = await client.request(UnresolveDiscussionDocument, {
+    id: threadId,
+  });
+
+  return requireMutationEntity(
+    result.commentUnresolve,
+    "comment",
+    "Failed to unresolve discussion",
   );
-
-  if (!result.commentUnresolve.success || !result.commentUnresolve.comment) {
-    throw new Error("Failed to unresolve discussion");
-  }
-
-  return result.commentUnresolve.comment;
 }

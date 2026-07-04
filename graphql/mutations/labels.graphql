@@ -1,0 +1,28 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear issue labels
+# ------------------------------------------------------------
+
+mutation CreateIssueLabel($input: IssueLabelCreateInput!) {
+  issueLabelCreate(input: $input) {
+    success
+    issueLabel {
+      ...LabelFields
+    }
+  }
+}
+
+mutation UpdateIssueLabel($id: String!, $input: IssueLabelUpdateInput!) {
+  issueLabelUpdate(id: $id, input: $input) {
+    success
+    issueLabel {
+      ...LabelFields
+    }
+  }
+}
+
+mutation DeleteIssueLabel($id: String!) {
+  issueLabelDelete(id: $id) {
+    success
+    entityId
+  }
+}

@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../src/common/context.js", () => ({
   createContext: vi.fn(() => ({
     gql: { request: vi.fn() },
-    sdk: {},
   })),
   getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
 }));
@@ -22,22 +21,32 @@ vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
   resolveIssueId: vi.fn().mockResolvedValue("resolved-issue-uuid"),
 }));
 
-vi.mock("../../../src/services/attachment-service.js", () => ({
-  createAttachment: vi.fn().mockResolvedValue({
-    id: "att-1",
-    title: "Test",
-    url: "https://example.com",
-  }),
-  deleteAttachment: vi.fn().mockResolvedValue({
-    id: "att-1",
-    success: true,
-  }),
-  listAttachments: vi
-    .fn()
-    .mockResolvedValue([
-      { id: "att-1", title: "PR #42", sourceType: "github" },
-    ]),
-}));
+vi.mock(
+  "../../../src/services/attachment-service.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../src/services/attachment-service.js")
+      >();
+    return {
+      ...actual,
+      createAttachment: vi.fn().mockResolvedValue({
+        id: "att-1",
+        title: "Test",
+        url: "https://example.com",
+      }),
+      deleteAttachment: vi.fn().mockResolvedValue({
+        id: "att-1",
+        success: true,
+      }),
+      listAttachments: vi
+        .fn()
+        .mockResolvedValue([
+          { id: "att-1", title: "PR #42", sourceType: "github" },
+        ]),
+    };
+  },
+);
 
 import { setupAttachmentsCommands } from "../../../src/commands/attachments.js";
 import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
@@ -70,6 +79,53 @@ describe("attachments list", () => {
       "resolved-issue-uuid",
       undefined,
     );
+  });
+
+  it("accepts --issue as an alias for the issue argument", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "attachments",
+      "list",
+      "--issue",
+      "ENG-42",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(listAttachments).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      undefined,
+    );
+  });
+
+  it("rejects combining positional issue and --issue", async () => {
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "attachments",
+      "list",
+      "ENG-42",
+      "--issue",
+      "ENG-43",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --issue: cannot be combined with positional issue",
+      ),
+    );
+    expect(listAttachments).not.toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
   });
 
   it("passes source-type filter", async () => {
@@ -175,6 +231,59 @@ describe("attachments create", () => {
       expect.anything(),
       expect.objectContaining({
         subtitle: "merged pull request",
+      }),
+    );
+  });
+
+  it("accepts --issue as an alias for the issue argument", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "attachments",
+      "create",
+      "--issue",
+      "ENG-42",
+      "--title",
+      "My PR",
+      "--url",
+      "https://github.com/org/repo/pull/1",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(createAttachment).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        issueId: "resolved-issue-uuid",
+        title: "My PR",
+        url: "https://github.com/org/repo/pull/1",
+      }),
+    );
+  });
+
+  it("passes optional comment and icon URL", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "attachments",
+      "create",
+      "ENG-42",
+      "--title",
+      "Build",
+      "--url",
+      "https://ci.example.com/build/1",
+      "--comment",
+      "Build is green",
+      "--icon-url",
+      "https://ci.example.com/icon.png",
+    ]);
+
+    expect(createAttachment).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        commentBody: "Build is green",
+        iconUrl: "https://ci.example.com/icon.png",
       }),
     );
   });

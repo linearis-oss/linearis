@@ -1,6 +1,8 @@
 // tests/unit/services/milestone-service.test.ts
+
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import {
   createMilestone,
   getMilestone,
@@ -32,7 +34,7 @@ describe("listMilestones", () => {
         },
       },
     });
-    const result = await listMilestones(client, "proj-1");
+    const result = await listMilestones(client, asUuid("proj-1"));
     expect(result.nodes).toHaveLength(1);
     expect(result.nodes[0]).toEqual({
       id: "ms-1",
@@ -46,7 +48,7 @@ describe("listMilestones", () => {
 
   it("returns empty when project is null", async () => {
     const client = mockGqlClient({ project: null });
-    const result = await listMilestones(client, "missing-proj");
+    const result = await listMilestones(client, asUuid("missing-proj"));
     expect(result.nodes).toEqual([]);
     expect(result.pageInfo).toEqual({ hasNextPage: false, endCursor: null });
   });
@@ -60,7 +62,7 @@ describe("listMilestones", () => {
         },
       },
     });
-    await listMilestones(client, "proj-1", { after: "cur1" });
+    await listMilestones(client, asUuid("proj-1"), { after: "cur1" });
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       projectId: "proj-1",
       first: 50,
@@ -77,7 +79,7 @@ describe("listMilestones", () => {
         },
       },
     });
-    await listMilestones(client, "proj-1");
+    await listMilestones(client, asUuid("proj-1"));
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       projectId: "proj-1",
       first: 50,
@@ -99,14 +101,14 @@ describe("getMilestone", () => {
         issues: { nodes: [] },
       },
     });
-    const result = await getMilestone(client, "ms-1");
+    const result = await getMilestone(client, asUuid("ms-1"));
     expect(result.id).toBe("ms-1");
     expect(result.name).toBe("v1.0");
   });
 
   it("throws when not found", async () => {
     const client = mockGqlClient({ projectMilestone: null });
-    await expect(getMilestone(client, "missing-id")).rejects.toThrow(
+    await expect(getMilestone(client, asUuid("missing-id"))).rejects.toThrow(
       "not found",
     );
   });
@@ -127,11 +129,34 @@ describe("createMilestone", () => {
       },
     });
     const result = await createMilestone(client, {
-      projectId: "proj-1",
+      projectId: asUuid("proj-1"),
       name: "v2.0",
     });
     expect(result.id).toBe("ms-new");
     expect(result.name).toBe("v2.0");
+  });
+
+  it("passes input as a single GraphQL variable", async () => {
+    const client = mockGqlClient({
+      projectMilestoneCreate: {
+        success: true,
+        projectMilestone: {
+          id: "ms-new",
+          name: "v2.0",
+          description: null,
+          targetDate: null,
+          sortOrder: 0,
+        },
+      },
+    });
+    const input = {
+      projectId: asUuid("proj-1"),
+      name: "v2.0",
+      description: "desc",
+      targetDate: "2025-12-01",
+    };
+    await createMilestone(client, input);
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), { input });
   });
 
   it("throws on failure", async () => {
@@ -142,7 +167,7 @@ describe("createMilestone", () => {
       },
     });
     await expect(
-      createMilestone(client, { projectId: "proj-1", name: "Bad" }),
+      createMilestone(client, { projectId: asUuid("proj-1"), name: "Bad" }),
     ).rejects.toThrow("Failed to create milestone");
   });
 });
@@ -161,9 +186,32 @@ describe("updateMilestone", () => {
         },
       },
     });
-    const result = await updateMilestone(client, "ms-1", { name: "v1.1" });
+    const result = await updateMilestone(client, asUuid("ms-1"), {
+      name: "v1.1",
+    });
     expect(result.id).toBe("ms-1");
     expect(result.name).toBe("v1.1");
+  });
+
+  it("passes id and input as GraphQL variables", async () => {
+    const client = mockGqlClient({
+      projectMilestoneUpdate: {
+        success: true,
+        projectMilestone: {
+          id: "ms-1",
+          name: "v1.1",
+          description: null,
+          targetDate: null,
+          sortOrder: 0,
+        },
+      },
+    });
+    const input = { name: "v1.1", description: "updated" };
+    await updateMilestone(client, asUuid("ms-1"), input);
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "ms-1",
+      input,
+    });
   });
 
   it("throws on failure", async () => {
@@ -174,7 +222,7 @@ describe("updateMilestone", () => {
       },
     });
     await expect(
-      updateMilestone(client, "ms-1", { name: "Bad" }),
+      updateMilestone(client, asUuid("ms-1"), { name: "Bad" }),
     ).rejects.toThrow("Failed to update milestone");
   });
 });

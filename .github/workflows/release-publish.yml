@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Guard workflow_dispatch caller permissions
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -65,7 +65,7 @@ jobs:
           echo "Releasing from branch: $branch"
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           ref: ${{ steps.target.outputs.branch }}
@@ -73,7 +73,7 @@ jobs:
 
       - name: Create linearis-bot app token
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -97,34 +97,22 @@ jobs:
           git config user.name "${{ steps.app-bot.outputs.name }}"
           git config user.email "${{ steps.app-bot.outputs.email }}"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-          registry-url: https://registry.npmjs.org
+      # No registry-url: it writes _authToken into .npmrc, shadowing OIDC.
+      - name: Setup, install and build
+        uses: ./.github/actions/setup
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Verify npm auth
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # OIDC trusted publishing needs npm >= 11.5.1; .nvmrc pins only Node major.
+      - name: Ensure npm supports trusted publishing
+        shell: bash
         run: |
-          test -n "${NODE_AUTH_TOKEN}" || {
-            echo "NPM_TOKEN missing (check job environment + secret scope)"
-            exit 1
-          }
-          npm whoami --registry=https://registry.npmjs.org/
+          npm install -g npm@^11.5.1
+          npm --version
 
+      # Publishes via OIDC (no NODE_AUTH_TOKEN); GH_TOKEN is only for the release + push.
       - name: Run semantic-release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_REF: refs/heads/${{ steps.target.outputs.branch }}
           GITHUB_REF_NAME: ${{ steps.target.outputs.branch }}
         run: npm run release:run

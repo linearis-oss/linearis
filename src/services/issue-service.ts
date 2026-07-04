@@ -1,31 +1,14 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type {
-  CreatedIssue,
-  Issue,
-  IssueByIdentifier,
-  IssueByIdentifierWithAttachments,
-  IssueByIdentifierWithComments,
-  IssueByIdentifierWithCommentThreads,
-  IssueComment,
-  IssueCommentThread,
-  IssueDetail,
-  IssueDetailWithAttachments,
-  IssueDetailWithComments,
-  IssueDetailWithCommentThreads,
-  IssueSearchResult,
-  PaginatedResult,
-  PaginationOptions,
-  UpdatedIssue,
-} from "../common/types.js";
+import { firstOrThrow } from "../common/array.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
+import { requireMutationEntity } from "../common/mutation-payload.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveIssueDocument,
-  type ArchiveIssueMutation,
   CreateIssueDocument,
   type CreateIssueMutation,
   DeleteIssueDocument,
-  type DeleteIssueMutation,
   FilteredSearchIssuesDocument,
-  type FilteredSearchIssuesQuery,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   type GetIssueByIdentifierQuery,
@@ -47,16 +30,106 @@ import {
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
-  PaginationOrderBy,
   SearchIssuesDocument,
   type SearchIssuesQuery,
   type SearchIssuesQueryVariables,
   UnarchiveIssueDocument,
-  type UnarchiveIssueMutation,
   UpdateIssueDocument,
   type UpdateIssueMutation,
 } from "../gql/graphql.js";
 import { normalizeReactions } from "./reaction-service.js";
+
+// Issue projection types
+export type IssueListItem = GetIssuesQuery["issues"]["nodes"][0];
+export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
+export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
+export type IssueDetailWithComments = NonNullable<
+  GetIssueByIdWithCommentsQuery["issue"]
+>;
+export type IssueByIdentifierWithComments =
+  GetIssueByIdentifierWithCommentsQuery["issues"]["nodes"][0];
+type IssueComment = NonNullable<
+  NonNullable<IssueDetailWithComments["comments"]>["nodes"][0]
+>;
+type IssueCommentThread = IssueComment & {
+  replies: IssueCommentThread[];
+};
+export type IssueDetailWithCommentThreads = Omit<
+  IssueDetailWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
+export type IssueByIdentifierWithCommentThreads = Omit<
+  IssueByIdentifierWithComments,
+  "comments"
+> & {
+  comments: { nodes: IssueCommentThread[] };
+};
+export type IssueDetailWithAttachments = NonNullable<
+  GetIssueByIdWithAttachmentsQuery["issue"]
+>;
+export type IssueByIdentifierWithAttachments =
+  GetIssueByIdentifierWithAttachmentsQuery["issues"]["nodes"][0];
+export type IssueSearchResult = SearchIssuesQuery["searchIssues"]["nodes"][0];
+export type CreatedIssue = NonNullable<
+  CreateIssueMutation["issueCreate"]["issue"]
+>;
+export type UpdatedIssue = NonNullable<
+  UpdateIssueMutation["issueUpdate"]["issue"]
+>;
+
+// Service-owned input types (UUIDs pre-resolved by the command).
+export type CreateIssueInput = BrandUuidFields<
+  Pick<
+    IssueCreateInput,
+    | "title"
+    | "teamId"
+    | "description"
+    | "assigneeId"
+    | "priority"
+    | "estimate"
+    | "projectId"
+    | "labelIds"
+    | "projectMilestoneId"
+    | "cycleId"
+    | "stateId"
+    | "parentId"
+    | "dueDate"
+  >,
+  | "teamId"
+  | "assigneeId"
+  | "projectId"
+  | "labelIds"
+  | "projectMilestoneId"
+  | "cycleId"
+  | "stateId"
+  | "parentId"
+>;
+export type UpdateIssueInput = BrandUuidFields<
+  Pick<
+    IssueUpdateInput,
+    | "title"
+    | "description"
+    | "stateId"
+    | "priority"
+    | "estimate"
+    | "assigneeId"
+    | "projectId"
+    | "labelIds"
+    | "parentId"
+    | "projectMilestoneId"
+    | "cycleId"
+    | "dueDate"
+  >,
+  | "stateId"
+  | "assigneeId"
+  | "projectId"
+  | "labelIds"
+  | "parentId"
+  | "projectMilestoneId"
+  | "cycleId"
+>;
 
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
@@ -197,29 +270,26 @@ export async function listIssues(
   client: GraphQLClient,
   options: PaginationOptions = {},
   filter?: IssueFilter,
-): Promise<PaginatedResult<Issue>> {
+): Promise<PaginatedResult<IssueListItem>> {
   const { limit = 25, after } = options;
 
   if (filter) {
-    const result = await client.request<FilteredSearchIssuesQuery>(
-      FilteredSearchIssuesDocument,
-      {
-        first: limit,
-        after,
-        filter: buildListIssuesFilter(filter),
-        orderBy: PaginationOrderBy.UpdatedAt,
-      },
-    );
+    const result = await client.request(FilteredSearchIssuesDocument, {
+      first: limit,
+      after,
+      filter: buildListIssuesFilter(filter),
+      orderBy: "updatedAt",
+    });
     return {
       nodes: result.issues?.nodes ?? [],
       pageInfo: result.issues.pageInfo,
     };
   }
 
-  const result = await client.request<GetIssuesQuery>(GetIssuesDocument, {
+  const result = await client.request(GetIssuesDocument, {
     first: limit,
     after,
-    orderBy: PaginationOrderBy.UpdatedAt,
+    orderBy: "updatedAt",
   });
   return {
     nodes: result.issues?.nodes ?? [],
@@ -229,9 +299,9 @@ export async function listIssues(
 
 export async function getIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetail> {
-  const result = await client.request<GetIssueByIdQuery>(GetIssueByIdDocument, {
+  const result = await client.request(GetIssueByIdDocument, {
     id,
   });
   if (!result.issue) {
@@ -242,12 +312,9 @@ export async function getIssue(
 
 export async function getIssueWithComments(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithComments> {
-  const result = await client.request<GetIssueByIdWithCommentsQuery>(
-    GetIssueByIdWithCommentsDocument,
-    { id },
-  );
+  const result = await client.request(GetIssueByIdWithCommentsDocument, { id });
   if (!result.issue) {
     throw new Error(`Issue with ID "${id}" not found`);
   }
@@ -256,7 +323,7 @@ export async function getIssueWithComments(
 
 export async function getIssueWithCommentThreads(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithCommentThreads> {
   const issue = await getIssueWithComments(client, id);
   return threadIssueComments(issue);
@@ -267,16 +334,14 @@ export async function getIssueByIdentifier(
   teamKey: string,
   issueNumber: number,
 ): Promise<IssueByIdentifier> {
-  const result = await client.request<GetIssueByIdentifierQuery>(
-    GetIssueByIdentifierDocument,
-    { teamKey, number: issueNumber },
+  const result = await client.request(GetIssueByIdentifierDocument, {
+    teamKey,
+    number: issueNumber,
+  });
+  return firstOrThrow(
+    result.issues.nodes,
+    `Issue with identifier "${teamKey}-${issueNumber}" not found`,
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
-      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return result.issues.nodes[0];
 }
 
 export async function getIssueByIdentifierWithComments(
@@ -284,16 +349,14 @@ export async function getIssueByIdentifierWithComments(
   teamKey: string,
   issueNumber: number,
 ): Promise<IssueByIdentifierWithComments> {
-  const result = await client.request<GetIssueByIdentifierWithCommentsQuery>(
+  const result = await client.request(
     GetIssueByIdentifierWithCommentsDocument,
     { teamKey, number: issueNumber },
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
-      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return result.issues.nodes[0];
+  return firstOrThrow(
+    result.issues.nodes,
+    `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+  );
 }
 
 export async function getIssueByIdentifierWithCommentThreads(
@@ -311,12 +374,11 @@ export async function getIssueByIdentifierWithCommentThreads(
 
 export async function getIssueWithReactions(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithReactions> {
-  const result = await client.request<GetIssueByIdWithReactionsQuery>(
-    GetIssueByIdWithReactionsDocument,
-    { id },
-  );
+  const result = await client.request(GetIssueByIdWithReactionsDocument, {
+    id,
+  });
   if (!result.issue) {
     throw new Error(`Issue with ID "${id}" not found`);
   }
@@ -328,26 +390,25 @@ export async function getIssueByIdentifierWithReactions(
   teamKey: string,
   issueNumber: number,
 ): Promise<IssueByIdentifierWithReactions> {
-  const result = await client.request<GetIssueByIdentifierWithReactionsQuery>(
+  const result = await client.request(
     GetIssueByIdentifierWithReactionsDocument,
     { teamKey, number: issueNumber },
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
+  return normalizeIssueReactions(
+    firstOrThrow(
+      result.issues.nodes,
       `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return normalizeIssueReactions(result.issues.nodes[0]);
+    ),
+  );
 }
 
 export async function getIssueWithAttachments(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetailWithAttachments> {
-  const result = await client.request<GetIssueByIdWithAttachmentsQuery>(
-    GetIssueByIdWithAttachmentsDocument,
-    { id },
-  );
+  const result = await client.request(GetIssueByIdWithAttachmentsDocument, {
+    id,
+  });
   if (!result.issue) {
     throw new Error(`Issue with ID "${id}" not found`);
   }
@@ -359,16 +420,14 @@ export async function getIssueByIdentifierWithAttachments(
   teamKey: string,
   issueNumber: number,
 ): Promise<IssueByIdentifierWithAttachments> {
-  const result = await client.request<GetIssueByIdentifierWithAttachmentsQuery>(
+  const result = await client.request(
     GetIssueByIdentifierWithAttachmentsDocument,
     { teamKey, number: issueNumber },
   );
-  if (!result.issues.nodes.length) {
-    throw new Error(
-      `Issue with identifier "${teamKey}-${issueNumber}" not found`,
-    );
-  }
-  return result.issues.nodes[0];
+  return firstOrThrow(
+    result.issues.nodes,
+    `Issue with identifier "${teamKey}-${issueNumber}" not found`,
+  );
 }
 
 export async function searchIssues(
@@ -384,10 +443,7 @@ export async function searchIssues(
     after,
     ...(filter && { filter }),
   };
-  const result = await client.request<SearchIssuesQuery>(
-    SearchIssuesDocument,
-    variables,
-  );
+  const result = await client.request(SearchIssuesDocument, variables);
   return {
     nodes: result.searchIssues?.nodes ?? [],
     pageInfo: result.searchIssues.pageInfo,
@@ -396,75 +452,67 @@ export async function searchIssues(
 
 export async function createIssue(
   client: GraphQLClient,
-  input: IssueCreateInput,
+  input: CreateIssueInput,
 ): Promise<CreatedIssue> {
-  const result = await client.request<CreateIssueMutation>(
-    CreateIssueDocument,
-    { input },
+  const gqlInput: IssueCreateInput = input;
+  const result = await client.request(CreateIssueDocument, { input: gqlInput });
+  return requireMutationEntity(
+    result.issueCreate,
+    "issue",
+    "Failed to create issue",
   );
-  if (!result.issueCreate.success || !result.issueCreate.issue) {
-    throw new Error("Failed to create issue");
-  }
-  return result.issueCreate.issue;
 }
 
 export async function updateIssue(
   client: GraphQLClient,
-  id: string,
-  input: IssueUpdateInput,
+  id: UUID,
+  input: UpdateIssueInput,
 ): Promise<UpdatedIssue> {
-  const result = await client.request<UpdateIssueMutation>(
-    UpdateIssueDocument,
-    { id, input },
+  const gqlInput: IssueUpdateInput = input;
+  const result = await client.request(UpdateIssueDocument, {
+    id,
+    input: gqlInput,
+  });
+  return requireMutationEntity(
+    result.issueUpdate,
+    "issue",
+    "Failed to update issue",
   );
-  if (!result.issueUpdate.success || !result.issueUpdate.issue) {
-    throw new Error("Failed to update issue");
-  }
-  return result.issueUpdate.issue;
 }
 
 export async function archiveIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetail> {
-  const result = await client.request<ArchiveIssueMutation>(
-    ArchiveIssueDocument,
-    { id },
+  const result = await client.request(ArchiveIssueDocument, { id });
+
+  return requireMutationEntity(
+    result.issueArchive,
+    "entity",
+    `Failed to archive issue "${id}"`,
   );
-
-  if (!result.issueArchive.success || !result.issueArchive.entity) {
-    throw new Error(`Failed to archive issue "${id}"`);
-  }
-
-  return result.issueArchive.entity;
 }
 
 export async function unarchiveIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<IssueDetail> {
-  const result = await client.request<UnarchiveIssueMutation>(
-    UnarchiveIssueDocument,
-    { id },
+  const result = await client.request(UnarchiveIssueDocument, { id });
+
+  return requireMutationEntity(
+    result.issueUnarchive,
+    "entity",
+    `Failed to unarchive issue "${id}"`,
   );
-
-  if (!result.issueUnarchive.success || !result.issueUnarchive.entity) {
-    throw new Error(`Failed to unarchive issue "${id}"`);
-  }
-
-  return result.issueUnarchive.entity;
 }
 
 export async function deleteIssue(
   client: GraphQLClient,
-  id: string,
+  id: UUID,
 ): Promise<{ id: string; success: true }> {
-  const result = await client.request<DeleteIssueMutation>(
-    DeleteIssueDocument,
-    {
-      id,
-    },
-  );
+  const result = await client.request(DeleteIssueDocument, {
+    id,
+  });
 
   if (!result.issueDelete.success || !result.issueDelete.entity?.id) {
     throw new Error(`Failed to delete issue "${id}"`);

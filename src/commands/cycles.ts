@@ -10,6 +10,7 @@ import {
   requiresParameterError,
 } from "../common/errors.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
+import { buildPaginationOptions } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import { resolveCycleId } from "../resolvers/cycle-resolver.js";
 import { resolveTeamId } from "../resolvers/team-resolver.js";
@@ -71,7 +72,7 @@ export function setupCyclesCommands(program: Command): void {
 
         // Resolve team filter if provided
         const teamId = options.team
-          ? await resolveTeamId(ctx.sdk, options.team)
+          ? await resolveTeamId(ctx.gql, options.team)
           : undefined;
 
         // Fetch cycles
@@ -79,7 +80,7 @@ export function setupCyclesCommands(program: Command): void {
           ctx.gql,
           teamId,
           options.active || false,
-          { limit: parseLimit(options.limit), after: options.after },
+          buildPaginationOptions(parseLimit(options.limit), options.after),
         );
 
         if (options.window) {
@@ -129,7 +130,7 @@ export function setupCyclesCommands(program: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
 
-        const cycleId = await resolveCycleId(ctx.sdk, cycle, options.team);
+        const cycleId = await resolveCycleId(ctx.gql, cycle, options.team);
 
         const cycleResult = await getCycle(
           ctx.gql,
