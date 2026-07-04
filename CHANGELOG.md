@@ -4,6 +4,12 @@
 
 * **issues:** add activity command with threaded discussion timeline ([38a3ea3](https://github.com/linearis-oss/linearis/commit/38a3ea3379a7c92eba728d0d5ee7537dbd2a452b)), closes [#144](https://github.com/linearis-oss/linearis/issues/144)
 
+## [2026.6.0-next.12](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.11...v2026.6.0-next.12) (2026-07-04)
+
+### Features
+
+* **issues:** add activity command with threaded discussion timeline ([38a3ea3](https://github.com/linearis-oss/linearis/commit/38a3ea3379a7c92eba728d0d5ee7537dbd2a452b)), closes [#144](https://github.com/linearis-oss/linearis/issues/144)
+
 ## [2026.6.0-next.11](https://github.com/linearis-oss/linearis/compare/v2026.6.0-next.10...v2026.6.0-next.11) (2026-07-03)
 
 ### Features
