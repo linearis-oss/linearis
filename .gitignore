@@ -2,6 +2,9 @@
 /src/gql/
 USAGE.md
 
+# clean-publish staging dir (release publish; see .releaserc.cjs)
+/.clean-pkg/
+
 docs/superpowers/
 
 # pi
