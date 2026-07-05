@@ -98,6 +98,8 @@ Need a CLI command?
   → Use createContext() → resolve IDs → call service → outputSuccess()
   → Register in src/main.ts (setupXCommands + META in allMetas[])
   → Add DomainMeta export + usage subcommand
+  → Add interactive support (see Interactive Prompts): *CreateSpec/*UpdateSpec
+    for create/update; optional [id] positional + entity picker for id commands
 
 Need tests?
   → Add tests/unit/{resolvers,services,common}/*.test.ts
@@ -192,6 +194,72 @@ Registration checklist:
 3. Add meta to `allMetas[]` in `src/main.ts`.
 4. Run `npm run generate:usage` to update `USAGE.md`.
 
+## Interactive Prompts
+
+Human users get an optional wizard; agents and pipes get untouched JSON. The
+descriptor-driven engine in `src/common/interactive/` **gathers input only** — it
+sits above the Resolver→Service→`outputSuccess` pipeline and never changes it.
+Choice `value`s are the human strings a user would type (team key, project name) or
+a UUID passthrough, so **resolvers still run** and layer separation holds. All prompt
+UI is on **stderr**; stdout stays byte-identical JSON. **Never compromise the
+machine/agent contract to add interactivity.**
+
+### When to add support
+
+- **New `create`/`update` command** → declare an `export const *CreateSpec` /
+  `*UpdateSpec` (`PromptSpec<O>`) colocated at the top of the command file, next to
+  the options interface it mirrors. Field order encodes cross-field deps.
+- **New command with a leading entity-id positional** (`read`/`update`/`delete`/
+  `archive`/`react`) → make the positional **optional** (`[id]`, not `<id>`) and pass
+  an entity `picker` so the engine can fill it when absent.
+- **Otherwise** (`list`/`search`, a free-text positional whose value is user-typed
+  rather than chosen from an enumerable source, or a required 2nd positional) →
+  **skip**, and if it keeps a required leading `<arg>` add its verb to
+  `SKIP_REQUIRED_POSITIONAL` in the coverage test with a one-line reason.
+
+### Call site (one insertion per action; body below is unchanged)
+
+```typescript
+const filled = await maybeCollectInteractive<CreateWizardOptions, never>(
+  ctx, getRootOpts(command), {
+    spec: issueCreateSpec,
+    options: { ...options, ...(title !== undefined ? { title } : {}) } as CreateWizardOptions,
+    missingRequired: title === undefined || options.team === undefined,
+  });
+// For id positionals: use EMPTY_SPEC + `positional: { name, value, picker }`.
+```
+
+`maybeCollectInteractive` returns inputs **untouched** when `shouldPrompt`
+(`gating.ts`) says no — that gate fires only on a real TTY with `-i` explicit or a
+required arg missing, and is suppressed by non-TTY, `CI`/`LINEARIS_NO_INTERACTIVE`,
+`--no-interactive`, `--compact`, or `--fields`.
+
+### Reuse, don't reinvent
+
+- Choices come from `src/common/interactive/choices.ts` — loaders import **list
+  services** via `ctx.gql`, not resolvers (`teamChoices`, `assigneeChoices`,
+  `projectChoices`, `milestoneChoices`, `statusChoices`, `priorityChoices`, …). The
+  one exception is `estimateChoices`, which reads a team's estimate scale via a
+  resolver under a documented `ARCHITECTURAL EXCEPTION` — follow that pattern only
+  when no list service exposes the data.
+- Wrap with `withNoneChoice`/`optionalChoices` for escapable/optional fields; gate
+  cross-field fields with `when(draft)` + lazy `choices(ctx, draft)` (team before
+  cycle/status; project before milestone).
+- Pickers: `makeChoicePicker` for a flat select; `makeDiscussionPickers`
+  (`discussion-pickers.ts`) for thread/reply selection. Entity-picker commands seed
+  the resolved parent (e.g. the issue's team) into the draft before the wizard.
+
+### Rules
+
+- Never `console.log` or prompt on stdout; never bypass `shouldPrompt` or weaken its
+  gates. Choice loaders read list services, not resolvers (see the `estimateChoices`
+  exception above).
+- Cancellation is handled centrally (`InteractiveCancelledError` →
+  `{"error":"INTERACTIVE_CANCELLED"}` on stderr, exit 1) — don't catch it in commands.
+- `tests/unit/interactive/coverage-sweep.test.ts` fails CI if a create/update ships
+  without a matching spec or an entity-id positional is left required. Run `npm test`
+  after adding a command.
+
 ## File Map
 
 ```
@@ -202,6 +270,7 @@ src/
   services/            # business logic (GraphQL CRUD)
   commands/            # CLI definitions (Commander.js)
   common/              # context, output, errors, types, auth, usage
+    interactive/       # descriptor-driven prompt engine (input only)
   gql/                 # GENERATED — do not edit
 graphql/
   queries/             # .graphql query definitions
