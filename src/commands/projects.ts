@@ -16,7 +16,10 @@ import {
   teamChoices,
   userChoices,
 } from "../common/interactive/choices.js";
-import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import {
+  maybeCollectInteractive,
+  normalizeWizardLists,
+} from "../common/interactive/engine.js";
 import type { ChoicePicker } from "../common/interactive/pickers.js";
 import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
@@ -371,30 +374,6 @@ export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
     },
   ],
 };
-
-/**
- * Multiselect fields yield a `string[]` of UUIDs, but the command body expects
- * the CLI-shaped comma-separated `string`. Normalise the named keys in place so
- * the command body below the wizard call stays unchanged.
- */
-function normalizeWizardLists<O extends Record<string, unknown>>(
-  filled: O,
-  keys: readonly string[],
-): O {
-  const normalized = { ...filled };
-  for (const key of keys) {
-    const value = normalized[key];
-    if (Array.isArray(value)) {
-      const joined = value.join(",");
-      if (joined.length > 0) {
-        (normalized as Record<string, unknown>)[key] = joined;
-      } else {
-        delete (normalized as Record<string, unknown>)[key];
-      }
-    }
-  }
-  return normalized;
-}
 
 /**
  * Entity picker for an absent `[project]` positional. Lists recent projects and

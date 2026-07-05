@@ -114,9 +114,14 @@ export const documentCreateSpec: PromptSpec<DocumentCreateWizardOptions> = {
       name: "project",
       kind: "select",
       message: "Project",
-      choices: projectChoices,
+      choices: optionalChoices(projectChoices, "None (no project)"),
     },
-    { name: "team", kind: "select", message: "Team", choices: teamChoices },
+    {
+      name: "team",
+      kind: "select",
+      message: "Team",
+      choices: optionalChoices(teamChoices, "None (no team)"),
+    },
     { name: "icon", kind: "text", message: "Icon" },
     { name: "color", kind: "text", message: "Icon color" },
     {
@@ -147,7 +152,7 @@ export const documentUpdateSpec: PromptSpec<DocumentUpdateWizardOptions> = {
       name: "project",
       kind: "select",
       message: "Project",
-      choices: projectChoices,
+      choices: optionalChoices(projectChoices, "Keep current"),
     },
     { name: "icon", kind: "text", message: "Icon", default: (d) => d.icon },
     {

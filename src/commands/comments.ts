@@ -166,13 +166,20 @@ async function resolveEmojiPositional(
   emoji: string | undefined,
   shortcode: string | undefined,
 ): Promise<string | undefined> {
+  // A --shortcode already fully determines the emoji, so never offer the
+  // picker in that case: it would force the user to pick a glyph and then
+  // collide with the shortcode in resolveReactionEmojiInput ("cannot provide
+  // both"). Only prompt for a genuinely absent emoji.
+  if (shortcode !== undefined) {
+    return emoji;
+  }
   const filled = await maybeCollectInteractive<Record<string, never>, string>(
     ctx,
     getRootOpts(command),
     {
       spec: EMPTY_SPEC,
       options: {},
-      missingRequired: emoji === undefined && shortcode === undefined,
+      missingRequired: emoji === undefined,
       positional: { name: "emoji", value: emoji, picker: emojiPicker },
     },
   );

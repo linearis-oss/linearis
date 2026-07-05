@@ -29,7 +29,10 @@ import {
   statusChoices,
   teamChoices,
 } from "../common/interactive/choices.js";
-import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import {
+  maybeCollectInteractive,
+  normalizeWizardLists,
+} from "../common/interactive/engine.js";
 import { shouldPrompt } from "../common/interactive/gating.js";
 import {
   type ChoicePicker,
@@ -58,6 +61,8 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
+import { resolveProjectId } from "../resolvers/project-resolver.js";
+import { resolveTeamId } from "../resolvers/team-resolver.js";
 import { getIssueActivity } from "../services/activity-service.js";
 import {
   createDiscussionCommentReaction,
@@ -372,24 +377,6 @@ export const issueUpdateSpec: PromptSpec<UpdateWizardOptions> = {
     },
   ],
 };
-
-/**
- * The `labels` multiselect yields a `string[]` of UUIDs, but the command body
- * expects the CLI-shaped comma-separated `string`. Normalise it in place so the
- * command body below the wizard call stays unchanged.
- */
-function normalizeWizardLabels<O extends { labels?: unknown }>(filled: O): O {
-  const normalized = { ...filled };
-  if (Array.isArray(normalized.labels)) {
-    const joined = normalized.labels.join(",");
-    if (joined.length > 0) {
-      (normalized as { labels?: string }).labels = joined;
-    } else {
-      delete (normalized as { labels?: string }).labels;
-    }
-  }
-  return normalized;
-}
 
 /**
  * Entity picker for an absent `<issue>` positional. Lists recent open issues
@@ -1587,24 +1574,49 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       commandAction<[string, CreateOptions, Command]>(
         async (title, options, command) => {
-          const ctx = createContext(getRootOpts(command));
+          const rootOpts = getRootOpts(command);
+          const ctx = createContext(rootOpts);
+
+          const missingRequired =
+            title === undefined || options.team === undefined;
+
+          // When the field wizard will run, resolve any human-readable
+          // --team/--project flags to UUIDs up front so the team/project-scoped
+          // choice loaders (cycle, status, labels, milestone) filter correctly.
+          // Mirrors the update path, which seeds the resolved team UUID: without
+          // this, `-i --team ENG` would filter those pickers on the raw key and
+          // silently offer no options.
+          let seededOptions = options;
+          if (shouldPrompt(rootOpts, { missingRequired })) {
+            const [teamId, projectId] = await Promise.all([
+              options.team ? resolveTeamId(ctx.gql, options.team) : undefined,
+              options.project
+                ? resolveProjectId(ctx.gql, options.project)
+                : undefined,
+            ]);
+            seededOptions = {
+              ...options,
+              ...(teamId !== undefined ? { team: teamId } : {}),
+              ...(projectId !== undefined ? { project: projectId } : {}),
+            };
+          }
 
           const filled = await maybeCollectInteractive<
             CreateWizardOptions,
             never
-          >(ctx, getRootOpts(command), {
+          >(ctx, rootOpts, {
             spec: issueCreateSpec,
             options: {
-              ...options,
+              ...seededOptions,
               ...(title !== undefined ? { title } : {}),
             } as CreateWizardOptions,
-            missingRequired: title === undefined || options.team === undefined,
+            missingRequired,
           });
           title = filled.options.title ?? title;
           if (title === undefined) {
             throw invalidParameterError("title", "is required");
           }
-          options = normalizeWizardLabels(filled.options);
+          options = normalizeWizardLists(filled.options, ["labels"]);
 
           const relationActions = parseRelationFlags(options);
 
@@ -1787,7 +1799,7 @@ export function setupIssuesCommands(program: Command): void {
             options: wizardOptions,
             missingRequired: issueArg === undefined,
           });
-          options = normalizeWizardLabels(filled.options);
+          options = normalizeWizardLists(filled.options, ["labels"]);
 
           if (options.parentTicket && options.clearParentTicket) {
             throw new Error(

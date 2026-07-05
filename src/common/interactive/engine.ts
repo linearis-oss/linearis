@@ -298,3 +298,30 @@ export async function maybeCollectInteractive<
 
   return { options: filledOptions, positional };
 }
+
+/**
+ * Normalise wizard-filled multiselect fields back to the CLI-shaped
+ * comma-separated `string` the command bodies expect. A `multiselect` prompt
+ * yields a `string[]` of values (usually UUIDs), whereas the same option passed
+ * as a flag (e.g. `--labels a,b`) is a comma-separated string — so for each
+ * named key this joins a present array, or deletes the key when the array is
+ * empty so it reads as "unset" downstream. Non-array values are left untouched.
+ */
+export function normalizeWizardLists<O extends Record<string, unknown>>(
+  filled: O,
+  keys: readonly string[],
+): O {
+  const normalized = { ...filled };
+  for (const key of keys) {
+    const value = normalized[key];
+    if (Array.isArray(value)) {
+      const joined = value.join(",");
+      if (joined.length > 0) {
+        (normalized as Record<string, unknown>)[key] = joined;
+      } else {
+        delete (normalized as Record<string, unknown>)[key];
+      }
+    }
+  }
+  return normalized;
+}
