@@ -278,7 +278,29 @@ graphql/
 tests/
   unit/                # mirrors src/ structure
   integration/         # CLI integration tests (need API token)
+skills/
+  linearis/SKILL.md    # agent skill teaching the CLI (has its own version)
+.claude-plugin/        # Claude Code plugin + marketplace manifests (versioned)
 ```
+
+## Skill & Plugin Versioning
+
+The agent skill and Claude Code plugin (`skills/linearis/SKILL.md`,
+`.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`) carry a
+**SemVer** version that is **independent of the date-based npm package version**
+(`package.json`). Consumers pull skill/plugin updates by this version, so it must
+move whenever the shipped content changes.
+
+**When you edit any skill or plugin file, bump the version in the same change:**
+
+- Keep all four version fields in lockstep — `metadata.version` in `SKILL.md`,
+  `version` in `plugin.json`, and both `metadata.version` and `plugins[0].version`
+  in `marketplace.json`.
+- **patch** (`1.0.0` → `1.0.1`) for wording, guidance, or fixes to existing
+  content; **minor** for new capability or materially new instructions; **major**
+  for breaking changes to what agents rely on.
+- Commit the bump as its own `chore(skill):` commit (or fold it into the content
+  commit), separate from the date-based release flow — never touch `CHANGELOG.md`.
 
 ## Verification Checklist
 
