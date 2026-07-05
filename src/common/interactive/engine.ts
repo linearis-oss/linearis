@@ -25,7 +25,7 @@ import type { FieldPrompt, PromptIO, PromptSpec } from "./types.js";
 export async function collectInteractive<O extends Record<string, unknown>>(
   ctx: CommandContext,
   spec: PromptSpec<O>,
-  provided: O,
+  provided: Partial<O>,
   io: PromptIO = clackIO,
 ): Promise<O> {
   const draft: Record<string, unknown> = { ...provided };

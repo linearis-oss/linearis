@@ -210,7 +210,10 @@ describe("labelChoices", () => {
 
     const result = await labelChoices(mockCtx(request), { team: TEAM_UUID });
 
-    const [, variables] = request.mock.calls[0];
+    const [, variables] = request.mock.calls[0] as [
+      unknown,
+      { filter?: unknown },
+    ];
     expect(variables.filter).toEqual({ team: { id: { eq: TEAM_UUID } } });
     expect(result).toEqual([{ value: "l1", label: "bug", hint: "defects" }]);
   });
@@ -225,7 +228,10 @@ describe("labelChoices", () => {
 
     await labelChoices(mockCtx(request), {});
 
-    const [, variables] = request.mock.calls[0];
+    const [, variables] = request.mock.calls[0] as [
+      unknown,
+      { filter?: unknown },
+    ];
     expect(variables.filter).toBeUndefined();
   });
 });
@@ -279,7 +285,10 @@ describe("cycleChoices (cross-field: cycle needs team)", () => {
 
     const result = await cycleChoices(mockCtx(request), { team: TEAM_UUID });
 
-    const [, variables] = request.mock.calls[0];
+    const [, variables] = request.mock.calls[0] as [
+      unknown,
+      { filter?: unknown },
+    ];
     expect(variables.filter).toEqual({ team: { id: { eq: TEAM_UUID } } });
     // Past cycle excluded; current (active) first so it is the default.
     expect(result.map((c) => c.value)).toEqual(["current", "future"]);
