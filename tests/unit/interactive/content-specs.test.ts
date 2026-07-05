@@ -52,10 +52,10 @@ describe("documentCreateSpec", () => {
 });
 
 describe("documentUpdateSpec", () => {
-  it("has no required fields and seeds defaults from options", () => {
+  it("has no required fields (a flag-supplied field is skipped, the rest prompted)", () => {
     expect(documentUpdateSpec.fields.every((f) => !f.required)).toBe(true);
     const title = documentUpdateSpec.fields.find((f) => f.name === "title");
-    expect(title?.default?.({ title: "cur" })).toBe("cur");
+    expect(title?.kind).toBe("text");
   });
 });
 

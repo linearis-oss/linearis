@@ -75,9 +75,13 @@ async function updatePicker(
   ctx: CommandContext,
   io: PromptIO,
 ): Promise<string> {
+  const initiativeOptions = await initiativeChoices(ctx);
+  if (initiativeOptions.length === 0) {
+    throw invalidParameterError("initiative", "no initiatives are available");
+  }
   const initiativeAnswer = await io.select({
     message: "Initiative",
-    options: await initiativeChoices(ctx),
+    options: initiativeOptions,
   });
   if (io.isCancel(initiativeAnswer)) {
     throw new InteractiveCancelledError();
@@ -93,6 +97,12 @@ async function updatePicker(
     label: (update.body ?? "").slice(0, 60) || update.id,
     ...(update.health ? { hint: String(update.health) } : {}),
   }));
+  if (options.length === 0) {
+    throw invalidParameterError(
+      "update",
+      "the selected initiative has no updates",
+    );
+  }
   const answer = await io.select({ message: "Update", options });
   if (io.isCancel(answer)) {
     throw new InteractiveCancelledError();

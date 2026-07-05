@@ -1,5 +1,5 @@
 import type { CommandContext } from "../context.js";
-import { InteractiveCancelledError } from "../errors.js";
+import { InteractiveCancelledError, invalidParameterError } from "../errors.js";
 import type { Choice, PromptIO } from "./types.js";
 
 /**
@@ -20,6 +20,9 @@ export type ChoicePicker = (
  * domains (the issue picker, the emoji picker). Cross-field pickers that first
  * select a parent (comment/thread, attachment, milestone, cycle) are NOT built
  * with this factory.
+ *
+ * Throws a clean {@link invalidParameterError} when `load` yields no options,
+ * since clack's `select` crashes on an empty option list.
  */
 export function makeChoicePicker(
   message: string,
@@ -27,6 +30,12 @@ export function makeChoicePicker(
 ): ChoicePicker {
   return async (ctx, io) => {
     const options = await load(ctx);
+    if (options.length === 0) {
+      throw invalidParameterError(
+        message.toLowerCase(),
+        "none are available to choose from",
+      );
+    }
     const answer = await io.select({ message, options });
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();

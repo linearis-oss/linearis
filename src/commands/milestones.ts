@@ -81,9 +81,10 @@ export const milestoneCreateSpec: PromptSpec<MilestoneCreateWizardOptions> = {
 };
 
 /**
- * Interactive wizard for `milestones update`. All fields optional; the current
- * option values seed each field. `project` is offered first so the milestone
- * picker (run afterwards by the positional flow) can scope its lookup.
+ * Interactive wizard for `milestones update`. All fields optional; a field
+ * already supplied by a flag is skipped, the rest are prompted fresh (the
+ * wizard does not pre-load the milestone's current values). The `[milestone]`
+ * positional is resolved first by the picker before these fields are prompted.
  */
 export const milestoneUpdateSpec: PromptSpec<MilestoneCreateWizardOptions> = {
   intro: "Update a milestone",
@@ -148,9 +149,13 @@ function makeMilestonePicker(
   return async (ctx, io) => {
     let projectId = projectHint;
     if (projectId === undefined) {
+      const projectOptions = await projectChoices(ctx);
+      if (projectOptions.length === 0) {
+        throw invalidParameterError("project", "no projects are available");
+      }
       const projectAnswer = await io.select({
         message: "Project",
-        options: await projectChoices(ctx),
+        options: projectOptions,
       });
       if (io.isCancel(projectAnswer)) {
         throw new InteractiveCancelledError();
@@ -161,6 +166,12 @@ function makeMilestonePicker(
     }
 
     const options = await milestoneChoices(ctx, { project: projectId });
+    if (options.length === 0) {
+      throw invalidParameterError(
+        "milestone",
+        "the selected project has no milestones",
+      );
+    }
     const answer = await io.select({ message: "Milestone", options });
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();

@@ -1,7 +1,10 @@
 import type { Command } from "commander";
 import type { CommandContext } from "../../common/context.js";
 import { createContext, getRootOpts } from "../../common/context.js";
-import { InteractiveCancelledError } from "../../common/errors.js";
+import {
+  InteractiveCancelledError,
+  invalidParameterError,
+} from "../../common/errors.js";
 import { initiativeChoices } from "../../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../../common/interactive/engine.js";
 import type { PromptIO } from "../../common/interactive/types.js";
@@ -21,6 +24,9 @@ function makeInitiativePicker(
 ): (ctx: CommandContext, io: PromptIO) => Promise<string> {
   return async (ctx, io) => {
     const options = await initiativeChoices(ctx);
+    if (options.length === 0) {
+      throw invalidParameterError("initiative", "no initiatives are available");
+    }
     const answer = await io.select({ message: label, options });
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();

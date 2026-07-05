@@ -90,6 +90,9 @@ function makeCyclePicker(
     }
 
     const options = await allCycleChoices(ctx, { team: teamId });
+    if (options.length === 0) {
+      throw invalidParameterError("cycle", "the selected team has no cycles");
+    }
     const answer = await io.select({ message: "Cycle", options });
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();

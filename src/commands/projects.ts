@@ -299,9 +299,9 @@ export const projectCreateSpec: PromptSpec<CreateWizardOptions> = {
 };
 
 /**
- * Interactive wizard for `projects update`. All fields optional; current option
- * values seed each field and prevent re-prompting for fields already provided
- * by flags.
+ * Interactive wizard for `projects update`. All fields optional; a field
+ * already supplied by a flag is skipped, the rest are prompted fresh (the
+ * wizard does not pre-load the project's current values).
  */
 export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
   intro: "Update a project",
@@ -389,6 +389,9 @@ async function projectPicker(
     label: project.name,
     hint: project.state,
   }));
+  if (options.length === 0) {
+    throw invalidParameterError("project", "no projects are available");
+  }
   const answer = await io.select({ message: "Project", options });
   if (io.isCancel(answer)) {
     throw new InteractiveCancelledError();

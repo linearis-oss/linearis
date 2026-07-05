@@ -291,8 +291,9 @@ export const initiativeCreateSpec: PromptSpec<InitiativeCreateWizardOptions> = {
 };
 
 /**
- * Interactive wizard for `initiatives update`. All fields optional; the current
- * option values seed each field.
+ * Interactive wizard for `initiatives update`. All fields optional; a field
+ * already supplied by a flag is skipped, the rest are prompted fresh (the
+ * wizard does not pre-load the initiative's current values).
  */
 export const initiativeUpdateSpec: PromptSpec<InitiativeUpdateWizardOptions> = {
   intro: "Update an initiative",
@@ -343,6 +344,9 @@ async function initiativePicker(
   io: PromptIO,
 ): Promise<string> {
   const options = await initiativeChoices(ctx);
+  if (options.length === 0) {
+    throw invalidParameterError("initiative", "no initiatives are available");
+  }
   const answer = await io.select({ message: "Initiative", options });
   if (io.isCancel(answer)) {
     throw new InteractiveCancelledError();

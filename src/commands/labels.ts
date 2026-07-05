@@ -111,9 +111,10 @@ export const labelCreateSpec: PromptSpec<CreateLabelWizardOptions> = {
 };
 
 /**
- * Interactive wizard for `labels update`. All fields optional; current option
- * values seed each field so an explicit flag is never re-prompted. The label
- * picker (run afterwards by the positional flow) resolves the `[label]`.
+ * Interactive wizard for `labels update`. All fields optional; a field already
+ * supplied by a flag is skipped, the rest are prompted fresh (the wizard does
+ * not pre-load the label's current values). The `[label]` positional is
+ * resolved first by the picker before these fields are prompted.
  */
 export const labelUpdateSpec: PromptSpec<UpdateLabelWizardOptions> = {
   intro: "Update an issue label",
@@ -157,6 +158,9 @@ function makeLabelPicker(
       ctx,
       teamId !== undefined ? { team: teamId } : {},
     );
+    if (options.length === 0) {
+      throw invalidParameterError("label", "no labels are available");
+    }
     const answer = await io.select({ message: "Label", options });
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();

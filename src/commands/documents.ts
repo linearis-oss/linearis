@@ -135,18 +135,18 @@ export const documentCreateSpec: PromptSpec<DocumentCreateWizardOptions> = {
 };
 
 /**
- * Interactive wizard for `documents update`. All fields optional; current
- * option values seed each field and prevent re-prompting for provided flags.
+ * Interactive wizard for `documents update`. All fields optional; a field
+ * already supplied by a flag is skipped, the rest are prompted fresh (the
+ * wizard does not pre-load the document's current values).
  */
 export const documentUpdateSpec: PromptSpec<DocumentUpdateWizardOptions> = {
   intro: "Update a document",
   fields: [
-    { name: "title", kind: "text", message: "Title", default: (d) => d.title },
+    { name: "title", kind: "text", message: "Title" },
     {
       name: "content",
       kind: "multiline",
       message: "Content (markdown)",
-      default: (d) => d.content,
     },
     {
       name: "project",
@@ -154,12 +154,11 @@ export const documentUpdateSpec: PromptSpec<DocumentUpdateWizardOptions> = {
       message: "Project",
       choices: optionalChoices(projectChoices, "Keep current"),
     },
-    { name: "icon", kind: "text", message: "Icon", default: (d) => d.icon },
+    { name: "icon", kind: "text", message: "Icon" },
     {
       name: "color",
       kind: "text",
       message: "Icon color",
-      default: (d) => d.color,
     },
   ],
 };
@@ -173,6 +172,9 @@ async function documentPicker(
   io: PromptIO,
 ): Promise<string> {
   const options = await documentChoices(ctx);
+  if (options.length === 0) {
+    throw invalidParameterError("document", "no documents are available");
+  }
   const answer = await io.select({ message: "Document", options });
   if (io.isCancel(answer)) {
     throw new InteractiveCancelledError();

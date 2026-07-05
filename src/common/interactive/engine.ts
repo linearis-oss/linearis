@@ -260,9 +260,10 @@ export interface MaybeCollectArgs<O extends Record<string, unknown>, T> {
 
 /**
  * Call-site helper. Runs {@link shouldPrompt}; when it returns false the inputs
- * are returned untouched (zero change for agents/pipes). When true it runs the
- * options wizard and, if a positional picker was supplied and its value is
- * absent, the picker.
+ * are returned untouched (zero change for agents/pipes). When true it first runs
+ * the positional picker (if one was supplied and its value is absent) and then
+ * the options wizard, so an interactive user chooses *which* entity to act on
+ * before being prompted for its fields.
  */
 export async function maybeCollectInteractive<
   O extends Record<string, unknown>,
@@ -281,20 +282,21 @@ export async function maybeCollectInteractive<
     };
   }
 
+  // Resolve the positional first so the user picks which entity to act on
+  // before the field wizard prompts for its values. Cancellation inside the
+  // picker must throw InteractiveCancelledError (same contract as the field
+  // engine) so it flows to outputError.
+  let positional = args.positional?.value;
+  if (args.positional && positional === undefined) {
+    positional = await args.positional.picker(ctx, io);
+  }
+
   const filledOptions = await collectInteractive(
     ctx,
     args.spec,
     args.options,
     io,
   );
-
-  let positional = args.positional?.value;
-  if (args.positional && positional === undefined) {
-    // Run the entity picker to fill an absent positional argument. Cancellation
-    // inside the picker must throw InteractiveCancelledError (same contract as
-    // the field engine) so it flows to outputError.
-    positional = await args.positional.picker(ctx, io);
-  }
 
   return { options: filledOptions, positional };
 }

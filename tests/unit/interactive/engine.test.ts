@@ -464,4 +464,40 @@ describe("maybeCollectInteractive positional picker", () => {
 
     setTTY(!!origStdin && !!origStdout);
   });
+
+  it("runs the positional picker before the field wizard", async () => {
+    setTTY(true);
+    process.env["CI"] = "";
+    const calls: string[] = [];
+    const picker = vi.fn(async () => {
+      calls.push("picker");
+      return "ENG-42";
+    });
+    const spec: PromptSpec<{ title?: string } & Record<string, unknown>> = {
+      fields: [{ name: "title", kind: "text", message: "Title" }],
+    };
+
+    const result = await maybeCollectInteractive<
+      { title?: string } & Record<string, unknown>,
+      string
+    >(
+      ctx,
+      { interactive: true },
+      {
+        spec,
+        options: {},
+        missingRequired: true,
+        positional: { name: "issue", value: undefined, picker },
+        io: fakeIO({ Title: "hello" }, calls),
+      },
+    );
+
+    // The user picks which entity to act on before being prompted for fields.
+    expect(calls).toEqual(["picker", "text:Title"]);
+    expect(result.positional).toBe("ENG-42");
+    expect(result.options.title).toBe("hello");
+
+    setTTY(!!origStdin && !!origStdout);
+    process.env["CI"] = origCI ?? "";
+  });
 });
