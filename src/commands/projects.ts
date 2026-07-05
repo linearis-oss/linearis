@@ -10,12 +10,14 @@ import {
 import { asUuid } from "../common/identifier.js";
 import {
   labelChoices,
+  optionalChoices,
   priorityChoices,
   projectStatusChoices,
   teamChoices,
   userChoices,
 } from "../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { ChoicePicker } from "../common/interactive/pickers.js";
 import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
@@ -55,6 +57,12 @@ import {
   unarchiveProject,
   updateProject,
 } from "../services/project-service.js";
+import {
+  makeDiscussionPickers,
+  resolveDiscussionBody,
+  resolveEmojiPositional,
+  resolvePickedPositional,
+} from "./discussion-pickers.js";
 
 interface ListOptions {
   limit: string;
@@ -88,46 +96,75 @@ interface ReactionOptions {
 function addCommentReactionCommands(
   parent: ReturnType<Command["command"]>,
   noun: "thread" | "reply",
+  picker: ChoicePicker,
 ): void {
   parent
-    .command(`react <${noun}> [emoji]`)
+    .command(`react [${noun}] [emoji]`)
     .description(`add a reaction to a discussion ${noun}`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      commandAction<[string, string | undefined, ReactionOptions, Command]>(
-        async (commentId, emoji, options, command) => {
-          const ctx = createContext(getRootOpts(command));
-          const result = await createDiscussionCommentReaction(ctx.gql, {
-            commentId: asUuid(commentId),
-            target: noun,
-            expectedEntityKind: "project",
-            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-          });
-          outputSuccess(result);
-        },
-      ),
+      commandAction<
+        [string | undefined, string | undefined, ReactionOptions, Command]
+      >(async (commentId, emoji, options, command) => {
+        const ctx = createContext(getRootOpts(command));
+        const resolvedComment = await resolvePickedPositional(
+          ctx,
+          command,
+          noun,
+          commentId,
+          picker,
+        );
+        const resolvedEmoji = await resolveEmojiPositional(
+          ctx,
+          command,
+          emoji,
+          options.shortcode,
+        );
+        const result = await createDiscussionCommentReaction(ctx.gql, {
+          commentId: asUuid(resolvedComment),
+          target: noun,
+          expectedEntityKind: "project",
+          emoji: resolveReactionEmojiInput(resolvedEmoji, options.shortcode),
+        });
+        outputSuccess(result);
+      }),
     );
 
   parent
-    .command(`unreact <${noun}> [emoji]`)
+    .command(`unreact [${noun}] [emoji]`)
     .description(`remove your reaction from a discussion ${noun} by emoji`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      commandAction<[string, string | undefined, ReactionOptions, Command]>(
-        async (commentId, emoji, options, command) => {
-          const ctx = createContext(getRootOpts(command));
-          const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-            commentId: asUuid(commentId),
-            target: noun,
-            expectedEntityKind: "project",
-            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-          });
-          outputSuccess(result);
-        },
-      ),
+      commandAction<
+        [string | undefined, string | undefined, ReactionOptions, Command]
+      >(async (commentId, emoji, options, command) => {
+        const ctx = createContext(getRootOpts(command));
+        const resolvedComment = await resolvePickedPositional(
+          ctx,
+          command,
+          noun,
+          commentId,
+          picker,
+        );
+        const resolvedEmoji = await resolveEmojiPositional(
+          ctx,
+          command,
+          emoji,
+          options.shortcode,
+        );
+        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+          commentId: asUuid(resolvedComment),
+          target: noun,
+          expectedEntityKind: "project",
+          emoji: resolveReactionEmojiInput(resolvedEmoji, options.shortcode),
+        });
+        outputSuccess(result);
+      }),
     );
 
   parent
+    // `unreact-id` stays fully non-interactive: its <reactionId> cannot be
+    // sourced from any list service (flag-only by-ID escape hatch for agents).
     .command(`unreact-id <${noun}> <reactionId>`)
     .description(
       `remove your reaction from a discussion ${noun} by reaction ID`,
@@ -212,11 +249,21 @@ export const projectCreateSpec: PromptSpec<CreateWizardOptions> = {
     },
     { name: "description", kind: "multiline", message: "Description" },
     { name: "content", kind: "multiline", message: "Content (markdown)" },
+    { name: "icon", kind: "text", message: "Icon (emoji or icon name)" },
+    {
+      name: "color",
+      kind: "text",
+      message: "Color (hex, e.g. #B45309)",
+      validate: (value) =>
+        value === "" || /^#[0-9a-fA-F]{6}$/.test(value)
+          ? undefined
+          : "must be a hex color like #B45309",
+    },
     {
       name: "lead",
       kind: "select",
       message: "Lead",
-      choices: userChoices,
+      choices: optionalChoices(userChoices, "None (no lead)"),
     },
     {
       name: "members",
@@ -234,7 +281,7 @@ export const projectCreateSpec: PromptSpec<CreateWizardOptions> = {
       name: "status",
       kind: "select",
       message: "Status",
-      choices: projectStatusChoices,
+      choices: optionalChoices(projectStatusChoices, "None (no status)"),
     },
     {
       name: "labels",
@@ -271,11 +318,21 @@ export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
       kind: "multiline",
       message: "Content (markdown)",
     },
+    { name: "icon", kind: "text", message: "Icon (emoji or icon name)" },
+    {
+      name: "color",
+      kind: "text",
+      message: "Color (hex, e.g. #B45309)",
+      validate: (value) =>
+        value === "" || /^#[0-9a-fA-F]{6}$/.test(value)
+          ? undefined
+          : "must be a hex color like #B45309",
+    },
     {
       name: "lead",
       kind: "select",
       message: "Lead",
-      choices: userChoices,
+      choices: optionalChoices(userChoices, "Keep current"),
     },
     {
       name: "members",
@@ -293,7 +350,7 @@ export const projectUpdateSpec: PromptSpec<UpdateWizardOptions> = {
       name: "status",
       kind: "select",
       message: "Status",
-      choices: projectStatusChoices,
+      choices: optionalChoices(projectStatusChoices, "Keep current"),
     },
     {
       name: "labels",
@@ -387,6 +444,20 @@ async function resolveProjectPositional(
   }
   return filled.positional;
 }
+
+/**
+ * Discussion positional pickers for the project domain (see
+ * {@link makeDiscussionPickers}). `rootThreadPicker` fills a `[thread]`,
+ * `commentOrReplyPicker` fills a `[comment]` (root or reply), and `replyPicker`
+ * fills a `[reply]`.
+ */
+const { rootThreadPicker, commentOrReplyPicker, replyPicker } =
+  makeDiscussionPickers({
+    entityKind: "project",
+    entityPicker: projectPicker,
+    resolveEntityId: (ctx, human) => resolveProjectId(ctx.gql, human),
+    listThreads: listDiscussionsForProject,
+  });
 
 export const PROJECTS_META: DomainMeta = {
   name: "projects",
@@ -536,19 +607,16 @@ export function setupProjectsCommands(program: Command): void {
         async (projectArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
-
           const project = await resolveProjectPositional(
             ctx,
             command,
             projectArg,
           );
+          const body = await resolveDiscussionBody(ctx, command, options);
           const projectId = await resolveProjectId(ctx.gql, project);
           const result = await startProjectDiscussion(ctx.gql, {
             projectId,
-            body: options.body,
+            body,
           });
 
           outputSuccess(result);
@@ -597,19 +665,26 @@ export function setupProjectsCommands(program: Command): void {
   const projectThreads = projects
     .command("threads")
     .description("discussion thread reaction operations");
-  addCommentReactionCommands(projectThreads, "thread");
+  addCommentReactionCommands(projectThreads, "thread", rootThreadPicker);
 
   const projectReplies = projects
-    .command("replies <thread>")
+    .command("replies [thread]")
     .description("list replies in a root discussion thread")
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      commandAction<[string, DiscussionsOptions, Command]>(
+      commandAction<[string | undefined, DiscussionsOptions, Command]>(
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "50"),
             options.after,
@@ -617,13 +692,13 @@ export function setupProjectsCommands(program: Command): void {
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
-                asUuid(thread),
+                asUuid(threadId),
                 paginationOptions,
                 "project",
               )
             : await listDiscussionReplies(
                 ctx.gql,
-                asUuid(thread),
+                asUuid(threadId),
                 paginationOptions,
                 "project",
               );
@@ -632,28 +707,33 @@ export function setupProjectsCommands(program: Command): void {
         },
       ),
     );
-  addCommentReactionCommands(projectReplies, "reply");
+  addCommentReactionCommands(projectReplies, "reply", replyPicker);
 
   projects
-    .command("reply <thread>")
+    .command("reply [thread]")
     .description("reply to a root discussion thread")
     .addHelpText(
       "after",
-      "\nImportant: `<thread>` must be a root discussion thread ID.",
+      "\nImportant: `[thread]` must be a root discussion thread ID.",
     )
     .option("--body <text>", "reply body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await replyToDiscussion(ctx.gql, {
-            threadId: asUuid(thread),
-            body: options.body,
+            threadId: asUuid(threadId),
+            body,
             entityKind: "project",
           });
 
@@ -663,23 +743,28 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("edit <comment>")
+    .command("edit [comment]")
     .description("edit a root discussion or reply comment")
     .option("--body <text>", "new comment body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
         async (comment, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const commentId = await resolvePickedPositional(
+            ctx,
+            command,
+            "comment",
+            comment,
+            commentOrReplyPicker,
+          );
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await editDiscussionComment(
             ctx.gql,
-            asUuid(comment),
+            asUuid(commentId),
             {
-              body: options.body,
+              body,
             },
             "project",
           );
@@ -690,23 +775,28 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("edit-reply <reply>")
+    .command("edit-reply [reply]")
     .description("edit a discussion reply")
     .option("--body <text>", "new reply body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
         async (reply, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const replyId = await resolvePickedPositional(
+            ctx,
+            command,
+            "reply",
+            reply,
+            replyPicker,
+          );
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await editDiscussionReply(
             ctx.gql,
-            asUuid(reply),
+            asUuid(replyId),
             {
-              body: options.body,
+              body,
             },
             "project",
           );
@@ -717,16 +807,23 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("delete-comment <comment>")
+    .command("delete-comment [comment]")
     .description("delete a root discussion or reply comment")
     .action(
-      commandAction<[string, unknown, Command]>(
+      commandAction<[string | undefined, unknown, Command]>(
         async (comment, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const commentId = await resolvePickedPositional(
+            ctx,
+            command,
+            "comment",
+            comment,
+            commentOrReplyPicker,
+          );
           const result = await deleteDiscussionComment(
             ctx.gql,
-            asUuid(comment),
+            asUuid(commentId),
             "project",
           );
 
@@ -736,16 +833,23 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("delete-reply <reply>")
+    .command("delete-reply [reply]")
     .description("delete a discussion reply")
     .action(
-      commandAction<[string, unknown, Command]>(
+      commandAction<[string | undefined, unknown, Command]>(
         async (reply, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const replyId = await resolvePickedPositional(
+            ctx,
+            command,
+            "reply",
+            reply,
+            replyPicker,
+          );
           const result = await deleteDiscussionReply(
             ctx.gql,
-            asUuid(reply),
+            asUuid(replyId),
             "project",
           );
 
@@ -755,16 +859,23 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("resolve <thread>")
+    .command("resolve [thread]")
     .description("resolve a discussion thread")
     .option("--with-comment <comment>", "comment to mark as resolving comment")
     .action(
-      commandAction<[string, ResolveDiscussionOptions, Command]>(
+      commandAction<[string | undefined, ResolveDiscussionOptions, Command]>(
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
           const result = await resolveDiscussion(ctx.gql, {
-            threadId: asUuid(thread),
+            threadId: asUuid(threadId),
             ...(options.withComment !== undefined
               ? { resolvingCommentId: asUuid(options.withComment) }
               : {}),
@@ -777,16 +888,23 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("unresolve <thread>")
+    .command("unresolve [thread]")
     .description("unresolve a discussion thread")
     .action(
-      commandAction<[string, unknown, Command]>(
+      commandAction<[string | undefined, unknown, Command]>(
         async (thread, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
           const result = await unresolveDiscussion(
             ctx.gql,
-            asUuid(thread),
+            asUuid(threadId),
             "project",
           );
 

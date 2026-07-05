@@ -10,9 +10,12 @@ import {
 import { asUuid } from "../../common/identifier.js";
 import {
   initiativeChoices,
+  optionalChoices,
   userChoices,
+  withNoneChoice,
 } from "../../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../../common/interactive/engine.js";
+import type { ChoicePicker } from "../../common/interactive/pickers.js";
 import type {
   Choice,
   PromptIO,
@@ -62,6 +65,12 @@ import {
   unarchiveInitiative,
   updateInitiative,
 } from "../../services/initiative-service.js";
+import {
+  makeDiscussionPickers,
+  resolveDiscussionBody,
+  resolveEmojiPositional,
+  resolvePickedPositional,
+} from "../discussion-pickers.js";
 
 interface InitiativeExpandOptions {
   withProjects?: boolean;
@@ -125,46 +134,75 @@ interface ReactionOptions {
 function addCommentReactionCommands(
   parent: ReturnType<Command["command"]>,
   noun: "thread" | "reply",
+  picker: ChoicePicker,
 ): void {
   parent
-    .command(`react <${noun}> [emoji]`)
+    .command(`react [${noun}] [emoji]`)
     .description(`add a reaction to a discussion ${noun}`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      commandAction<[string, string | undefined, ReactionOptions, Command]>(
-        async (commentId, emoji, options, command) => {
-          const ctx = createContext(getRootOpts(command));
-          const result = await createDiscussionCommentReaction(ctx.gql, {
-            commentId: asUuid(commentId),
-            target: noun,
-            expectedEntityKind: "initiative",
-            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-          });
-          outputSuccess(result);
-        },
-      ),
+      commandAction<
+        [string | undefined, string | undefined, ReactionOptions, Command]
+      >(async (commentId, emoji, options, command) => {
+        const ctx = createContext(getRootOpts(command));
+        const resolvedComment = await resolvePickedPositional(
+          ctx,
+          command,
+          noun,
+          commentId,
+          picker,
+        );
+        const resolvedEmoji = await resolveEmojiPositional(
+          ctx,
+          command,
+          emoji,
+          options.shortcode,
+        );
+        const result = await createDiscussionCommentReaction(ctx.gql, {
+          commentId: asUuid(resolvedComment),
+          target: noun,
+          expectedEntityKind: "initiative",
+          emoji: resolveReactionEmojiInput(resolvedEmoji, options.shortcode),
+        });
+        outputSuccess(result);
+      }),
     );
 
   parent
-    .command(`unreact <${noun}> [emoji]`)
+    .command(`unreact [${noun}] [emoji]`)
     .description(`remove your reaction from a discussion ${noun} by emoji`)
     .option("--shortcode <name>", "emoji shortcode (e.g. thumbs_up)")
     .action(
-      commandAction<[string, string | undefined, ReactionOptions, Command]>(
-        async (commentId, emoji, options, command) => {
-          const ctx = createContext(getRootOpts(command));
-          const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
-            commentId: asUuid(commentId),
-            target: noun,
-            expectedEntityKind: "initiative",
-            emoji: resolveReactionEmojiInput(emoji, options.shortcode),
-          });
-          outputSuccess(result);
-        },
-      ),
+      commandAction<
+        [string | undefined, string | undefined, ReactionOptions, Command]
+      >(async (commentId, emoji, options, command) => {
+        const ctx = createContext(getRootOpts(command));
+        const resolvedComment = await resolvePickedPositional(
+          ctx,
+          command,
+          noun,
+          commentId,
+          picker,
+        );
+        const resolvedEmoji = await resolveEmojiPositional(
+          ctx,
+          command,
+          emoji,
+          options.shortcode,
+        );
+        const result = await deleteDiscussionCommentReactionByEmoji(ctx.gql, {
+          commentId: asUuid(resolvedComment),
+          target: noun,
+          expectedEntityKind: "initiative",
+          emoji: resolveReactionEmojiInput(resolvedEmoji, options.shortcode),
+        });
+        outputSuccess(result);
+      }),
     );
 
   parent
+    // `unreact-id` stays fully non-interactive: its <reactionId> cannot be
+    // sourced from any list service (flag-only by-ID escape hatch for agents).
     .command(`unreact-id <${noun}> <reactionId>`)
     .description(
       `remove your reaction from a discussion ${noun} by reaction ID`,
@@ -239,13 +277,14 @@ export const initiativeCreateSpec: PromptSpec<InitiativeCreateWizardOptions> = {
       name: "owner",
       kind: "select",
       message: "Owner",
-      choices: userChoices,
+      choices: optionalChoices(userChoices, "None (no owner)"),
     },
     {
       name: "status",
       kind: "select",
       message: "Status",
-      choices: async () => initiativeStatusChoices(),
+      choices: async () =>
+        withNoneChoice(initiativeStatusChoices(), "None (default status)"),
     },
     { name: "targetDate", kind: "date", message: "Target date" },
   ],
@@ -277,13 +316,14 @@ export const initiativeUpdateSpec: PromptSpec<InitiativeUpdateWizardOptions> = {
       name: "owner",
       kind: "select",
       message: "Owner",
-      choices: userChoices,
+      choices: optionalChoices(userChoices, "Keep current"),
     },
     {
       name: "status",
       kind: "select",
       message: "Status",
-      choices: async () => initiativeStatusChoices(),
+      choices: async () =>
+        withNoneChoice(initiativeStatusChoices(), "Keep current"),
     },
     {
       name: "targetDate",
@@ -338,6 +378,20 @@ async function resolveInitiativePositional(
   }
   return filled.positional;
 }
+
+/**
+ * Discussion positional pickers for the initiative domain (see
+ * {@link makeDiscussionPickers}). `rootThreadPicker` fills a `[thread]`,
+ * `commentOrReplyPicker` fills a `[comment]` (root or reply), and `replyPicker`
+ * fills a `[reply]`.
+ */
+const { rootThreadPicker, commentOrReplyPicker, replyPicker } =
+  makeDiscussionPickers({
+    entityKind: "initiative",
+    entityPicker: initiativePicker,
+    resolveEntityId: (ctx, human) => resolveInitiativeId(ctx.gql, human),
+    listThreads: listDiscussionsForInitiative,
+  });
 
 function parseSortOrder(value?: string): "asc" | "desc" | undefined {
   if (!value) return undefined;
@@ -584,19 +638,16 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         async (initiativeArg, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
-
           const initiative = await resolveInitiativePositional(
             ctx,
             command,
             initiativeArg,
           );
+          const body = await resolveDiscussionBody(ctx, command, options);
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
           const result = await startInitiativeDiscussion(ctx.gql, {
             initiativeId,
-            body: options.body,
+            body,
           });
 
           outputSuccess(result);
@@ -645,19 +696,26 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
   const initiativeThreads = initiatives
     .command("threads")
     .description("discussion thread reaction operations");
-  addCommentReactionCommands(initiativeThreads, "thread");
+  addCommentReactionCommands(initiativeThreads, "thread", rootThreadPicker);
 
   const initiativeReplies = initiatives
-    .command("replies <thread>")
+    .command("replies [thread]")
     .description("list replies in a root discussion thread")
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
     .option("--with-reactions", "include normalized discussion reactions")
     .action(
-      commandAction<[string, DiscussionsOptions, Command]>(
+      commandAction<[string | undefined, DiscussionsOptions, Command]>(
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
           const paginationOptions = buildPaginationOptions(
             parseLimit(options.limit || "50"),
             options.after,
@@ -665,13 +723,13 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
           const result = options.withReactions
             ? await listDiscussionRepliesWithReactions(
                 ctx.gql,
-                asUuid(thread),
+                asUuid(threadId),
                 paginationOptions,
                 "initiative",
               )
             : await listDiscussionReplies(
                 ctx.gql,
-                asUuid(thread),
+                asUuid(threadId),
                 paginationOptions,
                 "initiative",
               );
@@ -680,28 +738,33 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
         },
       ),
     );
-  addCommentReactionCommands(initiativeReplies, "reply");
+  addCommentReactionCommands(initiativeReplies, "reply", replyPicker);
 
   initiatives
-    .command("reply <thread>")
+    .command("reply [thread]")
     .description("reply to a root discussion thread")
     .addHelpText(
       "after",
-      "\nImportant: `<thread>` must be a root discussion thread ID.",
+      "\nImportant: `[thread]` must be a root discussion thread ID.",
     )
     .option("--body <text>", "reply body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await replyToDiscussion(ctx.gql, {
-            threadId: asUuid(thread),
-            body: options.body,
+            threadId: asUuid(threadId),
+            body,
             entityKind: "initiative",
           });
 
@@ -711,23 +774,28 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("edit <comment>")
+    .command("edit [comment]")
     .description("edit a root discussion or reply comment")
     .option("--body <text>", "new comment body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
         async (comment, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const commentId = await resolvePickedPositional(
+            ctx,
+            command,
+            "comment",
+            comment,
+            commentOrReplyPicker,
+          );
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await editDiscussionComment(
             ctx.gql,
-            asUuid(comment),
+            asUuid(commentId),
             {
-              body: options.body,
+              body,
             },
             "initiative",
           );
@@ -738,23 +806,28 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("edit-reply <reply>")
+    .command("edit-reply [reply]")
     .description("edit a discussion reply")
     .option("--body <text>", "new reply body (required, markdown supported)")
     .action(
-      commandAction<[string, DiscussionBodyOptions, Command]>(
+      commandAction<[string | undefined, DiscussionBodyOptions, Command]>(
         async (reply, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
-          if (!options.body) {
-            throw invalidParameterError("--body", "is required");
-          }
+          const replyId = await resolvePickedPositional(
+            ctx,
+            command,
+            "reply",
+            reply,
+            replyPicker,
+          );
+          const body = await resolveDiscussionBody(ctx, command, options);
 
           const result = await editDiscussionReply(
             ctx.gql,
-            asUuid(reply),
+            asUuid(replyId),
             {
-              body: options.body,
+              body,
             },
             "initiative",
           );
@@ -765,16 +838,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("delete-comment <comment>")
+    .command("delete-comment [comment]")
     .description("delete a root discussion or reply comment")
     .action(
-      commandAction<[string, unknown, Command]>(
+      commandAction<[string | undefined, unknown, Command]>(
         async (comment, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const commentId = await resolvePickedPositional(
+            ctx,
+            command,
+            "comment",
+            comment,
+            commentOrReplyPicker,
+          );
           const result = await deleteDiscussionComment(
             ctx.gql,
-            asUuid(comment),
+            asUuid(commentId),
             "initiative",
           );
 
@@ -784,16 +864,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("delete-reply <reply>")
+    .command("delete-reply [reply]")
     .description("delete a discussion reply")
     .action(
-      commandAction<[string, unknown, Command]>(
+      commandAction<[string | undefined, unknown, Command]>(
         async (reply, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const replyId = await resolvePickedPositional(
+            ctx,
+            command,
+            "reply",
+            reply,
+            replyPicker,
+          );
           const result = await deleteDiscussionReply(
             ctx.gql,
-            asUuid(reply),
+            asUuid(replyId),
             "initiative",
           );
 
@@ -803,16 +890,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("resolve <thread>")
+    .command("resolve [thread]")
     .description("resolve a discussion thread")
     .option("--with-comment <comment>", "comment to mark as resolving comment")
     .action(
-      commandAction<[string, ResolveDiscussionOptions, Command]>(
+      commandAction<[string | undefined, ResolveDiscussionOptions, Command]>(
         async (thread, options, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
           const result = await resolveDiscussion(ctx.gql, {
-            threadId: asUuid(thread),
+            threadId: asUuid(threadId),
             ...(options.withComment !== undefined
               ? { resolvingCommentId: asUuid(options.withComment) }
               : {}),
@@ -825,16 +919,23 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     );
 
   initiatives
-    .command("unresolve <thread>")
+    .command("unresolve [thread]")
     .description("unresolve a discussion thread")
     .action(
-      commandAction<[string, unknown, Command]>(
+      commandAction<[string | undefined, unknown, Command]>(
         async (thread, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
 
+          const threadId = await resolvePickedPositional(
+            ctx,
+            command,
+            "thread",
+            thread,
+            rootThreadPicker,
+          );
           const result = await unresolveDiscussion(
             ctx.gql,
-            asUuid(thread),
+            asUuid(threadId),
             "initiative",
           );
 

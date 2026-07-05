@@ -57,6 +57,28 @@ export function withNoneChoice(choices: Choice[], label: string): Choice[] {
   return [{ value: "", label }, ...choices];
 }
 
+/**
+ * Wrap a choice loader so it prepends an empty-valued sentinel (via
+ * {@link withNoneChoice}) whenever it returns at least one real option. This
+ * makes an otherwise-mandatory single-select escapable:
+ *  - on create, picking the sentinel leaves the field unset (CLI default);
+ *  - on update, it leaves the field unchanged.
+ *
+ * When the underlying loader returns no options (e.g. a team with estimates
+ * disabled, or no upcoming cycles) the empty list is passed through unchanged,
+ * so the engine skips the field entirely instead of rendering a select whose
+ * only entry is the sentinel.
+ */
+export function optionalChoices(
+  load: (ctx: CommandContext, draft: Draft) => Promise<Choice[]>,
+  label: string,
+): (ctx: CommandContext, draft: Draft) => Promise<Choice[]> {
+  return async (ctx, draft) => {
+    const base = await load(ctx, draft);
+    return base.length === 0 ? [] : withNoneChoice(base, label);
+  };
+}
+
 export async function teamChoices(ctx: CommandContext): Promise<Choice[]> {
   const { nodes } = await listTeams(ctx.gql);
   return nodes.map((team) => ({
@@ -181,6 +203,30 @@ export async function cycleChoices(
     return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
   });
   return upcoming.map((cycle) => ({
+    value: cycle.id,
+    label: cycle.name,
+    hint: cycle.isActive ? "current" : `${cycle.startsAt} → ${cycle.endsAt}`,
+  }));
+}
+
+/**
+ * Every cycle for the draft's team, including ended ones. Unlike
+ * {@link cycleChoices} (which drops past cycles because you cannot schedule work
+ * into a finished cycle), reading a cycle is a retrospective operation, so the
+ * `cycles read` picker must be able to reach historical cycles too. The active
+ * cycle is surfaced first; the rest follow most-recent-first by start date.
+ */
+export async function allCycleChoices(
+  ctx: CommandContext,
+  draft: Draft,
+): Promise<Choice[]> {
+  const teamId = draftUuid(draft, "team");
+  const { nodes } = await listCycles(ctx.gql, teamId);
+  const sorted = [...nodes].sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime();
+  });
+  return sorted.map((cycle) => ({
     value: cycle.id,
     label: cycle.name,
     hint: cycle.isActive ? "current" : `${cycle.startsAt} → ${cycle.endsAt}`,

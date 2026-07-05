@@ -31,6 +31,15 @@ describe("projectCreateSpec", () => {
       expect(field?.kind).toBe("multiselect");
     }
   });
+
+  it("covers icon and hex-validated color fields", () => {
+    const names = projectCreateSpec.fields.map((f) => f.name);
+    expect(names).toEqual(expect.arrayContaining(["icon", "color"]));
+    const color = projectCreateSpec.fields.find((f) => f.name === "color");
+    expect(color?.validate?.("not-hex")).toBeDefined();
+    expect(color?.validate?.("#B45309")).toBeUndefined();
+    expect(color?.validate?.("")).toBeUndefined();
+  });
 });
 
 describe("projectUpdateSpec", () => {

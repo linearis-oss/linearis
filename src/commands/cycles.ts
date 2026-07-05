@@ -12,7 +12,7 @@ import {
   requiresParameterError,
 } from "../common/errors.js";
 import {
-  cycleChoices,
+  allCycleChoices,
   teamChoices,
   withNoneChoice,
 } from "../common/interactive/choices.js";
@@ -64,9 +64,10 @@ export const cycleListSpec: PromptSpec<CycleListWizardOptions> = {
 /**
  * Entity picker for an absent `[cycle]` positional. Cycles are team-scoped, so
  * this first resolves/prompts the parent team (via `--team` or a team select),
- * then loads that team's cycles via `cycleChoices({ team })`. This is the
- * cross-field-dependency case for the cycles domain: the cycle list is only
- * fetched once the parent team UUID is known.
+ * then loads that team's cycles via `allCycleChoices({ team })` — the unfiltered
+ * loader, since reading a cycle is retrospective and must reach ended cycles too.
+ * This is the cross-field-dependency case for the cycles domain: the cycle list
+ * is only fetched once the parent team UUID is known.
  *
  * Returns the selected cycle UUID (which the resolver accepts).
  */
@@ -88,7 +89,7 @@ function makeCyclePicker(
       teamId = await resolveTeamId(ctx.gql, teamId);
     }
 
-    const options = await cycleChoices(ctx, { team: teamId });
+    const options = await allCycleChoices(ctx, { team: teamId });
     const answer = await io.select({ message: "Cycle", options });
     if (io.isCancel(answer)) {
       throw new InteractiveCancelledError();

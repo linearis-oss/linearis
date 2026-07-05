@@ -178,6 +178,57 @@ describe("collectInteractive", () => {
     );
   });
 
+  it("gives a required text field a non-blank validator (composed with any base)", async () => {
+    let received: ((value: string) => string | undefined) | undefined;
+    const io: PromptIO = {
+      ...fakeIO({}),
+      text: async (o) => {
+        received = o.validate;
+        return "Acme";
+      },
+    };
+    const spec: PromptSpec<Opts> = {
+      fields: [
+        {
+          name: "title",
+          kind: "text",
+          message: "Title",
+          required: true,
+          validate: (v) => (v === "bad" ? "no bad" : undefined),
+        },
+      ],
+    };
+
+    await collectInteractive(ctx, spec, {}, io);
+
+    expect(received).toBeDefined();
+    // Blank is rejected in place instead of being accepted as "leave unset".
+    expect(received?.("")).toBe("Title is required");
+    expect(received?.("   ")).toBe("Title is required");
+    // A non-blank value still runs the caller-supplied validator.
+    expect(received?.("bad")).toBe("no bad");
+    expect(received?.("Acme")).toBeUndefined();
+  });
+
+  it("does not add a required validator to an optional text field", async () => {
+    let received: ((value: string) => string | undefined) | undefined = () =>
+      "sentinel";
+    const io: PromptIO = {
+      ...fakeIO({}),
+      text: async (o) => {
+        received = o.validate;
+        return "";
+      },
+    };
+    const spec: PromptSpec<Opts> = {
+      fields: [{ name: "title", kind: "text", message: "Title" }],
+    };
+
+    await collectInteractive(ctx, spec, {}, io);
+
+    expect(received).toBeUndefined();
+  });
+
   it("passes the validate function through to the IO", async () => {
     const validate = vi.fn((v: string) =>
       v.length < 2 ? "too short" : undefined,

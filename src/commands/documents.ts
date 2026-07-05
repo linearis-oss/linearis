@@ -11,6 +11,8 @@ import {
 import { asUuid, type UUID } from "../common/identifier.js";
 import {
   documentChoices,
+  issueChoices,
+  optionalChoices,
   projectChoices,
   teamChoices,
 } from "../common/interactive/choices.js";
@@ -117,6 +119,13 @@ export const documentCreateSpec: PromptSpec<DocumentCreateWizardOptions> = {
     { name: "team", kind: "select", message: "Team", choices: teamChoices },
     { name: "icon", kind: "text", message: "Icon" },
     { name: "color", kind: "text", message: "Icon color" },
+    {
+      name: "issue",
+      kind: "select",
+      message: "Attach to issue",
+      searchable: true,
+      choices: optionalChoices(issueChoices, "None (standalone document)"),
+    },
   ],
 };
 

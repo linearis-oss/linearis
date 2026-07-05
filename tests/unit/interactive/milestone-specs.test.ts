@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   milestoneCreateSpec,
+  milestoneListSpec,
   milestoneUpdateSpec,
 } from "../../../src/commands/milestones.js";
 
@@ -23,6 +24,16 @@ describe("milestoneCreateSpec", () => {
       (f) => f.name === "project",
     );
     expect(project?.kind).toBe("select");
+    expect(project?.choices).toBeDefined();
+  });
+});
+
+describe("milestoneListSpec", () => {
+  it("requires a project (list is project-scoped) via a searchable select", () => {
+    const project = milestoneListSpec.fields.find((f) => f.name === "project");
+    expect(project?.required).toBe(true);
+    expect(project?.kind).toBe("select");
+    expect(project?.searchable).toBe(true);
     expect(project?.choices).toBeDefined();
   });
 });

@@ -85,23 +85,27 @@ async function promptField<O>(
   onPrompt: () => void,
 ): Promise<string | string[] | boolean | symbol> {
   switch (field.kind) {
-    case "text":
+    case "text": {
       onPrompt();
+      const validate = buildTextValidate(field);
       return io.text({
         message: field.message,
         ...(initial !== undefined ? { initialValue: initial } : {}),
-        ...(field.validate !== undefined ? { validate: field.validate } : {}),
+        ...(validate !== undefined ? { validate } : {}),
       });
-    case "multiline":
+    }
+    case "multiline": {
       onPrompt();
+      const validate = buildTextValidate(field);
       return io.multiline({
         message: field.message,
         // Enter inserts a newline; a visible, Tab-focusable [ submit ] button
         // makes confirming discoverable (Enter on a blank line also submits).
         showSubmit: true,
         ...(initial !== undefined ? { initialValue: initial } : {}),
-        ...(field.validate !== undefined ? { validate: field.validate } : {}),
+        ...(validate !== undefined ? { validate } : {}),
       });
+    }
     case "select": {
       const options = (await field.choices?.(ctx, draft)) ?? [];
       // Nothing to choose from (e.g. team has estimates disabled, or no
@@ -166,6 +170,26 @@ async function promptField<O>(
       return formatLocalDate(answer as Date);
     }
   }
+}
+
+/**
+ * Build the validate callback for a text/multiline field. When the field is
+ * `required`, a non-blank guard is composed in front of any caller-supplied
+ * validator: clack returns "" for an empty submission, and collectInteractive
+ * would treat that as "leave unset", so without this a required title/name/body
+ * could be blown past with Enter and only fail at the downstream required-field
+ * throw after the whole wizard was filled in. Returning an error string here
+ * re-prompts in place instead.
+ */
+function buildTextValidate<O>(
+  field: FieldPrompt<O>,
+): ((value: string) => string | undefined) | undefined {
+  const base = field.validate;
+  if (field.required !== true) return base;
+  return (value: string) => {
+    if (value.trim() === "") return `${field.message} is required`;
+    return base?.(value);
+  };
 }
 
 /**

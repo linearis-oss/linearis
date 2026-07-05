@@ -41,6 +41,14 @@ describe("documentCreateSpec", () => {
     expect(team?.kind).toBe("select");
     expect(team?.choices).toBeDefined();
   });
+
+  it("offers an optional issue attachment via a searchable select", () => {
+    const issue = documentCreateSpec.fields.find((f) => f.name === "issue");
+    expect(issue?.kind).toBe("select");
+    expect(issue?.required).not.toBe(true);
+    expect(issue?.searchable).toBe(true);
+    expect(issue?.choices).toBeDefined();
+  });
 });
 
 describe("documentUpdateSpec", () => {
@@ -58,6 +66,16 @@ describe("attachmentCreateSpec", () => {
       .map((f) => f.name);
     expect(required).toContain("title");
     expect(required).toContain("url");
+  });
+
+  it("covers the optional comment and icon-url flags", () => {
+    const names = attachmentCreateSpec.fields.map((f) => f.name);
+    expect(names).toContain("comment");
+    expect(names).toContain("iconUrl");
+    const comment = attachmentCreateSpec.fields.find(
+      (f) => f.name === "comment",
+    );
+    expect(comment?.kind).toBe("multiline");
   });
 });
 

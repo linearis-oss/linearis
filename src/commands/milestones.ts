@@ -106,6 +106,33 @@ export const milestoneUpdateSpec: PromptSpec<MilestoneCreateWizardOptions> = {
   ],
 };
 
+/** Wizard shape for `milestones list`: a required project select. */
+interface MilestoneListWizardOptions extends Record<string, unknown> {
+  project?: string;
+  limit?: string;
+  after?: string;
+}
+
+/**
+ * Interactive wizard for `milestones list`. Milestones are project-scoped and
+ * `--project` is required, so — unlike the other list commands — a TTY user with
+ * no `--project` is prompted for one instead of hitting the missing-required
+ * error. Agents/pipes keep the old "--project is required" throw.
+ */
+export const milestoneListSpec: PromptSpec<MilestoneListWizardOptions> = {
+  intro: "List milestones in a project",
+  fields: [
+    {
+      name: "project",
+      kind: "select",
+      message: "Project",
+      required: true,
+      searchable: true,
+      choices: projectChoices,
+    },
+  ],
+};
+
 /**
  * Entity picker for an absent `[milestone]` positional. Milestones are
  * project-scoped, so this first prompts for a project (unless one was already
@@ -170,23 +197,42 @@ export function setupMilestonesCommands(program: Command): void {
   milestones
     .command("list")
     .description("list milestones in a project")
-    .requiredOption("--project <project>", "target project (required)")
+    .option("--project <project>", "target project (required)")
     .option("-l, --limit <n>", "max results", "50")
     .option("--after <cursor>", "cursor for next page")
+    .addHelpText(
+      "after",
+      "\n--project is required. Pass it, or run in a terminal (or with -i) to pick one interactively.",
+    )
     .action(
       handleCommand(async (...args: unknown[]) => {
-        const [options, command] = args as [MilestoneListOptions, Command];
+        const [options, command] = args as [
+          Partial<MilestoneListOptions>,
+          Command,
+        ];
         const ctx = createContext(getRootOpts(command));
 
-        // Resolve project ID
-        const projectId = await resolveProjectId(ctx.gql, options.project);
+        const filled = await maybeCollectInteractive<
+          MilestoneListWizardOptions,
+          never
+        >(ctx, getRootOpts(command), {
+          spec: milestoneListSpec,
+          options: options as MilestoneListWizardOptions,
+          missingRequired: options.project === undefined,
+        });
+        const project = filled.options.project;
+        if (project === undefined) {
+          throw invalidParameterError("--project", "is required");
+        }
+
+        const projectId = await resolveProjectId(ctx.gql, project);
 
         const milestones = await listMilestones(
           ctx.gql,
           projectId,
           buildPaginationOptions(
-            parseLimit(options.limit || "50"),
-            options.after,
+            parseLimit(filled.options.limit || "50"),
+            filled.options.after,
           ),
         );
 

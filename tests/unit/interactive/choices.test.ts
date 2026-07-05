@@ -3,11 +3,13 @@ import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import type { CommandContext } from "../../../src/common/context.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
+  allCycleChoices,
   cycleChoices,
   emojiChoices,
   initiativeChoices,
   labelChoices,
   milestoneChoices,
+  optionalChoices,
   projectStatusChoices,
   statusChoices,
   teamChoices,
@@ -32,6 +34,33 @@ describe("withNoneChoice", () => {
       { value: "", label: "— all teams —" },
       { value: "t1", label: "Team One" },
     ]);
+  });
+});
+
+describe("optionalChoices", () => {
+  it("prepends the leave-unchanged sentinel when the loader has options", async () => {
+    const load = vi.fn().mockResolvedValue([{ value: "u1", label: "Ada" }]);
+
+    const result = await optionalChoices(load, "Keep current")(
+      mockCtx(vi.fn()),
+      {},
+    );
+
+    expect(result).toEqual([
+      { value: "", label: "Keep current" },
+      { value: "u1", label: "Ada" },
+    ]);
+  });
+
+  it("passes an empty list through so the engine skips the field", async () => {
+    const load = vi.fn().mockResolvedValue([]);
+
+    const result = await optionalChoices(load, "Keep current")(
+      mockCtx(vi.fn()),
+      {},
+    );
+
+    expect(result).toEqual([]);
   });
 });
 
@@ -255,6 +284,58 @@ describe("cycleChoices (cross-field: cycle needs team)", () => {
     // Past cycle excluded; current (active) first so it is the default.
     expect(result.map((c) => c.value)).toEqual(["current", "future"]);
     expect(result[0]?.hint).toBe("current");
+  });
+});
+
+describe("allCycleChoices (read picker: keeps ended cycles)", () => {
+  const day = 24 * 60 * 60 * 1000;
+  const iso = (offsetDays: number): string =>
+    new Date(Date.now() + offsetDays * day).toISOString();
+
+  it("keeps past cycles and surfaces the active cycle first", async () => {
+    const request = vi.fn().mockResolvedValue({
+      cycles: {
+        nodes: [
+          {
+            id: "past",
+            number: 1,
+            name: "Past",
+            startsAt: iso(-28),
+            endsAt: iso(-14),
+            isActive: false,
+            isNext: false,
+            isPrevious: true,
+          },
+          {
+            id: "future",
+            number: 3,
+            name: "Future",
+            startsAt: iso(14),
+            endsAt: iso(28),
+            isActive: false,
+            isNext: true,
+            isPrevious: false,
+          },
+          {
+            id: "current",
+            number: 2,
+            name: "Current",
+            startsAt: iso(-3),
+            endsAt: iso(11),
+            isActive: true,
+            isNext: false,
+            isPrevious: false,
+          },
+        ],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    const result = await allCycleChoices(mockCtx(request), { team: TEAM_UUID });
+
+    // Unlike cycleChoices, the past cycle is retained; active is first, then
+    // remaining cycles most-recent-first by start date.
+    expect(result.map((c) => c.value)).toEqual(["current", "future", "past"]);
   });
 });
 

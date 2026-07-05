@@ -8,8 +8,10 @@ import {
   InteractiveCancelledError,
   invalidParameterError,
 } from "../common/errors.js";
+import type { UUID } from "../common/identifier.js";
 import { teamChoices, userChoices } from "../common/interactive/choices.js";
 import { maybeCollectInteractive } from "../common/interactive/engine.js";
+import type { ChoicePicker } from "../common/interactive/pickers.js";
 import type { PromptIO, PromptSpec } from "../common/interactive/types.js";
 import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { buildPaginationOptions } from "../common/types.js";
@@ -383,6 +385,56 @@ async function resolveUserOption(
   return filled.positional;
 }
 
+/**
+ * Fill an absent `--user` on `remove-member` via a picker scoped to the team's
+ * CURRENT members (unlike {@link resolveUserOption}, which offers all users) so
+ * a non-member — which the API would reject — cannot be selected. Returns the
+ * selected user's UUID for the resolver.
+ */
+async function resolveTeamMemberOption(
+  ctx: CommandContext,
+  command: Command,
+  teamId: UUID,
+  user: string | undefined,
+): Promise<string> {
+  const memberPicker: ChoicePicker = async (pickerCtx, io) => {
+    const { nodes } = await listTeamMembers(pickerCtx.gql, { id: teamId });
+    const options = nodes.flatMap((member) =>
+      member.user
+        ? [
+            {
+              value: member.user.id,
+              label: member.user.displayName,
+              hint: member.user.email,
+            },
+          ]
+        : [],
+    );
+    if (options.length === 0) {
+      throw invalidParameterError("--user", "the selected team has no members");
+    }
+    const answer = await io.select({ message: "User", options });
+    if (io.isCancel(answer)) {
+      throw new InteractiveCancelledError();
+    }
+    return answer as string;
+  };
+  const filled = await maybeCollectInteractive<Record<string, never>, string>(
+    ctx,
+    getRootOpts(command),
+    {
+      spec: EMPTY_SPEC,
+      options: {},
+      missingRequired: user === undefined,
+      positional: { name: "user", value: user, picker: memberPicker },
+    },
+  );
+  if (filled.positional === undefined) {
+    throw invalidParameterError("--user", "is required");
+  }
+  return filled.positional;
+}
+
 export function setupTeamsCommands(program: Command): void {
   const teams = program.command("teams").description("Team operations");
 
@@ -575,11 +627,14 @@ export function setupTeamsCommands(program: Command): void {
         ];
         const ctx = createContext(getRootOpts(command));
         const team = await resolveTeamPositional(ctx, command, teamArg);
-        const user = await resolveUserOption(ctx, command, options.user);
-        const [teamId, userId] = await Promise.all([
-          resolveTeamId(ctx.gql, team),
-          resolveUserId(ctx.gql, user),
-        ]);
+        const teamId = await resolveTeamId(ctx.gql, team);
+        const user = await resolveTeamMemberOption(
+          ctx,
+          command,
+          teamId,
+          options.user,
+        );
+        const userId = await resolveUserId(ctx.gql, user);
         const result = await removeTeamMember(ctx.gql, { teamId, userId });
         outputSuccess(result);
       }),

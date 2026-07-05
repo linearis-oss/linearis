@@ -25,21 +25,9 @@ const COMMANDS_DIR = join(process.cwd(), "src/commands");
 
 /** command signatures (verb + positionals) intentionally left with `<arg>`. */
 const SKIP_REQUIRED_POSITIONAL = new Set<string>([
-  // raw comment/thread UUID discussion subcommands (no in-command parent list)
-  "replies",
-  "reply",
-  "edit",
-  "edit-reply",
-  "delete-comment",
-  "delete-reply",
-  "resolve",
-  "unresolve",
-  "react",
-  "unreact",
+  // `unreact-id` targets a reaction by raw UUID; no per-comment reaction list
+  // service exists to source a picker, so it stays a flag-only escape hatch.
   "unreact-id",
-  // relation ops: require relation flags / a raw relation UUID
-  "add",
-  "remove",
   // full-text search takes a free-text query, not an entity id
   "search",
   // create's leading positional is a free-text name/title filled by the

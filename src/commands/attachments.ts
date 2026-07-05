@@ -73,6 +73,8 @@ export const attachmentCreateSpec: PromptSpec<CreateWizardOptions> = {
     { name: "title", kind: "text", message: "Title", required: true },
     { name: "url", kind: "text", message: "URL", required: true },
     { name: "subtitle", kind: "text", message: "Subtitle" },
+    { name: "iconUrl", kind: "text", message: "Icon URL" },
+    { name: "comment", kind: "multiline", message: "Comment" },
   ],
 };
 
