@@ -26,8 +26,10 @@ import {
   optionalChoices,
   optionalProjectChoices,
   priorityChoices,
+  projectChoices,
   statusChoices,
   teamChoices,
+  userChoices,
 } from "../common/interactive/choices.js";
 import {
   maybeCollectInteractive,
@@ -314,7 +316,10 @@ export const issueUpdateSpec: PromptSpec<UpdateWizardOptions> = {
       kind: "select",
       message: "Assignee",
       searchable: true,
-      choices: assigneeChoices,
+      // "Keep current" (not the create-only "None (unassigned)"): an empty
+      // selection leaves the assignee unchanged on update, so the sentinel must
+      // not imply it unassigns.
+      choices: optionalChoices(userChoices, "Keep current"),
     },
     {
       name: "priority",
@@ -328,7 +333,9 @@ export const issueUpdateSpec: PromptSpec<UpdateWizardOptions> = {
       message: "Project",
       searchable: true,
       when: (draft) => draft.team !== undefined,
-      choices: optionalProjectChoices,
+      // "Keep current" (not the create-only "None (no project)"): an empty
+      // selection leaves the project unchanged on update.
+      choices: optionalChoices(projectChoices, "Keep current"),
     },
     {
       name: "projectMilestone",
@@ -1572,7 +1579,7 @@ export function setupIssuesCommands(program: Command): void {
     .option("--duplicate-of <issue>", "this issue duplicates <issue>")
     .option("--similar-to <issue>", "this issue is similar to <issue>")
     .action(
-      commandAction<[string, CreateOptions, Command]>(
+      commandAction<[string | undefined, CreateOptions, Command]>(
         async (title, options, command) => {
           const rootOpts = getRootOpts(command);
           const ctx = createContext(rootOpts);
