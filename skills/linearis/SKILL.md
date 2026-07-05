@@ -13,7 +13,7 @@ compatibility: Requires the linearis CLI (npm i -g linearis), Node >=22, and a L
 allowed-tools: Bash(linearis:*), Bash(linear:*), Bash(jq:*)
 metadata:
   author: linearis-oss
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # linearis
