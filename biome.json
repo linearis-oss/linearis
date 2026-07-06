@@ -6,7 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist", "!!**/src/gql", "!!**/coverage"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!**/src/gql",
+      "!!**/coverage",
+      "!!docs/assets/*.svg"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

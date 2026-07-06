@@ -13,6 +13,8 @@ import {
   DeleteProjectDocument,
   GetProjectDocument,
   type GetProjectQuery,
+  GetProjectStatusesDocument,
+  type GetProjectStatusesQuery,
   GetProjectsDocument,
   type GetProjectsQuery,
   type ProjectCreateInput,
@@ -114,6 +116,21 @@ export async function listProjects(
     nodes: result.projects.nodes,
     pageInfo: result.projects.pageInfo,
   };
+}
+
+/** A project status option (workflow state for projects). */
+export type ProjectStatusItem =
+  GetProjectStatusesQuery["projectStatuses"]["nodes"][0];
+
+/**
+ * Lists the organization's project statuses. Used by the interactive project
+ * status picker. The set is small and fixed, so there is no pagination.
+ */
+export async function listProjectStatuses(
+  client: GraphQLClient,
+): Promise<ProjectStatusItem[]> {
+  const result = await client.request(GetProjectStatusesDocument);
+  return result.projectStatuses.nodes;
 }
 
 export async function getProject(

@@ -7,6 +7,12 @@ export interface CommandOptions {
   apiToken?: string;
   compact?: boolean;
   fields?: string[];
+  /**
+   * Root `-i/--interactive` / `--no-interactive` flag. Commander sets `true`
+   * for `-i`, `false` for `--no-interactive`, and leaves it `undefined`
+   * otherwise.
+   */
+  interactive?: boolean;
 }
 
 export type TokenSource = "flag" | "env" | "stored" | "legacy";

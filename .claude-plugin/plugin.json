@@ -1,7 +1,7 @@
 {
   "name": "linearis",
   "description": "Agent skill for the linearis Linear.app CLI: preflight, discover-then-act usage protocol, JSON output, ID resolution, discussions, files.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "linearis-oss",
     "url": "https://github.com/linearis-oss/linearis"

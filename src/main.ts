@@ -47,7 +47,9 @@ program
     "--fields <list>",
     "comma-separated dot-paths to include (e.g. identifier,title,state.name)",
     parseFieldsList,
-  );
+  )
+  .option("-i, --interactive", "prompt interactively for missing input")
+  .option("--no-interactive", "never prompt");
 
 program.hook("preAction", async (_thisCommand, actionCommand) => {
   setOutputOptions(getRootOpts(actionCommand));

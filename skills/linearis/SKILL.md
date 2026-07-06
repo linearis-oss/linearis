@@ -13,7 +13,7 @@ compatibility: Requires the linearis CLI (npm i -g linearis), Node >=22, and a L
 allowed-tools: Bash(linearis:*), Bash(linear:*), Bash(jq:*)
 metadata:
   author: linearis-oss
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # linearis
@@ -37,6 +37,8 @@ Drive [Linear.app](https://linear.app) from the shell via the `linearis` CLI (JS
 ## Output
 
 Every command prints JSON on stdout. Shape it at the source with the global `--fields identifier,title,state.name` and `--compact` — no external binary, works on Windows and fresh containers. Reach for `jq` only for complex reshaping, and fall back to raw JSON if `jq` is absent.
+
+The CLI can prompt interactively for missing input, but only on a real TTY. As an agent, pass the global `--no-interactive` flag so a missing required argument returns a JSON error you can act on instead of blocking on stdin.
 
 ## Invariants worth knowing (everything else lives in `usage`)
 

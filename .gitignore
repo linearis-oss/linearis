@@ -2,6 +2,11 @@
 /src/gql/
 USAGE.md
 
+# Demo recordings: intermediate casts and raw session captures are regenerable
+# (see scripts/*-demo-*-cast.mjs); only the rendered SVGs in docs/assets/ are committed.
+docs/assets/*.cast
+docs/assets/*.jsonl
+
 # clean-publish staging dir (release publish; see .releaserc.cjs)
 /.clean-pkg/
 
