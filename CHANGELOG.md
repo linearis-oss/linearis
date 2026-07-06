@@ -1,3 +1,5 @@
+## [2026.7.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.6.0...v2026.7.0-next.1) (2026-07-06)
+
 ## [2026.6.0](https://github.com/linearis-oss/linearis/compare/v2026.5.0...v2026.6.0) (2026-07-04)
 
 ### Features
