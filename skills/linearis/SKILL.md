@@ -24,8 +24,8 @@ Drive [Linear.app](https://linear.app) from the shell via the `linearis` CLI (JS
 
 - **Not installed** — if the shell reports command-not-found, tell the user linearis isn't installed and offer `npm install -g linearis`. As a no-install fallback, prefix commands with `npx linearis@latest` (adds cold-start latency and needs network per call — fallback, not default). Never silently `npm install -g`.
 - **Auth required** — any command may fail with this envelope on stderr and exit code 42:
-  `{ "error": "AUTHENTICATION_REQUIRED", "action": "USER_ACTION_REQUIRED", "instruction": "Run 'linearis auth' …", "exit_code": 42 }`.
-  Detect it by `exit_code === 42` / `error === "AUTHENTICATION_REQUIRED"` (not paraphrased text) and surface the CLI's own `instruction`. `linearis auth` is an interactive browser flow you cannot complete — hand it to the user.
+  `{ "error": "AUTHENTICATION_REQUIRED", "action": "USER_ACTION_REQUIRED", "instruction": "Run 'linearis auth login' …", "exit_code": 42 }`.
+  Detect it by `exit_code === 42` / `error === "AUTHENTICATION_REQUIRED"` (not paraphrased text) and surface the CLI's own `instruction`. `linearis auth login` is an interactive browser flow you cannot complete — hand it to the user.
 - **Updates (advisory, never blocking)** — optionally run `linearis version check` once → `{ current, latest, channel, updateAvailable }`. If `updateAvailable` is true, mention it and ask the user before `npm install -g linearis@latest`, honoring `channel` (don't move a `next` user to `latest`). npm can hang or rate-limit; on any timeout/error just proceed with the installed version. Read the plain installed version with `linearis version` (JSON), not `--version`.
 
 ## Discover, then act
