@@ -371,35 +371,38 @@ describe("interceptParseErrors + handleParseFailure", () => {
   it.each([
     [["issues", "help"], "linearis issues"],
     [["issues", "threads", "help"], "linearis issues threads"],
-  ])("treats %s as an unknown command, not implicit help", async (argv, path) => {
-    await runCli(argv);
+  ])(
+    "treats %s as an unknown command, not implicit help",
+    async (argv, path) => {
+      await runCli(argv);
 
-    expect(emittedPayload()).toMatchObject({
-      error: "UNKNOWN_COMMAND",
-      message: `Unknown command "help" for "${path}".`,
-      command: path,
-      exit_code: 2,
-    });
-    expect(emittedPayload().available_commands).not.toContain("help");
-    expect(exitSpy).toHaveBeenCalledWith(2);
-    expect(stdoutSpy).not.toHaveBeenCalled();
-  });
+      expect(emittedPayload()).toMatchObject({
+        error: "UNKNOWN_COMMAND",
+        message: `Unknown command "help" for "${path}".`,
+        command: path,
+        exit_code: 2,
+      });
+      expect(emittedPayload().available_commands).not.toContain("help");
+      expect(exitSpy).toHaveBeenCalledWith(2);
+      expect(stdoutSpy).not.toHaveBeenCalled();
+    },
+  );
 
-  it.each([
-    ["--help"],
-    ["--version"],
-  ])("leaves %s untouched and exits 0", async (arg) => {
-    await runCli([arg]);
+  it.each([["--help"], ["--version"]])(
+    "leaves %s untouched and exits 0",
+    async (arg) => {
+      await runCli([arg]);
 
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
-    expect(stderrSpy).not.toHaveBeenCalled();
-    expect(exitSpy).toHaveBeenCalledWith(0);
-    expect(exitSpy).not.toHaveBeenCalledWith(2);
-    // Both throw an exit-code-0 CommanderError after writing to stdout.
-    expect(
-      stdoutSpy.mock.calls.length + consoleLogSpy.mock.calls.length,
-    ).toBeGreaterThan(0);
-  });
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(stderrSpy).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(0);
+      expect(exitSpy).not.toHaveBeenCalledWith(2);
+      // Both throw an exit-code-0 CommanderError after writing to stdout.
+      expect(
+        stdoutSpy.mock.calls.length + consoleLogSpy.mock.calls.length,
+      ).toBeGreaterThan(0);
+    },
+  );
 
   it("still exits 0 for the root overview", async () => {
     await runCli([]);

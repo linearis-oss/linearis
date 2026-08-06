@@ -34,6 +34,15 @@ runs:
         cache: npm
         registry-url: ${{ inputs.registry-url }}
 
+    # package-lock.json is written by npm 11 (project default and Renovate).
+    # Node 22 bundles npm 10, which materializes optional peerDependencies that
+    # npm 11 omits from the lockfile, so `npm ci` there fails with EUSAGE. Pin
+    # the npm major so every matrix Node version agrees with the committed
+    # lockfile; the matrix still exercises the engines floor at runtime.
+    - name: Pin npm major
+      shell: bash
+      run: npm install -g npm@11
+
     # `npm ci` runs `prepare`, which is CI-guarded (scripts/prepare.mjs) so it
     # does NOT hit the live Linear GraphQL schema here. Jobs needing generated
     # types must run the build step below (or `npm pack`).
