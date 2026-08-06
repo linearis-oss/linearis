@@ -28,6 +28,10 @@ import { PROJECTS_META, setupProjectsCommands } from "./commands/projects.js";
 import { setupTeamsCommands, TEAMS_META } from "./commands/teams.js";
 import { setupUsersCommands, USERS_META } from "./commands/users.js";
 import { setupVersionCommands, VERSION_META } from "./commands/version.js";
+import {
+  handleParseFailure,
+  interceptParseErrors,
+} from "./common/cli-errors.js";
 import { getRootOpts } from "./common/context.js";
 import { parseFieldsList, setOutputOptions } from "./common/output.js";
 import { maybeNotifyUpdate } from "./common/update-notifier.js";
@@ -109,4 +113,7 @@ program
     }
   });
 
-program.parseAsync();
+// Must run after every command is registered so the walk sees the whole tree.
+interceptParseErrors(program);
+
+program.parseAsync().catch(handleParseFailure);

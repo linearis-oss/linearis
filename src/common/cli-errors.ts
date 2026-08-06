@@ -1,0 +1,191 @@
+import type { Command, CommanderError } from "commander";
+import { AuthenticationError, USAGE_ERROR_CODE } from "./errors.js";
+import { outputAuthError, outputError, outputUsageError } from "./output.js";
+
+type UsageErrorCode =
+  | "UNKNOWN_COMMAND"
+  | "UNKNOWN_OPTION"
+  | "MISSING_ARGUMENT"
+  | "TOO_MANY_ARGUMENTS"
+  | "INVALID_USAGE";
+
+export interface UsageErrorPayload {
+  error: UsageErrorCode;
+  message: string;
+  /** Space-joined path of the command that failed to parse, e.g. "linearis issues". */
+  command: string;
+  /** Present only when the failing scope has subcommands to choose from. */
+  available_commands?: string[];
+  instruction: string;
+  exit_code: number;
+}
+
+/**
+ * Pairs a Commander parse failure with the `Command` that raised it.
+ *
+ * Commander's `CommanderError` carries only a message and a code, so the scope
+ * of the failure ("which command was being parsed?") would otherwise have to be
+ * reconstructed from `argv` — which needs option-arity heuristics to tell an
+ * option value from a subcommand name. Capturing the `Command` at throw time in
+ * the per-command `exitOverride` callback avoids that entirely.
+ *
+ * Module-private: it never escapes {@link handleParseFailure}.
+ */
+class CliUsageError extends Error {
+  readonly commanderError: CommanderError;
+  readonly command: Command;
+
+  constructor(commanderError: CommanderError, command: Command) {
+    super(commanderError.message);
+    this.name = "CliUsageError";
+    this.commanderError = commanderError;
+    this.command = command;
+  }
+}
+
+/** "linearis issues read" for a leaf command, walking up via `parent`. */
+function commandPath(command: Command): string {
+  const parts: string[] = [];
+  let current: Command | null = command;
+  while (current) {
+    parts.unshift(current.name());
+    current = current.parent;
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Nearest command (self or ancestor) that owns a `usage` subcommand. Every
+ * domain registers one and so does the root, so this always resolves to a
+ * runnable suggestion.
+ */
+function usageScope(command: Command): Command {
+  let current: Command | null = command;
+  while (current) {
+    if (current.commands.some((c) => c.name() === "usage")) return current;
+    current = current.parent;
+  }
+  return command;
+}
+
+function classify(error: CommanderError, command: Command): UsageErrorCode {
+  switch (error.code) {
+    case "commander.unknownCommand":
+      return "UNKNOWN_COMMAND";
+    case "commander.excessArguments":
+      // A domain command (`issues`) declares no arguments but has subcommands,
+      // and its overview action handler makes Commander treat an unrecognised
+      // subcommand as an excess operand rather than an unknown command.
+      return command.commands.length > 0 &&
+        command.registeredArguments.length === 0
+        ? "UNKNOWN_COMMAND"
+        : "TOO_MANY_ARGUMENTS";
+    case "commander.unknownOption":
+      return "UNKNOWN_OPTION";
+    case "commander.missingArgument":
+      return "MISSING_ARGUMENT";
+    default:
+      return "INVALID_USAGE";
+  }
+}
+
+/** The first operand Commander could not account for, if there is one. */
+function offendingToken(
+  error: CommanderError,
+  command: Command,
+): string | undefined {
+  return error.code === "commander.unknownCommand"
+    ? command.args[0]
+    : command.args[command.registeredArguments.length];
+}
+
+/**
+ * Turn a Commander parse failure into the JSON envelope the CLI contract
+ * promises. Pure — exported for tests.
+ */
+export function describeUsageError(
+  error: CommanderError,
+  command: Command,
+): UsageErrorPayload {
+  const code = classify(error, command);
+  const path = commandPath(command);
+  const usagePath = commandPath(usageScope(command));
+  const token = offendingToken(error, command);
+
+  // Commander raises `commander.help` with exit code 1 when a group has
+  // subcommands, no action handler and no operand to dispatch on (`linearis
+  // issues threads`). Its message is the internal "(outputHelp)" placeholder,
+  // so it needs its own phrasing rather than the generic message fallback.
+  const missingSubcommand = error.code === "commander.help";
+
+  const message =
+    code === "UNKNOWN_COMMAND" && token !== undefined
+      ? `Unknown command "${token}" for "${path}".`
+      : missingSubcommand
+        ? `Missing subcommand for "${path}".`
+        : error.message.replace(/^error: /, "");
+
+  const instruction =
+    code === "UNKNOWN_COMMAND" || missingSubcommand
+      ? `Run '${usagePath} usage' to list valid subcommands.`
+      : `Run '${usagePath} usage' to see the valid arguments and options.`;
+
+  const available = command.commands.map((c) => c.name());
+
+  return {
+    error: code,
+    message,
+    command: path,
+    ...(available.length > 0 ? { available_commands: available } : {}),
+    instruction,
+    exit_code: USAGE_ERROR_CODE,
+  };
+}
+
+/**
+ * Install per-command exit callbacks so a parse failure surfaces as a
+ * `CliUsageError` carrying its `Command`, and silence Commander's plain-text
+ * stderr writes.
+ *
+ * `Command.error()` writes the message to stderr *before* calling `_exit`, so
+ * suppressing `writeErr` is what keeps stderr JSON-only; the same text is still
+ * available on `CommanderError.message`.
+ *
+ * Must be called after every command has been registered, so the walk sees the
+ * whole tree.
+ */
+export function interceptParseErrors(program: Command): void {
+  const install = (cmd: Command): void => {
+    cmd.exitOverride((err) => {
+      throw new CliUsageError(err, cmd);
+    });
+    cmd.configureOutput({ writeErr: () => {} });
+    for (const child of cmd.commands) install(child);
+  };
+  install(program);
+}
+
+/**
+ * Terminal handler for anything escaping `program.parseAsync()`. Before this
+ * existed the promise was neither awaited nor caught, so a rejection during
+ * parsing surfaced as a raw Node unhandled-rejection stack trace.
+ */
+export function handleParseFailure(error: unknown): void {
+  if (error instanceof CliUsageError) {
+    // `--help`, `--version` and a bare `linearis <domain>` throw with exit code
+    // 0 after writing to stdout: success, not a usage error.
+    if (error.commanderError.exitCode === 0) {
+      process.exit(0);
+      return;
+    }
+    outputUsageError(describeUsageError(error.commanderError, error.command));
+    return;
+  }
+  // Defensive: no Commander-registered option parser in this CLI throws, and
+  // action handlers are already wrapped by handleCommand().
+  if (error instanceof AuthenticationError) {
+    outputAuthError(error);
+    return;
+  }
+  outputError(error instanceof Error ? error : new Error(String(error)));
+}

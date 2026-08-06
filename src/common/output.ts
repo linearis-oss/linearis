@@ -1,8 +1,10 @@
 import type { CommandOptions } from "./auth.js";
+import type { UsageErrorPayload } from "./cli-errors.js";
 import {
   AUTH_ERROR_CODE,
   AuthenticationError,
   invalidParameterError,
+  USAGE_ERROR_CODE,
 } from "./errors.js";
 import type { JsonSerializable } from "./json.js";
 
@@ -99,6 +101,15 @@ export function outputAuthError(error: AuthenticationError): void {
     ),
   );
   process.exit(AUTH_ERROR_CODE);
+}
+
+/**
+ * Emit a malformed-invocation envelope. Classification lives in
+ * `cli-errors.ts`; this layer only writes and exits.
+ */
+export function outputUsageError(payload: UsageErrorPayload): void {
+  console.error(JSON.stringify(payload, null, 2));
+  process.exit(USAGE_ERROR_CODE);
 }
 
 export function parseLimit(value: string): number {

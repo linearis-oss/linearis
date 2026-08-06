@@ -37,6 +37,13 @@ export function requiresParameterError(
 
 export const AUTH_ERROR_CODE = 42;
 
+/**
+ * Exit code for a malformed invocation (unknown command/option, wrong argument
+ * count). Distinct from 1 — an application error such as "entity not found" —
+ * so a caller can tell "I called the CLI wrong" from "the entity is missing".
+ */
+export const USAGE_ERROR_CODE = 2;
+
 export class AuthenticationError extends Error {
   readonly details: string;
 
