@@ -185,6 +185,7 @@ interface InitiativeUpdateOptions {
   description?: string;
   content?: string;
   owner?: string;
+  clearOwner?: boolean;
   status?: string;
   targetDate?: string;
   sortOrder?: string;
@@ -734,12 +735,20 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
     .option("--description <text>", "new description")
     .option("--content <text>", "new content (markdown)")
     .option("--owner <user>", "new owner (name, email, or UUID)")
+    .option("--clear-owner", "clear owner")
     .option("--status <status>", "planned, active, completed")
     .option("--target-date <date>", "new target date (YYYY-MM-DD)")
     .option("--sort-order <n>", "new display sort order")
     .action(
       commandAction<[string, InitiativeUpdateOptions, Command]>(
         async (initiative, options, command) => {
+          if (options.owner && options.clearOwner) {
+            throw invalidParameterError(
+              "--owner",
+              "cannot be combined with --clear-owner",
+            );
+          }
+
           const ctx = createContext(getRootOpts(command));
           const initiativeId = await resolveInitiativeId(ctx.gql, initiative);
 
@@ -757,7 +766,9 @@ export function setupInitiativeEntityCommands(initiatives: Command): void {
             input.content = options.content;
           }
 
-          if (options.owner) {
+          if (options.clearOwner) {
+            input.ownerId = null;
+          } else if (options.owner) {
             input.ownerId = await resolveUserId(ctx.gql, options.owner);
           }
 
