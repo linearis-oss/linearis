@@ -9,6 +9,7 @@ import {
   GetProjectDocument,
   GetProjectLabelIdsDocument,
   GetProjectWithReactionsDocument,
+  UpdateProjectDocument,
 } from "../../../src/gql/graphql.js";
 import {
   archiveProject,
@@ -354,7 +355,10 @@ describe("getProjectLabelIds", () => {
     const client = mockGqlClient({
       project: {
         id: "proj-1",
-        labels: { nodes: [{ id: "label-1" }, { id: "label-2" }] },
+        labels: {
+          nodes: [{ id: "label-1" }, { id: "label-2" }],
+          pageInfo: { hasNextPage: false },
+        },
       },
     });
 
@@ -371,6 +375,115 @@ describe("getProjectLabelIds", () => {
     await expect(
       getProjectLabelIds(client, asUuid("nonexistent")),
     ).rejects.toThrow('Project with ID "nonexistent" not found');
+  });
+
+  it("throws instead of returning a truncated label set", async () => {
+    const client = mockGqlClient({
+      project: {
+        id: "proj-1",
+        labels: {
+          nodes: [{ id: "label-1" }],
+          pageInfo: { hasNextPage: true },
+        },
+      },
+    });
+
+    await expect(getProjectLabelIds(client, asUuid("proj-1"))).rejects.toThrow(
+      "refusing to modify labels from a truncated label set",
+    );
+  });
+});
+
+describe("project fragment connection bounds", () => {
+  // Linear's complexity estimator charges an unbounded connection at its
+  // default page size per parent row; unbounded connections in these
+  // fragments are what made default `projects list`/`read` exceed the
+  // 10000 budget (#276, #283). These assertions make a future tidy-up
+  // that unbounds them fail CI instead of shipping the regression.
+  // pageInfo itself prices at ~23 complexity per parent row, so the
+  // truncation signal lives only in the detail fragment (parent count of
+  // one) — selecting it in ProjectListFields would put the 100-row list
+  // back over budget.
+  const BOUNDED_CONNECTIONS: Array<[string, string, boolean]> = [
+    ["ProjectListFields", "teams", false],
+    ["ProjectListFields", "labels", false],
+    ["ProjectDetailFields", "teams", true],
+    ["ProjectDetailFields", "labels", true],
+    ["ProjectDetailFields", "members", true],
+    ["ProjectDetailFields", "initiatives", true],
+    ["ProjectDetailWithDefaultConnectionsFields", "projectMilestones", true],
+  ];
+
+  it.each(BOUNDED_CONNECTIONS)(
+    "%s bounds %s with a literal first argument",
+    (fragmentName, connectionName, requiresPageInfo) => {
+      const fragment = getFragment(UpdateProjectDocument, fragmentName);
+
+      const field = fragment.selectionSet.selections.find(
+        (selection) =>
+          selection.kind === Kind.FIELD &&
+          selection.name.value === connectionName,
+      );
+      if (!field || field.kind !== Kind.FIELD) {
+        throw new Error(`${fragmentName} does not select ${connectionName}`);
+      }
+
+      const firstArgument = field.arguments?.find(
+        (argument) => argument.name.value === "first",
+      );
+      expect(
+        firstArgument?.value.kind,
+        `${fragmentName}.${connectionName} must carry a literal first: bound`,
+      ).toBe(Kind.INT);
+
+      if (requiresPageInfo) {
+        const pageInfo = field.selectionSet?.selections.find(
+          (selection) =>
+            selection.kind === Kind.FIELD &&
+            selection.name.value === "pageInfo",
+        );
+        expect(
+          pageInfo,
+          `${fragmentName}.${connectionName} must select pageInfo so consumers can detect truncation`,
+        ).toBeDefined();
+      }
+    },
+  );
+
+  it("bounds the lean label lookup and selects its truncation signal", () => {
+    const operation = GetProjectLabelIdsDocument.definitions.find(
+      (definition) => definition.kind === Kind.OPERATION_DEFINITION,
+    );
+    if (!operation || operation.kind !== Kind.OPERATION_DEFINITION) {
+      throw new Error("GetProjectLabelIds operation not found");
+    }
+
+    const projectField = operation.selectionSet.selections.find(
+      (selection) =>
+        selection.kind === Kind.FIELD && selection.name.value === "project",
+    );
+    if (!projectField || projectField.kind !== Kind.FIELD) {
+      throw new Error("GetProjectLabelIds does not select project");
+    }
+
+    const labelsField = projectField.selectionSet?.selections.find(
+      (selection) =>
+        selection.kind === Kind.FIELD && selection.name.value === "labels",
+    );
+    if (!labelsField || labelsField.kind !== Kind.FIELD) {
+      throw new Error("GetProjectLabelIds does not select labels");
+    }
+
+    const firstArgument = labelsField.arguments?.find(
+      (argument) => argument.name.value === "first",
+    );
+    expect(firstArgument?.value.kind).toBe(Kind.INT);
+
+    const pageInfo = labelsField.selectionSet?.selections.find(
+      (selection) =>
+        selection.kind === Kind.FIELD && selection.name.value === "pageInfo",
+    );
+    expect(pageInfo).toBeDefined();
   });
 });
 

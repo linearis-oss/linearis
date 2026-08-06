@@ -159,6 +159,15 @@ export async function getProjectLabelIds(
     throw new Error(`Project with ID "${id}" not found`);
   }
 
+  // labelIds is a full-replacement input on projectUpdate; merging from a
+  // truncated read would silently delete every label past the page limit.
+  if (result.project.labels.pageInfo.hasNextPage) {
+    throw new Error(
+      `Project with ID "${id}" has more labels than a single read can ` +
+        "return; refusing to modify labels from a truncated label set",
+    );
+  }
+
   return result.project.labels.nodes.map((label) => asUuid(label.id));
 }
 

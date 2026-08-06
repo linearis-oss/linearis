@@ -61,8 +61,25 @@ fragment ProjectListFields on Project {
 # Extended fields for single-project read view. Includes content,
 # members, milestones, initiatives, creator, lifecycle dates, and
 # visual properties.
+#
+# Every bounded connection selects pageInfo.hasNextPage here so a
+# truncated page is detectable. The teams/labels re-selections merge
+# with ProjectListFields (identical first: arguments), adding the
+# truncation signal only in detail/mutation contexts: pageInfo prices
+# at ~23 complexity per parent row, which is negligible on a single
+# project but would put the 100-row list back over the 10000 budget.
 fragment ProjectDetailFields on Project {
   ...ProjectListFields
+  teams(first: 25) {
+    pageInfo {
+      hasNextPage
+    }
+  }
+  labels(first: 25) {
+    pageInfo {
+      hasNextPage
+    }
+  }
   content
   icon
   color
@@ -80,11 +97,17 @@ fragment ProjectDetailFields on Project {
       id
       name
     }
+    pageInfo {
+      hasNextPage
+    }
   }
   initiatives(first: 25) {
     nodes {
       id
       name
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 }
@@ -96,6 +119,9 @@ fragment ProjectDetailWithDefaultConnectionsFields on Project {
       id
       name
       targetDate
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 }
@@ -208,12 +234,20 @@ query GetProjectStatuses {
 # previously fetched the full project detail (milestones + issues) just
 # to read the current label set — an over-budget query on real
 # workspaces (#283).
+#
+# 250 is Linear's per-connection maximum, so this read cannot be raised
+# further; hasNextPage lets the service refuse a truncated label set
+# instead of writing it back as if it were complete (labelIds is a
+# full-replacement input).
 query GetProjectLabelIds($id: String!) {
   project(id: $id) {
     id
     labels(first: 250) {
       nodes {
         id
+      }
+      pageInfo {
+        hasNextPage
       }
     }
   }
