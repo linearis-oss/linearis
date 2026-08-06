@@ -280,7 +280,29 @@ outputSuccess(data);   // JSON.stringify(data, null, 2)
 
 // Error: written to stderr, exits with code 1
 outputError(error);    // { "error": "message" }
+
+// Authentication error: written to stderr, exits with code 42
+outputAuthError(error);   // { "error": "AUTHENTICATION_REQUIRED", ... }
+
+// Malformed invocation: written to stderr, exits with code 2
+outputUsageError(payload);  // { "error": "UNKNOWN_COMMAND", ... }
 ```
+
+Exit codes:
+
+| Code | Constant | Meaning |
+|---|---|---|
+| `0` | — | Success |
+| `1` | — | Application error (`outputError`) |
+| `2` | `USAGE_ERROR_CODE` | Invalid invocation (`outputUsageError`) |
+| `42` | `AUTH_ERROR_CODE` | Authentication required (`outputAuthError`) |
+
+`outputUsageError` is driven by `src/common/cli-errors.ts`, which classifies
+Commander parse failures. `interceptParseErrors(program)` installs a per-command
+`exitOverride` (capturing the failing `Command`, so the scope is exact) and
+silences Commander's plain-text stderr writes; `program.parseAsync().catch(handleParseFailure)`
+is the terminal handler. Both are wired at the bottom of `src/main.ts`, after
+every command is registered.
 
 ## Authentication
 

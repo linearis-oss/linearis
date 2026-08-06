@@ -147,6 +147,34 @@ The 🔴 rows are mostly workspace administration and integration plumbing — w
 > [!TIP]
 > Missing something you need day to day? [Open an issue](https://github.com/linearis-oss/linearis/issues) — the covered set is driven by what people actually reach for, not by API completeness.
 
+## Exit codes
+
+Every failure is JSON on stderr, and the exit code says which class of failure it is:
+
+| Code | Meaning | Payload |
+|---|---|---|
+| `0` | Success | Result JSON on stdout |
+| `1` | Application error — the request was well-formed but could not be fulfilled (entity not found, API rejection) | `{ "error": "<message>" }` |
+| `2` | Invalid invocation — unknown command or option, wrong number of arguments | Usage envelope (below) |
+| `42` | Authentication required — no usable token, or the stored one is invalid | `{ "error": "AUTHENTICATION_REQUIRED", … }` |
+
+Exit code `2` carries a machine-readable recovery path:
+
+```json
+{
+  "error": "UNKNOWN_COMMAND",
+  "message": "Unknown command \"get\" for \"linearis issues\".",
+  "command": "linearis issues",
+  "available_commands": ["read", "list", "create", "…", "usage"],
+  "instruction": "Run 'linearis issues usage' to list valid subcommands.",
+  "exit_code": 2
+}
+```
+
+`error` is one of `UNKNOWN_COMMAND`, `UNKNOWN_OPTION`, `MISSING_ARGUMENT`,
+`TOO_MANY_ARGUMENTS`, or `INVALID_USAGE`. `available_commands` is present only when
+the failing scope has subcommands to choose from.
+
 ## AI agent integration
 
 Linearis is structured around a **discover-then-act** pattern that matches how agents work:
