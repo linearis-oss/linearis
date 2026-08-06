@@ -1,10 +1,6 @@
 import type { Command, CommanderError } from "commander";
-import {
-  AuthenticationError,
-  USAGE_ERROR_CODE,
-  type UsageErrorPayload,
-} from "./errors.js";
-import { outputAuthError, outputError, outputUsageError } from "./output.js";
+import { USAGE_ERROR_CODE, type UsageErrorPayload } from "./errors.js";
+import { outputError, outputUsageError } from "./output.js";
 
 type UsageErrorCode = UsageErrorPayload["error"];
 
@@ -61,9 +57,9 @@ function classify(error: CommanderError, command: Command): UsageErrorCode {
     case "commander.unknownCommand":
       return "UNKNOWN_COMMAND";
     case "commander.excessArguments":
-      // A domain command (`issues`) declares no arguments but has subcommands,
-      // and its overview action handler makes Commander treat an unrecognised
-      // subcommand as an excess operand rather than an unknown command.
+      // The root declares no arguments but has subcommands, and its overview
+      // action handler makes Commander treat an unrecognised subcommand as an
+      // excess operand rather than an unknown command.
       return command.commands.length > 0 &&
         command.registeredArguments.length === 0
         ? "UNKNOWN_COMMAND"
@@ -188,22 +184,20 @@ export function interceptParseErrors(program: Command): void {
  * Terminal handler for anything escaping `program.parseAsync()`. Before this
  * existed the promise was neither awaited nor caught, so a rejection during
  * parsing surfaced as a raw Node unhandled-rejection stack trace.
+ *
+ * Anything that is not a parse failure falls through to `outputError`: action
+ * handlers do their own error mapping inside `handleCommand()`, so this only
+ * has to keep the JSON contract for the unexpected.
  */
 export function handleParseFailure(error: unknown): void {
   if (error instanceof CliUsageError) {
-    // `--help`, `--version` and a bare `linearis <domain>` throw with exit code
-    // 0 after writing to stdout: success, not a usage error.
+    // `--help` and `--version` throw with exit code 0 after writing to stdout:
+    // success, not a usage error.
     if (error.commanderError.exitCode === 0) {
       process.exit(0);
       return;
     }
     outputUsageError(describeUsageError(error.commanderError, error.command));
-    return;
-  }
-  // Defensive: no Commander-registered option parser in this CLI throws, and
-  // action handlers are already wrapped by handleCommand().
-  if (error instanceof AuthenticationError) {
-    outputAuthError(error);
     return;
   }
   outputError(error instanceof Error ? error : new Error(String(error)));
