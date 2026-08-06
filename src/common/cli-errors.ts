@@ -7,6 +7,7 @@ type UsageErrorCode =
   | "UNKNOWN_OPTION"
   | "MISSING_ARGUMENT"
   | "TOO_MANY_ARGUMENTS"
+  | "MISSING_SUBCOMMAND"
   | "INVALID_USAGE";
 
 export interface UsageErrorPayload {
@@ -87,6 +88,10 @@ function classify(error: CommanderError, command: Command): UsageErrorCode {
       return "UNKNOWN_OPTION";
     case "commander.missingArgument":
       return "MISSING_ARGUMENT";
+    // Commander asks a command to print its own help when it has subcommands,
+    // no action handler and no operand to dispatch on (`linearis issues`).
+    case "commander.help":
+      return "MISSING_SUBCOMMAND";
     default:
       return "INVALID_USAGE";
   }
@@ -137,11 +142,10 @@ export function describeUsageError(
   const usagePath = commandPath(usageScope(command));
   const token = offendingToken(error, command);
 
-  // Commander raises `commander.help` with exit code 1 when a group has
-  // subcommands, no action handler and no operand to dispatch on (`linearis
-  // issues threads`). Its message is the internal "(outputHelp)" placeholder,
-  // so it needs its own phrasing rather than the generic message fallback.
-  const missingSubcommand = error.code === "commander.help";
+  // The message Commander raises `commander.help` with is its internal
+  // "(outputHelp)" placeholder, so this code needs its own phrasing rather than
+  // the generic message fallback.
+  const missingSubcommand = code === "MISSING_SUBCOMMAND";
 
   // The hint is worth keeping even where the message is rewritten: an unknown
   // subcommand is exactly the case Commander can suggest a near miss for.

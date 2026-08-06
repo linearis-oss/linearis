@@ -44,8 +44,6 @@ export function setupInitiativeUpdateCommands(initiatives: Command): void {
     .command("updates")
     .description("initiative update operations");
 
-  updates.action(() => updates.help());
-
   updates
     .command("list")
     .description("list initiative updates")

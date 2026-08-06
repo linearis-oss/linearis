@@ -526,13 +526,9 @@ function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
 export function setupIssuesCommands(program: Command): void {
   const issues = program.command("issues").description("Issue operations");
 
-  issues.action(() => issues.help());
-
   const relations = issues
     .command("relations")
     .description("Issue relation operations");
-
-  relations.action(() => relations.help());
 
   relations
     .command("list <issue>")

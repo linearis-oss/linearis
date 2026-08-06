@@ -10,11 +10,9 @@ import {
 
 /**
  * Mirrors the shape of the real tree in `src/main.ts`: a root with an action
- * handler (the overview), domains whose action handler prints their own help
- * (`issues.action(() => issues.help())`), a subcommand group with no action
- * handler (`issues threads`, as built by `addCommentReactionCommands`), leaf
- * commands with declared arguments, and a `usage` subcommand at both the root
- * and domain level.
+ * handler (the overview) and no declared arguments, subcommand groups with no
+ * action handler (`issues`, `issues threads`), leaf commands with declared
+ * arguments, and a `usage` subcommand at both the root and domain level.
  */
 function buildProgram() {
   const program = new Command();
@@ -25,7 +23,6 @@ function buildProgram() {
   program.action(() => console.log("overview"));
 
   const issues = program.command("issues").description("manage issues");
-  issues.action(() => issues.help());
 
   const threads = issues
     .command("threads")
@@ -93,6 +90,10 @@ describe("describeUsageError", () => {
 
     const payload = describeUsageError(error, program);
 
+    // The root is the one command that still pairs an action handler (the
+    // overview) with no declared arguments, so Commander routes the operand to
+    // _excessArguments() instead of unknownCommand().
+    expect(error.code).toBe("commander.excessArguments");
     expect(payload.error).toBe("UNKNOWN_COMMAND");
     expect(payload.message).toBe('Unknown command "issue" for "linearis".');
     expect(payload.command).toBe("linearis");
@@ -113,9 +114,7 @@ describe("describeUsageError", () => {
 
     const payload = describeUsageError(error, issues);
 
-    // Commander raises excessArguments (not unknownCommand) here because the
-    // domain has an action handler and no declared arguments.
-    expect(error.code).toBe("commander.excessArguments");
+    expect(error.code).toBe("commander.unknownCommand");
     expect(payload.error).toBe("UNKNOWN_COMMAND");
     expect(payload.message).toBe(
       'Unknown command "get" for "linearis issues".',
@@ -226,7 +225,7 @@ describe("describeUsageError", () => {
     // internal "(outputHelp)" placeholder as the message.
     expect(error.code).toBe("commander.help");
     expect(error.exitCode).toBe(1);
-    expect(payload.error).toBe("INVALID_USAGE");
+    expect(payload.error).toBe("MISSING_SUBCOMMAND");
     expect(payload.message).toBe(
       'Missing subcommand for "linearis issues threads".',
     );
@@ -308,23 +307,29 @@ describe("interceptParseErrors + handleParseFailure", () => {
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it("emits an envelope instead of help text for a bare subcommand group", async () => {
-    await runCli(["issues", "threads"]);
+  // Every group behaves the same way, whether or not it is a domain: a domain
+  // and a nested group are the same class of incomplete invocation.
+  it.each([
+    [["issues"], "linearis issues"],
+    [["issues", "threads"], "linearis issues threads"],
+  ])("emits an envelope for the bare group %s", async (argv, path) => {
+    await runCli(argv);
 
     expect(emittedPayload()).toMatchObject({
-      error: "INVALID_USAGE",
-      message: 'Missing subcommand for "linearis issues threads".',
-      command: "linearis issues threads",
+      error: "MISSING_SUBCOMMAND",
+      message: `Missing subcommand for "${path}".`,
+      command: path,
       exit_code: 2,
     });
     expect(exitSpy).toHaveBeenCalledWith(2);
+    // Commander's help text must not reach stdout or stderr alongside the JSON.
     expect(stderrSpy).not.toHaveBeenCalled();
+    expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
   it.each([
     ["--help"],
     ["--version"],
-    ["issues"],
   ])("leaves %s untouched and exits 0", async (arg) => {
     await runCli([arg]);
 
@@ -332,11 +337,18 @@ describe("interceptParseErrors + handleParseFailure", () => {
     expect(stderrSpy).not.toHaveBeenCalled();
     expect(exitSpy).toHaveBeenCalledWith(0);
     expect(exitSpy).not.toHaveBeenCalledWith(2);
-    // All three throw an exit-code-0 CommanderError after writing to stdout:
-    // `--help` and a bare domain via `help()`, `--version` via its own writer.
+    // Both throw an exit-code-0 CommanderError after writing to stdout.
     expect(
       stdoutSpy.mock.calls.length + consoleLogSpy.mock.calls.length,
     ).toBeGreaterThan(0);
+  });
+
+  it("still exits 0 for the root overview", async () => {
+    await runCli([]);
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith("overview");
+    expect(exitSpy).not.toHaveBeenCalledWith(2);
   });
 
   it("routes a non-Commander rejection to outputError", () => {

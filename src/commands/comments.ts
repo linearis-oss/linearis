@@ -74,8 +74,6 @@ export function setupCommentsCommands(program: Command): void {
       "\nDEPRECATED: kept for compatibility. Prefer `issues discuss`, `issues discussions`, `issues replies`, `issues reply`, `issues edit-reply`, and `issues delete-reply`.\nCompatibility mode only supports replying by root thread ID (nested-reply targets are not supported).\nCompatibility edit/delete accept root thread IDs and reply IDs.",
     );
 
-  comments.action(() => comments.help());
-
   comments
     .command("list <issue>")
     .description(
