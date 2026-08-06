@@ -29,8 +29,6 @@ export const USERS_META: DomainMeta = {
 export function setupUsersCommands(program: Command): void {
   const users = program.command("users").description("User operations");
 
-  users.action(() => users.help());
-
   users
     .command("list")
     .description("list workspace members")

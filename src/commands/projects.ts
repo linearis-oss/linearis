@@ -253,8 +253,6 @@ export function setupProjectsCommands(program: Command): void {
     .command("projects")
     .description("Project operations");
 
-  projects.action(() => projects.help());
-
   projects
     .command("list")
     .description("list projects")

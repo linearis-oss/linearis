@@ -258,8 +258,6 @@ function addTeamSettingFlags(command: Command): Command {
 export function setupTeamsCommands(program: Command): void {
   const teams = program.command("teams").description("Team operations");
 
-  teams.action(() => teams.help());
-
   teams
     .command("list")
     .description("list all teams")

@@ -71,8 +71,6 @@ export function setupAttachmentsCommands(program: Command): void {
     .command("attachments")
     .description("Attachment operations");
 
-  attachments.action(() => attachments.help());
-
   attachments
     .command("list [issue]")
     .description("list attachments on an issue")

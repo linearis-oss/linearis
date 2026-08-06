@@ -169,8 +169,6 @@ export const LABELS_META: DomainMeta = {
 export function setupLabelsCommands(program: Command): void {
   const labels = program.command("labels").description("Label operations");
 
-  labels.action(() => labels.help());
-
   labels
     .command("list")
     .description("list available labels")

@@ -147,6 +147,42 @@ The 🔴 rows are mostly workspace administration and integration plumbing — w
 > [!TIP]
 > Missing something you need day to day? [Open an issue](https://github.com/linearis-oss/linearis/issues) — the covered set is driven by what people actually reach for, not by API completeness.
 
+## Exit codes
+
+Every failure is JSON on stderr, and the exit code says which class of failure it is:
+
+| Code | Meaning | Payload |
+|---|---|---|
+| `0` | Success | Result JSON on stdout |
+| `1` | Application error — the request was well-formed but could not be fulfilled (entity not found, API rejection) | `{ "error": "<message>" }` |
+| `2` | Invalid invocation — unknown command or option, wrong number of arguments, or a command group named without a subcommand | Usage envelope (below) |
+| `42` | Authentication required — no usable token, or the stored one is invalid | `{ "error": "AUTHENTICATION_REQUIRED", … }` |
+
+Exit code `2` carries a machine-readable recovery path:
+
+```json
+{
+  "error": "UNKNOWN_COMMAND",
+  "message": "Unknown command \"get\" for \"linearis issues\".",
+  "suggestion": "Did you mean read?",
+  "command": "linearis issues",
+  "available_commands": ["read", "list", "create", "…", "usage"],
+  "instruction": "Run 'linearis issues usage' to list valid subcommands.",
+  "exit_code": 2
+}
+```
+
+`error` is one of `UNKNOWN_COMMAND`, `UNKNOWN_OPTION`, `MISSING_ARGUMENT`,
+`MISSING_REQUIRED_OPTION`, `MISSING_OPTION_ARGUMENT`, `TOO_MANY_ARGUMENTS`,
+`MISSING_SUBCOMMAND`, or `INVALID_USAGE`. `message` is always
+a single line. `suggestion` is present only when there is a close-enough near miss,
+and `available_commands` only when the failing scope has subcommands to choose from.
+
+Naming a command group without a subcommand (`linearis issues`, `linearis issues
+threads`) is a `MISSING_SUBCOMMAND` failure, not a request for help — use
+`linearis issues usage` for the machine-readable reference or `linearis issues
+--help` for the human one. `linearis` on its own still prints the overview.
+
 ## AI agent integration
 
 Linearis is structured around a **discover-then-act** pattern that matches how agents work:

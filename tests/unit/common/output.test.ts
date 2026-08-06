@@ -1,11 +1,13 @@
 // tests/unit/common/output.test.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { UsageErrorPayload } from "../../../src/common/errors.js";
 import { AuthenticationError } from "../../../src/common/errors.js";
 import {
   handleCommand,
   outputAuthError,
   outputError,
   outputSuccess,
+  outputUsageError,
   parseFieldsList,
   parseLimit,
   pickFields,
@@ -247,6 +249,31 @@ describe("handleCommand with AuthenticationError", () => {
     const output = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string);
     expect(output.error).toBe("AUTHENTICATION_REQUIRED");
     expect(exitSpy).toHaveBeenCalledWith(42);
+
+    consoleSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
+
+describe("outputUsageError", () => {
+  it("writes the envelope to stderr and exits 2", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
+
+    const payload: UsageErrorPayload = {
+      error: "UNKNOWN_COMMAND",
+      message: 'Unknown command "get" for "linearis issues".',
+      command: "linearis issues",
+      available_commands: ["read", "usage"],
+      instruction: "Run 'linearis issues usage' to list valid subcommands.",
+      exit_code: 2,
+    };
+    outputUsageError(payload);
+
+    expect(consoleSpy).toHaveBeenCalledWith(JSON.stringify(payload, null, 2));
+    expect(exitSpy).toHaveBeenCalledWith(2);
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();

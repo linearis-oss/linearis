@@ -45,8 +45,6 @@ export const CYCLES_META: DomainMeta = {
 export function setupCyclesCommands(program: Command): void {
   const cycles = program.command("cycles").description("Cycle operations");
 
-  cycles.action(() => cycles.help());
-
   cycles
     .command("list")
     .description("list cycles")

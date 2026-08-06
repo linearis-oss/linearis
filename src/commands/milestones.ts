@@ -61,8 +61,6 @@ export function setupMilestonesCommands(program: Command): void {
     .command("milestones")
     .description("Project milestone operations");
 
-  milestones.action(() => milestones.help());
-
   // List milestones in a project
   milestones
     .command("list")

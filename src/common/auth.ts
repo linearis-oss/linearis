@@ -38,7 +38,7 @@ export function resolveApiToken(options: CommandOptions): ResolvedToken {
   const legacyFile = path.join(os.homedir(), ".linear_api_token");
   if (fs.existsSync(legacyFile)) {
     console.error(
-      "Warning: ~/.linear_api_token is deprecated. Run 'linearis auth' to migrate.",
+      "Warning: ~/.linear_api_token is deprecated. Run 'linearis auth login' to migrate.",
     );
     return {
       token: fs.readFileSync(legacyFile, "utf8").trim(),
@@ -47,7 +47,7 @@ export function resolveApiToken(options: CommandOptions): ResolvedToken {
   }
 
   throw new Error(
-    "No API token found. Run 'linearis auth' to set up authentication.",
+    "No API token found. Run 'linearis auth login' to set up authentication.",
   );
 }
 

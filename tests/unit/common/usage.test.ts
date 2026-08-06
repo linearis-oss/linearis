@@ -140,6 +140,41 @@ describe("formatDomainUsage", () => {
     );
   });
 
+  // A bare nested group (`linearis issues threads`) is a MISSING_SUBCOMMAND
+  // whose recovery instruction points at `linearis issues usage`, so that
+  // output has to name the nested subcommands and their options.
+  it("expands nested command groups under their invocation path", () => {
+    const domain = new Command("issues").description("Issue operations");
+    const threads = domain
+      .command("threads")
+      .description("discussion thread reaction operations");
+    threads
+      .command("react <thread> [emoji]")
+      .description("add a reaction to a discussion thread")
+      .option("--issue <issue>", "owning issue");
+    threads
+      .command("unreact <thread>")
+      .description("remove your reaction from a discussion thread");
+
+    const meta: DomainMeta = {
+      name: "issues",
+      summary: "work items",
+      context: "an issue belongs to exactly one team.",
+      arguments: {},
+      seeAlso: [],
+    };
+
+    const result = formatDomainUsage(domain, meta);
+
+    // The group keeps its own line as the heading its children hang off.
+    expect(result).toMatch(/^ +threads +discussion thread reaction/m);
+    expect(result).toContain("threads react <thread> [emoji]");
+    expect(result).toContain("threads unreact <thread>");
+    // Options are keyed by the full path, not the ambiguous leaf name.
+    expect(result).toContain("threads react options:");
+    expect(result).not.toContain("\nreact options:");
+  });
+
   it("omits arguments and see-also sections when empty", () => {
     const domain = new Command("teams").description("Team operations");
     domain.command("list").description("list all teams");
