@@ -68,6 +68,13 @@ function classify(error: CommanderError, command: Command): UsageErrorCode {
       return "UNKNOWN_OPTION";
     case "commander.missingArgument":
       return "MISSING_ARGUMENT";
+    // A declared `requiredOption` was left out entirely (`--url` on
+    // `attachments create`); distinct from an option that was passed but got no
+    // value (`--url` with nothing after it).
+    case "commander.missingMandatoryOptionValue":
+      return "MISSING_REQUIRED_OPTION";
+    case "commander.optionMissingArgument":
+      return "MISSING_OPTION_ARGUMENT";
     // Commander asks a command to print its own help when it has subcommands,
     // no action handler and no operand to dispatch on (`linearis issues`).
     case "commander.help":

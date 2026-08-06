@@ -173,7 +173,8 @@ Exit code `2` carries a machine-readable recovery path:
 ```
 
 `error` is one of `UNKNOWN_COMMAND`, `UNKNOWN_OPTION`, `MISSING_ARGUMENT`,
-`TOO_MANY_ARGUMENTS`, `MISSING_SUBCOMMAND`, or `INVALID_USAGE`. `message` is always
+`MISSING_REQUIRED_OPTION`, `MISSING_OPTION_ARGUMENT`, `TOO_MANY_ARGUMENTS`,
+`MISSING_SUBCOMMAND`, or `INVALID_USAGE`. `message` is always
 a single line. `suggestion` is present only when there is a close-enough near miss,
 and `available_commands` only when the failing scope has subcommands to choose from.
 

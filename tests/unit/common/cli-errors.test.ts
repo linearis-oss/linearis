@@ -44,6 +44,12 @@ function buildProgram() {
     .option("--limit <n>", "max results")
     .action(() => {});
 
+  const create = issues
+    .command("create")
+    .description("create an issue")
+    .requiredOption("--title <title>", "issue title")
+    .action(() => {});
+
   issues
     .command("usage")
     .description("show issues usage")
@@ -54,7 +60,7 @@ function buildProgram() {
     .description("show overview")
     .action(() => console.log("usage"));
 
-  return { program, issues, threads, read, list };
+  return { program, issues, threads, read, list, create };
 }
 
 /**
@@ -124,6 +130,7 @@ describe("describeUsageError", () => {
       "threads",
       "read",
       "list",
+      "create",
       "usage",
     ]);
     expect(payload.instruction).toBe(
@@ -178,6 +185,36 @@ describe("describeUsageError", () => {
     expect(payload.message).toBe("unknown option '--bogus'");
     expect(payload.command).toBe("linearis issues list");
     expect(payload).not.toHaveProperty("suggestion");
+  });
+
+  it("reports an omitted required option", async () => {
+    const { program, create } = buildProgram();
+    const error = await captureFailure(program, create, ["issues", "create"]);
+
+    const payload = describeUsageError(error, create);
+
+    expect(error.code).toBe("commander.missingMandatoryOptionValue");
+    expect(payload.error).toBe("MISSING_REQUIRED_OPTION");
+    expect(payload.message).toBe(
+      "required option '--title <title>' not specified",
+    );
+    expect(payload.command).toBe("linearis issues create");
+  });
+
+  it("reports an option left without its value", async () => {
+    const { program, create } = buildProgram();
+    const error = await captureFailure(program, create, [
+      "issues",
+      "create",
+      "--title",
+    ]);
+
+    const payload = describeUsageError(error, create);
+
+    expect(error.code).toBe("commander.optionMissingArgument");
+    expect(payload.error).toBe("MISSING_OPTION_ARGUMENT");
+    expect(payload.message).toBe("option '--title <title>' argument missing");
+    expect(payload.command).toBe("linearis issues create");
   });
 
   it("moves Commander's near-miss hint out of the message", async () => {
