@@ -121,7 +121,9 @@ interface UpdateOptions {
   estimate?: string;
   clearEstimate?: boolean;
   assignee?: string;
+  clearAssignee?: boolean;
   project?: string;
+  clearProject?: boolean;
   labels?: string;
   labelMode?: string;
   clearLabels?: boolean;
@@ -1282,7 +1284,9 @@ export function setupIssuesCommands(program: Command): void {
     .option("--status <status>", "new status")
     .option("--priority <1-4>", "new priority")
     .option("--assignee <user>", "new assignee")
+    .option("--clear-assignee", "clear assignee")
     .option("--project <project>", "new project")
+    .option("--clear-project", "clear project (also clears project milestone)")
     .option("--labels <labels>", "labels to apply (comma-separated)")
     .option("--label-mode <mode>", "add | remove | overwrite")
     .option("--clear-labels", "remove all labels")
@@ -1305,6 +1309,24 @@ export function setupIssuesCommands(program: Command): void {
     .action(
       commandAction<[string, UpdateOptions, Command]>(
         async (issue, options, command) => {
+          if (options.assignee && options.clearAssignee) {
+            throw new Error(
+              "Cannot use --assignee and --clear-assignee together",
+            );
+          }
+
+          if (options.project && options.clearProject) {
+            throw new Error(
+              "Cannot use --project and --clear-project together",
+            );
+          }
+
+          if (options.clearProject && options.projectMilestone) {
+            throw new Error(
+              "Cannot use --clear-project and --project-milestone together",
+            );
+          }
+
           if (options.parentTicket && options.clearParentTicket) {
             throw new Error(
               "Cannot use --parent-ticket and --clear-parent-ticket together",
@@ -1406,8 +1428,12 @@ export function setupIssuesCommands(program: Command): void {
           }
 
           const updIdsInput: ResolveUpdateIssueIdsInput = {};
-          if (options.assignee) updIdsInput.assignee = options.assignee;
-          if (options.project) updIdsInput.project = options.project;
+          if (!options.clearAssignee && options.assignee) {
+            updIdsInput.assignee = options.assignee;
+          }
+          if (!options.clearProject && options.project) {
+            updIdsInput.project = options.project;
+          }
           if (!options.clearLabels && options.labels) {
             updIdsInput.labels = options.labels.split(",").map((l) => l.trim());
           }
@@ -1459,11 +1485,15 @@ export function setupIssuesCommands(program: Command): void {
             input.estimate = parsedEstimate;
           }
 
-          if (ids.assigneeId) {
+          if (options.clearAssignee) {
+            input.assigneeId = null;
+          } else if (ids.assigneeId) {
             input.assigneeId = ids.assigneeId;
           }
 
-          if (ids.projectId) {
+          if (options.clearProject) {
+            input.projectId = null;
+          } else if (ids.projectId) {
             input.projectId = ids.projectId;
           }
 
@@ -1495,7 +1525,13 @@ export function setupIssuesCommands(program: Command): void {
             input.parentId = ids.parentId;
           }
 
-          if (options.clearProjectMilestone) {
+          // A milestone belongs to a project, so --clear-project must detach the
+          // milestone too — otherwise the issue keeps pointing at a milestone of
+          // a project it no longer belongs to. Moving the issue to a different
+          // project with --project is deliberately not handled here: the new
+          // milestone is the caller's to pick, and reconciling the old one is
+          // left to the API rather than guessed at locally.
+          if (options.clearProjectMilestone || options.clearProject) {
             input.projectMilestoneId = null;
           } else if (ids.projectMilestoneId) {
             input.projectMilestoneId = ids.projectMilestoneId;
