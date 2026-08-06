@@ -364,6 +364,27 @@ describe("interceptParseErrors + handleParseFailure", () => {
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
+  // Commander adds an implicit `help` subcommand to every command that has
+  // subcommands and no action handler, which is exactly the shape of a command
+  // group. It must not become a stdout-and-exit-0 escape hatch out of the
+  // MISSING_SUBCOMMAND contract.
+  it.each([
+    [["issues", "help"], "linearis issues"],
+    [["issues", "threads", "help"], "linearis issues threads"],
+  ])("treats %s as an unknown command, not implicit help", async (argv, path) => {
+    await runCli(argv);
+
+    expect(emittedPayload()).toMatchObject({
+      error: "UNKNOWN_COMMAND",
+      message: `Unknown command "help" for "${path}".`,
+      command: path,
+      exit_code: 2,
+    });
+    expect(emittedPayload().available_commands).not.toContain("help");
+    expect(exitSpy).toHaveBeenCalledWith(2);
+    expect(stdoutSpy).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["--help"],
     ["--version"],

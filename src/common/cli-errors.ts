@@ -173,6 +173,13 @@ export function describeUsageError(
  * suppressing `writeErr` is what keeps stderr JSON-only; the same text is still
  * available on `CommanderError.message`.
  *
+ * The walk also disables Commander's implicit `help` subcommand, which it adds
+ * to any command that has subcommands and no action handler — i.e. to every
+ * command group. Left on, `linearis issues help` would print human-readable
+ * help on stdout and exit 0, the exact contract `MISSING_SUBCOMMAND` exists to
+ * avoid; off, it is an `UNKNOWN_COMMAND` like any other unrecognised
+ * subcommand. `--help` is a separate option and is unaffected.
+ *
  * Must be called after every command has been registered, so the walk sees the
  * whole tree.
  */
@@ -182,6 +189,7 @@ export function interceptParseErrors(program: Command): void {
       throw new CliUsageError(err, cmd);
     });
     cmd.configureOutput({ writeErr: () => {} });
+    cmd.helpCommand(false);
     for (const child of cmd.commands) install(child);
   };
   install(program);
