@@ -30,7 +30,7 @@ The official Linear MCP works well, but it costs ~13k tokens just by being conne
 A typical agent interaction costs **~500–700 tokens** of context instead of ~13k. The agent pays only for what it uses, one domain at a time.
 
 > [!NOTE]
-> The trade-off is coverage. Linearis focuses on the operations that matter for day-to-day work — issues, discussions, cycles, projects, documents, and files. For custom workflows, integrations, or workspace settings, the MCP is the better choice.
+> The trade-off is coverage. Linearis focuses on the operations that matter for day-to-day work — issues, discussions, cycles, projects, documents, and files. For custom workflows, integrations, or workspace settings, the MCP is the better choice. See [Coverage](#coverage) for the exact picture.
 
 ## Features
 
@@ -108,22 +108,44 @@ linearis issues replies <root-thread-id>
 linearis issues reply <root-thread-id> --body "I found the root cause"
 ```
 
-### Domains
+## Coverage
 
-| Domain | What it covers |
-|---|---|
-| `issues` | Work items with status, priority, assignee, labels, and discussions |
-| `projects` | Groups of issues working toward a goal |
-| `initiatives` | Strategic, multi-project goals |
-| `cycles` | Time-boxed iterations (sprints) per team |
-| `milestones` | Progress checkpoints within projects |
-| `documents` | Long-form markdown docs attached to projects or issues |
-| `labels` | Categorization tags for issues and projects |
-| `attachments` | Linked external resources on issues (PRs, commits, URLs) |
-| `files` | Upload and download file attachments |
-| `teams` | Organizational units owning issues and cycles |
-| `users` | Workspace members and assignees |
-| `auth` | Authenticate with the Linear API |
+Linear's GraphQL API exposes **537 root operations** (164 queries, 373 mutations). Linearis wires about **75 of them** directly, plus a number of nested reads — chosen to cover planning and issue work end to end rather than the whole API.
+
+The table below is the honest picture of the whole surface — what works today, and what you'll need the [Linear MCP](#linearis-vs-linear-mcp) or a raw API call for.
+
+**Legend** — ✅ complete for practical purposes · 🟡 core operations, known gaps · 🟠 read-only or narrow slice · 🔴 no CLI surface yet
+
+| Area | Extent | What you can do | Not covered |
+|---|---|---|---|
+| `auth` | ✅ | Interactive login, token status, logout | — |
+| Discussions | ✅ | Root threads and replies on issues, projects, and initiatives; edit, delete, resolve/unresolve; emoji reactions on any of them | Custom workspace emoji management |
+| `issues` | 🟡 | List, filter, full-text search, read, create, update, archive/unarchive, delete; assign labels/assignee/state/priority/project/cycle; relations (list/add/remove); activity history | Batch create/update, subscribe/unsubscribe, share links, reminders, external sync toggles |
+| `initiatives` | 🟡 | List, read, create, update, archive/unarchive, delete; attach/detach projects; initiative-to-initiative relations; initiative updates (list, read, create, update, archive/unarchive); discussions | Initiative labels, lead-team reassignment, relation reordering |
+| `projects` | 🟡 | List, read, create, update, archive/unarchive, delete; assign project labels by name (`--labels`, `--label-mode`, `--clear-labels`); discussions | Project updates (status posts), project-label CRUD, project relations, project status administration, Slack channel creation |
+| `documents` | 🟡 | List, read, create, update, delete | Content history, document full-text search, unarchive |
+| `milestones` | 🟡 | List, read, create, update (per project) | Delete, reordering/move between projects |
+| `attachments` | 🟡 | List on an issue, create from a URL, delete | Update, and the provider-specific link mutations (GitHub PR/issue, GitLab MR, Slack, Jira, Zendesk, Intercom, Front, Salesforce, Discord) |
+| `files` | 🟡 | Upload a file, download via signed URL | Delete uploads, image-from-URL, CSV export reports |
+| `teams` | 🟡 | List, read, create, update; list/add/remove members | Delete, workflow-state administration, triage responsibility, git automation, SLA configuration |
+| `labels` | 🟠 | Issue labels: list, read, create, update, delete; project labels: list (`--type project`) | Project-label create/update/delete, initiative labels, retire/restore |
+| `cycles` | 🟠 | List cycles, read a cycle with its issues | Create, update, archive, shift all, start upcoming cycle |
+| `users` | 🟠 | List workspace members | Read a single user, update, role changes, suspend/unsuspend, user settings, session management |
+| Integrations | 🔴 | — | All 73 integration root fields (65 mutations, 8 queries): Slack, GitHub, GitLab, Jira, Figma, Sentry, PagerDuty, Intercom, Salesforce, and more |
+| Organization & admin | 🔴 | — | Org settings, invites, domains, webhooks, OAuth apps, audit log, SSO |
+| Releases | 🔴 | — | Releases, release pipelines, stages, release notes |
+| Customers (CRM) | 🔴 | — | Customers, needs, tiers, customer statuses |
+| Views & templates | 🔴 | — | Custom views, favorites, templates, view preferences |
+| Notifications | 🔴 | — | Inbox, subscriptions, snooze, mark read, push subscriptions |
+| Agent sessions | 🔴 | — | Agent sessions, activities, skills, semantic search |
+| Roadmaps | 🔴 | — | Roadmaps and roadmap-to-project links |
+| Imports & exports | 🔴 | — | Jira/Asana/Clubhouse/GitHub/CSV import jobs |
+| Schedules | 🔴 | — | Time schedules and on-call rotations |
+
+The 🔴 rows are mostly workspace administration and integration plumbing — work an agent rarely does mid-task, and the main reason the API-wide coverage number is low while day-to-day coverage is not.
+
+> [!TIP]
+> Missing something you need day to day? [Open an issue](https://github.com/linearis-oss/linearis/issues) — the covered set is driven by what people actually reach for, not by API completeness.
 
 ## AI agent integration
 
