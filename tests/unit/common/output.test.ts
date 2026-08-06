@@ -183,7 +183,7 @@ describe("pickFields", () => {
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
     expect((result as { a: number }).a).toBe(1);
     const ownProto = Object.getOwnPropertyDescriptor(result, "__proto__");
-    expect((ownProto?.value as { x: number }).x).toBe(9);
+    expect(ownProto?.value).toEqual({ x: 9 });
   });
 });
 
