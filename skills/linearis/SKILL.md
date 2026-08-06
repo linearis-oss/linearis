@@ -26,6 +26,9 @@ Drive [Linear.app](https://linear.app) from the shell via the `linearis` CLI (JS
 - **Auth required** — any command may fail with this envelope on stderr and exit code 42:
   `{ "error": "AUTHENTICATION_REQUIRED", "action": "USER_ACTION_REQUIRED", "instruction": "Run 'linearis auth login' …", "exit_code": 42 }`.
   Detect it by `exit_code === 42` / `error === "AUTHENTICATION_REQUIRED"` (not paraphrased text) and surface the CLI's own `instruction`. `linearis auth login` is an interactive browser flow you cannot complete — hand it to the user.
+- **Invalid invocation** — an unknown command or option, a wrong argument count, or a command group named without a subcommand fails on stderr with exit code `2`:
+  `{ "error": "UNKNOWN_COMMAND", "message": "…", "suggestion": "Did you mean read?", "command": "linearis issues", "available_commands": [...], "instruction": "Run 'linearis issues usage' …", "exit_code": 2 }`.
+  Recover from the envelope, not by guessing: pick from `available_commands`, or run the `instruction`. `error` is one of `UNKNOWN_COMMAND`, `UNKNOWN_OPTION`, `MISSING_ARGUMENT`, `MISSING_REQUIRED_OPTION`, `MISSING_OPTION_ARGUMENT`, `TOO_MANY_ARGUMENTS`, `MISSING_SUBCOMMAND`, `INVALID_USAGE`. A bare group (`linearis issues`) is a failure, not a request for help.
 - **Updates (advisory, never blocking)** — optionally run `linearis version check` once → `{ current, latest, channel, updateAvailable }`. If `updateAvailable` is true, mention it and ask the user before `npm install -g linearis@latest`, honoring `channel` (don't move a `next` user to `latest`). npm can hang or rate-limit; on any timeout/error just proceed with the installed version. Read the plain installed version with `linearis version` (JSON), not `--version`.
 
 ## Discover, then act
