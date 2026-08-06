@@ -7,6 +7,7 @@ import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveProjectDocument,
   GetProjectDocument,
+  GetProjectLabelIdsDocument,
   GetProjectWithReactionsDocument,
 } from "../../../src/gql/graphql.js";
 import {
@@ -14,6 +15,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectLabelIds,
   listProjects,
   unarchiveProject,
   updateProject,
@@ -290,7 +292,7 @@ describe("getProject", () => {
       id: "proj-1",
       milestonesFirst: 25,
       skipMilestones: false,
-      issuesFirst: 50,
+      issuesFirst: 25,
       skipIssues: false,
     });
   });
@@ -344,6 +346,31 @@ describe("getProject", () => {
     await expect(getProject(client, asUuid("nonexistent"))).rejects.toThrow(
       'Project with ID "nonexistent" not found',
     );
+  });
+});
+
+describe("getProjectLabelIds", () => {
+  it("returns the project's label UUIDs via the lean query", async () => {
+    const client = mockGqlClient({
+      project: {
+        id: "proj-1",
+        labels: { nodes: [{ id: "label-1" }, { id: "label-2" }] },
+      },
+    });
+
+    const result = await getProjectLabelIds(client, asUuid("proj-1"));
+
+    expect(result).toEqual(["label-1", "label-2"]);
+    expect(client.request).toHaveBeenCalledWith(GetProjectLabelIdsDocument, {
+      id: "proj-1",
+    });
+  });
+
+  it("throws when project not found", async () => {
+    const client = mockGqlClient({ project: null });
+    await expect(
+      getProjectLabelIds(client, asUuid("nonexistent")),
+    ).rejects.toThrow('Project with ID "nonexistent" not found');
   });
 });
 

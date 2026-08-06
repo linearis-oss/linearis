@@ -37,6 +37,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectLabelIds,
   listProjects,
   type UpdateProjectInput,
   unarchiveProject,
@@ -283,7 +284,7 @@ export function setupProjectsCommands(program: Command): void {
     .option(
       "--issues-first <n>",
       "how many issues to fetch; 0 omits issues",
-      "50",
+      "25",
     )
     .action(
       commandAction<[string, ReadOptions, Command]>(
@@ -731,9 +732,9 @@ export function setupProjectsCommands(program: Command): void {
           const projectId = await resolveProjectId(ctx.gql, project);
           const needsLabelContext =
             options.labels && (labelMode === "add" || labelMode === "remove");
-          const projectContext = needsLabelContext
-            ? await getProject(ctx.gql, projectId)
-            : undefined;
+          const currentLabelIds = needsLabelContext
+            ? await getProjectLabelIds(ctx.gql, projectId)
+            : [];
 
           const input: UpdateProjectInput = {};
 
@@ -813,15 +814,9 @@ export function setupProjectsCommands(program: Command): void {
             const labelIds = await resolveProjectLabelIds(ctx.gql, labelNames);
 
             if (labelMode === "add") {
-              const currentLabels = projectContext?.labels?.nodes
-                ? projectContext.labels.nodes.map((l) => asUuid(l.id))
-                : [];
-              input.labelIds = [...new Set([...currentLabels, ...labelIds])];
+              input.labelIds = [...new Set([...currentLabelIds, ...labelIds])];
             } else if (labelMode === "remove") {
-              const currentLabels = projectContext?.labels?.nodes
-                ? projectContext.labels.nodes.map((l) => asUuid(l.id))
-                : [];
-              input.labelIds = currentLabels.filter(
+              input.labelIds = currentLabelIds.filter(
                 (id) => !labelIds.includes(id),
               );
             } else {
