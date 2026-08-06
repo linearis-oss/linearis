@@ -11,7 +11,10 @@ type UsageErrorCode =
 
 export interface UsageErrorPayload {
   error: UsageErrorCode;
+  /** Single-line description of the failure. */
   message: string;
+  /** Commander's near-miss hint, e.g. "Did you mean --limit?" — when it has one. */
+  suggestion?: string;
   /** Space-joined path of the command that failed to parse, e.g. "linearis issues". */
   command: string;
   /** Present only when the failing scope has subcommands to choose from. */
@@ -100,6 +103,28 @@ function offendingToken(
 }
 
 /**
+ * Split Commander's near-miss hint off the message.
+ *
+ * With `showSuggestionAfterError` (on by default) Commander appends the hint as
+ * a parenthesised second line — `unknown option '--limt'\n(Did you mean
+ * --limit?)`. Reusing that verbatim would put an embedded newline in a
+ * machine-readable field, so the first line stays `message` and the hint gets
+ * its own key, unwrapped from its parentheses.
+ */
+function splitSuggestion(raw: string): {
+  message: string;
+  suggestion?: string;
+} {
+  const [first = "", ...rest] = raw.split("\n");
+  const message = first.replace(/^error: /, "");
+  const hint = rest
+    .join(" ")
+    .trim()
+    .replace(/^\((.*)\)$/, "$1");
+  return hint.length > 0 ? { message, suggestion: hint } : { message };
+}
+
+/**
  * Turn a Commander parse failure into the JSON envelope the CLI contract
  * promises. Pure — exported for tests.
  */
@@ -118,12 +143,17 @@ export function describeUsageError(
   // so it needs its own phrasing rather than the generic message fallback.
   const missingSubcommand = error.code === "commander.help";
 
+  // The hint is worth keeping even where the message is rewritten: an unknown
+  // subcommand is exactly the case Commander can suggest a near miss for.
+  const { message: commanderMessage, suggestion } = splitSuggestion(
+    error.message,
+  );
   const message =
     code === "UNKNOWN_COMMAND" && token !== undefined
       ? `Unknown command "${token}" for "${path}".`
       : missingSubcommand
         ? `Missing subcommand for "${path}".`
-        : error.message.replace(/^error: /, "");
+        : commanderMessage;
 
   const instruction =
     code === "UNKNOWN_COMMAND" || missingSubcommand
@@ -135,6 +165,7 @@ export function describeUsageError(
   return {
     error: code,
     message,
+    ...(suggestion !== undefined ? { suggestion } : {}),
     command: path,
     ...(available.length > 0 ? { available_commands: available } : {}),
     instruction,

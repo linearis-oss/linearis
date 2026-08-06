@@ -178,6 +178,26 @@ describe("describeUsageError", () => {
     expect(payload.error).toBe("UNKNOWN_OPTION");
     expect(payload.message).toBe("unknown option '--bogus'");
     expect(payload.command).toBe("linearis issues list");
+    expect(payload).not.toHaveProperty("suggestion");
+  });
+
+  it("moves Commander's near-miss hint out of the message", async () => {
+    const { program, list } = buildProgram();
+    const error = await captureFailure(program, list, [
+      "issues",
+      "list",
+      "--limt",
+      "5",
+    ]);
+
+    // Commander appends the hint to the message as a parenthesised second line.
+    expect(error.message).toContain("\n");
+
+    const payload = describeUsageError(error, list);
+
+    expect(payload.message).toBe("unknown option '--limt'");
+    expect(payload.message).not.toContain("\n");
+    expect(payload.suggestion).toBe("Did you mean --limit?");
   });
 
   it("maps a genuine commander.unknownCommand to UNKNOWN_COMMAND", async () => {

@@ -164,6 +164,7 @@ Exit code `2` carries a machine-readable recovery path:
 {
   "error": "UNKNOWN_COMMAND",
   "message": "Unknown command \"get\" for \"linearis issues\".",
+  "suggestion": "Did you mean read?",
   "command": "linearis issues",
   "available_commands": ["read", "list", "create", "…", "usage"],
   "instruction": "Run 'linearis issues usage' to list valid subcommands.",
@@ -172,8 +173,9 @@ Exit code `2` carries a machine-readable recovery path:
 ```
 
 `error` is one of `UNKNOWN_COMMAND`, `UNKNOWN_OPTION`, `MISSING_ARGUMENT`,
-`TOO_MANY_ARGUMENTS`, or `INVALID_USAGE`. `available_commands` is present only when
-the failing scope has subcommands to choose from.
+`TOO_MANY_ARGUMENTS`, or `INVALID_USAGE`. `message` is always a single line.
+`suggestion` is present only when there is a close-enough near miss, and
+`available_commands` only when the failing scope has subcommands to choose from.
 
 ## AI agent integration
 
