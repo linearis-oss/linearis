@@ -1,10 +1,10 @@
 import type { CommandOptions } from "./auth.js";
-import type { UsageErrorPayload } from "./cli-errors.js";
 import {
   AUTH_ERROR_CODE,
   AuthenticationError,
   invalidParameterError,
   USAGE_ERROR_CODE,
+  type UsageErrorPayload,
 } from "./errors.js";
 import type { JsonSerializable } from "./json.js";
 

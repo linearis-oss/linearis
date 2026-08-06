@@ -1,6 +1,6 @@
 // tests/unit/common/output.test.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { UsageErrorPayload } from "../../../src/common/cli-errors.js";
+import type { UsageErrorPayload } from "../../../src/common/errors.js";
 import { AuthenticationError } from "../../../src/common/errors.js";
 import {
   handleCommand,

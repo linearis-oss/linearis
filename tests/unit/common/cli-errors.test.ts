@@ -5,8 +5,8 @@ import {
   describeUsageError,
   handleParseFailure,
   interceptParseErrors,
-  type UsageErrorPayload,
 } from "../../../src/common/cli-errors.js";
+import type { UsageErrorPayload } from "../../../src/common/errors.js";
 
 /**
  * Mirrors the shape of the real tree in `src/main.ts`: a root with an action

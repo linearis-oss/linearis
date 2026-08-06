@@ -1,28 +1,12 @@
 import type { Command, CommanderError } from "commander";
-import { AuthenticationError, USAGE_ERROR_CODE } from "./errors.js";
+import {
+  AuthenticationError,
+  USAGE_ERROR_CODE,
+  type UsageErrorPayload,
+} from "./errors.js";
 import { outputAuthError, outputError, outputUsageError } from "./output.js";
 
-type UsageErrorCode =
-  | "UNKNOWN_COMMAND"
-  | "UNKNOWN_OPTION"
-  | "MISSING_ARGUMENT"
-  | "TOO_MANY_ARGUMENTS"
-  | "MISSING_SUBCOMMAND"
-  | "INVALID_USAGE";
-
-export interface UsageErrorPayload {
-  error: UsageErrorCode;
-  /** Single-line description of the failure. */
-  message: string;
-  /** Commander's near-miss hint, e.g. "Did you mean --limit?" — when it has one. */
-  suggestion?: string;
-  /** Space-joined path of the command that failed to parse, e.g. "linearis issues". */
-  command: string;
-  /** Present only when the failing scope has subcommands to choose from. */
-  available_commands?: string[];
-  instruction: string;
-  exit_code: number;
-}
+type UsageErrorCode = UsageErrorPayload["error"];
 
 /**
  * Pairs a Commander parse failure with the `Command` that raised it.

@@ -44,6 +44,33 @@ export const AUTH_ERROR_CODE = 42;
  */
 export const USAGE_ERROR_CODE = 2;
 
+type UsageErrorCode =
+  | "UNKNOWN_COMMAND"
+  | "UNKNOWN_OPTION"
+  | "MISSING_ARGUMENT"
+  | "TOO_MANY_ARGUMENTS"
+  | "MISSING_SUBCOMMAND"
+  | "INVALID_USAGE";
+
+/**
+ * The exit-code-2 envelope. Classified in `cli-errors.ts` and written by
+ * `outputUsageError`; it lives here, next to the exit code it carries, so those
+ * two modules do not have to import each other.
+ */
+export interface UsageErrorPayload {
+  error: UsageErrorCode;
+  /** Single-line description of the failure. */
+  message: string;
+  /** Commander's near-miss hint, e.g. "Did you mean --limit?" — when it has one. */
+  suggestion?: string;
+  /** Space-joined path of the command that failed to parse, e.g. "linearis issues". */
+  command: string;
+  /** Present only when the failing scope has subcommands to choose from. */
+  available_commands?: string[];
+  instruction: string;
+  exit_code: number;
+}
+
 export class AuthenticationError extends Error {
   readonly details: string;
 
