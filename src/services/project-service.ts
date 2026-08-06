@@ -1,5 +1,9 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import type { BrandUuidFields, UUID } from "../common/identifier.js";
+import {
+  asUuid,
+  type BrandUuidFields,
+  type UUID,
+} from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
@@ -12,6 +16,7 @@ import {
   type CreateProjectMutation,
   DeleteProjectDocument,
   GetProjectDocument,
+  GetProjectLabelIdsDocument,
   type GetProjectQuery,
   GetProjectsDocument,
   type GetProjectsQuery,
@@ -93,7 +98,11 @@ export interface ProjectDetailOptions {
 }
 
 const DEFAULT_PROJECT_MILESTONES_FIRST = 25;
-const DEFAULT_PROJECT_ISSUES_FIRST = 50;
+// 25 keeps the default read under Linear's 10000 complexity budget: each
+// issue in the response costs ~260 (CompleteIssueFields carries four
+// connections charged at their default page size), so 50 issues alone
+// exceeded the budget and the default read failed on real workspaces (#276).
+const DEFAULT_PROJECT_ISSUES_FIRST = 25;
 
 function connectionFirstOrOneWhenSkipped(value: number): number {
   return value === 0 ? 1 : value;
@@ -138,6 +147,28 @@ export async function getProject(
   }
 
   return result.project;
+}
+
+export async function getProjectLabelIds(
+  client: GraphQLClient,
+  id: UUID,
+): Promise<UUID[]> {
+  const result = await client.request(GetProjectLabelIdsDocument, { id });
+
+  if (!result.project) {
+    throw new Error(`Project with ID "${id}" not found`);
+  }
+
+  // labelIds is a full-replacement input on projectUpdate; merging from a
+  // truncated read would silently delete every label past the page limit.
+  if (result.project.labels.pageInfo.hasNextPage) {
+    throw new Error(
+      `Project with ID "${id}" has more labels than a single read can ` +
+        "return; refusing to modify labels from a truncated label set",
+    );
+  }
+
+  return result.project.labels.nodes.map((label) => asUuid(label.id));
 }
 
 export async function createProject(

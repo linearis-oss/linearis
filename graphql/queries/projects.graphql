@@ -12,6 +12,12 @@
 # Fields returned for each project in list results. Includes status,
 # priority, lead, teams, labels, health, and progress for rich output.
 # Retains deprecated `state` field for backward compatibility.
+#
+# Nested connections are explicitly bounded: Linear's complexity
+# estimator charges an unbounded connection at its default page size
+# (50) per parent row, which pushed the default `projects list`
+# (first: 100) to ~13950 against a 10000 budget — the "Query too
+# complex" error in #276. Bounds of 25 keep the same query at ~7450.
 fragment ProjectListFields on Project {
   id
   name
@@ -34,14 +40,14 @@ fragment ProjectListFields on Project {
     id
     name
   }
-  teams {
+  teams(first: 25) {
     nodes {
       id
       key
       name
     }
   }
-  labels {
+  labels(first: 25) {
     nodes {
       id
       name
@@ -55,8 +61,25 @@ fragment ProjectListFields on Project {
 # Extended fields for single-project read view. Includes content,
 # members, milestones, initiatives, creator, lifecycle dates, and
 # visual properties.
+#
+# Every bounded connection selects pageInfo.hasNextPage here so a
+# truncated page is detectable. The teams/labels re-selections merge
+# with ProjectListFields (identical first: arguments), adding the
+# truncation signal only in detail/mutation contexts: pageInfo prices
+# at ~23 complexity per parent row, which is negligible on a single
+# project but would put the 100-row list back over the 10000 budget.
 fragment ProjectDetailFields on Project {
   ...ProjectListFields
+  teams(first: 25) {
+    pageInfo {
+      hasNextPage
+    }
+  }
+  labels(first: 25) {
+    pageInfo {
+      hasNextPage
+    }
+  }
   content
   icon
   color
@@ -69,27 +92,36 @@ fragment ProjectDetailFields on Project {
     id
     name
   }
-  members {
+  members(first: 25) {
     nodes {
       id
       name
     }
+    pageInfo {
+      hasNextPage
+    }
   }
-  initiatives {
+  initiatives(first: 25) {
     nodes {
       id
       name
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 }
 
 fragment ProjectDetailWithDefaultConnectionsFields on Project {
   ...ProjectDetailFields
-  projectMilestones {
+  projectMilestones(first: 25) {
     nodes {
       id
       name
       targetDate
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 }
@@ -192,6 +224,31 @@ query GetProjectStatuses {
     nodes {
       id
       name
+    }
+  }
+}
+
+# Get only a project's label IDs
+#
+# Lean lookup used by `projects update --label-mode add|remove`, which
+# previously fetched the full project detail (milestones + issues) just
+# to read the current label set — an over-budget query on real
+# workspaces (#283).
+#
+# 250 is Linear's per-connection maximum, so this read cannot be raised
+# further; hasNextPage lets the service refuse a truncated label set
+# instead of writing it back as if it were complete (labelIds is a
+# full-replacement input).
+query GetProjectLabelIds($id: String!) {
+  project(id: $id) {
+    id
+    labels(first: 250) {
+      nodes {
+        id
+      }
+      pageInfo {
+        hasNextPage
+      }
     }
   }
 }

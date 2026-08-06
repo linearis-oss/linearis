@@ -38,6 +38,7 @@ vi.mock("../../../src/services/project-service.js", () => ({
   archiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Archived" }),
   listProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
   getProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
+  getProjectLabelIds: vi.fn().mockResolvedValue([]),
   createProject: vi.fn().mockResolvedValue({ id: "proj-new" }),
   deleteProject: vi.fn().mockResolvedValue({ id: "proj-1", success: true }),
   unarchiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Active" }),
@@ -139,6 +140,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  getProjectLabelIds,
   listProjects,
   unarchiveProject,
   updateProject,
@@ -204,7 +206,7 @@ describe("projects read", () => {
     expect(getProject).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-project-uuid",
-      { milestonesFirst: 25, issuesFirst: 50 },
+      { milestonesFirst: 25, issuesFirst: 25 },
     );
     expect(outputSuccess).toHaveBeenCalledWith({ id: "proj-1" });
   });
@@ -1056,10 +1058,9 @@ describe("projects update", () => {
   });
 
   it("adds labels without dropping existing project labels", async () => {
-    vi.mocked(getProject).mockResolvedValueOnce({
-      id: "proj-1",
-      labels: { nodes: [{ id: "existing-label-uuid" }] },
-    } as Awaited<ReturnType<typeof getProject>>);
+    vi.mocked(getProjectLabelIds).mockResolvedValueOnce([
+      "existing-label-uuid",
+    ] as Awaited<ReturnType<typeof getProjectLabelIds>>);
 
     const program = createProgram();
     await program.parseAsync([
@@ -1074,7 +1075,7 @@ describe("projects update", () => {
       "add",
     ]);
 
-    expect(getProject).toHaveBeenCalledWith(
+    expect(getProjectLabelIds).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-project-uuid",
     );
@@ -1091,12 +1092,10 @@ describe("projects update", () => {
   });
 
   it("removes selected project labels without clearing all labels", async () => {
-    vi.mocked(getProject).mockResolvedValueOnce({
-      id: "proj-1",
-      labels: {
-        nodes: [{ id: "keep-label-uuid" }, { id: "resolved-label-uuid" }],
-      },
-    } as Awaited<ReturnType<typeof getProject>>);
+    vi.mocked(getProjectLabelIds).mockResolvedValueOnce([
+      "keep-label-uuid",
+      "resolved-label-uuid",
+    ] as Awaited<ReturnType<typeof getProjectLabelIds>>);
 
     const program = createProgram();
     await program.parseAsync([
