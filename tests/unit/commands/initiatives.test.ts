@@ -398,6 +398,47 @@ describe("initiatives update", () => {
       expect.stringContaining("at least one option must be provided"),
     );
   });
+
+  it("clears the owner with --clear-owner", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "update",
+      "Growth",
+      "--clear-owner",
+    ]);
+
+    expect(resolveUserId).not.toHaveBeenCalled();
+    expect(updateInitiative).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-initiative-uuid",
+      expect.objectContaining({ ownerId: null }),
+    );
+  });
+
+  it("rejects --owner and --clear-owner together", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "initiatives",
+      "update",
+      "Growth",
+      "--owner",
+      "Alice",
+      "--clear-owner",
+    ]);
+
+    expect(updateInitiative).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be combined with --clear-owner"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
 });
 
 describe("initiative relations and projects wiring", () => {

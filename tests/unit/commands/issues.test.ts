@@ -1098,6 +1098,166 @@ describe("issues update --assignee", () => {
   });
 });
 
+describe("issues update --clear-assignee", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("sends an explicit null assigneeId", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-assignee",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ assigneeId: null }),
+    );
+  });
+
+  it("does not resolve an assignee when clearing alongside other fields", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-assignee",
+      "--status",
+      "Todo",
+    ]);
+
+    expect(resolveUpdateIssueIds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ assignee: expect.anything() }),
+      expect.anything(),
+    );
+  });
+
+  it("rejects --assignee and --clear-assignee together", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--assignee",
+      "Jane Smith",
+      "--clear-assignee",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Cannot use --assignee and --clear-assignee together",
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+});
+
+describe("issues update --clear-project", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("sends an explicit null projectId and clears the project milestone", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-project",
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ projectId: null, projectMilestoneId: null }),
+    );
+  });
+
+  it("does not resolve a project when clearing alongside other fields", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-project",
+      "--status",
+      "Todo",
+    ]);
+
+    expect(resolveUpdateIssueIds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ project: expect.anything() }),
+      expect.anything(),
+    );
+  });
+
+  it("rejects --project and --clear-project together", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--project",
+      "Apollo",
+      "--clear-project",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Cannot use --project and --clear-project together",
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects --clear-project and --project-milestone together", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--clear-project",
+      "--project-milestone",
+      "Beta",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Cannot use --clear-project and --project-milestone together",
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+});
+
 describe("issues read", () => {
   beforeEach(() => {
     vi.clearAllMocks();
