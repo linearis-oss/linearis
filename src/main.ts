@@ -33,6 +33,7 @@ import {
   interceptParseErrors,
 } from "./common/cli-errors.js";
 import { getRootOpts } from "./common/context.js";
+import { parseGraphqlTimeoutOption } from "./common/number-options.js";
 import { parseFieldsList, setOutputOptions } from "./common/output.js";
 import { maybeNotifyUpdate } from "./common/update-notifier.js";
 import {
@@ -46,6 +47,11 @@ program
   .description("CLI for Linear.app with JSON output")
   .version(pkg.version)
   .option("--api-token <token>", "Linear API token")
+  .option(
+    "--graphql-timeout-ms <ms>",
+    "GraphQL request timeout in milliseconds",
+    parseGraphqlTimeoutOption,
+  )
   .option("--compact", "emit single-line JSON (no indentation)")
   .option(
     "--fields <list>",

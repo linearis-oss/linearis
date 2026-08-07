@@ -6,7 +6,11 @@ import {
   resolveApiToken,
   type TokenSource,
 } from "../common/auth.js";
-import { createGraphQLClient, getRootOpts } from "../common/context.js";
+import {
+  configureGraphqlRequestTimeout,
+  createGraphQLClient,
+  getRootOpts,
+} from "../common/context.js";
 import { handleCommand, outputSuccess } from "../common/output.js";
 import { clearToken, saveToken } from "../common/token-storage.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
@@ -29,6 +33,7 @@ export const AUTH_META: DomainMeta = {
     "linearis requires a Linear API token for all operations.",
     "the auth command guides you through creating and storing a token.",
     "tokens are encrypted and stored in ~/.linearis/token.",
+    "graphql timeout order: --graphql-timeout-ms flag, LINEAR_GRAPHQL_TIMEOUT_MS env, default 30000ms.",
     "token resolution order: --api-token flag, LINEAR_API_TOKEN env,",
     "~/.linearis/token (encrypted), ~/.linear_api_token (deprecated).",
   ].join("\n"),
@@ -119,9 +124,10 @@ export function setupAuthCommands(program: Command): void {
     .option("--force", "reauthenticate even if already authenticated")
     .action(async (options: { force?: boolean }, command: Command) => {
       try {
+        const rootOpts = getRootOpts(command) as CommandOptions;
+        configureGraphqlRequestTimeout(rootOpts);
         if (!options.force) {
           try {
-            const rootOpts = getRootOpts(command) as CommandOptions;
             const { token, source } = resolveApiToken(rootOpts);
             try {
               const viewer = await validateApiToken(token);
@@ -217,6 +223,7 @@ export function setupAuthCommands(program: Command): void {
           return;
         }
 
+        configureGraphqlRequestTimeout(rootOpts);
         try {
           const viewer = await validateApiToken(token);
           outputSuccess({

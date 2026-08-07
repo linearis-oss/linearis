@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseEstimateOption,
+  parseGraphqlTimeoutOption,
   parsePriorityOption,
 } from "../../../src/common/number-options.js";
 
@@ -59,6 +60,24 @@ describe("parseEstimateOption", () => {
     );
     expect(() => parseEstimateOption("2.0")).toThrow(
       "Invalid --estimate: must be a non-negative integer",
+    );
+  });
+});
+
+describe("parseGraphqlTimeoutOption", () => {
+  it("parses a positive integer timeout", () => {
+    expect(parseGraphqlTimeoutOption("5000")).toBe(5000);
+  });
+
+  it.each(["0", "-1", "1.5", "abc"])("rejects invalid timeout %s", (raw) => {
+    expect(() => parseGraphqlTimeoutOption(raw)).toThrow(
+      "Invalid --graphql-timeout-ms: must be a positive integer",
+    );
+  });
+
+  it("rejects timeout values that Node would clamp to one millisecond", () => {
+    expect(() => parseGraphqlTimeoutOption("2147483648")).toThrow(
+      "Invalid --graphql-timeout-ms: must not exceed 2147483647",
     );
   });
 });

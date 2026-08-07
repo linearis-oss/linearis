@@ -35,6 +35,9 @@ describe("formatOverview", () => {
     expect(result).toContain(
       "auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token",
     );
+    expect(result).toContain(
+      "graphql timeout: --graphql-timeout-ms <ms> | LINEAR_GRAPHQL_TIMEOUT_MS | default 30000",
+    );
     expect(result).toContain("output: JSON");
     expect(result).toContain("ids: UUID or human-readable");
     expect(result).toContain("domains:");
