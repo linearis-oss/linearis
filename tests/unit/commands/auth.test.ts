@@ -152,6 +152,29 @@ describe("auth login", () => {
     expect(saveToken).toHaveBeenCalledWith("test-token");
   });
 
+  it("does not swallow failures after an existing token is resolved", async () => {
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "existing-token",
+      source: "stored",
+    });
+    vi.mocked(validateToken).mockRejectedValue(new Error("Invalid token"));
+    stderrSpy
+      .mockImplementationOnce(() => {
+        throw new Error("stderr unavailable");
+      })
+      .mockImplementation(() => {});
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "login"]);
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      "Authentication failed: stderr unavailable",
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(createInterface).not.toHaveBeenCalled();
+    expect(saveToken).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["abc", "must be a positive integer"],
     ["0", "must be a positive integer"],

@@ -127,12 +127,18 @@ export function setupAuthCommands(program: Command): void {
         const rootOpts = getRootOpts(command) as CommandOptions;
         configureGraphqlRequestTimeout(rootOpts);
         if (!options.force) {
+          let existingToken: ReturnType<typeof resolveApiToken> | undefined;
           try {
-            const { token, source } = resolveApiToken(rootOpts);
+            existingToken = resolveApiToken(rootOpts);
+          } catch {
+            // No token found anywhere, proceed with login
+          }
+
+          if (existingToken) {
             try {
-              const viewer = await validateApiToken(token);
+              const viewer = await validateApiToken(existingToken.token);
               console.error(
-                `Already authenticated as ${viewer.name} (${viewer.email}) via ${SOURCE_LABELS[source]}.`,
+                `Already authenticated as ${viewer.name} (${viewer.email}) via ${SOURCE_LABELS[existingToken.source]}.`,
               );
               console.error("Run with --force to reauthenticate.");
               return;
@@ -142,8 +148,6 @@ export function setupAuthCommands(program: Command): void {
                 "Existing token is invalid. Starting new authentication...",
               );
             }
-          } catch {
-            // No token found anywhere, proceed with login
           }
         }
 
