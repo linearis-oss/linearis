@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Marketplace for the linearis Claude Code plugin.",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "linearis",
       "source": "./",
       "description": "Agent skill teaching agents to use the linearis Linear.app CLI.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": { "name": "linearis-oss" },
       "homepage": "https://github.com/linearis-oss/linearis",
       "license": "MIT"

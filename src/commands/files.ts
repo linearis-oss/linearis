@@ -25,8 +25,6 @@ export function setupFilesCommands(program: Command): void {
     .command("files")
     .description("Upload and download files from Linear storage.");
 
-  files.action(() => files.help());
-
   files
     .command("download <url>")
     .description("download a file from Linear storage")

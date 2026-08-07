@@ -94,8 +94,6 @@ export function setupDocumentsCommands(program: Command): void {
     .command("documents")
     .description("Document operations (project-level documentation)");
 
-  documents.action(() => documents.help());
-
   documents
     .command("list")
     .description("list documents")

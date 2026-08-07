@@ -112,8 +112,6 @@ export function setupAuthCommands(program: Command): void {
     .command("auth")
     .description("Authenticate with Linear API");
 
-  auth.action(() => auth.help());
-
   // Login bypasses handleCommand() — interactive UX with raw stdin and process.exit
   auth
     .command("login")

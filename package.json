@@ -1,6 +1,6 @@
 {
   "name": "linearis",
-  "version": "2026.6.0",
+  "version": "2026.7.0-next.6",
   "description": "CLI tool for Linear.app with JSON output, smart ID resolution, and optimized GraphQL queries. Designed for LLM agents and humans who prefer structured data.",
   "main": "dist/main.js",
   "type": "module",
@@ -70,8 +70,8 @@
   },
   "homepage": "https://github.com/linearis-oss/linearis#readme",
   "dependencies": {
-    "commander": "14.0.3",
-    "graphql": "16.12.0",
+    "commander": "15.0.0",
+    "graphql": "17.0.2",
     "node-emoji": "2.2.0"
   },
   "devDependencies": {
@@ -96,7 +96,7 @@
     "lefthook": "^2.1.0",
     "semantic-release": "^25.0.1",
     "tsx": "^4.20.5",
-    "typescript": "^6.0.0",
+    "typescript": "^7.0.0",
     "vitest": "^4.0.0"
   },
   "graphql": {

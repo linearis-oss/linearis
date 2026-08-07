@@ -35,9 +35,9 @@ function extractLongFlag(flags: string): string {
   return longPart || flags;
 }
 
-function formatCommandSignature(cmd: Command): string {
+function formatCommandSignature(cmd: Command, path: string): string {
   const args = cmd.registeredArguments;
-  const parts: string[] = [cmd.name()];
+  const parts: string[] = [path];
 
   if (args.length > 0) {
     for (const arg of args) {
@@ -50,6 +50,31 @@ function formatCommandSignature(cmd: Command): string {
   return parts.join(" ");
 }
 
+/**
+ * Every runnable command under a domain, depth-first, each paired with the
+ * space-separated path it is invoked by (`threads react`).
+ *
+ * Domains nest one level deep (`issues threads`, `issues relations`,
+ * `initiatives updates`), and a bare nested group is a MISSING_SUBCOMMAND whose
+ * recovery instruction points here — so listing the group's own name and
+ * stopping would send the caller to an output that cannot answer the question
+ * it was sent to answer. The group keeps its line, as the heading its children
+ * hang off; the children are what make the reference complete.
+ */
+function collectCommands(
+  parent: Command,
+  prefix: string,
+): { path: string; cmd: Command }[] {
+  const entries: { path: string; cmd: Command }[] = [];
+  for (const cmd of parent.commands) {
+    if (cmd.name() === "usage") continue;
+    const path = prefix.length > 0 ? `${prefix} ${cmd.name()}` : cmd.name();
+    entries.push({ path, cmd });
+    entries.push(...collectCommands(cmd, path));
+  }
+  return entries;
+}
+
 export function formatDomainUsage(command: Command, meta: DomainMeta): string {
   const lines: string[] = [];
 
@@ -58,12 +83,12 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
   lines.push(meta.context);
   lines.push("");
 
-  const subcommands = command.commands.filter((c) => c.name() !== "usage");
+  const subcommands = collectCommands(command, "");
   lines.push("commands:");
 
-  const subcommandEntries = subcommands.map((c) => ({
-    sig: formatCommandSignature(c),
-    desc: c.description(),
+  const subcommandEntries = subcommands.map(({ path, cmd }) => ({
+    sig: formatCommandSignature(cmd, path),
+    desc: cmd.description(),
   }));
   const maxSigLen = Math.max(...subcommandEntries.map((e) => e.sig.length));
 
@@ -83,12 +108,12 @@ export function formatDomainUsage(command: Command, meta: DomainMeta): string {
     }
   }
 
-  for (const cmd of subcommands) {
+  for (const { path, cmd } of subcommands) {
     const opts = cmd.options.filter((o) => !o.hidden);
     if (opts.length === 0) continue;
 
     lines.push("");
-    lines.push(`${cmd.name()} options:`);
+    lines.push(`${path} options:`);
 
     const optionEntries = opts.map((o) => ({
       flag: extractLongFlag(o.flags),

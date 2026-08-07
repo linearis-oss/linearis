@@ -29,8 +29,6 @@ export function setupInitiativesCommands(program: Command): void {
     .command("initiatives")
     .description("Initiative operations");
 
-  initiatives.action(() => initiatives.help());
-
   setupInitiativeEntityCommands(initiatives);
   setupInitiativeRelationCommands(initiatives);
   setupInitiativeProjectCommands(initiatives);

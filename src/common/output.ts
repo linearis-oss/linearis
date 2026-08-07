@@ -3,6 +3,8 @@ import {
   AUTH_ERROR_CODE,
   AuthenticationError,
   invalidParameterError,
+  USAGE_ERROR_CODE,
+  type UsageErrorPayload,
 } from "./errors.js";
 import type { JsonSerializable } from "./json.js";
 
@@ -91,7 +93,7 @@ export function outputAuthError(error: AuthenticationError): void {
         details: error.details,
         action: "USER_ACTION_REQUIRED",
         instruction:
-          "Run 'linearis auth' to set up or refresh your authentication token.",
+          "Run 'linearis auth login' to set up or refresh your authentication token.",
         exit_code: AUTH_ERROR_CODE,
       },
       null,
@@ -99,6 +101,15 @@ export function outputAuthError(error: AuthenticationError): void {
     ),
   );
   process.exit(AUTH_ERROR_CODE);
+}
+
+/**
+ * Emit a malformed-invocation envelope. Classification lives in
+ * `cli-errors.ts`; this layer only writes and exits.
+ */
+export function outputUsageError(payload: UsageErrorPayload): void {
+  console.error(JSON.stringify(payload, null, 2));
+  process.exit(USAGE_ERROR_CODE);
 }
 
 export function parseLimit(value: string): number {
