@@ -58,6 +58,28 @@ For the authoritative workflow trigger matrix, required check names, and verific
 `CHANGELOG.md` is release-workflow-owned. Do not edit it in feature/fix PRs.
 If CI reports changelog history violations, rebase on `main` and drop/amend commits that touched `CHANGELOG.md`.
 
+There is one exception, for repairing releases whose notes semantic-release
+failed to render — as happened for `2026.7.0-next.1` … `2026.7.0`, when the
+`conventionalcommits` preset resolved to a version incompatible with the notes
+generator's writer. `guard-changelog-history` in `ci-validate.yml` lets through
+a commit whose subject is exactly:
+
+```
+chore(release): backfill changelog notes
+```
+
+and only when that commit changes nothing but `CHANGELOG.md` and only adds
+lines to it — a backfill that removes or rewrites an existing line fails the
+guard. Every other `CHANGELOG.md` edit stays blocked.
+
+Such a repair must be generated rather than hand-written: re-render the notes
+for each empty section using the commit range from the compare link already in
+its heading, and splice in only the body so the heading's original version,
+date and compare link survive untouched — which is also what keeps the diff
+additions-only, as the guard requires.
+GitHub Release bodies are damaged the same way and cannot be fixed by a
+committed file; a maintainer patches those separately with `gh api`.
+
 ## Pull Requests
 
 1. Fork the repo and create your branch from `main`
