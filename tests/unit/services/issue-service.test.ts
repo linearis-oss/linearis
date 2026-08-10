@@ -23,6 +23,7 @@ import {
   GetIssueByIdWithCommentsDocument,
   GetIssueByIdWithReactionsDocument,
   GetIssuesDocument,
+  IssueVcsBranchSearchDocument,
   RemindOnIssueDocument,
   SearchIssuesDocument,
   ShareIssueDocument,
@@ -37,6 +38,7 @@ import {
   batchUpdateIssues,
   createIssue,
   deleteIssue,
+  findIssueByBranch,
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
@@ -1167,5 +1169,28 @@ describe("batchUpdateIssues", () => {
     await expect(
       batchUpdateIssues(client, [asUuid("issue-1")], { priority: 2 }),
     ).rejects.toThrow("Failed to update 1 issues");
+  });
+});
+
+describe("findIssueByBranch", () => {
+  it("returns the issue owning the branch", async () => {
+    const client = mockGqlClient({
+      issueVcsBranchSearch: { id: "issue-1", identifier: "ENG-1" },
+    });
+
+    await expect(
+      findIssueByBranch(client, "fabian/eng-1-login"),
+    ).resolves.toEqual({ id: "issue-1", identifier: "ENG-1" });
+    expect(client.request).toHaveBeenCalledWith(IssueVcsBranchSearchDocument, {
+      branchName: "fabian/eng-1-login",
+    });
+  });
+
+  it("throws when the branch belongs to no issue", async () => {
+    const client = mockGqlClient({ issueVcsBranchSearch: null });
+
+    await expect(findIssueByBranch(client, "main")).rejects.toThrow(
+      'Issue for branch "main" not found',
+    );
   });
 });

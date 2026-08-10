@@ -7,6 +7,7 @@ import { parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
+import { getCurrentBranch } from "../common/git.js";
 import {
   asUuid,
   isUuid,
@@ -70,6 +71,7 @@ import {
   type CreateIssueInput,
   createIssue,
   deleteIssue,
+  findIssueByBranch,
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
@@ -1612,6 +1614,25 @@ export function setupIssuesCommands(program: Command): void {
               relationActions,
             );
           }
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("from-branch [branch]")
+    .description("find the issue a git branch belongs to")
+    .addHelpText(
+      "after",
+      "\nWith no argument the current checkout's branch is used, so this works as `linearis issues from-branch` inside a worktree.",
+    )
+    .action(
+      commandAction<[string | undefined, unknown, Command]>(
+        async (branch, _unused1, command) => {
+          const branchName = branch ?? getCurrentBranch();
+          const ctx = createContext(getRootOpts(command));
+          const result = await findIssueByBranch(ctx.gql, branchName);
 
           outputSuccess(result);
         },

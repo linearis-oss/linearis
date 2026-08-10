@@ -942,6 +942,16 @@ query FindIssues($filter: IssueFilter, $first: Int = 1) {
   }
 }
 
+# Find the issue a VCS branch belongs to
+#
+# Linear derives a branch name per issue (the `branchName` field), and this is
+# the reverse lookup. Returns null when the branch is not one of Linear's.
+query IssueVcsBranchSearch($branchName: String!) {
+  issueVcsBranchSearch(branchName: $branchName) {
+    ...CompleteIssueWithDefaultCommentsFields
+  }
+}
+
 # Complete issue fragment with attachments
 fragment CompleteIssueWithAttachmentsFields on Issue {
   ...CompleteIssueWithDefaultCommentsFields

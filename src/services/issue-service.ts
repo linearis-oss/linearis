@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { firstOrThrow } from "../common/array.js";
+import { notFoundError } from "../common/errors.js";
 import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
@@ -36,6 +37,7 @@ import {
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
+  IssueVcsBranchSearchDocument,
   RemindOnIssueDocument,
   SearchIssuesDocument,
   type SearchIssuesQuery,
@@ -474,6 +476,28 @@ export async function searchIssues(
     nodes: result.searchIssues?.nodes ?? [],
     pageInfo: result.searchIssues.pageInfo,
   };
+}
+
+/**
+ * Finds the issue a VCS branch belongs to.
+ *
+ * The reverse of the `branchName` field on a read payload.
+ *
+ * @throws Error if no issue owns the branch
+ */
+export async function findIssueByBranch(
+  client: GraphQLClient,
+  branchName: string,
+): Promise<IssueDetail> {
+  const result = await client.request(IssueVcsBranchSearchDocument, {
+    branchName,
+  });
+
+  if (!result.issueVcsBranchSearch) {
+    throw notFoundError("Issue for branch", branchName);
+  }
+
+  return result.issueVcsBranchSearch;
 }
 
 export async function createIssue(
