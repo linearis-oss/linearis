@@ -11,6 +11,7 @@ import { handleCommand, outputSuccess, parseLimit } from "../common/output.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import {
   type LabelResolverScope,
+  type ResolveLabelOptions,
   resolveLabelId,
 } from "../resolvers/label-resolver.js";
 import { resolveProjectLabelId } from "../resolvers/project-resolver.js";
@@ -123,15 +124,21 @@ function rejectTeamScopingForProjectLabels(
  * A group and its children are always the same kind, so routing the parent
  * through the other resolver could only ever produce a not-found or a
  * cross-kind parent the API would reject.
+ *
+ * Issue-label lookups take the same team scoping the written label was
+ * resolved with. Without it the workspace-wide name match wins, so in a
+ * workspace where two teams each own a group called "Area" the new label would
+ * land in whichever one the API returned first.
  */
 async function resolveLabelParentId(
   client: ReturnType<typeof createContext>["gql"],
   parent: string,
   type: LabelType,
+  scoping: ResolveLabelOptions,
 ): Promise<UUID> {
   return type === "project"
     ? resolveProjectLabelId(client, parent)
-    : resolveLabelId(client, parent);
+    : resolveLabelId(client, parent, scoping);
 }
 
 /**
@@ -149,6 +156,8 @@ async function resolveLabelLookup(
   ctx: ReturnType<typeof createContext>;
   labelId: UUID;
   type: LabelType;
+  /** The scoping `<label>` was resolved with, so `--parent` can reuse it. */
+  scoping: ResolveLabelOptions;
 }> {
   const ctx = createContext(getRootOpts(command));
   const type = parseLabelType(options.type);
@@ -161,6 +170,7 @@ async function resolveLabelLookup(
       ctx,
       labelId: await resolveProjectLabelId(ctx.gql, label),
       type,
+      scoping: {},
     };
   }
 
@@ -178,16 +188,13 @@ async function resolveLabelLookup(
   const teamId = options.team
     ? await resolveTeamId(ctx.gql, options.team)
     : undefined;
-  const labelId = await resolveLabelId(
-    ctx.gql,
-    label,
-    omitUndefined({
-      teamId,
-      scope: scope as LabelResolverScope | undefined,
-    }),
-  );
+  const scoping = omitUndefined({
+    teamId,
+    scope: scope as LabelResolverScope | undefined,
+  });
+  const labelId = await resolveLabelId(ctx.gql, label, scoping);
 
-  return { ctx, labelId, type };
+  return { ctx, labelId, type, scoping };
 }
 
 /**
@@ -360,8 +367,12 @@ export function setupLabelsCommands(program: Command): void {
         const input: CreateLabelInput = { name };
         const color = parseLabelColor(options.color);
 
-        if (options.team) {
-          input.teamId = await resolveTeamId(ctx.gql, options.team);
+        const teamId = options.team
+          ? await resolveTeamId(ctx.gql, options.team)
+          : undefined;
+
+        if (teamId) {
+          input.teamId = teamId;
         }
 
         if (color) {
@@ -377,6 +388,7 @@ export function setupLabelsCommands(program: Command): void {
             ctx.gql,
             options.parent,
             type,
+            omitUndefined({ teamId }),
           );
         }
 
@@ -438,7 +450,7 @@ export function setupLabelsCommands(program: Command): void {
           Command,
         ];
         const input = buildUpdateInput(options);
-        const { ctx, labelId, type } = await resolveLabelLookup(
+        const { ctx, labelId, type, scoping } = await resolveLabelLookup(
           command,
           label,
           options,
@@ -449,6 +461,7 @@ export function setupLabelsCommands(program: Command): void {
             ctx.gql,
             options.parent,
             type,
+            scoping,
           );
         }
 

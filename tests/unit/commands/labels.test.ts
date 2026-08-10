@@ -803,6 +803,47 @@ describe("labels --type project", () => {
     );
   });
 
+  it("scopes --parent to --team when creating an issue label", async () => {
+    await run("create", "Bug", "--team", "ENG", "--parent", "Area");
+
+    expect(resolveLabelId).toHaveBeenCalledWith(expect.anything(), "Area", {
+      teamId: "resolved-team-uuid",
+    });
+  });
+
+  it("resolves --parent workspace-wide when no team is given", async () => {
+    await run("create", "Bug", "--parent", "Area");
+
+    expect(resolveLabelId).toHaveBeenCalledWith(expect.anything(), "Area", {});
+  });
+
+  it("scopes --parent the same way <label> was resolved on update", async () => {
+    await run(
+      "update",
+      "Bug",
+      "--team",
+      "ENG",
+      "--scope",
+      "team",
+      "--parent",
+      "Area",
+    );
+
+    const scoping = { teamId: "resolved-team-uuid", scope: "team" };
+    expect(resolveLabelId).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      "Bug",
+      scoping,
+    );
+    expect(resolveLabelId).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      "Area",
+      scoping,
+    );
+  });
+
   it("reads a project label by name", async () => {
     await run("read", "Customer", "--type", "project");
 
