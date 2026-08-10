@@ -36,6 +36,7 @@
     "check:ci": "biome check .",
     "knip": "knip --no-config-hints",
     "knip:ci": "knip --no-config-hints --reporter markdown",
+    "count:root-fields": "node scripts/count-root-fields.mjs",
     "verify:packed-binaries": "node scripts/verify-packed-binaries.mjs",
     "release": "npm test && npm run build && npm run verify:packed-binaries && rm -rf .clean-pkg && npx clean-publish --without-publish --temp-dir .clean-pkg && npm publish ./.clean-pkg --access public && rm -rf .clean-pkg",
     "prestart": "npm run generate",
