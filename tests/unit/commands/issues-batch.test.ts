@@ -4,6 +4,7 @@ import {
   buildBatchUpdateContext,
   buildBatchUpdateInput,
   parseBatchCreateEntries,
+  parseBatchUpdateDocument,
   validateBatchUpdateEstimate,
 } from "../../../src/commands/issues-batch.js";
 import { asUuid } from "../../../src/common/identifier.js";
@@ -148,6 +149,164 @@ describe("parseBatchCreateEntries", () => {
   });
 });
 
+describe("parseBatchUpdateDocument", () => {
+  it("reads the targets and the patch, mirroring the update flags", () => {
+    expect(
+      parseBatchUpdateDocument(
+        JSON.stringify({
+          issues: ["ENG-1", "ENG-2"],
+          patch: {
+            title: "New title",
+            description: "body",
+            status: "In Progress",
+            priority: 2,
+            estimate: 3,
+            assignee: "alice",
+            project: "Auth",
+            projectMilestone: "Beta",
+            labels: ["bug", "urgent"],
+            parentTicket: "ENG-9",
+            cycle: "current",
+            dueDate: "2026-09-01",
+          },
+        }),
+      ),
+    ).toEqual({
+      issues: ["ENG-1", "ENG-2"],
+      patch: {
+        title: "New title",
+        description: "body",
+        status: "In Progress",
+        priority: 2,
+        estimate: 3,
+        assignee: "alice",
+        project: "Auth",
+        projectMilestone: "Beta",
+        labels: ["bug", "urgent"],
+        parentTicket: "ENG-9",
+        cycle: "current",
+        dueDate: "2026-09-01",
+      },
+    });
+  });
+
+  it("reads null as the clear that the --clear-* flags express", () => {
+    const { patch } = parseBatchUpdateDocument(
+      JSON.stringify({
+        issues: "ENG-1,ENG-2",
+        patch: {
+          assignee: null,
+          project: null,
+          labels: null,
+          parentTicket: null,
+          projectMilestone: null,
+          cycle: null,
+          estimate: null,
+          dueDate: null,
+        },
+      }),
+    );
+
+    expect(patch).toEqual({
+      assignee: null,
+      project: null,
+      labels: null,
+      parentTicket: null,
+      projectMilestone: null,
+      cycle: null,
+      estimate: null,
+      dueDate: null,
+    });
+  });
+
+  it("refuses to clear a field that has no clear flag", () => {
+    // Linear has no empty state for a title, so a null there is a mistake the
+    // caller wants to hear about rather than a no-op applied to every issue.
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: ["ENG-1"], patch: { title: null } }),
+      ),
+    ).toThrow(/patch: cannot clear "title" with null/);
+  });
+
+  it("rejects an unknown patch key rather than dropping it", () => {
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: ["ENG-1"], patch: { assingee: "alice" } }),
+      ),
+    ).toThrow(/patch: has unknown key "assingee"/);
+  });
+
+  it("requires a project alongside a milestone", () => {
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({
+          issues: ["ENG-1"],
+          patch: { projectMilestone: "Beta" },
+        }),
+      ),
+    ).toThrow(/patch: has projectMilestone without project/);
+
+    // Clearing the project takes the milestone with it, so naming both is a
+    // contradiction rather than a shorthand.
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({
+          issues: ["ENG-1"],
+          patch: { project: null, projectMilestone: "Beta" },
+        }),
+      ),
+    ).toThrow(/patch: has projectMilestone without project/);
+  });
+
+  it("rejects a patch with nothing to change", () => {
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: ["ENG-1"], patch: {} }),
+      ),
+    ).toThrow(/patch: needs at least one field to change/);
+  });
+
+  it("validates due dates and priorities as the flags do", () => {
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: ["ENG-1"], patch: { dueDate: "01-09-2026" } }),
+      ),
+    ).toThrow(/Invalid due date format/);
+
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: ["ENG-1"], patch: { priority: 9 } }),
+      ),
+    ).toThrow(/patch: has "priority" outside the allowed range/);
+  });
+
+  it("rejects documents that are not an issues/patch object", () => {
+    expect(() => parseBatchUpdateDocument("not json")).toThrow(
+      /is not valid JSON/,
+    );
+    expect(() => parseBatchUpdateDocument("[]")).toThrow(
+      /must be a JSON object with "issues" and "patch"/,
+    );
+    expect(() =>
+      parseBatchUpdateDocument(JSON.stringify({ patch: { title: "T" } })),
+    ).toThrow(/requires "issues"/);
+    expect(() =>
+      parseBatchUpdateDocument(JSON.stringify({ issues: ["ENG-1"] })),
+    ).toThrow(/requires "patch" as an object/);
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: ["ENG-1"], patch: {}, extra: 1 }),
+      ),
+    ).toThrow(/batch document: has unknown key "extra"/);
+    expect(() =>
+      parseBatchUpdateDocument(
+        JSON.stringify({ issues: [], patch: { title: "T" } }),
+      ),
+    ).toThrow(/has "issues" that is not a non-empty array/);
+  });
+});
+
 describe("buildBatchUpdateContext", () => {
   const target = (teamKey: string): ResolvedIssueRef => ({
     ref: `${teamKey}-1`,
@@ -158,7 +317,6 @@ describe("buildBatchUpdateContext", () => {
 
   it("scopes lookups to the only team when all targets share one", () => {
     const context = buildBatchUpdateContext([target("ENG"), target("ENG")], {
-      issues: "ENG-1,ENG-2",
       status: "Todo",
     });
 
@@ -169,12 +327,9 @@ describe("buildBatchUpdateContext", () => {
   });
 
   it("rejects a named status or cycle spanning teams", () => {
-    for (const options of [
-      { issues: "ENG-1,OPS-1", status: "Todo" },
-      { issues: "ENG-1,OPS-1", cycle: "Cycle 4" },
-    ]) {
+    for (const patch of [{ status: "Todo" }, { cycle: "Cycle 4" }]) {
       expect(() =>
-        buildBatchUpdateContext([target("ENG"), target("OPS")], options),
+        buildBatchUpdateContext([target("ENG"), target("OPS")], patch),
       ).toThrow(/cannot be resolved by name across teams ENG, OPS/);
     }
   });
@@ -184,30 +339,29 @@ describe("buildBatchUpdateContext", () => {
     // lookup takes the first hit and half the batch gets the wrong label.
     expect(() =>
       buildBatchUpdateContext([target("ENG"), target("OPS")], {
-        issues: "ENG-1,OPS-1",
-        labels: "bug",
+        labels: ["bug"],
       }),
-    ).toThrow(/--labels: cannot be resolved by name across teams ENG, OPS/);
+    ).toThrow(/labels: cannot be resolved by name across teams ENG, OPS/);
   });
 
   it("rejects a label list that mixes a UUID with a name", () => {
     expect(() =>
       buildBatchUpdateContext([target("ENG"), target("OPS")], {
-        issues: "ENG-1,OPS-1",
-        labels: "66666666-6666-4666-8666-666666666666,bug",
+        labels: ["66666666-6666-4666-8666-666666666666", "bug"],
       }),
-    ).toThrow(/--labels/);
+    ).toThrow(/labels/);
   });
 
   it("lets a UUID status, cycle or label through as the documented escape hatch", () => {
     // The error message advises passing a UUID; a UUID needs no team to
     // resolve against, so the guard must not reject it as well.
     const context = buildBatchUpdateContext([target("ENG"), target("OPS")], {
-      issues: "ENG-1,OPS-1",
       status: "33333333-3333-4333-8333-333333333333",
       cycle: "44444444-4444-4444-8444-444444444444",
-      labels:
-        "66666666-6666-4666-8666-666666666666,77777777-7777-4777-8777-777777777777",
+      labels: [
+        "66666666-6666-4666-8666-666666666666",
+        "77777777-7777-4777-8777-777777777777",
+      ],
     });
 
     expect(context).toEqual({});
@@ -252,8 +406,7 @@ describe("validateBatchUpdateEstimate", () => {
 
     await expect(
       validateBatchUpdateEstimate(client, [target("ENG", ENG_TEAM)], {
-        issues: "ENG-1",
-        estimate: "7",
+        estimate: 7,
       }),
     ).rejects.toThrow(/must be one of \[1, 2, 3, 5, 8\] for team "ENG"/);
   });
@@ -266,8 +419,7 @@ describe("validateBatchUpdateEstimate", () => {
 
     await expect(
       validateBatchUpdateEstimate(client, [target("ENG", ENG_TEAM)], {
-        issues: "ENG-1",
-        estimate: "5",
+        estimate: 5,
       }),
     ).resolves.toBeUndefined();
   });
@@ -285,7 +437,7 @@ describe("validateBatchUpdateEstimate", () => {
       validateBatchUpdateEstimate(
         client,
         [target("ENG", ENG_TEAM), target("OPS", OPS_TEAM)],
-        { issues: "ENG-1,OPS-1", estimate: "8" },
+        { estimate: 8 },
       ),
     ).rejects.toThrow(/for team "OPS"/);
   });
@@ -299,12 +451,11 @@ describe("validateBatchUpdateEstimate", () => {
     await validateBatchUpdateEstimate(
       client,
       [target("ENG", ENG_TEAM), target("ENG", ENG_TEAM)],
-      { issues: "ENG-1,ENG-2", estimate: "3" },
+      { estimate: 3 },
     );
     expect(request).toHaveBeenCalledTimes(1);
 
     await validateBatchUpdateEstimate(client, [target("ENG", ENG_TEAM)], {
-      issues: "ENG-1",
       title: "no estimate here",
     });
     expect(request).toHaveBeenCalledTimes(1);
@@ -315,25 +466,22 @@ describe("buildBatchUpdateInput", () => {
   const CYCLE = asUuid("66666666-6666-4666-8666-666666666666");
   const MILESTONE = asUuid("77777777-7777-4777-8777-777777777777");
 
-  it("detaches the cycle with --clear-cycle", () => {
-    expect(
-      buildBatchUpdateInput({ issues: "ENG-1", clearCycle: true }, {}),
-    ).toEqual({ cycleId: null });
+  it("detaches the cycle when the patch clears it", () => {
+    expect(buildBatchUpdateInput({ cycle: null }, {})).toEqual({
+      cycleId: null,
+    });
   });
 
-  it("detaches the milestone with --clear-project-milestone", () => {
-    expect(
-      buildBatchUpdateInput(
-        { issues: "ENG-1", clearProjectMilestone: true },
-        {},
-      ),
-    ).toEqual({ projectMilestoneId: null });
+  it("detaches the milestone when the patch clears it", () => {
+    expect(buildBatchUpdateInput({ projectMilestone: null }, {})).toEqual({
+      projectMilestoneId: null,
+    });
   });
 
-  it("still sets a cycle or milestone when the clear flags are absent", () => {
+  it("still sets a cycle or milestone when the patch names one", () => {
     expect(
       buildBatchUpdateInput(
-        { issues: "ENG-1", cycle: "Cycle 4", projectMilestone: "Beta" },
+        { cycle: "Cycle 4", projectMilestone: "Beta" },
         { cycleId: CYCLE, projectMilestoneId: MILESTONE },
       ),
     ).toEqual({ cycleId: CYCLE, projectMilestoneId: MILESTONE });

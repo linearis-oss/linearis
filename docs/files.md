@@ -107,7 +107,10 @@ Source `.graphql` files that feed into code generation.
 
 Hand-written JSON Schemas for the commands that take a JSON document instead of flags. Nothing reads them at runtime — they exist for callers (editors, validators, agents) and are shipped in the npm package via `files` in `package.json`.
 
-- **issues-batch-create.schema.json** -- the `issues batch create` document. Kept in step with `parseBatchCreateEntries` in `src/commands/issues-batch.ts` by `tests/unit/commands/issues-batch-schema.test.ts`; extend both when adding a field.
+- **issues-batch-create.schema.json** -- the `issues batch create` document (an array of issues to create).
+- **issues-batch-update.schema.json** -- the `issues batch update` document (`issues` plus the one `patch` they share, where `null` clears a field).
+
+Both are kept in step with their parsers in `src/commands/issues-batch.ts` (`parseBatchCreateEntries`, `parseBatchUpdateDocument`) by `tests/unit/commands/issues-batch-schema.test.ts`; extend both when adding a field.
 
 ## Tests (`tests/`)
 
