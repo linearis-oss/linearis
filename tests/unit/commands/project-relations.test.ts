@@ -100,6 +100,33 @@ describe("projects relations", () => {
     expect(listProjectRelations).not.toHaveBeenCalled();
   });
 
+  it("list rejects --limit alongside a project rather than ignoring it", async () => {
+    await run("list", "Upstream", "--limit", "200");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be used with a project"),
+    );
+    expect(listProjectRelations).not.toHaveBeenCalled();
+  });
+
+  it("list rejects --after alongside a project rather than ignoring it", async () => {
+    await run("list", "Upstream", "--after", "cursor");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be used with a project"),
+    );
+    expect(listProjectRelations).not.toHaveBeenCalled();
+  });
+
+  it("list still accepts a project when the limit is left at its default", async () => {
+    await run("list", "Upstream");
+
+    expect(listProjectRelations).toHaveBeenCalledWith(
+      expect.anything(),
+      "project-uuid-1",
+    );
+  });
+
   it("read resolves the relation and returns it", async () => {
     await run("read", "relation-uuid");
 

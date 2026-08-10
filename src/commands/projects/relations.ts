@@ -59,8 +59,35 @@ interface RelationRemoveOptions {
 }
 
 interface RelationListOptions {
-  limit: string;
+  limit?: string;
   after?: string;
+}
+
+const DEFAULT_LIMIT = "50";
+
+/**
+ * `relations list <project>` reads both directions of one project in a single
+ * query capped at 100 each and reports `truncated` instead of a cursor, so
+ * `-l`/`--after` have nothing to act on. Accepting them silently would answer
+ * a different question than the one asked.
+ */
+function rejectPaginationForProject(
+  command: Command,
+  options: RelationListOptions,
+): void {
+  if (command.getOptionValueSource("limit") === "cli") {
+    throw invalidParameterError(
+      "--limit",
+      "cannot be used with a project: both directions are returned in full, with `truncated` set when the API caps them",
+    );
+  }
+
+  if (options.after !== undefined) {
+    throw invalidParameterError(
+      "--after",
+      "cannot be used with a project: the per-project query is not cursor-paginated",
+    );
+  }
 }
 
 function parseAnchor(flag: string, value: string): ProjectRelationAnchor {
@@ -107,7 +134,11 @@ export function setupProjectRelationCommands(projects: Command): void {
         "Without one, the workspace-wide connection is paged instead — it\n" +
         "takes no filter, so -l/--after are the only knobs it has.",
     )
-    .option("-l, --limit <n>", "max results (workspace-wide only)", "50")
+    .option(
+      "-l, --limit <n>",
+      "max results (workspace-wide only)",
+      DEFAULT_LIMIT,
+    )
     .option("--after <cursor>", "cursor for next page (workspace-wide only)")
     .action(
       commandAction<[string | undefined, RelationListOptions, Command]>(
@@ -119,13 +150,15 @@ export function setupProjectRelationCommands(projects: Command): void {
               await listAllProjectRelations(
                 ctx.gql,
                 buildPaginationOptions(
-                  parseLimit(options.limit),
+                  parseLimit(options.limit ?? DEFAULT_LIMIT),
                   options.after,
                 ),
               ),
             );
             return;
           }
+
+          rejectPaginationForProject(command, options);
 
           const projectId = await resolveProjectId(ctx.gql, project);
           outputSuccess(await listProjectRelations(ctx.gql, projectId));
