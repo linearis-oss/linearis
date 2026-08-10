@@ -394,6 +394,14 @@ export const ISSUES_META: DomainMeta = {
     "reachable by identifier everywhere, but excluded from `list`/`search`",
     "unless you pass --include-archived.",
     "",
+    "`list`/`search` also hide completed issues by default. saying anything",
+    "about state lifts that narrowing: --status and --state-type replace it",
+    "with what you asked for, and --include-archived drops it too. so",
+    "--include-archived widens the result twice — archived issues are nearly",
+    "always completed, and keeping the default clause would hide the very",
+    "issues the flag was passed to surface. to see completed work without",
+    "archived issues, pass --state-type completed instead.",
+    "",
     "people attach to an issue in four ways: assignee (one, owns it),",
     "delegate (one, acts for the assignee), subscribers (many, get notified),",
     "and shared access (`share --with`, which grants a user visibility of an",
@@ -707,7 +715,10 @@ function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
       "filter by state category (triage, backlog, unstarted, started, completed, canceled)",
     )
     .option("--subscriber <user>", "filter by subscriber")
-    .option("--include-archived", "include archived issues in the results");
+    .option(
+      "--include-archived",
+      "include archived issues, and drop the default 'hide completed' narrowing",
+    );
 }
 
 export function setupIssuesCommands(program: Command): void {
