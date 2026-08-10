@@ -5,18 +5,18 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
+  AddProjectLabelDocument,
   DisableProjectExternalSyncDocument,
   GetProjectDocument,
-  GetProjectLabelIdsDocument,
   GetProjectWithReactionsDocument,
   UpdateProjectDocument,
 } from "../../../src/gql/graphql.js";
 import {
+  applyProjectLabels,
   createProject,
   deleteProject,
   disableProjectExternalSync,
   getProject,
-  getProjectLabelIds,
   listProjects,
   searchProjects,
   unarchiveProject,
@@ -351,50 +351,6 @@ describe("getProject", () => {
   });
 });
 
-describe("getProjectLabelIds", () => {
-  it("returns the project's label UUIDs via the lean query", async () => {
-    const client = mockGqlClient({
-      project: {
-        id: "proj-1",
-        labels: {
-          nodes: [{ id: "label-1" }, { id: "label-2" }],
-          pageInfo: { hasNextPage: false },
-        },
-      },
-    });
-
-    const result = await getProjectLabelIds(client, asUuid("proj-1"));
-
-    expect(result).toEqual(["label-1", "label-2"]);
-    expect(client.request).toHaveBeenCalledWith(GetProjectLabelIdsDocument, {
-      id: "proj-1",
-    });
-  });
-
-  it("throws when project not found", async () => {
-    const client = mockGqlClient({ project: null });
-    await expect(
-      getProjectLabelIds(client, asUuid("nonexistent")),
-    ).rejects.toThrow('Project with ID "nonexistent" not found');
-  });
-
-  it("throws instead of returning a truncated label set", async () => {
-    const client = mockGqlClient({
-      project: {
-        id: "proj-1",
-        labels: {
-          nodes: [{ id: "label-1" }],
-          pageInfo: { hasNextPage: true },
-        },
-      },
-    });
-
-    await expect(getProjectLabelIds(client, asUuid("proj-1"))).rejects.toThrow(
-      "refusing to modify labels from a truncated label set",
-    );
-  });
-});
-
 describe("project fragment connection bounds", () => {
   // Linear's complexity estimator charges an unbounded connection at its
   // default page size per parent row; unbounded connections in these
@@ -450,42 +406,6 @@ describe("project fragment connection bounds", () => {
       }
     },
   );
-
-  it("bounds the lean label lookup and selects its truncation signal", () => {
-    const operation = GetProjectLabelIdsDocument.definitions.find(
-      (definition) => definition.kind === Kind.OPERATION_DEFINITION,
-    );
-    if (!operation || operation.kind !== Kind.OPERATION_DEFINITION) {
-      throw new Error("GetProjectLabelIds operation not found");
-    }
-
-    const projectField = operation.selectionSet.selections.find(
-      (selection) =>
-        selection.kind === Kind.FIELD && selection.name.value === "project",
-    );
-    if (!projectField || projectField.kind !== Kind.FIELD) {
-      throw new Error("GetProjectLabelIds does not select project");
-    }
-
-    const labelsField = projectField.selectionSet?.selections.find(
-      (selection) =>
-        selection.kind === Kind.FIELD && selection.name.value === "labels",
-    );
-    if (!labelsField || labelsField.kind !== Kind.FIELD) {
-      throw new Error("GetProjectLabelIds does not select labels");
-    }
-
-    const firstArgument = labelsField.arguments?.find(
-      (argument) => argument.name.value === "first",
-    );
-    expect(firstArgument?.value.kind).toBe(Kind.INT);
-
-    const pageInfo = labelsField.selectionSet?.selections.find(
-      (selection) =>
-        selection.kind === Kind.FIELD && selection.name.value === "pageInfo",
-    );
-    expect(pageInfo).toBeDefined();
-  });
 });
 
 describe("createProject", () => {
@@ -740,5 +660,70 @@ describe("disableProjectExternalSync", () => {
     await expect(
       disableProjectExternalSync(client, asUuid("proj-1"), "github"),
     ).rejects.toThrow('Failed to disable github sync on project "proj-1"');
+  });
+});
+
+describe("applyProjectLabels", () => {
+  it("issues one add mutation per label, in order", async () => {
+    const client = mockGqlClient({
+      projectAddLabel: { success: true, project: { id: "proj-1" } },
+    });
+
+    await expect(
+      applyProjectLabels(
+        client,
+        asUuid("proj-1"),
+        [asUuid("label-1"), asUuid("label-2")],
+        "add",
+      ),
+    ).resolves.toEqual({ id: "proj-1" });
+
+    expect(client.request).toHaveBeenCalledTimes(2);
+    expect(client.request).toHaveBeenNthCalledWith(1, AddProjectLabelDocument, {
+      id: "proj-1",
+      labelId: "label-1",
+    });
+    expect(client.request).toHaveBeenNthCalledWith(2, AddProjectLabelDocument, {
+      id: "proj-1",
+      labelId: "label-2",
+    });
+  });
+
+  it("removes through the remove mutation", async () => {
+    const client = mockGqlClient({
+      projectRemoveLabel: { success: true, project: { id: "proj-1" } },
+    });
+
+    await applyProjectLabels(
+      client,
+      asUuid("proj-1"),
+      [asUuid("label-1")],
+      "remove",
+    );
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      id: "proj-1",
+      labelId: "label-1",
+    });
+  });
+
+  it("names the label that failed", async () => {
+    const client = mockGqlClient({
+      projectAddLabel: { success: false, project: null },
+    });
+
+    await expect(
+      applyProjectLabels(client, asUuid("proj-1"), [asUuid("label-1")], "add"),
+    ).rejects.toThrow('Failed to add label "label-1" on project "proj-1"');
+  });
+
+  it("throws rather than reporting success for an empty label list", async () => {
+    const client = mockGqlClient({});
+
+    await expect(
+      applyProjectLabels(client, asUuid("proj-1"), [], "add"),
+    ).rejects.toThrow('No labels given to add on project "proj-1"');
+
+    expect(client.request).not.toHaveBeenCalled();
   });
 });

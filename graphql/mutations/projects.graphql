@@ -69,3 +69,26 @@ mutation DisableProjectExternalSync(
     }
   }
 }
+
+# Add one label to a project
+#
+# Incremental, unlike `ProjectUpdateInput.labelIds`, which replaces the
+# whole set — so `--label-mode add` needs no read of the current labels
+# and cannot drop the ones it did not see.
+mutation AddProjectLabel($id: String!, $labelId: String!) {
+  projectAddLabel(id: $id, labelId: $labelId) {
+    success
+    project {
+      ...ProjectDetailWithDefaultConnectionsFields
+    }
+  }
+}
+
+mutation RemoveProjectLabel($id: String!, $labelId: String!) {
+  projectRemoveLabel(id: $id, labelId: $labelId) {
+    success
+    project {
+      ...ProjectDetailWithDefaultConnectionsFields
+    }
+  }
+}

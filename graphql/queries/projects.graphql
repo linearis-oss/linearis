@@ -313,31 +313,6 @@ query GetProjectStatuses($includeArchived: Boolean = false) {
   }
 }
 
-# Get only a project's label IDs
-#
-# Lean lookup used by `projects update --label-mode add|remove`, which
-# previously fetched the full project detail (milestones + issues) just
-# to read the current label set — an over-budget query on real
-# workspaces (#283).
-#
-# 250 is Linear's per-connection maximum, so this read cannot be raised
-# further; hasNextPage lets the service refuse a truncated label set
-# instead of writing it back as if it were complete (labelIds is a
-# full-replacement input).
-query GetProjectLabelIds($id: String!) {
-  project(id: $id) {
-    id
-    labels(first: 250) {
-      nodes {
-        id
-      }
-      pageInfo {
-        hasNextPage
-      }
-    }
-  }
-}
-
 # Find projects by case-insensitive name for ID resolution
 #
 # Returns up to two matches so the resolver can throw on ambiguity.

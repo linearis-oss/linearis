@@ -1,15 +1,13 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import {
-  asUuid,
-  type BrandUuidFields,
-  type UUID,
-} from "../common/identifier.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
 } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
+  AddProjectLabelDocument,
+  type AddProjectLabelMutation,
   CreateProjectDocument,
   type CreateProjectMutation,
   DeleteProjectDocument,
@@ -17,12 +15,12 @@ import {
   type DisableProjectExternalSyncMutation,
   type ExternalSyncService,
   GetProjectDocument,
-  GetProjectLabelIdsDocument,
   type GetProjectQuery,
   GetProjectsDocument,
   type GetProjectsQuery,
   type ProjectCreateInput,
   type ProjectUpdateInput,
+  RemoveProjectLabelDocument,
   SearchProjectsDocument,
   type SearchProjectsQuery,
   UnarchiveProjectDocument,
@@ -45,6 +43,9 @@ export type UnarchivedProject = NonNullable<
 >;
 export type ProjectSearchResult =
   SearchProjectsQuery["searchProjects"]["nodes"][0];
+export type LabelledProject = NonNullable<
+  AddProjectLabelMutation["projectAddLabel"]["project"]
+>;
 export type SyncDisabledProject = NonNullable<
   DisableProjectExternalSyncMutation["projectExternalSyncDisable"]["project"]
 >;
@@ -187,28 +188,6 @@ export async function getProject(
   return result.project;
 }
 
-export async function getProjectLabelIds(
-  client: GraphQLClient,
-  id: UUID,
-): Promise<UUID[]> {
-  const result = await client.request(GetProjectLabelIdsDocument, { id });
-
-  if (!result.project) {
-    throw new Error(`Project with ID "${id}" not found`);
-  }
-
-  // labelIds is a full-replacement input on projectUpdate; merging from a
-  // truncated read would silently delete every label past the page limit.
-  if (result.project.labels.pageInfo.hasNextPage) {
-    throw new Error(
-      `Project with ID "${id}" has more labels than a single read can ` +
-        "return; refusing to modify labels from a truncated label set",
-    );
-  }
-
-  return result.project.labels.nodes.map((label) => asUuid(label.id));
-}
-
 export async function createProject(
   client: GraphQLClient,
   input: CreateProjectInput,
@@ -241,6 +220,48 @@ export async function updateProject(
     "project",
     `Failed to update project "${id}"`,
   );
+}
+
+/**
+ * Adds or removes labels one at a time.
+ *
+ * `projectAddLabel`/`projectRemoveLabel` are incremental, so unlike the
+ * full-replacement `labelIds` input they need no read of the project's
+ * current labels and cannot drop labels this call never saw. Each mutation
+ * takes a single label, so a multi-label request is a sequence; it runs in
+ * order rather than concurrently, which leaves a comprehensible prefix
+ * applied if one of them fails.
+ *
+ * Returns the project as of the last mutation.
+ */
+export async function applyProjectLabels(
+  client: GraphQLClient,
+  id: UUID,
+  labelIds: UUID[],
+  mode: "add" | "remove",
+): Promise<LabelledProject> {
+  let project: LabelledProject | undefined;
+
+  for (const labelId of labelIds) {
+    const payload =
+      mode === "add"
+        ? (await client.request(AddProjectLabelDocument, { id, labelId }))
+            .projectAddLabel
+        : (await client.request(RemoveProjectLabelDocument, { id, labelId }))
+            .projectRemoveLabel;
+
+    project = requireMutationEntity(
+      payload,
+      "project",
+      `Failed to ${mode} label "${labelId}" on project "${id}"`,
+    );
+  }
+
+  if (!project) {
+    throw new Error(`No labels given to ${mode} on project "${id}"`);
+  }
+
+  return project;
 }
 
 /**

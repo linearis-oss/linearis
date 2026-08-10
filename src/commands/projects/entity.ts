@@ -36,12 +36,12 @@ import {
   unresolveDiscussion,
 } from "../../services/discussion-service.js";
 import {
+  applyProjectLabels,
   type CreateProjectInput,
   createProject,
   deleteProject,
   disableProjectExternalSync,
   getProject,
-  getProjectLabelIds,
   listProjects,
   searchProjects,
   type UpdateProjectInput,
@@ -769,13 +769,7 @@ export function setupProjectEntityCommands(projects: Command): void {
           }
 
           const labelMode = parseLabelMode(options.labelMode);
-
           const projectId = await resolveProjectId(ctx.gql, project);
-          const needsLabelContext =
-            options.labels && (labelMode === "add" || labelMode === "remove");
-          const currentLabelIds = needsLabelContext
-            ? await getProjectLabelIds(ctx.gql, projectId)
-            : [];
 
           const input: UpdateProjectInput = {};
 
@@ -845,35 +839,51 @@ export function setupProjectEntityCommands(projects: Command): void {
             );
           }
 
+          // `add`/`remove` go through the incremental mutations; only
+          // `overwrite` and `--clear-labels` touch the full-replacement
+          // `labelIds` input, which is the only path that can drop a label
+          // it never read.
+          const incrementalLabelIds =
+            options.labels && (labelMode === "add" || labelMode === "remove")
+              ? await resolveProjectLabelIds(
+                  ctx.gql,
+                  parseCommaSeparatedOption("--labels", options.labels),
+                )
+              : undefined;
+
           if (options.clearLabels) {
             input.labelIds = [];
-          } else if (options.labels) {
-            const labelNames = options.labels
-              .split(",")
-              .map((l) => l.trim())
-              .filter(Boolean);
-            const labelIds = await resolveProjectLabelIds(ctx.gql, labelNames);
-
-            if (labelMode === "add") {
-              input.labelIds = [...new Set([...currentLabelIds, ...labelIds])];
-            } else if (labelMode === "remove") {
-              input.labelIds = currentLabelIds.filter(
-                (id) => !labelIds.includes(id),
-              );
-            } else {
-              input.labelIds = labelIds;
-            }
+          } else if (options.labels && !incrementalLabelIds) {
+            input.labelIds = await resolveProjectLabelIds(
+              ctx.gql,
+              parseCommaSeparatedOption("--labels", options.labels),
+            );
           }
 
-          if (Object.keys(input).length === 0) {
+          const hasFieldUpdates = Object.keys(input).length > 0;
+
+          if (!hasFieldUpdates && !incrementalLabelIds) {
             throw invalidParameterError(
               "update options",
               "at least one option must be provided",
             );
           }
 
-          const result = await updateProject(ctx.gql, projectId, input);
-          outputSuccess(result);
+          const updated = hasFieldUpdates
+            ? await updateProject(ctx.gql, projectId, input)
+            : undefined;
+
+          // Labels last, so the emitted project reflects every change made.
+          outputSuccess(
+            incrementalLabelIds
+              ? await applyProjectLabels(
+                  ctx.gql,
+                  projectId,
+                  incrementalLabelIds,
+                  labelMode === "add" ? "add" : "remove",
+                )
+              : updated,
+          );
         },
       ),
     );
