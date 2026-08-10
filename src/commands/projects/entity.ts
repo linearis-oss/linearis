@@ -10,6 +10,7 @@ import {
   parseLimit,
 } from "../../common/output.js";
 import { buildPaginationOptions } from "../../common/types.js";
+import type { ExternalSyncService } from "../../gql/graphql.js";
 import {
   resolveProjectId,
   resolveProjectLabelIds,
@@ -38,9 +39,11 @@ import {
   type CreateProjectInput,
   createProject,
   deleteProject,
+  disableProjectExternalSync,
   getProject,
   getProjectLabelIds,
   listProjects,
+  searchProjects,
   type UpdateProjectInput,
   unarchiveProject,
   updateProject,
@@ -55,6 +58,17 @@ interface ListOptions {
 interface ReadOptions {
   milestonesFirst: string;
   issuesFirst: string;
+}
+
+interface SearchOptions {
+  limit: string;
+  after?: string;
+  includeArchived?: boolean;
+  team?: string;
+}
+
+interface DisableSyncOptions {
+  source: string;
 }
 
 interface DiscussionsOptions {
@@ -176,6 +190,23 @@ interface UpdateOptions {
   clearLabels?: boolean;
 }
 
+const EXTERNAL_SYNC_SOURCES = [
+  "jira",
+  "github",
+  "slack",
+] as const satisfies readonly ExternalSyncService[];
+
+function parseExternalSyncSource(value: string): ExternalSyncService {
+  const match = EXTERNAL_SYNC_SOURCES.find((source) => source === value);
+  if (!match) {
+    throw invalidParameterError(
+      "--source",
+      `must be one of: ${EXTERNAL_SYNC_SOURCES.join(", ")}`,
+    );
+  }
+  return match;
+}
+
 function parsePriority(value: string): Priority {
   const priority = Number.parseInt(value, 10);
   if (Number.isNaN(priority) || priority < 0 || priority > 4) {
@@ -248,6 +279,39 @@ export function setupProjectEntityCommands(projects: Command): void {
         });
         outputSuccess(result);
       }),
+    );
+
+  projects
+    .command("search <query>")
+    .description("full-text search projects")
+    .addHelpText(
+      "after",
+      "\nResults are relevance-ordered by the API, so there is no sort\n" +
+        "option. This endpoint is rate-limited more tightly than\n" +
+        "`projects list` — prefer list when a filter would do.",
+    )
+    .option("-l, --limit <n>", "max results", "25")
+    .option("--after <cursor>", "cursor for next page")
+    .option("--include-archived", "include archived projects")
+    .option("--team <team>", "restrict to one team (key, name, or UUID)")
+    .action(
+      commandAction<[string, SearchOptions, Command]>(
+        async (query, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          const teamId = options.team
+            ? await resolveTeamId(ctx.gql, options.team)
+            : undefined;
+
+          const result = await searchProjects(ctx.gql, query, {
+            ...buildPaginationOptions(parseLimit(options.limit), options.after),
+            includeArchived: options.includeArchived ?? false,
+            ...(teamId !== undefined ? { teamId } : {}),
+          });
+
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -809,6 +873,26 @@ export function setupProjectEntityCommands(projects: Command): void {
           }
 
           const result = await updateProject(ctx.gql, projectId, input);
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  projects
+    .command("disable-sync <project>")
+    .description("stop syncing a project with an external tracker")
+    .requiredOption("--source <source>", EXTERNAL_SYNC_SOURCES.join(" | "))
+    .action(
+      commandAction<[string, DisableSyncOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const source = parseExternalSyncSource(options.source);
+          const projectId = await resolveProjectId(ctx.gql, project);
+          const result = await disableProjectExternalSync(
+            ctx.gql,
+            projectId,
+            source,
+          );
           outputSuccess(result);
         },
       ),

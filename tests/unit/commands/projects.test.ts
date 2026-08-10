@@ -36,6 +36,8 @@ vi.mock("../../../src/resolvers/user-resolver.js", () => ({
 
 vi.mock("../../../src/services/project-service.js", () => ({
   listProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
+  searchProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
+  disableProjectExternalSync: vi.fn().mockResolvedValue({ id: "proj-1" }),
   getProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
   getProjectLabelIds: vi.fn().mockResolvedValue([]),
   createProject: vi.fn().mockResolvedValue({ id: "proj-new" }),
@@ -137,9 +139,11 @@ import {
 import {
   createProject,
   deleteProject,
+  disableProjectExternalSync,
   getProject,
   getProjectLabelIds,
   listProjects,
+  searchProjects,
   unarchiveProject,
   updateProject,
 } from "../../../src/services/project-service.js";
@@ -1134,5 +1138,96 @@ describe("projects update", () => {
       expect.stringContaining("must be one of 'add', 'remove', or 'overwrite'"),
     );
     expect(updateProject).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes the term and pagination through", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "search",
+      "auth",
+      "--limit",
+      "10",
+    ]);
+
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(searchProjects).toHaveBeenCalledWith(expect.anything(), "auth", {
+      limit: 10,
+      after: undefined,
+      includeArchived: false,
+    });
+  });
+
+  it("resolves --team before searching", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "search",
+      "auth",
+      "--team",
+      "ENG",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "ENG");
+    expect(searchProjects).toHaveBeenCalledWith(
+      expect.anything(),
+      "auth",
+      expect.objectContaining({ teamId: "resolved-team-uuid" }),
+    );
+  });
+});
+
+describe("projects disable-sync", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("resolves the project and forwards the source", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "disable-sync",
+      "My Project",
+      "--source",
+      "jira",
+    ]);
+
+    expect(disableProjectExternalSync).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      "jira",
+    );
+  });
+
+  it("rejects a source Linear does not sync from", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "disable-sync",
+      "My Project",
+      "--source",
+      "gitlab",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --source"),
+    );
+    expect(disableProjectExternalSync).not.toHaveBeenCalled();
   });
 });

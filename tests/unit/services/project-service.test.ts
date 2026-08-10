@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
+  DisableProjectExternalSyncDocument,
   GetProjectDocument,
   GetProjectLabelIdsDocument,
   GetProjectWithReactionsDocument,
@@ -13,9 +14,11 @@ import {
 import {
   createProject,
   deleteProject,
+  disableProjectExternalSync,
   getProject,
   getProjectLabelIds,
   listProjects,
+  searchProjects,
   unarchiveProject,
   updateProject,
 } from "../../../src/services/project-service.js";
@@ -660,5 +663,82 @@ describe("deleteProject", () => {
     await expect(deleteProject(client, asUuid("proj-1"))).rejects.toThrow(
       'Failed to delete project "proj-1"',
     );
+  });
+});
+
+describe("searchProjects", () => {
+  it("forwards the term, team filter and pagination", async () => {
+    const client = mockGqlClient({
+      searchProjects: {
+        nodes: [{ id: "proj-1", name: "Auth" }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await expect(
+      searchProjects(client, "auth", {
+        limit: 10,
+        after: "cursor-1",
+        includeArchived: true,
+        teamId: asUuid("team-1"),
+      }),
+    ).resolves.toEqual({
+      nodes: [{ id: "proj-1", name: "Auth" }],
+      pageInfo: { hasNextPage: false, endCursor: null },
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      term: "auth",
+      first: 10,
+      after: "cursor-1",
+      includeArchived: true,
+      teamId: "team-1",
+    });
+  });
+
+  it("defaults to 25 results, no team, and no archived projects", async () => {
+    const client = mockGqlClient({
+      searchProjects: { nodes: [], pageInfo: { hasNextPage: false } },
+    });
+
+    await searchProjects(client, "auth");
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      term: "auth",
+      first: 25,
+      after: undefined,
+      includeArchived: false,
+      teamId: undefined,
+    });
+  });
+});
+
+describe("disableProjectExternalSync", () => {
+  it("returns the project on success", async () => {
+    const client = mockGqlClient({
+      projectExternalSyncDisable: {
+        success: true,
+        project: { id: "proj-1", name: "Auth" },
+      },
+    });
+
+    await expect(
+      disableProjectExternalSync(client, asUuid("proj-1"), "jira"),
+    ).resolves.toEqual({ id: "proj-1", name: "Auth" });
+
+    expect(client.request).toHaveBeenCalledWith(
+      DisableProjectExternalSyncDocument,
+      { projectId: "proj-1", syncSource: "jira" },
+    );
+  });
+
+  it("names the source in the failure message", async () => {
+    const client = mockGqlClient({
+      projectExternalSyncDisable: { success: false, project: null },
+    });
+
+    await expect(
+      disableProjectExternalSync(client, asUuid("proj-1"), "github"),
+    ).rejects.toThrow('Failed to disable github sync on project "proj-1"');
   });
 });

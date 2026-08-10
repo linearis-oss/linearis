@@ -30,6 +30,7 @@ export const PROJECTS_META: DomainMeta = {
     name: "string",
   },
   seeAlso: [
+    "labels list --type project",
     "milestones list --project",
     "documents list --project",
     "issues create --project",

@@ -13,6 +13,9 @@ import {
   CreateProjectDocument,
   type CreateProjectMutation,
   DeleteProjectDocument,
+  DisableProjectExternalSyncDocument,
+  type DisableProjectExternalSyncMutation,
+  type ExternalSyncService,
   GetProjectDocument,
   GetProjectLabelIdsDocument,
   type GetProjectQuery,
@@ -20,6 +23,8 @@ import {
   type GetProjectsQuery,
   type ProjectCreateInput,
   type ProjectUpdateInput,
+  SearchProjectsDocument,
+  type SearchProjectsQuery,
   UnarchiveProjectDocument,
   type UnarchiveProjectMutation,
   UpdateProjectDocument,
@@ -37,6 +42,11 @@ export type UpdatedProject = NonNullable<
 >;
 export type UnarchivedProject = NonNullable<
   UnarchiveProjectMutation["projectUnarchive"]["entity"]
+>;
+export type ProjectSearchResult =
+  SearchProjectsQuery["searchProjects"]["nodes"][0];
+export type SyncDisabledProject = NonNullable<
+  DisableProjectExternalSyncMutation["projectExternalSyncDisable"]["project"]
 >;
 export type DeletedProject = {
   id: string;
@@ -87,6 +97,11 @@ export interface ProjectListOptions extends PaginationOptions {
   includeArchived?: boolean;
 }
 
+export interface ProjectSearchOptions extends ProjectListOptions {
+  /** Narrows the search to projects owned by one team. */
+  teamId?: UUID;
+}
+
 export interface ProjectDetailOptions {
   milestonesFirst?: number;
   issuesFirst?: number;
@@ -117,6 +132,34 @@ export async function listProjects(
   return {
     nodes: result.projects.nodes,
     pageInfo: result.projects.pageInfo,
+  };
+}
+
+/**
+ * Full-text search across projects.
+ *
+ * Results come back relevance-ordered from the API, so there is no
+ * `orderBy` knob — supplying one would discard the ranking that makes the
+ * search worth running. Mirrors `searchIssues`.
+ */
+export async function searchProjects(
+  client: GraphQLClient,
+  term: string,
+  options: ProjectSearchOptions = {},
+): Promise<PaginatedResult<ProjectSearchResult>> {
+  const { limit = 25, after, includeArchived = false, teamId } = options;
+
+  const result = await client.request(SearchProjectsDocument, {
+    term,
+    first: limit,
+    after,
+    includeArchived,
+    teamId,
+  });
+
+  return {
+    nodes: result.searchProjects.nodes,
+    pageInfo: result.searchProjects.pageInfo,
   };
 }
 
@@ -216,6 +259,29 @@ export async function unarchiveProject(
     result.projectUnarchive,
     "entity",
     `Failed to unarchive project "${id}"`,
+  );
+}
+
+/**
+ * Stops one external tracker from pushing updates into the project.
+ *
+ * The link itself survives; only the sync stops. Mirrors the attachment
+ * equivalent.
+ */
+export async function disableProjectExternalSync(
+  client: GraphQLClient,
+  projectId: UUID,
+  syncSource: ExternalSyncService,
+): Promise<SyncDisabledProject> {
+  const result = await client.request(DisableProjectExternalSyncDocument, {
+    projectId,
+    syncSource,
+  });
+
+  return requireMutationEntity(
+    result.projectExternalSyncDisable,
+    "project",
+    `Failed to disable ${syncSource} sync on project "${projectId}"`,
   );
 }
 

@@ -54,3 +54,18 @@ mutation DeleteProject($id: String!) {
     }
   }
 }
+
+# Stop syncing a project with an external tracker
+#
+# Mirrors `attachments disable-sync`: the link stays, the updates stop.
+mutation DisableProjectExternalSync(
+  $projectId: String!
+  $syncSource: ExternalSyncService!
+) {
+  projectExternalSyncDisable(projectId: $projectId, syncSource: $syncSource) {
+    success
+    project {
+      ...ProjectDetailWithDefaultConnectionsFields
+    }
+  }
+}
