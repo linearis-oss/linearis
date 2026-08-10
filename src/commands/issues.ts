@@ -3,7 +3,11 @@ import { firstOrThrow } from "../common/array.js";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
 import { parseDateTimeOption } from "../common/datetime.js";
-import { parseLabelMode } from "../common/domain-values.js";
+import {
+  parseLabelMode,
+  parseSetMode,
+  type SetMode,
+} from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
@@ -15,7 +19,10 @@ import {
   parseIssueIdentifier,
   type UUID,
 } from "../common/identifier.js";
-import type { RawFilterFlags } from "../common/issue-filter.js";
+import {
+  parseCommaSeparated,
+  type RawFilterFlags,
+} from "../common/issue-filter.js";
 import {
   parseEstimateOption,
   parsePriorityOption,
@@ -82,6 +89,7 @@ import {
   getIssueWithComments,
   getIssueWithCommentThreads,
   getIssueWithReactions,
+  type IssueDetail,
   type IssueReadOptions,
   listIssues,
   remindOnIssue,
@@ -120,6 +128,8 @@ interface CreateOptions {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  subscribers?: string;
+  delegate?: string;
   dueDate?: string;
   blocks?: string;
   blockedBy?: string;
@@ -148,6 +158,12 @@ interface UpdateOptions {
   clearProjectMilestone?: boolean;
   cycle?: string;
   clearCycle?: boolean;
+  team?: string;
+  subscribers?: string;
+  subscriberMode?: string;
+  clearSubscribers?: boolean;
+  delegate?: string;
+  clearDelegate?: boolean;
   dueDate?: string;
   clearDueDate?: boolean;
   blocks?: string;
@@ -210,6 +226,35 @@ async function resolveIssueAndUser(
       ? resolveViewerId(ctx.gql)
       : resolveUserId(ctx.gql, user),
   ]);
+}
+
+/**
+ * Combines a set-valued flag with the issue's current members.
+ *
+ * `overwrite` (and an omitted mode) replaces, matching the API's own
+ * replace-the-list semantics for `labelIds`/`subscriberIds`; `add` and
+ * `remove` are computed here from the issue's current values because the API
+ * has no incremental form for either field.
+ */
+function applySetMode(
+  mode: SetMode | undefined,
+  current: readonly UUID[],
+  requested: readonly UUID[],
+): UUID[] {
+  if (mode === "add") {
+    return [...new Set([...current, ...requested])];
+  }
+
+  if (mode === "remove") {
+    return current.filter((id) => !requested.includes(id));
+  }
+
+  return [...requested];
+}
+
+/** The issue's current subscriber UUIDs, for `--subscriber-mode add|remove`. */
+function currentSubscriberIds(issue: IssueDetail | undefined): UUID[] {
+  return (issue?.subscribers?.nodes ?? []).map((user) => asUuid(user.id));
 }
 
 interface ReactionOptions {
@@ -1202,6 +1247,8 @@ export function setupIssuesCommands(program: Command): void {
     .option("--status <status>", "set status")
     .option("--estimate <n>", "set estimate")
     .option("--parent-ticket <issue>", "set parent issue")
+    .option("--subscribers <users>", "subscribe users (comma-separated)")
+    .option("--delegate <user>", "delegate to a user")
     .option("--due-date <date>", "due date (YYYY-MM-DD)")
     .option("--blocks <issue>", "this issue blocks <issue>")
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
@@ -1250,6 +1297,10 @@ export function setupIssuesCommands(program: Command): void {
           if (options.status) idsInput.status = options.status;
           if (options.parentTicket)
             idsInput.parentTicket = options.parentTicket;
+          if (options.subscribers) {
+            idsInput.subscribers = parseCommaSeparated(options.subscribers);
+          }
+          if (options.delegate) idsInput.delegate = options.delegate;
 
           const ids = await resolveCreateIssueIds(ctx.gql, idsInput);
 
@@ -1309,6 +1360,14 @@ export function setupIssuesCommands(program: Command): void {
             input.parentId = ids.parentId;
           }
 
+          if (ids.subscriberIds) {
+            input.subscriberIds = ids.subscriberIds;
+          }
+
+          if (ids.delegateId) {
+            input.delegateId = ids.delegateId;
+          }
+
           if (options.dueDate) {
             input.dueDate = parseDueDate(options.dueDate);
           }
@@ -1352,6 +1411,12 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
+    .option("--team <team>", "move the issue to another team")
+    .option("--subscribers <users>", "subscribers to apply (comma-separated)")
+    .option("--subscriber-mode <mode>", "add | remove | overwrite")
+    .option("--clear-subscribers", "remove all subscribers")
+    .option("--delegate <user>", "set delegate")
+    .option("--clear-delegate", "clear delegate")
     .option("--estimate <n>", "new estimate")
     .option("--clear-estimate", "clear estimate")
     .option("--due-date <date>", "set due date (YYYY-MM-DD)")
@@ -1423,7 +1488,35 @@ export function setupIssuesCommands(program: Command): void {
             throw new Error("--clear-labels cannot be used with --label-mode");
           }
 
+          if (options.subscriberMode && !options.subscribers) {
+            throw new Error(
+              "--subscriber-mode requires --subscribers to be specified",
+            );
+          }
+
+          if (options.clearSubscribers && options.subscribers) {
+            throw new Error(
+              "--clear-subscribers cannot be used with --subscribers",
+            );
+          }
+
+          if (options.clearSubscribers && options.subscriberMode) {
+            throw new Error(
+              "--clear-subscribers cannot be used with --subscriber-mode",
+            );
+          }
+
+          if (options.delegate && options.clearDelegate) {
+            throw new Error(
+              "Cannot use --delegate and --clear-delegate together",
+            );
+          }
+
           const labelMode = parseLabelMode(options.labelMode);
+          const subscriberMode = parseSetMode(
+            "--subscriber-mode",
+            options.subscriberMode,
+          );
 
           const parsedPriority =
             options.priority !== undefined
@@ -1463,7 +1556,10 @@ export function setupIssuesCommands(program: Command): void {
             options.status ||
             options.projectMilestone ||
             options.cycle ||
-            (options.labels && (labelMode === "add" || labelMode === "remove"));
+            (options.labels &&
+              (labelMode === "add" || labelMode === "remove")) ||
+            (options.subscribers &&
+              (subscriberMode === "add" || subscriberMode === "remove"));
           const issueContext = needsContext
             ? await getIssue(ctx.gql, resolvedIssueId)
             : undefined;
@@ -1503,6 +1599,13 @@ export function setupIssuesCommands(program: Command): void {
           if (!options.clearParentTicket && options.parentTicket) {
             updIdsInput.parentTicket = options.parentTicket;
           }
+          if (options.team) updIdsInput.team = options.team;
+          if (!options.clearSubscribers && options.subscribers) {
+            updIdsInput.subscribers = parseCommaSeparated(options.subscribers);
+          }
+          if (!options.clearDelegate && options.delegate) {
+            updIdsInput.delegate = options.delegate;
+          }
 
           const needsResolution =
             updIdsInput.assignee !== undefined ||
@@ -1511,7 +1614,10 @@ export function setupIssuesCommands(program: Command): void {
             updIdsInput.projectMilestone !== undefined ||
             updIdsInput.cycle !== undefined ||
             updIdsInput.status !== undefined ||
-            updIdsInput.parentTicket !== undefined;
+            updIdsInput.parentTicket !== undefined ||
+            updIdsInput.team !== undefined ||
+            updIdsInput.subscribers !== undefined ||
+            updIdsInput.delegate !== undefined;
 
           const ids: ResolvedUpdateIssueIds = needsResolution
             ? await resolveUpdateIssueIds(ctx.gql, updIdsInput, updContext)
@@ -1564,15 +1670,7 @@ export function setupIssuesCommands(program: Command): void {
                 ? issueContext.labels.nodes.map((l) => asUuid(l.id))
                 : [];
 
-            if (labelMode === "add") {
-              input.labelIds = [...new Set([...currentLabels, ...labelIds])];
-            } else if (labelMode === "remove") {
-              input.labelIds = currentLabels.filter(
-                (id) => !labelIds.includes(id),
-              );
-            } else {
-              input.labelIds = labelIds;
-            }
+            input.labelIds = applySetMode(labelMode, currentLabels, labelIds);
           }
 
           if (options.clearParentTicket) {
@@ -1597,6 +1695,26 @@ export function setupIssuesCommands(program: Command): void {
             input.cycleId = null;
           } else if (ids.cycleId) {
             input.cycleId = ids.cycleId;
+          }
+
+          if (ids.teamId) {
+            input.teamId = ids.teamId;
+          }
+
+          if (options.clearSubscribers) {
+            input.subscriberIds = [];
+          } else if (options.subscribers && ids.subscriberIds) {
+            input.subscriberIds = applySetMode(
+              subscriberMode,
+              currentSubscriberIds(issueContext),
+              ids.subscriberIds,
+            );
+          }
+
+          if (options.clearDelegate) {
+            input.delegateId = null;
+          } else if (ids.delegateId) {
+            input.delegateId = ids.delegateId;
           }
 
           if (options.clearDueDate) {

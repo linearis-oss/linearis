@@ -482,3 +482,71 @@ describe("resolveBatchCreateIssueIds", () => {
     ).rejects.toThrow('Team "NOPE" not found');
   });
 });
+
+describe("resolveUpdateIssueIds team move", () => {
+  it("scopes the status lookup to the destination team, not the current one", async () => {
+    // resolveTeamId runs first (FindTeams), then the batch request.
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        teams: { nodes: [{ id: "des-team", key: "DES", name: "Design" }] },
+      })
+      .mockResolvedValueOnce(
+        buildResponse({
+          statuses: [
+            {
+              id: "des-review",
+              name: "In Review",
+              team: { id: "des-team", key: "DES" },
+            },
+          ],
+        }),
+      );
+    const client = { request } as unknown as GraphQLClient;
+
+    const result = await resolveUpdateIssueIds(
+      client,
+      { team: "DES", status: "In Review" },
+      { teamId: "eng-team" as never, teamKey: "ENG" },
+    );
+
+    expect(result.teamId).toBe("des-team");
+    expect(result.stateId).toBe("des-review");
+    expect(request).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ teamId: "des-team", teamKey: null }),
+    );
+  });
+});
+
+describe("resolveUpdateIssueIds user references", () => {
+  it("resolves subscribers and delegate through the user resolver", async () => {
+    const request = vi.fn().mockImplementation((_document, variables) => {
+      const filter = (
+        variables as { filter?: Record<string, unknown> } | undefined
+      )?.filter;
+
+      if (filter && "displayName" in filter) {
+        const name = (filter as { displayName: { eqIgnoreCase: string } })
+          .displayName.eqIgnoreCase;
+        return Promise.resolve({
+          users: {
+            nodes: [{ id: `${name}-uuid`, name, email: `${name}@x.io` }],
+          },
+        });
+      }
+
+      return Promise.resolve(buildResponse({}));
+    });
+    const client = { request } as unknown as GraphQLClient;
+
+    const result = await resolveUpdateIssueIds(
+      client,
+      { subscribers: ["alice", "bob"], delegate: "carol" },
+      {},
+    );
+
+    expect(result.subscriberIds).toEqual(["alice-uuid", "bob-uuid"]);
+    expect(result.delegateId).toBe("carol-uuid");
+  });
+});

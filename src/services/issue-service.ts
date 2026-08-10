@@ -112,6 +112,8 @@ export type CreateIssueInput = BrandUuidFields<
     | "stateId"
     | "parentId"
     | "dueDate"
+    | "subscriberIds"
+    | "delegateId"
   >,
   | "teamId"
   | "assigneeId"
@@ -121,6 +123,8 @@ export type CreateIssueInput = BrandUuidFields<
   | "cycleId"
   | "stateId"
   | "parentId"
+  | "subscriberIds"
+  | "delegateId"
 >;
 export type UpdateIssueInput = BrandUuidFields<
   Pick<
@@ -137,6 +141,9 @@ export type UpdateIssueInput = BrandUuidFields<
     | "projectMilestoneId"
     | "cycleId"
     | "dueDate"
+    | "teamId"
+    | "subscriberIds"
+    | "delegateId"
   >,
   | "stateId"
   | "assigneeId"
@@ -145,6 +152,9 @@ export type UpdateIssueInput = BrandUuidFields<
   | "parentId"
   | "projectMilestoneId"
   | "cycleId"
+  | "teamId"
+  | "subscriberIds"
+  | "delegateId"
 >;
 
 /**

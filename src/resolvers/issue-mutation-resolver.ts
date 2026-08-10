@@ -22,7 +22,8 @@ import {
   type ProjectNode,
   type TeamNode,
 } from "./batch-resolve-mappers.js";
-import type { TeamEstimateContext } from "./team-resolver.js";
+import { resolveTeamId, type TeamEstimateContext } from "./team-resolver.js";
+import { resolveUserId } from "./user-resolver.js";
 
 /**
  * Batch resolver for issue create / update.
@@ -72,6 +73,9 @@ export interface ResolveCreateIssueIdsInput {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  /** User references (name, email, UUID or `me`) to subscribe on creation. */
+  subscribers?: string[];
+  delegate?: string;
   /** When true, resolve the team's estimation config for `--estimate` validation. */
   withEstimateContext?: boolean;
 }
@@ -86,6 +90,34 @@ export interface ResolvedCreateIssueIds {
   cycleId?: UUID;
   stateId?: UUID;
   parentId?: UUID;
+  subscriberIds?: UUID[];
+  delegateId?: UUID;
+}
+
+/**
+ * Resolves the user-valued references that the `BatchResolve*` queries cannot.
+ *
+ * `--subscribers` is a list and `--delegate` a second single user, neither of
+ * which the batch query's one `$assigneeQuery` variable can express, and a
+ * `me` alias needs the viewer lookup. They go through `resolveUserId` in
+ * parallel instead, which keeps the name/email disambiguation identical to
+ * every other user flag and costs nothing when the flags are absent.
+ */
+async function resolveIssueUserRefs(
+  client: GraphQLClient,
+  input: { subscribers?: string[]; delegate?: string },
+): Promise<{ subscriberIds?: UUID[]; delegateId?: UUID }> {
+  const [subscriberIds, delegateId] = await Promise.all([
+    input.subscribers
+      ? Promise.all(input.subscribers.map((ref) => resolveUserId(client, ref)))
+      : undefined,
+    input.delegate ? resolveUserId(client, input.delegate) : undefined,
+  ]);
+
+  return {
+    ...(subscriberIds && { subscriberIds }),
+    ...(delegateId && { delegateId }),
+  };
 }
 
 /**
@@ -116,6 +148,8 @@ export async function resolveCreateIssueIds(
     input.parentTicket && !isUuid(input.parentTicket)
       ? parseIssueIdentifier(input.parentTicket)
       : null;
+
+  const userRefsPromise = resolveIssueUserRefs(client, input);
 
   const response = await client.request(BatchResolveForCreateDocument, {
     teamKey: teamIsUuid ? null : input.team,
@@ -209,7 +243,7 @@ export async function resolveCreateIssueIds(
       : mapParent(response.parentIssues.nodes, input.parentTicket);
   }
 
-  return resolved;
+  return { ...resolved, ...(await userRefsPromise) };
 }
 
 /**
@@ -262,6 +296,8 @@ function batchCreateCacheKey(entry: ResolveCreateIssueIdsInput): string {
     entry.cycle ?? null,
     entry.status ?? null,
     entry.parentTicket ?? null,
+    entry.subscribers ?? null,
+    entry.delegate ?? null,
     entry.withEstimateContext ?? false,
   ]);
 }
@@ -295,6 +331,10 @@ export interface ResolveUpdateIssueIdsInput {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  /** Destination team for a move; also rescopes status / cycle resolution. */
+  team?: string;
+  subscribers?: string[];
+  delegate?: string;
 }
 
 export interface ResolvedUpdateIssueIds {
@@ -306,6 +346,10 @@ export interface ResolvedUpdateIssueIds {
   cycleId?: UUID;
   stateId?: UUID;
   parentId?: UUID;
+  teamId?: UUID;
+  /** Resolved subscriber UUIDs (add/remove/overwrite set math stays in the command). */
+  subscriberIds?: UUID[];
+  delegateId?: UUID;
 }
 
 /**
@@ -348,6 +392,19 @@ export async function resolveUpdateIssueIds(
       ? parseIssueIdentifier(input.parentTicket)
       : null;
 
+  const userRefsPromise = resolveIssueUserRefs(client, input);
+
+  // A team move rescopes the lookups: a status or cycle named alongside
+  // `--team` belongs to the *destination* team's workflow, not the team the
+  // issue is leaving. This is the one lookup that cannot be batched with the
+  // rest, since its result is an input to them.
+  const destinationTeamId = input.team
+    ? await resolveTeamId(client, input.team)
+    : undefined;
+  const scope: UpdateIssueContext = destinationTeamId
+    ? { teamId: destinationTeamId }
+    : context;
+
   const response = await client.request(BatchResolveForUpdateDocument, {
     assigneeQuery,
     projectName: projectNameVar,
@@ -355,14 +412,16 @@ export async function resolveUpdateIssueIds(
     labelFilter: buildLabelFilter(labelNames),
     statusName,
     cycleName,
-    teamKey: context.teamKey ?? null,
-    teamId: context.teamId ?? null,
+    teamKey: scope.teamKey ?? null,
+    teamId: scope.teamId ?? null,
     milestoneName,
     parentTeamKey: parent?.teamKey ?? null,
     parentIssueNumber: parent?.issueNumber ?? null,
   });
 
-  const resolved: ResolvedUpdateIssueIds = {};
+  const resolved: ResolvedUpdateIssueIds = destinationTeamId
+    ? { teamId: destinationTeamId }
+    : {};
 
   if (input.assignee) {
     resolved.assigneeId = isUuid(input.assignee)
@@ -401,7 +460,7 @@ export async function resolveUpdateIssueIds(
   if (input.cycle) {
     resolved.cycleId = isUuid(input.cycle)
       ? asUuid(input.cycle)
-      : mapCycle(response.cycles.nodes, input.cycle, context.teamKey);
+      : mapCycle(response.cycles.nodes, input.cycle, scope.teamKey);
   }
 
   if (input.status) {
@@ -410,7 +469,7 @@ export async function resolveUpdateIssueIds(
       : mapStatus(
           response.statuses.nodes,
           input.status,
-          context.teamId ? `for team ${context.teamId}` : undefined,
+          scope.teamId ? `for team ${scope.teamId}` : undefined,
         );
   }
 
@@ -420,5 +479,5 @@ export async function resolveUpdateIssueIds(
       : mapParent(response.parentIssues.nodes, input.parentTicket);
   }
 
-  return resolved;
+  return { ...resolved, ...(await userRefsPromise) };
 }
