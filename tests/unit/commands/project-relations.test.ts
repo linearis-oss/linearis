@@ -41,7 +41,11 @@ vi.mock("../../../src/services/project-relation-service.js", async () => {
     listAllProjectRelations: vi
       .fn()
       .mockResolvedValue({ nodes: [], pageInfo: {} }),
-    getProjectRelation: vi.fn().mockResolvedValue({ id: "rel-1" }),
+    getProjectRelation: vi.fn().mockResolvedValue({
+      id: "rel-1",
+      project: { id: "project-uuid-1" },
+      relatedProject: { id: "project-uuid-2" },
+    }),
     createProjectRelation: vi.fn().mockResolvedValue({ id: "rel-1" }),
     updateProjectRelation: vi.fn().mockResolvedValue({ id: "rel-1" }),
     deleteProjectRelation: vi
@@ -242,6 +246,38 @@ describe("projects relations", () => {
       "relation-uuid",
       { relatedAnchorType: "start", projectMilestoneId: "milestone-uuid" },
     );
+  });
+
+  it("update scopes a milestone to the relation's own ends on the UUID path", async () => {
+    await run(
+      "update",
+      "relation-uuid",
+      "--from-milestone",
+      "Beta",
+      "--to-milestone",
+      "Kickoff",
+    );
+
+    expect(getProjectRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      "relation-uuid",
+    );
+    expect(resolveMilestoneId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Beta",
+      "project-uuid-1",
+    );
+    expect(resolveMilestoneId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Kickoff",
+      "project-uuid-2",
+    );
+  });
+
+  it("update reads the ends back only when a milestone flag needs them", async () => {
+    await run("update", "relation-uuid", "--from", "start");
+
+    expect(getProjectRelation).not.toHaveBeenCalled();
   });
 
   it("remove takes a relation UUID directly", async () => {

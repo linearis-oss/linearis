@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
-import type { UUID } from "../../common/identifier.js";
+import { asUuid, type UUID } from "../../common/identifier.js";
 import {
   commandAction,
   outputSuccess,
@@ -242,23 +242,29 @@ export function setupProjectRelationCommands(projects: Command): void {
             ends.toMilestoneId = null;
           }
 
-          const { relationId, inverted, projectId, relatedProjectId } =
-            await resolveRelation(ctx, relation, options.blocks);
+          const resolved = await resolveRelation(ctx, relation, options.blocks);
 
-          if (options.fromMilestone) {
-            ends.fromMilestoneId = await resolveMilestoneId(
-              ctx.gql,
-              options.fromMilestone,
-              projectId,
+          if (options.fromMilestone || options.toMilestone) {
+            const { projectId, relatedProjectId } = await relationEnds(
+              ctx,
+              resolved,
             );
-          }
 
-          if (options.toMilestone) {
-            ends.toMilestoneId = await resolveMilestoneId(
-              ctx.gql,
-              options.toMilestone,
-              relatedProjectId,
-            );
+            if (options.fromMilestone) {
+              ends.fromMilestoneId = await resolveMilestoneId(
+                ctx.gql,
+                options.fromMilestone,
+                projectId,
+              );
+            }
+
+            if (options.toMilestone) {
+              ends.toMilestoneId = await resolveMilestoneId(
+                ctx.gql,
+                options.toMilestone,
+                relatedProjectId,
+              );
+            }
           }
 
           if (Object.keys(ends).length === 0) {
@@ -271,8 +277,8 @@ export function setupProjectRelationCommands(projects: Command): void {
           outputSuccess(
             await updateProjectRelation(
               ctx.gql,
-              relationId,
-              orientToRelation(ends, inverted),
+              resolved.relationId,
+              orientToRelation(ends, resolved.inverted),
             ),
           );
         },
@@ -343,6 +349,41 @@ function orientToRelation(
   return input;
 }
 
+interface ResolvedRelation {
+  relationId: UUID;
+  inverted: boolean;
+  /** The caller's near end — absent when the relation was named by UUID. */
+  projectId?: UUID;
+  /** The caller's far end — absent when the relation was named by UUID. */
+  relatedProjectId?: UUID;
+}
+
+/**
+ * The two projects a relation joins, in the caller's orientation.
+ *
+ * A milestone must be looked up inside the project that owns its end, or a
+ * common name like "Launch" resolves to whichever project's milestone the
+ * workspace-wide search happens to hit first. The pair path already knows both
+ * IDs. The UUID path reads them off the relation instead, which costs one
+ * request but only when a milestone flag was actually given — and because that
+ * path reports `inverted: false`, the relation's own `project` is the near end.
+ */
+async function relationEnds(
+  ctx: ReturnType<typeof createContext>,
+  resolved: ResolvedRelation,
+): Promise<{ projectId: UUID; relatedProjectId: UUID }> {
+  const { projectId, relatedProjectId } = resolved;
+  if (projectId !== undefined && relatedProjectId !== undefined) {
+    return { projectId, relatedProjectId };
+  }
+
+  const relation = await getProjectRelation(ctx.gql, resolved.relationId);
+  return {
+    projectId: asUuid(relation.project.id),
+    relatedProjectId: asUuid(relation.relatedProject.id),
+  };
+}
+
 /**
  * Accepts either a relation UUID or a project pair.
  *
@@ -352,21 +393,15 @@ function orientToRelation(
  *
  * The milestone flags must be scoped to the right project, so the endpoint IDs
  * come back too, alongside `inverted` — the relation may be stored with the
- * endpoints the other way round. On the UUID path the IDs are undefined and
- * `resolveMilestoneId` searches the workspace, which is all it can do when the
- * caller addressed the relation itself rather than naming its two ends; there
- * is nothing to invert on that path either.
+ * endpoints the other way round. On the UUID path neither is known yet:
+ * {@link relationEnds} reads them back off the relation, and there is nothing
+ * to invert because the caller named no ends to invert against.
  */
 async function resolveRelation(
   ctx: ReturnType<typeof createContext>,
   relation: string,
   blocks: string | undefined,
-): Promise<{
-  relationId: UUID;
-  inverted: boolean;
-  projectId?: UUID;
-  relatedProjectId?: UUID;
-}> {
+): Promise<ResolvedRelation> {
   if (blocks === undefined) {
     const resolved = await resolveProjectRelation(ctx.gql, relation);
     return { relationId: resolved.id, inverted: resolved.inverted };
