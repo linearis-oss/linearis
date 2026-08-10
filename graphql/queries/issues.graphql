@@ -933,6 +933,7 @@ query FindIssues($filter: IssueFilter, $first: Int = 1) {
   issues(filter: $filter, first: $first, includeArchived: true) {
     nodes {
       id
+      number
       team {
         id
         key

@@ -59,6 +59,73 @@ export async function resolveIssueId(
   );
 }
 
+/** An issue reference resolved to its UUID plus the team that scopes it. */
+export interface ResolvedIssueRef {
+  ref: string;
+  id: UUID;
+  teamId: UUID;
+  teamKey: string;
+}
+
+/**
+ * Resolves a list of issue references in one request.
+ *
+ * Unlike {@link resolveIssueId} this also returns each issue's team, because
+ * the batch-update caller needs it: `issueBatchUpdate` applies a single patch
+ * to every target, so a status or cycle named by word can only be resolved
+ * when all targets share one team. UUID references are looked up rather than
+ * passed straight through for the same reason — the team is not derivable from
+ * a UUID.
+ *
+ * Duplicate references collapse to one entry, preserving first-seen order.
+ *
+ * @throws Error if any reference does not match an issue
+ */
+export async function resolveIssueRefs(
+  client: GraphQLClient,
+  refs: readonly string[],
+): Promise<ResolvedIssueRef[]> {
+  const unique = [...new Set(refs)];
+
+  if (unique.length === 0) {
+    return [];
+  }
+
+  const { issues } = await client.request(FindIssuesDocument, {
+    filter: { or: unique.map(issueLookupFilter) },
+    first: unique.length,
+  });
+
+  return unique.map((ref) => {
+    const node = issues.nodes.find((candidate) =>
+      isUuid(ref)
+        ? candidate.id === ref
+        : matchesIdentifier(candidate, parseIssueIdentifier(ref)),
+    );
+
+    if (!node) {
+      throw notFoundError("Issue", ref);
+    }
+
+    return {
+      ref,
+      id: asUuid(node.id),
+      teamId: asUuid(node.team.id),
+      teamKey: node.team.key,
+    };
+  });
+}
+
+function matchesIdentifier(
+  node: { number: number; team: { key: string } },
+  identifier: { teamKey: string; issueNumber: number },
+): boolean {
+  return (
+    node.number === identifier.issueNumber &&
+    node.team.key === identifier.teamKey
+  );
+}
+
 export async function resolveIssueEstimateContext(
   client: GraphQLClient,
   issueIdOrIdentifier: string,

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
+  resolveBatchCreateIssueIds,
   resolveCreateIssueIds,
   resolveUpdateIssueIds,
 } from "../../../src/resolvers/issue-mutation-resolver.js";
@@ -410,5 +411,74 @@ describe("resolveUpdateIssueIds", () => {
     );
 
     expect(result).toEqual({ assigneeId: UUID, projectId: UUID });
+  });
+});
+
+describe("resolveBatchCreateIssueIds", () => {
+  const createResponse = (teamId: string, teamKey = "ENG") => ({
+    teams: {
+      nodes: [
+        {
+          id: teamId,
+          key: teamKey,
+          name: "Engineering",
+          issueEstimationType: "fibonacci",
+          issueEstimationExtended: false,
+          issueEstimationAllowZero: false,
+        },
+      ],
+    },
+    assignees: { nodes: [] },
+    projects: { nodes: [] },
+    labels: { nodes: [] },
+    statuses: { nodes: [] },
+    cycles: { nodes: [] },
+    parentIssues: { nodes: [] },
+  });
+
+  it("collapses entries that name the same references onto one request", async () => {
+    const request = vi.fn().mockResolvedValue(createResponse("team-uuid"));
+    const client = { request } as unknown as GraphQLClient;
+
+    const resolved = await resolveBatchCreateIssueIds(client, [
+      { team: "ENG" },
+      { team: "ENG" },
+      { team: "ENG" },
+    ]);
+
+    expect(resolved.map((ids) => ids.teamId)).toEqual([
+      "team-uuid",
+      "team-uuid",
+      "team-uuid",
+    ]);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves distinct reference sets separately, preserving input order", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse("team-a"))
+      .mockResolvedValueOnce(createResponse("team-b", "DES"));
+    const client = { request } as unknown as GraphQLClient;
+
+    const resolved = await resolveBatchCreateIssueIds(client, [
+      { team: "ENG" },
+      { team: "DES" },
+    ]);
+
+    expect(resolved.map((ids) => ids.teamId)).toEqual(["team-a", "team-b"]);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("propagates a not-found reference instead of skipping the entry", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ...createResponse("team-uuid"),
+      teams: { nodes: [] },
+    });
+    const client = { request } as unknown as GraphQLClient;
+
+    await expect(
+      resolveBatchCreateIssueIds(client, [{ team: "NOPE" }]),
+    ).rejects.toThrow('Team "NOPE" not found');
   });
 });

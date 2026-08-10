@@ -1,10 +1,16 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { firstOrThrow } from "../common/array.js";
 import type { BrandUuidFields, UUID } from "../common/identifier.js";
-import { requireMutationEntity } from "../common/mutation-payload.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveIssueDocument,
+  BatchCreateIssuesDocument,
+  type BatchCreateIssuesMutation,
+  BatchUpdateIssuesDocument,
   CreateIssueDocument,
   type CreateIssueMutation,
   DeleteIssueDocument,
@@ -83,6 +89,9 @@ export type CreatedIssue = NonNullable<
 export type UpdatedIssue = NonNullable<
   UpdateIssueMutation["issueUpdate"]["issue"]
 >;
+/** An issue as returned by the batch mutations (no comment payload). */
+export type BatchIssue =
+  BatchCreateIssuesMutation["issueBatchCreate"]["issues"][0];
 
 // Service-owned input types (UUIDs pre-resolved by the command).
 export type CreateIssueInput = BrandUuidFields<
@@ -521,6 +530,50 @@ export async function unarchiveIssue(
     "entity",
     `Failed to unarchive issue "${id}"`,
   );
+}
+
+/**
+ * Creates many issues in one `issueBatchCreate` transaction.
+ *
+ * Ordering of the returned issues follows the API response, which need not
+ * match the input order — callers should key off `identifier`/`title` rather
+ * than position.
+ */
+export async function batchCreateIssues(
+  client: GraphQLClient,
+  inputs: readonly CreateIssueInput[],
+): Promise<BatchIssue[]> {
+  const issues: IssueCreateInput[] = [...inputs];
+  const result = await client.request(BatchCreateIssuesDocument, {
+    input: { issues },
+  });
+
+  requireMutationSuccess(
+    result.issueBatchCreate,
+    `Failed to create ${inputs.length} issues`,
+  );
+
+  return result.issueBatchCreate.issues;
+}
+
+/** Applies one patch to every issue in an explicit UUID list. */
+export async function batchUpdateIssues(
+  client: GraphQLClient,
+  ids: readonly UUID[],
+  input: UpdateIssueInput,
+): Promise<BatchIssue[]> {
+  const gqlInput: IssueUpdateInput = input;
+  const result = await client.request(BatchUpdateIssuesDocument, {
+    ids: [...ids],
+    input: gqlInput,
+  });
+
+  requireMutationSuccess(
+    result.issueBatchUpdate,
+    `Failed to update ${ids.length} issues`,
+  );
+
+  return result.issueBatchUpdate.issues;
 }
 
 /**

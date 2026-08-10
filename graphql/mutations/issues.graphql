@@ -51,6 +51,30 @@ mutation UnarchiveIssue($id: String!) {
   }
 }
 
+# Create many issues in one transaction
+#
+# The batch payload returns the created issues without the per-issue comment
+# thread: a freshly created issue has no comments, and CompleteIssueFields
+# keeps the response proportional to the batch size.
+mutation BatchCreateIssues($input: IssueBatchCreateInput!) {
+  issueBatchCreate(input: $input) {
+    success
+    issues {
+      ...CompleteIssueFields
+    }
+  }
+}
+
+# Apply one patch to an explicit list of issues
+mutation BatchUpdateIssues($ids: [UUID!]!, $input: IssueUpdateInput!) {
+  issueBatchUpdate(ids: $ids, input: $input) {
+    success
+    issues {
+      ...CompleteIssueFields
+    }
+  }
+}
+
 # Subscribe a user to an issue's notifications
 #
 # The API accepts either userId or userEmail; the CLI always resolves to a

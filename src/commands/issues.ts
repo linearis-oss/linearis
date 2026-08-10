@@ -97,6 +97,7 @@ import {
   deleteOwnReactionByEmoji,
   deleteOwnReactionById,
 } from "../services/reaction-service.js";
+import { addBatchCommands } from "./issues-batch.js";
 
 interface FilterOptions extends RawFilterFlags {
   limit: string;
@@ -585,6 +586,8 @@ function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
 
 export function setupIssuesCommands(program: Command): void {
   const issues = program.command("issues").description("Issue operations");
+
+  addBatchCommands(issues);
 
   const relations = issues
     .command("relations")

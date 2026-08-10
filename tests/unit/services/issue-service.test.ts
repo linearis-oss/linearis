@@ -9,6 +9,8 @@ import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveIssueDocument,
+  BatchCreateIssuesDocument,
+  BatchUpdateIssuesDocument,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
   FindIssuesDocument,
@@ -31,6 +33,8 @@ import {
 } from "../../../src/gql/graphql.js";
 import {
   archiveIssue,
+  batchCreateIssues,
+  batchUpdateIssues,
   createIssue,
   deleteIssue,
   getIssue,
@@ -1100,5 +1104,68 @@ describe("remindOnIssue", () => {
     await expect(
       remindOnIssue(client, asUuid("issue-1"), "2026-08-14T09:00:00.000Z"),
     ).rejects.toThrow('Failed to set a reminder on issue "issue-1"');
+  });
+});
+
+describe("batchCreateIssues", () => {
+  it("wraps the inputs in the batch input shape", async () => {
+    const client = mockGqlClient({
+      issueBatchCreate: { success: true, issues: [{ id: "issue-1" }] },
+    });
+
+    await expect(
+      batchCreateIssues(client, [
+        { title: "A", teamId: asUuid("team-1") },
+        { title: "B", teamId: asUuid("team-1") },
+      ]),
+    ).resolves.toEqual([{ id: "issue-1" }]);
+
+    expect(client.request).toHaveBeenCalledWith(BatchCreateIssuesDocument, {
+      input: {
+        issues: [
+          { title: "A", teamId: "team-1" },
+          { title: "B", teamId: "team-1" },
+        ],
+      },
+    });
+  });
+
+  it("throws when the transaction reports failure", async () => {
+    const client = mockGqlClient({
+      issueBatchCreate: { success: false, issues: [] },
+    });
+
+    await expect(
+      batchCreateIssues(client, [{ title: "A", teamId: asUuid("team-1") }]),
+    ).rejects.toThrow("Failed to create 1 issues");
+  });
+});
+
+describe("batchUpdateIssues", () => {
+  it("sends the id list and one shared patch", async () => {
+    const client = mockGqlClient({
+      issueBatchUpdate: { success: true, issues: [{ id: "issue-1" }] },
+    });
+
+    await expect(
+      batchUpdateIssues(client, [asUuid("issue-1"), asUuid("issue-2")], {
+        priority: 2,
+      }),
+    ).resolves.toEqual([{ id: "issue-1" }]);
+
+    expect(client.request).toHaveBeenCalledWith(BatchUpdateIssuesDocument, {
+      ids: ["issue-1", "issue-2"],
+      input: { priority: 2 },
+    });
+  });
+
+  it("throws when the transaction reports failure", async () => {
+    const client = mockGqlClient({
+      issueBatchUpdate: { success: false, issues: [] },
+    });
+
+    await expect(
+      batchUpdateIssues(client, [asUuid("issue-1")], { priority: 2 }),
+    ).rejects.toThrow("Failed to update 1 issues");
   });
 });

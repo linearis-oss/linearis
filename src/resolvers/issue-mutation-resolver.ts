@@ -212,6 +212,60 @@ export async function resolveCreateIssueIds(
   return resolved;
 }
 
+/**
+ * Resolves the human identifiers for a whole batch of issues to create.
+ *
+ * Each entry still resolves through {@link resolveCreateIssueIds}, so the
+ * disambiguation and not-found semantics are identical to a single create —
+ * a batch must not quietly accept a team name that `issues create` would
+ * reject. What changes is the round-trip count: entries naming the same set of
+ * references (the usual case, where a batch shares a team and project and
+ * differs only in title) are collapsed onto one in-flight request via a
+ * promise cache, so the cost is one `BatchResolveForCreate` per *distinct*
+ * reference set rather than per row.
+ *
+ * Field-level memoization would collapse more, but status, cycle and milestone
+ * lookups are scoped by the entry's own team and project, so a per-field cache
+ * cannot be keyed correctly without duplicating that scoping here.
+ */
+export async function resolveBatchCreateIssueIds(
+  client: GraphQLClient,
+  entries: readonly ResolveCreateIssueIdsInput[],
+): Promise<ResolvedCreateIssueIds[]> {
+  const inFlight = new Map<string, Promise<ResolvedCreateIssueIds>>();
+
+  return Promise.all(
+    entries.map((entry) => {
+      const key = batchCreateCacheKey(entry);
+      const cached = inFlight.get(key);
+      if (cached) return cached;
+
+      const pending = resolveCreateIssueIds(client, entry);
+      inFlight.set(key, pending);
+      return pending;
+    }),
+  );
+}
+
+/**
+ * Stable cache key over exactly the fields {@link resolveCreateIssueIds} reads.
+ * Title and description are absent by construction — they never reach the
+ * resolver — so two entries with the same key resolve to the same UUIDs.
+ */
+function batchCreateCacheKey(entry: ResolveCreateIssueIdsInput): string {
+  return JSON.stringify([
+    entry.team,
+    entry.assignee ?? null,
+    entry.project ?? null,
+    entry.labels ?? null,
+    entry.projectMilestone ?? null,
+    entry.cycle ?? null,
+    entry.status ?? null,
+    entry.parentTicket ?? null,
+    entry.withEstimateContext ?? false,
+  ]);
+}
+
 function findTeamNode(nodes: TeamNode[], raw: string): TeamNode | undefined {
   return nodes.find((n) => n.key === raw) ?? nodes.find((n) => n.name === raw);
 }
