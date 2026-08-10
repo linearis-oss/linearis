@@ -30,10 +30,15 @@ import {
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
+  RemindOnIssueDocument,
   SearchIssuesDocument,
   type SearchIssuesQuery,
   type SearchIssuesQueryVariables,
+  ShareIssueDocument,
+  SubscribeToIssueDocument,
   UnarchiveIssueDocument,
+  UnshareIssueDocument,
+  UnsubscribeFromIssueDocument,
   UpdateIssueDocument,
   type UpdateIssueMutation,
 } from "../gql/graphql.js";
@@ -515,6 +520,95 @@ export async function unarchiveIssue(
     result.issueUnarchive,
     "entity",
     `Failed to unarchive issue "${id}"`,
+  );
+}
+
+/**
+ * Adds a user to an issue's subscriber list.
+ *
+ * `issueSubscribe` also accepts `userEmail`, but the CLI resolves user
+ * references to UUIDs in the resolver layer, so only `userId` is used.
+ */
+export async function subscribeToIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(SubscribeToIssueDocument, { id, userId });
+
+  return requireMutationEntity(
+    result.issueSubscribe,
+    "issue",
+    `Failed to subscribe user "${userId}" to issue "${id}"`,
+  );
+}
+
+export async function unsubscribeFromIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(UnsubscribeFromIssueDocument, {
+    id,
+    userId,
+  });
+
+  return requireMutationEntity(
+    result.issueUnsubscribe,
+    "issue",
+    `Failed to unsubscribe user "${userId}" from issue "${id}"`,
+  );
+}
+
+/**
+ * Grants a user access to an issue they cannot otherwise see.
+ *
+ * Note this is an access grant, not a link generator — the issue's permalink
+ * is the `url` field on any read payload.
+ */
+export async function shareIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(ShareIssueDocument, { id, userId });
+
+  return requireMutationEntity(
+    result.issueShare,
+    "issue",
+    `Failed to share issue "${id}" with user "${userId}"`,
+  );
+}
+
+export async function unshareIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(UnshareIssueDocument, { id, userId });
+
+  return requireMutationEntity(
+    result.issueUnshare,
+    "issue",
+    `Failed to unshare issue "${id}" from user "${userId}"`,
+  );
+}
+
+/** Schedules a reminder for the authenticated user at an ISO-8601 instant. */
+export async function remindOnIssue(
+  client: GraphQLClient,
+  id: UUID,
+  reminderAt: string,
+): Promise<UpdatedIssue> {
+  const result = await client.request(RemindOnIssueDocument, {
+    id,
+    reminderAt,
+  });
+
+  return requireMutationEntity(
+    result.issueReminder,
+    "issue",
+    `Failed to set a reminder on issue "${id}"`,
   );
 }
 

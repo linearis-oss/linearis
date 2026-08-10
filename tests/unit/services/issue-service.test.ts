@@ -21,8 +21,13 @@ import {
   GetIssueByIdWithCommentsDocument,
   GetIssueByIdWithReactionsDocument,
   GetIssuesDocument,
+  RemindOnIssueDocument,
   SearchIssuesDocument,
+  ShareIssueDocument,
+  SubscribeToIssueDocument,
   UnarchiveIssueDocument,
+  UnshareIssueDocument,
+  UnsubscribeFromIssueDocument,
 } from "../../../src/gql/graphql.js";
 import {
   archiveIssue,
@@ -39,8 +44,13 @@ import {
   getIssueWithCommentThreads,
   getIssueWithReactions,
   listIssues,
+  remindOnIssue,
   searchIssues,
+  shareIssue,
+  subscribeToIssue,
   unarchiveIssue,
+  unshareIssue,
+  unsubscribeFromIssue,
   updateIssue,
 } from "../../../src/services/issue-service.js";
 
@@ -1004,5 +1014,91 @@ describe("deleteIssue", () => {
     await expect(deleteIssue(client, asUuid("issue-1"))).rejects.toThrow(
       'Failed to delete issue "issue-1"',
     );
+  });
+});
+
+describe("subscriber and sharing mutations", () => {
+  const issueId = asUuid("issue-1");
+  const userId = asUuid("user-1");
+
+  const cases = [
+    {
+      name: "subscribeToIssue",
+      call: subscribeToIssue,
+      document: SubscribeToIssueDocument,
+      payloadKey: "issueSubscribe",
+      failure: 'Failed to subscribe user "user-1" to issue "issue-1"',
+    },
+    {
+      name: "unsubscribeFromIssue",
+      call: unsubscribeFromIssue,
+      document: UnsubscribeFromIssueDocument,
+      payloadKey: "issueUnsubscribe",
+      failure: 'Failed to unsubscribe user "user-1" from issue "issue-1"',
+    },
+    {
+      name: "shareIssue",
+      call: shareIssue,
+      document: ShareIssueDocument,
+      payloadKey: "issueShare",
+      failure: 'Failed to share issue "issue-1" with user "user-1"',
+    },
+    {
+      name: "unshareIssue",
+      call: unshareIssue,
+      document: UnshareIssueDocument,
+      payloadKey: "issueUnshare",
+      failure: 'Failed to unshare issue "issue-1" from user "user-1"',
+    },
+  ] as const;
+
+  it.each(cases)("$name returns the updated issue", async (testCase) => {
+    const client = mockGqlClient({
+      [testCase.payloadKey]: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(testCase.call(client, issueId, userId)).resolves.toEqual({
+      id: "issue-1",
+    });
+    expect(client.request).toHaveBeenCalledWith(testCase.document, {
+      id: "issue-1",
+      userId: "user-1",
+    });
+  });
+
+  it.each(cases)("$name throws when the mutation fails", async (testCase) => {
+    const client = mockGqlClient({
+      [testCase.payloadKey]: { success: false, issue: null },
+    });
+
+    await expect(testCase.call(client, issueId, userId)).rejects.toThrow(
+      testCase.failure,
+    );
+  });
+});
+
+describe("remindOnIssue", () => {
+  it("passes the reminder instant through untouched", async () => {
+    const client = mockGqlClient({
+      issueReminder: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(
+      remindOnIssue(client, asUuid("issue-1"), "2026-08-14T09:00:00.000Z"),
+    ).resolves.toEqual({ id: "issue-1" });
+    expect(client.request).toHaveBeenCalledWith(RemindOnIssueDocument, {
+      id: "issue-1",
+      reminderAt: "2026-08-14T09:00:00.000Z",
+    });
+  });
+
+  it("throws when the mutation fails", async () => {
+    const client = mockGqlClient({
+      issueReminder: { success: false, issue: null },
+    });
+
+    await expect(
+      remindOnIssue(client, asUuid("issue-1"), "2026-08-14T09:00:00.000Z"),
+    ).rejects.toThrow('Failed to set a reminder on issue "issue-1"');
   });
 });

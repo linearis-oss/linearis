@@ -1,7 +1,11 @@
 // tests/unit/resolvers/user-resolver.test.ts
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
-import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
+import { GetViewerDocument } from "../../../src/gql/graphql.js";
+import {
+  resolveUserId,
+  resolveViewerId,
+} from "../../../src/resolvers/user-resolver.js";
 
 interface MockUser {
   id: string;
@@ -76,4 +80,31 @@ describe("resolveUserId", () => {
       'Multiple Users found matching "Alex Smith"',
     );
   });
+});
+
+describe("resolveViewerId", () => {
+  it("returns the authenticated user's UUID", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue({ viewer: { id: "viewer-uuid" } });
+    const client = { request } as unknown as GraphQLClient;
+
+    await expect(resolveViewerId(client)).resolves.toBe("viewer-uuid");
+    expect(request).toHaveBeenCalledWith(GetViewerDocument);
+  });
+});
+
+describe("resolveUserId viewer aliases", () => {
+  it.each(["me", "@me", "ME"])(
+    "resolves %s to the viewer without a user lookup",
+    async (alias) => {
+      const request = vi
+        .fn()
+        .mockResolvedValue({ viewer: { id: "viewer-uuid" } });
+      const client = { request } as unknown as GraphQLClient;
+
+      await expect(resolveUserId(client, alias)).resolves.toBe("viewer-uuid");
+      expect(request).toHaveBeenCalledExactlyOnceWith(GetViewerDocument);
+    },
+  );
 });

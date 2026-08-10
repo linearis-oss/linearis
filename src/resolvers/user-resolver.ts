@@ -1,13 +1,39 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
-import { FindUsersDocument } from "../gql/graphql.js";
+import { FindUsersDocument, GetViewerDocument } from "../gql/graphql.js";
 
+/** Spellings of "the authenticated user" accepted wherever a user is expected. */
+const VIEWER_ALIASES: ReadonlySet<string> = new Set(["me", "@me"]);
+
+/**
+ * Resolves the authenticated user's UUID.
+ *
+ * ARCHITECTURAL EXCEPTION: this resolver queries `viewer` directly rather than
+ * going through a lean filter-based lookup. There is no filter that selects
+ * "the caller" — `viewer` is the only way to ask — and the query is already as
+ * lean as it gets (three scalars on a single node).
+ */
+export async function resolveViewerId(client: GraphQLClient): Promise<UUID> {
+  const { viewer } = await client.request(GetViewerDocument);
+  return asUuid(viewer.id);
+}
+
+/**
+ * Resolves a user reference to a UUID.
+ *
+ * Accepts a UUID, a display name, an email address, or `me`/`@me` for the
+ * authenticated user.
+ */
 export async function resolveUserId(
   client: GraphQLClient,
   nameOrEmailOrId: string,
 ): Promise<UUID> {
   if (isUuid(nameOrEmailOrId)) return asUuid(nameOrEmailOrId);
+
+  if (VIEWER_ALIASES.has(nameOrEmailOrId.toLowerCase())) {
+    return resolveViewerId(client);
+  }
 
   // Try by display name first (case-insensitive)
   const { users: byName } = await client.request(FindUsersDocument, {

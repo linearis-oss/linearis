@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { firstOrThrow } from "../common/array.js";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
+import { parseDateTimeOption } from "../common/datetime.js";
 import { parseLabelMode } from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
@@ -38,6 +39,7 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
+import { resolveUserId, resolveViewerId } from "../resolvers/user-resolver.js";
 import { getIssueActivity } from "../services/activity-service.js";
 import {
   createDiscussionCommentReaction,
@@ -80,9 +82,14 @@ import {
   getIssueWithReactions,
   type IssueReadOptions,
   listIssues,
+  remindOnIssue,
   searchIssues,
+  shareIssue,
+  subscribeToIssue,
   type UpdateIssueInput,
   unarchiveIssue,
+  unshareIssue,
+  unsubscribeFromIssue,
   updateIssue,
 } from "../services/issue-service.js";
 import {
@@ -167,6 +174,39 @@ function validateReadOptions(options: ReadOptions): void {
       "cannot be combined with --with-attachments, --with-comments, or --with-comment-threads",
     );
   }
+}
+
+interface SubscriberOptions {
+  user?: string;
+}
+
+interface ShareOptions {
+  with: string;
+}
+
+interface RemindOptions {
+  at: string;
+}
+
+/**
+ * Resolves the issue and the user a subscribe/share command acts on.
+ *
+ * The two lookups are independent, so they run concurrently. An omitted user
+ * means the caller themselves — subscribing yourself is the overwhelmingly
+ * common case, and `me` is accepted as the explicit spelling of the same thing
+ * (see `resolveUserId`).
+ */
+async function resolveIssueAndUser(
+  ctx: CommandContext,
+  issue: string,
+  user: string | undefined,
+): Promise<[UUID, UUID]> {
+  return Promise.all([
+    resolveIssueId(ctx.gql, issue),
+    user === undefined
+      ? resolveViewerId(ctx.gql)
+      : resolveUserId(ctx.gql, user),
+  ]);
 }
 
 interface ReactionOptions {
@@ -1569,6 +1609,123 @@ export function setupIssuesCommands(program: Command): void {
               relationActions,
             );
           }
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("subscribe <issue>")
+    .description("subscribe a user to an issue's notifications")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("--user <user>", "user to subscribe (defaults to you)")
+    .action(
+      commandAction<[string, SubscriberOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.user,
+          );
+          const result = await subscribeToIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("unsubscribe <issue>")
+    .description("remove a user from an issue's subscribers")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("--user <user>", "user to unsubscribe (defaults to you)")
+    .action(
+      commandAction<[string, SubscriberOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.user,
+          );
+          const result = await unsubscribeFromIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("share <issue>")
+    .description("grant a user access to an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.\nThis grants access; it does not mint a link. The issue's permalink is the \`url\` field on \`issues read\`.`,
+    )
+    .requiredOption("--with <user>", "user to grant access to")
+    .action(
+      commandAction<[string, ShareOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.with,
+          );
+          const result = await shareIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("unshare <issue>")
+    .description("revoke a user's access to an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .requiredOption("--with <user>", "user to revoke access from")
+    .action(
+      commandAction<[string, ShareOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.with,
+          );
+          const result = await unshareIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("remind <issue>")
+    .description("schedule a reminder for yourself on an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.\n--at accepts an ISO-8601 instant (2026-08-14T09:00:00Z) or a relative offset (+2h, +3d).`,
+    )
+    .requiredOption("--at <when>", "when to be reminded")
+    .action(
+      commandAction<[string, RemindOptions, Command]>(
+        async (issue, options, command) => {
+          const reminderAt = parseDateTimeOption("--at", options.at);
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await remindOnIssue(ctx.gql, issueId, reminderAt);
 
           outputSuccess(result);
         },
