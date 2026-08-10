@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../../common/context.js";
+import { parseHealth } from "../../common/domain-values.js";
 import { invalidParameterError } from "../../common/errors.js";
 import { asUuid } from "../../common/identifier.js";
 import {
@@ -15,7 +16,6 @@ import {
   createInitiativeUpdate,
   getInitiativeUpdate,
   listInitiativeUpdates,
-  parseHealth,
   type UpdateInitiativeUpdateInput,
   unarchiveInitiativeUpdate,
   updateInitiativeUpdate,

@@ -1,0 +1,58 @@
+# ------------------------------------------------------------
+# GraphQL mutations for the workspace project status flow
+# ------------------------------------------------------------
+
+mutation CreateProjectStatus($input: ProjectStatusCreateInput!) {
+  projectStatusCreate(input: $input) {
+    success
+    status {
+      ...ProjectStatusCoreFields
+    }
+  }
+}
+
+mutation UpdateProjectStatus($id: String!, $input: ProjectStatusUpdateInput!) {
+  projectStatusUpdate(id: $id, input: $input) {
+    success
+    status {
+      ...ProjectStatusCoreFields
+    }
+  }
+}
+
+# Archive a status
+#
+# Linear refuses this while projects are still assigned to the status, or
+# when it is the last status of its type.
+mutation ArchiveProjectStatus($id: String!) {
+  projectStatusArchive(id: $id) {
+    success
+    entity {
+      ...ProjectStatusCoreFields
+    }
+  }
+}
+
+mutation UnarchiveProjectStatus($id: String!) {
+  projectStatusUnarchive(id: $id) {
+    success
+    entity {
+      ...ProjectStatusCoreFields
+    }
+  }
+}
+
+# Move every project off one status and onto another
+#
+# The payload carries no entity — only whether the reassignment ran.
+mutation ReassignProjectStatus(
+  $originalProjectStatusId: String!
+  $newProjectStatusId: String!
+) {
+  projectReassignStatus(
+    originalProjectStatusId: $originalProjectStatusId
+    newProjectStatusId: $newProjectStatusId
+  ) {
+    success
+  }
+}

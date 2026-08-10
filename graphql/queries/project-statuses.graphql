@@ -1,0 +1,61 @@
+# ------------------------------------------------------------
+# GraphQL queries for the workspace project status flow
+#
+# Project statuses are workspace-scoped, not per-team: every project in
+# the workspace draws its status from this one ordered list.
+# ------------------------------------------------------------
+
+fragment ProjectStatusCoreFields on ProjectStatus {
+  id
+  name
+  description
+  color
+  type
+  position
+  indefinite
+  createdAt
+  updatedAt
+  archivedAt
+}
+
+# List the workspace's project statuses
+#
+# The connection takes no name filter, which is why
+# `resolveProjectStatusId()` matches names client-side.
+#
+# `first` overrides the API's default page of 50: archived statuses keep
+# accumulating, so `--include-archived` can pass 50 in a long-lived
+# workspace. pageInfo is selected so a caller that hits even the raised
+# bound learns the list is partial instead of reading it as complete.
+query ListProjectStatuses(
+  $includeArchived: Boolean = false
+  $first: Int = 250
+) {
+  projectStatuses(includeArchived: $includeArchived, first: $first) {
+    nodes {
+      ...ProjectStatusCoreFields
+    }
+    pageInfo {
+      hasNextPage
+    }
+  }
+}
+
+query GetProjectStatus($id: String!) {
+  projectStatus(id: $id) {
+    ...ProjectStatusCoreFields
+  }
+}
+
+# How many projects currently sit in a status
+#
+# Folded into `projects statuses read` rather than exposed as its own
+# verb: the count only means anything next to the status it describes,
+# and it is what tells you whether an archive will be refused.
+query GetProjectStatusProjectCount($id: String!) {
+  projectStatusProjectCount(id: $id) {
+    count
+    privateCount
+    archivedTeamCount
+  }
+}

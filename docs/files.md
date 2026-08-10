@@ -22,7 +22,9 @@ Each resolver converts a human-friendly identifier (name, key, or slug) into a U
 - **cycle-resolver.ts** -- `resolveCycleId(client, nameOrId, teamFilter?)`
 - **status-resolver.ts** -- `resolveStatusId(client, nameOrId, teamId?)`
 - **issue-resolver.ts** -- `resolveIssueId(client, issueIdOrIdentifier)`
-- **milestone-resolver.ts** -- `resolveMilestoneId(gqlClient, sdkClient, nameOrId, projectNameOrId?)`
+- **milestone-resolver.ts** -- `resolveMilestoneId(gqlClient, nameOrId, projectNameOrId?)` — a project scope is authoritative, never widened to the workspace
+- **project-status-resolver.ts** -- `resolveProjectStatusId(client, nameOrId, { includeArchived? })`
+- **project-relation-resolver.ts** -- `resolveProjectRelation(client, relationOrProjectId, relatedProjectId?)` — returns `{ id, inverted }`; `inverted` tells callers writing per-end fields to swap the two ends
 
 ## Service Layer (`src/services/`)
 
@@ -35,8 +37,12 @@ Business logic and CRUD operations. Services use `GraphQLClient` exclusively and
 - **cycle-service.ts** -- `listCycles`, `getCycle`
 - **team-service.ts** -- `listTeams`
 - **user-service.ts** -- `listUsers`
-- **project-service.ts** -- `listProjects`
-- **label-service.ts** -- `listLabels`
+- **project-service.ts** -- `listProjects`, `searchProjects`, `getProject`, `createProject`, `updateProject`, `applyProjectLabels`, `disableProjectExternalSync`, `unarchiveProject`, `deleteProject`
+- **project-update-service.ts** -- Project status posts: `listProjectUpdates`, `getProjectUpdate`, `createProjectUpdate`, `editProjectUpdate`, archive/unarchive, `remindProjectUpdate`
+- **project-status-service.ts** -- The workspace project status flow: list/get/create/update, `reassignProjectStatus`, archive/unarchive
+- **project-relation-service.ts** -- Project dependencies: list (per project and workspace-wide), get, create, update, delete
+- **project-activity-service.ts** -- Merges project discussions, history and status updates into one chronological timeline
+- **label-service.ts** -- `listLabels`, `listProjectLabels`, and get/create/update/delete/retire/restore dispatching on `LabelType`
 - **comment-service.ts** -- `createComment`
 - **file-service.ts** -- File upload and download operations for Linear uploads
 
@@ -52,8 +58,8 @@ CLI orchestration. Each file registers a command group via a `setup*Commands(pro
 - **cycles.ts** -- Cycle listing and detail reading
 - **teams.ts** -- Team listing
 - **users.ts** -- User listing
-- **projects.ts** -- Project listing
-- **labels.ts** -- Label listing
+- **projects/** -- Project commands. `index.ts` owns `PROJECTS_META` and registers the domain; `entity.ts` holds CRUD, search, sync and discussions; `updates.ts`, `statuses.ts` and `relations.ts` hold the subgroups
+- **labels.ts** -- Label commands for both issue and project labels (`--type`)
 - **comments.ts** -- Comment creation
 - **embeds.ts** -- File download from Linear upload URLs
 

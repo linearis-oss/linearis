@@ -1,19 +1,23 @@
 import type { Command } from "commander";
-import { createContext, getRootOpts } from "../common/context.js";
-import { type Priority, parseLabelMode } from "../common/domain-values.js";
-import { resolveReactionEmojiInput } from "../common/emoji.js";
-import { invalidParameterError } from "../common/errors.js";
-import { asUuid } from "../common/identifier.js";
-import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
-import { buildPaginationOptions } from "../common/types.js";
-import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
+import { createContext, getRootOpts } from "../../common/context.js";
+import { type Priority, parseLabelMode } from "../../common/domain-values.js";
+import { resolveReactionEmojiInput } from "../../common/emoji.js";
+import { invalidParameterError } from "../../common/errors.js";
+import { asUuid } from "../../common/identifier.js";
+import {
+  commandAction,
+  outputSuccess,
+  parseLimit,
+} from "../../common/output.js";
+import { buildPaginationOptions } from "../../common/types.js";
+import type { ExternalSyncService } from "../../gql/graphql.js";
 import {
   resolveProjectId,
   resolveProjectLabelIds,
-} from "../resolvers/project-resolver.js";
-import { resolveProjectStatusId } from "../resolvers/project-status-resolver.js";
-import { resolveTeamId } from "../resolvers/team-resolver.js";
-import { resolveUserId } from "../resolvers/user-resolver.js";
+} from "../../resolvers/project-resolver.js";
+import { resolveProjectStatusId } from "../../resolvers/project-status-resolver.js";
+import { resolveTeamId } from "../../resolvers/team-resolver.js";
+import { resolveUserId } from "../../resolvers/user-resolver.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -30,19 +34,21 @@ import {
   resolveDiscussion,
   startProjectDiscussion,
   unresolveDiscussion,
-} from "../services/discussion-service.js";
+} from "../../services/discussion-service.js";
+import { getProjectActivity } from "../../services/project-activity-service.js";
 import {
-  archiveProject,
+  applyProjectLabels,
   type CreateProjectInput,
   createProject,
   deleteProject,
+  disableProjectExternalSync,
   getProject,
-  getProjectLabelIds,
   listProjects,
+  searchProjects,
   type UpdateProjectInput,
   unarchiveProject,
   updateProject,
-} from "../services/project-service.js";
+} from "../../services/project-service.js";
 
 interface ListOptions {
   limit: string;
@@ -53,6 +59,24 @@ interface ListOptions {
 interface ReadOptions {
   milestonesFirst: string;
   issuesFirst: string;
+}
+
+interface SearchOptions {
+  limit: string;
+  after?: string;
+  includeArchived?: boolean;
+  team?: string;
+}
+
+interface DisableSyncOptions {
+  source: string;
+}
+
+interface ActivityOptions {
+  limit: string;
+  after?: string;
+  commentsOnly?: boolean;
+  withReactions?: boolean;
 }
 
 interface DiscussionsOptions {
@@ -174,26 +198,22 @@ interface UpdateOptions {
   clearLabels?: boolean;
 }
 
-export const PROJECTS_META: DomainMeta = {
-  name: "projects",
-  summary: "groups of issues toward a goal",
-  context: [
-    "a project collects related issues across teams. projects can have",
-    "milestones to track progress toward deadlines or phases. projects",
-    "have a status (backlog, planned, started, paused, completed,",
-    "canceled), priority (0-4), health (onTrack, atRisk, offTrack),",
-    "and can be assigned labels, a lead, and members.",
-  ].join("\n"),
-  arguments: {
-    project: "project identifier (UUID or name)",
-    name: "string",
-  },
-  seeAlso: [
-    "milestones list --project",
-    "documents list --project",
-    "issues create --project",
-  ],
-};
+const EXTERNAL_SYNC_SOURCES = [
+  "jira",
+  "github",
+  "slack",
+] as const satisfies readonly ExternalSyncService[];
+
+function parseExternalSyncSource(value: string): ExternalSyncService {
+  const match = EXTERNAL_SYNC_SOURCES.find((source) => source === value);
+  if (!match) {
+    throw invalidParameterError(
+      "--source",
+      `must be one of: ${EXTERNAL_SYNC_SOURCES.join(", ")}`,
+    );
+  }
+  return match;
+}
 
 function parsePriority(value: string): Priority {
   const priority = Number.parseInt(value, 10);
@@ -249,11 +269,7 @@ function getUpdateTeamNames(options: UpdateOptions): string[] | undefined {
   return parseCommaSeparatedOption(options.teams ? "--teams" : "--team", teams);
 }
 
-export function setupProjectsCommands(program: Command): void {
-  const projects = program
-    .command("projects")
-    .description("Project operations");
-
+export function setupProjectEntityCommands(projects: Command): void {
   projects
     .command("list")
     .description("list projects")
@@ -271,6 +287,39 @@ export function setupProjectsCommands(program: Command): void {
         });
         outputSuccess(result);
       }),
+    );
+
+  projects
+    .command("search <query>")
+    .description("full-text search projects")
+    .addHelpText(
+      "after",
+      "\nResults are relevance-ordered by the API, so there is no sort\n" +
+        "option. This endpoint is rate-limited more tightly than\n" +
+        "`projects list` — prefer list when a filter would do.",
+    )
+    .option("-l, --limit <n>", "max results", "25")
+    .option("--after <cursor>", "cursor for next page")
+    .option("--include-archived", "include archived projects")
+    .option("--team <team>", "restrict to one team (key, name, or UUID)")
+    .action(
+      commandAction<[string, SearchOptions, Command]>(
+        async (query, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          const teamId = options.team
+            ? await resolveTeamId(ctx.gql, options.team)
+            : undefined;
+
+          const result = await searchProjects(ctx.gql, query, {
+            ...buildPaginationOptions(parseLimit(options.limit), options.after),
+            includeArchived: options.includeArchived ?? false,
+            ...(teamId !== undefined ? { teamId } : {}),
+          });
+
+          outputSuccess(result);
+        },
+      ),
     );
 
   projects
@@ -301,6 +350,39 @@ export function setupProjectsCommands(program: Command): void {
               options.issuesFirst,
             ),
           });
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  projects
+    .command("activity <project>")
+    .description(
+      "chronological timeline: discussions, history events, status updates",
+    )
+    .addHelpText(
+      "after",
+      "\nHistory items carry Linear's opaque `entries` object verbatim.\n" +
+        "`ProjectHistory` has no typed from/to fields the way `IssueHistory`\n" +
+        "does, so this is not the normalized `changes[]` shape that\n" +
+        "`issues activity` returns.",
+    )
+    .option("-l, --limit <n>", "max timeline items", "50")
+    .option("--after <cursor>", "cursor for next page")
+    .option("--comments-only", "exclude history events and status updates")
+    .option("--with-reactions", "include normalized comment reactions")
+    .action(
+      commandAction<[string, ActivityOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          const projectId = await resolveProjectId(ctx.gql, project);
+          const result = await getProjectActivity(ctx.gql, projectId, {
+            ...buildPaginationOptions(parseLimit(options.limit), options.after),
+            commentsOnly: Boolean(options.commentsOnly),
+            withReactions: Boolean(options.withReactions),
+          });
+
           outputSuccess(result);
         },
       ),
@@ -728,13 +810,7 @@ export function setupProjectsCommands(program: Command): void {
           }
 
           const labelMode = parseLabelMode(options.labelMode);
-
           const projectId = await resolveProjectId(ctx.gql, project);
-          const needsLabelContext =
-            options.labels && (labelMode === "add" || labelMode === "remove");
-          const currentLabelIds = needsLabelContext
-            ? await getProjectLabelIds(ctx.gql, projectId)
-            : [];
 
           const input: UpdateProjectInput = {};
 
@@ -804,48 +880,70 @@ export function setupProjectsCommands(program: Command): void {
             );
           }
 
+          // `add`/`remove` go through the incremental mutations; only
+          // `overwrite` and `--clear-labels` touch the full-replacement
+          // `labelIds` input, which is the only path that can drop a label
+          // it never read.
+          const incrementalLabelIds =
+            options.labels && (labelMode === "add" || labelMode === "remove")
+              ? await resolveProjectLabelIds(
+                  ctx.gql,
+                  parseCommaSeparatedOption("--labels", options.labels),
+                )
+              : undefined;
+
           if (options.clearLabels) {
             input.labelIds = [];
-          } else if (options.labels) {
-            const labelNames = options.labels
-              .split(",")
-              .map((l) => l.trim())
-              .filter(Boolean);
-            const labelIds = await resolveProjectLabelIds(ctx.gql, labelNames);
-
-            if (labelMode === "add") {
-              input.labelIds = [...new Set([...currentLabelIds, ...labelIds])];
-            } else if (labelMode === "remove") {
-              input.labelIds = currentLabelIds.filter(
-                (id) => !labelIds.includes(id),
-              );
-            } else {
-              input.labelIds = labelIds;
-            }
+          } else if (options.labels && !incrementalLabelIds) {
+            input.labelIds = await resolveProjectLabelIds(
+              ctx.gql,
+              parseCommaSeparatedOption("--labels", options.labels),
+            );
           }
 
-          if (Object.keys(input).length === 0) {
+          const hasFieldUpdates = Object.keys(input).length > 0;
+
+          if (!hasFieldUpdates && !incrementalLabelIds) {
             throw invalidParameterError(
               "update options",
               "at least one option must be provided",
             );
           }
 
-          const result = await updateProject(ctx.gql, projectId, input);
-          outputSuccess(result);
+          const updated = hasFieldUpdates
+            ? await updateProject(ctx.gql, projectId, input)
+            : undefined;
+
+          // Labels last, so the emitted project reflects every change made.
+          outputSuccess(
+            incrementalLabelIds
+              ? await applyProjectLabels(
+                  ctx.gql,
+                  projectId,
+                  incrementalLabelIds,
+                  labelMode === "add" ? "add" : "remove",
+                )
+              : updated,
+          );
         },
       ),
     );
 
   projects
-    .command("archive <project>")
-    .description("archive a project")
+    .command("disable-sync <project>")
+    .description("stop syncing a project with an external tracker")
+    .requiredOption("--source <source>", EXTERNAL_SYNC_SOURCES.join(" | "))
     .action(
-      commandAction<[string, unknown, Command]>(
-        async (project, _unused1, command) => {
+      commandAction<[string, DisableSyncOptions, Command]>(
+        async (project, options, command) => {
           const ctx = createContext(getRootOpts(command));
+          const source = parseExternalSyncSource(options.source);
           const projectId = await resolveProjectId(ctx.gql, project);
-          const result = await archiveProject(ctx.gql, projectId);
+          const result = await disableProjectExternalSync(
+            ctx.gql,
+            projectId,
+            source,
+          );
           outputSuccess(result);
         },
       ),
@@ -853,7 +951,7 @@ export function setupProjectsCommands(program: Command): void {
 
   projects
     .command("unarchive <project>")
-    .description("unarchive a project")
+    .description("restore a project from the trash")
     .action(
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {
@@ -869,7 +967,7 @@ export function setupProjectsCommands(program: Command): void {
 
   projects
     .command("delete <project>")
-    .description("delete a project")
+    .description("move a project to the trash (restore with unarchive)")
     .action(
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {
@@ -882,11 +980,4 @@ export function setupProjectsCommands(program: Command): void {
         },
       ),
     );
-
-  projects
-    .command("usage")
-    .description("show detailed usage for projects")
-    .action(() => {
-      console.log(formatDomainUsage(projects, PROJECTS_META));
-    });
 }

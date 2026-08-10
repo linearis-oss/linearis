@@ -1,0 +1,60 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear project status updates
+#
+# A project update is a dated status post on a project: a markdown
+# body plus a health signal. It is a different entity from the
+# `projectUpdate` mutation, which edits the project itself.
+# ------------------------------------------------------------
+
+fragment ProjectUpdateCoreFields on ProjectUpdate {
+  id
+  body
+  health
+  isDiffHidden
+  isStale
+  url
+  createdAt
+  updatedAt
+  editedAt
+  archivedAt
+  project {
+    id
+    name
+  }
+  user {
+    id
+    name
+  }
+}
+
+# List the status updates posted on one project
+#
+# `projectUpdates` is workspace-wide, so the project is applied as a
+# filter rather than traversed from the project itself.
+query ListProjectUpdates(
+  $projectId: ID!
+  $first: Int = 50
+  $after: String
+  $includeArchived: Boolean = false
+) {
+  projectUpdates(
+    first: $first
+    after: $after
+    includeArchived: $includeArchived
+    filter: { project: { id: { eq: $projectId } } }
+  ) {
+    nodes {
+      ...ProjectUpdateCoreFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
+query GetProjectUpdate($id: String!) {
+  projectUpdate(id: $id) {
+    ...ProjectUpdateCoreFields
+  }
+}

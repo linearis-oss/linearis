@@ -145,7 +145,9 @@ A schema is the input contract only: it cannot know your team's workflow states,
 
 ## Coverage
 
-Linear's GraphQL API exposes **537 root operations** (164 queries, 373 mutations). Linearis wires **83 of them** directly, plus a number of nested reads — chosen to cover planning and issue work end to end rather than the whole API.
+Linear's GraphQL API exposes **520 root operations** (159 queries, 361 mutations). Linearis wires **114 of them** directly, plus a number of nested reads — chosen to cover planning and issue work end to end rather than the whole API.
+
+Both figures are checkable rather than asserted: `npm run count:root-fields -- --verify` parses `graphql/**/*.graphql` and cross-checks the result against a live introspection of the schema.
 
 The table below is the honest picture of the whole surface — what works today, and what you'll need the [Linear MCP](#linearis-vs-linear-mcp) or a raw API call for.
 
@@ -154,26 +156,26 @@ The table below is the honest picture of the whole surface — what works today,
 | Area | Extent | What you can do | Not covered |
 |---|---|---|---|
 | `auth` | ✅ | Interactive login, token status, logout | — |
-| Discussions | ✅ | Root threads and replies on issues, projects, and initiatives; edit, delete, resolve/unresolve; emoji reactions on any of them | Custom workspace emoji management |
+| Discussions | ✅ | Root threads and replies on issues, projects, and initiatives; edit, delete, resolve/unresolve; emoji reactions on any of them | Custom workspace emoji management, and comment threads on a status update — `CommentCreateInput.projectUpdateId` makes an update its own discussion surface, which neither `projects updates` nor `initiatives updates` exposes |
 | `issues` | ✅ | List, filter, full-text search, read, create, update, batch create/update, archive/unarchive, delete/restore, snooze; assign labels/assignee/delegate/state/priority/project/cycle/team (including moves between teams); subscribe/unsubscribe, share/unshare, reminders; find the issue for a git branch (`from-branch`); relations (list/add/remove); activity history | Deliberately excluded: the AI-assist and integration-suggestion queries (Figma file lookup, filter/repository suggestions, title-from-customer-request) — see the Integrations row — and `issuePriorityValues`, a static list already in the help text |
 | `initiatives` | 🟡 | List, read, create, update, archive/unarchive, delete; attach/detach projects; initiative-to-initiative relations; initiative updates (list, read, create, update, archive/unarchive); discussions | Initiative labels, lead-team reassignment, relation reordering |
-| `projects` | 🟡 | List, read, create, update, archive/unarchive, delete; assign project labels by name (`--labels`, `--label-mode`, `--clear-labels`); discussions | Project updates (status posts), project-label CRUD, project relations, project status administration, Slack channel creation |
+| `projects` | ✅ | List, full-text search, read, create, update, delete (trash) and unarchive (restore), disable external sync; assign project labels by name (`--labels`, `--label-mode`, `--clear-labels`); status updates (list, read, create, edit, archive/unarchive, remind); dependency relations (list, read, add, update, remove); administer the workspace project status flow (`projects statuses`); discussions; activity timeline | Deliberately excluded: Slack-channel creation and the AI filter suggestion, which are `[Internal]` integration plumbing — see the Integrations row. Project labels live under `labels --type project`; milestone delete/move under `milestones` |
 | `documents` | 🟡 | List, read, create, update, delete | Content history, document full-text search, unarchive |
 | `milestones` | 🟡 | List, read, create, update (per project) | Delete, reordering/move between projects |
 | `attachments` | 🟡 | List on an issue, create from a URL, delete, disable external sync | Update, and the provider-specific link mutations (GitHub PR/issue, GitLab MR, Slack, Jira, Zendesk, Intercom, Front, Salesforce, Discord) |
 | `files` | 🟡 | Upload a file, download via signed URL | Delete uploads, image-from-URL, CSV export reports |
 | `teams` | 🟡 | List, read, create, update; list/add/remove members | Delete, workflow-state administration, triage responsibility, git automation, SLA configuration |
-| `labels` | 🟠 | Issue labels: list, read, create, update, delete; project labels: list (`--type project`) | Project-label create/update/delete, initiative labels, retire/restore |
+| `labels` | 🟡 | Issue and project labels alike (`--type issue\|project`): list, read, create, update, delete, retire/restore; label groups (`--group`, `--parent`) | Initiative labels |
 | `cycles` | 🟠 | List cycles, read a cycle with its issues | Create, update, archive, shift all, start upcoming cycle |
 | `users` | 🟠 | List workspace members | Read a single user, update, role changes, suspend/unsuspend, user settings, session management |
-| Integrations | 🔴 | — | All 73 integration root fields (65 mutations, 8 queries): Slack, GitHub, GitLab, Jira, Figma, Sentry, PagerDuty, Intercom, Salesforce, and more |
+| Integrations | 🔴 | — | All 70 integration root fields (62 mutations, 8 queries): Slack, GitHub, GitLab, Jira, Figma, Sentry, PagerDuty, Intercom, Salesforce, and more. Also the `[Internal]` per-entity integration plumbing excluded from the `issues` and `projects` rows: Slack channel creation and dismissal on a project, Slack/Teams/Jira project posts, and the AI-assist suggestion queries (issue and project filter suggestions, Figma file lookup, title-from-customer-request) |
 | Organization & admin | 🔴 | — | Org settings, invites, domains, webhooks, OAuth apps, audit log, SSO |
 | Releases | 🔴 | — | Releases, release pipelines, stages, release notes |
 | Customers (CRM) | 🔴 | — | Customers, needs, tiers, customer statuses |
 | Views & templates | 🔴 | — | Custom views, favorites, templates, view preferences |
 | Notifications | 🔴 | — | Inbox, subscriptions, snooze, mark read, push subscriptions |
 | Agent sessions | 🔴 | — | Agent sessions, activities, skills, semantic search |
-| Roadmaps | 🔴 | — | Roadmaps and roadmap-to-project links |
+| Roadmaps | 🔴 | — | Roadmaps and roadmap-to-project links. `roadmapToProject*` is deprecated in favour of `initiativeToProject*`, which `initiatives` already wires |
 | Imports & exports | 🔴 | — | Jira/Asana/Clubhouse/GitHub/CSV import jobs |
 | Schedules | 🔴 | — | Time schedules and on-call rotations |
 

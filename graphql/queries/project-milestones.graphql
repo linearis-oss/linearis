@@ -74,7 +74,7 @@ query FindProjectMilestoneScoped($name: String!, $projectId: String!) {
   }
 }
 
-# Find project milestone by name globally (fallback)
+# Find project milestone by name globally
 #
 # Searches for a project milestone by name across all projects.
 query FindProjectMilestoneGlobal($name: String!) {

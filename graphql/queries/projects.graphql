@@ -110,6 +110,15 @@ fragment ProjectDetailFields on Project {
       hasNextPage
     }
   }
+  # The project's `health` is derived from its latest status update, so the
+  # read that reports the health also reports where it came from.
+  healthUpdatedAt
+  lastUpdate {
+    id
+    health
+    body
+    createdAt
+  }
 }
 
 fragment ProjectDetailWithDefaultConnectionsFields on Project {
@@ -214,41 +223,101 @@ query GetProjectWithReactions($id: String!, $first: Int, $after: String) {
   }
 }
 
+# The search fields, mirroring ProjectListFields
+#
+# `searchProjects` returns `ProjectSearchResult`, a sibling type of
+# `Project` rather than the thing itself, so the list fragment cannot be
+# reused. Two differences are real: `state` (deprecated on `Project`) does
+# not exist here, and `metadata` carries the search-ranking detail.
+fragment ProjectSearchFields on ProjectSearchResult {
+  id
+  name
+  description
+  status {
+    id
+    name
+    type
+  }
+  slugId
+  priority
+  priorityLabel
+  health
+  progress
+  startDate
+  targetDate
+  url
+  metadata
+  lead {
+    id
+    name
+  }
+  teams(first: 25) {
+    nodes {
+      id
+      key
+      name
+    }
+  }
+  labels(first: 25) {
+    nodes {
+      id
+      name
+      color
+    }
+  }
+}
+
+# Full-text search across projects
+#
+# Ranked by relevance rather than by `updatedAt`, so there is no orderBy
+# knob here — asking for one would silently discard the ranking that
+# makes the search worth running.
+#
+# `searchProjects` is rate-limited more tightly than the plain
+# `projects` connection; use `projects list` when a filter would do.
+query SearchProjects(
+  $term: String!
+  $first: Int = 25
+  $after: String
+  $includeArchived: Boolean = false
+  $teamId: String
+) {
+  searchProjects(
+    term: $term
+    first: $first
+    after: $after
+    includeArchived: $includeArchived
+    teamId: $teamId
+  ) {
+    nodes {
+      ...ProjectSearchFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
 # List all project statuses in the workspace
 #
 # Fetches project statuses for name-to-UUID resolution.
 # The API does not support filter args on this connection,
 # so all statuses are fetched and filtered client-side.
-query GetProjectStatuses {
-  projectStatuses {
+# archivedAt is selected so that an ambiguity between an archived status
+# and a live one of the same name can be spelled out to the caller.
+# `first` raises the API's default page of 50, which archived statuses can
+# outgrow; pageInfo lets the resolver refuse rather than report a name it
+# simply did not fetch as missing.
+query GetProjectStatuses($includeArchived: Boolean = false, $first: Int = 250) {
+  projectStatuses(includeArchived: $includeArchived, first: $first) {
     nodes {
       id
       name
+      archivedAt
     }
-  }
-}
-
-# Get only a project's label IDs
-#
-# Lean lookup used by `projects update --label-mode add|remove`, which
-# previously fetched the full project detail (milestones + issues) just
-# to read the current label set — an over-budget query on real
-# workspaces (#283).
-#
-# 250 is Linear's per-connection maximum, so this read cannot be raised
-# further; hasNextPage lets the service refuse a truncated label set
-# instead of writing it back as if it were complete (labelIds is a
-# full-replacement input).
-query GetProjectLabelIds($id: String!) {
-  project(id: $id) {
-    id
-    labels(first: 250) {
-      nodes {
-        id
-      }
-      pageInfo {
-        hasNextPage
-      }
+    pageInfo {
+      hasNextPage
     }
   }
 }

@@ -1,0 +1,54 @@
+# ------------------------------------------------------------
+# GraphQL queries backing `projects activity`
+#
+# The project timeline merges three independent connections: project
+# history, discussion threads, and status updates. Linear exposes no
+# unified activity connection, so each is exhausted separately and the
+# service interleaves them.
+# ------------------------------------------------------------
+
+query GetProjectActivityRef($id: String!) {
+  project(id: $id) {
+    id
+    name
+  }
+}
+
+# A project's history events
+#
+# Unlike `IssueHistory`, which has ~40 typed from*/to* fields, every
+# `ProjectHistory` event body lives in one opaque `entries` JSONObject.
+# There is nothing to normalize into a typed change list, and no actor
+# field either — the shape a caller gets here is whatever Linear put in
+# `entries`.
+query ListProjectActivityHistory($id: String!, $first: Int, $after: String) {
+  project(id: $id) {
+    history(first: $first, after: $after) {
+      nodes {
+        id
+        createdAt
+        entries
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+
+query ListProjectActivityUpdates($projectId: ID!, $first: Int, $after: String) {
+  projectUpdates(
+    first: $first
+    after: $after
+    filter: { project: { id: { eq: $projectId } } }
+  ) {
+    nodes {
+      ...ProjectUpdateCoreFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

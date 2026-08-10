@@ -30,15 +30,10 @@ mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
   }
 }
 
-mutation ArchiveProject($id: String!) {
-  projectArchive(id: $id) {
-    success
-    entity {
-      ...ProjectDetailWithDefaultConnectionsFields
-    }
-  }
-}
-
+# Restore a trashed project
+#
+# Linear collapses "archived" and "trashed" into a single state, so this
+# restores whatever projectDelete put away.
 mutation UnarchiveProject($id: String!) {
   projectUnarchive(id: $id) {
     success
@@ -48,10 +43,51 @@ mutation UnarchiveProject($id: String!) {
   }
 }
 
+# Trash a project
+#
+# Reversible: UnarchiveProject restores it.
 mutation DeleteProject($id: String!) {
   projectDelete(id: $id) {
     success
     entity {
+      ...ProjectDetailWithDefaultConnectionsFields
+    }
+  }
+}
+
+# Stop syncing a project with an external tracker
+#
+# Mirrors `attachments disable-sync`: the link stays, the updates stop.
+mutation DisableProjectExternalSync(
+  $projectId: String!
+  $syncSource: ExternalSyncService!
+) {
+  projectExternalSyncDisable(projectId: $projectId, syncSource: $syncSource) {
+    success
+    project {
+      ...ProjectDetailWithDefaultConnectionsFields
+    }
+  }
+}
+
+# Add one label to a project
+#
+# Incremental, unlike `ProjectUpdateInput.labelIds`, which replaces the
+# whole set — so `--label-mode add` needs no read of the current labels
+# and cannot drop the ones it did not see.
+mutation AddProjectLabel($id: String!, $labelId: String!) {
+  projectAddLabel(id: $id, labelId: $labelId) {
+    success
+    project {
+      ...ProjectDetailWithDefaultConnectionsFields
+    }
+  }
+}
+
+mutation RemoveProjectLabel($id: String!, $labelId: String!) {
+  projectRemoveLabel(id: $id, labelId: $labelId) {
+    success
+    project {
       ...ProjectDetailWithDefaultConnectionsFields
     }
   }
