@@ -1,16 +1,68 @@
 ## [2026.7.0](https://github.com/linearis-oss/linearis/compare/v2026.6.0...v2026.7.0) (2026-08-07)
 
+### Features
+
+* **initiatives:** add --clear-owner to initiatives update ([fb401ea](https://github.com/linearis-oss/linearis/commit/fb401ea029bd559140567ea61c6ff1493609b3ea)), closes [#282](https://github.com/linearis-oss/linearis/issues/282)
+* **issues:** add --clear-assignee and --clear-project to issues update ([9a5ca75](https://github.com/linearis-oss/linearis/commit/9a5ca7529efdec30d95c77838f947f6e7255b225)), closes [#282](https://github.com/linearis-oss/linearis/issues/282) [#282](https://github.com/linearis-oss/linearis/issues/282)
+
+### Bug Fixes
+
+* **cli:** classify the two option-shaped parse failures ([19ec395](https://github.com/linearis-oss/linearis/commit/19ec3955285f7fcad3d74e21b294604f59d54ccb)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **cli:** disable Commander's implicit help subcommand ([de405af](https://github.com/linearis-oss/linearis/commit/de405afd709abe27cac3fedf0e06165e7b0becc5)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **cli:** emit JSON envelope for argument-parse errors ([3bd0e38](https://github.com/linearis-oss/linearis/commit/3bd0e3899d64bfa5195009d686cf2cbdddc4ed06)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **cli:** give every bare command group the same MISSING_SUBCOMMAND envelope ([b4c3a8b](https://github.com/linearis-oss/linearis/commit/b4c3a8b58690da398c702147b1c1446f00ab34ca))
+* **cli:** keep the usage-error message on a single line ([a447807](https://github.com/linearis-oss/linearis/commit/a4478075c73af9e0c0d3af699c68402559c05343))
+* **common:** point auth recovery at 'auth login', not the bare group ([cca71ec](https://github.com/linearis-oss/linearis/commit/cca71ec64c86148dbaa27987933d6fae05541082)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **deps:** update dependency commander to v15 ([290424a](https://github.com/linearis-oss/linearis/commit/290424ae2a7f53d3b014de822187429d4fc350b6))
+* **deps:** update dependency graphql to v16.14.2 ([ca72bf7](https://github.com/linearis-oss/linearis/commit/ca72bf7ac32f40643f8b34b7bcafe15675f07226))
+* **deps:** update dependency graphql to v17 ([05bb7af](https://github.com/linearis-oss/linearis/commit/05bb7af33f14b5ab91e6c9797d613ac192c58c80))
+* **projects:** bound project query connections to avoid complexity limit ([dfe97b8](https://github.com/linearis-oss/linearis/commit/dfe97b8f0c3cf15c5fc40a7861f2cd422fdc30b9)), closes [#276](https://github.com/linearis-oss/linearis/issues/276) [#283](https://github.com/linearis-oss/linearis/issues/283)
+* **projects:** surface truncation on bounded connections, lock bounds in tests ([a3145c1](https://github.com/linearis-oss/linearis/commit/a3145c1b99273c11b1e7f077cf2799f63ae4c141)), closes [#276](https://github.com/linearis-oss/linearis/issues/276) [#284](https://github.com/linearis-oss/linearis/issues/284)
+* **usage:** list nested group subcommands in domain usage ([2bff44f](https://github.com/linearis-oss/linearis/commit/2bff44ff745df8e186d4a46f92feaac65ac4740c)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+
 ## [2026.7.0-next.6](https://github.com/linearis-oss/linearis/compare/v2026.7.0-next.5...v2026.7.0-next.6) (2026-08-07)
+
+### Bug Fixes
+
+* **projects:** bound project query connections to avoid complexity limit ([dfe97b8](https://github.com/linearis-oss/linearis/commit/dfe97b8f0c3cf15c5fc40a7861f2cd422fdc30b9)), closes [#276](https://github.com/linearis-oss/linearis/issues/276) [#283](https://github.com/linearis-oss/linearis/issues/283)
+* **projects:** surface truncation on bounded connections, lock bounds in tests ([a3145c1](https://github.com/linearis-oss/linearis/commit/a3145c1b99273c11b1e7f077cf2799f63ae4c141)), closes [#276](https://github.com/linearis-oss/linearis/issues/276) [#284](https://github.com/linearis-oss/linearis/issues/284)
 
 ## [2026.7.0-next.5](https://github.com/linearis-oss/linearis/compare/v2026.7.0-next.4...v2026.7.0-next.5) (2026-08-06)
 
+### Bug Fixes
+
+* **deps:** update dependency graphql to v17 ([05bb7af](https://github.com/linearis-oss/linearis/commit/05bb7af33f14b5ab91e6c9797d613ac192c58c80))
+
 ## [2026.7.0-next.4](https://github.com/linearis-oss/linearis/compare/v2026.7.0-next.3...v2026.7.0-next.4) (2026-08-06)
+
+### Bug Fixes
+
+* **cli:** classify the two option-shaped parse failures ([19ec395](https://github.com/linearis-oss/linearis/commit/19ec3955285f7fcad3d74e21b294604f59d54ccb)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **cli:** disable Commander's implicit help subcommand ([de405af](https://github.com/linearis-oss/linearis/commit/de405afd709abe27cac3fedf0e06165e7b0becc5)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **cli:** emit JSON envelope for argument-parse errors ([3bd0e38](https://github.com/linearis-oss/linearis/commit/3bd0e3899d64bfa5195009d686cf2cbdddc4ed06)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **cli:** give every bare command group the same MISSING_SUBCOMMAND envelope ([b4c3a8b](https://github.com/linearis-oss/linearis/commit/b4c3a8b58690da398c702147b1c1446f00ab34ca))
+* **cli:** keep the usage-error message on a single line ([a447807](https://github.com/linearis-oss/linearis/commit/a4478075c73af9e0c0d3af699c68402559c05343))
+* **common:** point auth recovery at 'auth login', not the bare group ([cca71ec](https://github.com/linearis-oss/linearis/commit/cca71ec64c86148dbaa27987933d6fae05541082)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
+* **usage:** list nested group subcommands in domain usage ([2bff44f](https://github.com/linearis-oss/linearis/commit/2bff44ff745df8e186d4a46f92feaac65ac4740c)), closes [#281](https://github.com/linearis-oss/linearis/issues/281)
 
 ## [2026.7.0-next.3](https://github.com/linearis-oss/linearis/compare/v2026.7.0-next.2...v2026.7.0-next.3) (2026-08-06)
 
+### Features
+
+* **initiatives:** add --clear-owner to initiatives update ([fb401ea](https://github.com/linearis-oss/linearis/commit/fb401ea029bd559140567ea61c6ff1493609b3ea)), closes [#282](https://github.com/linearis-oss/linearis/issues/282)
+* **issues:** add --clear-assignee and --clear-project to issues update ([9a5ca75](https://github.com/linearis-oss/linearis/commit/9a5ca7529efdec30d95c77838f947f6e7255b225)), closes [#282](https://github.com/linearis-oss/linearis/issues/282) [#282](https://github.com/linearis-oss/linearis/issues/282)
+
 ## [2026.7.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.7.0-next.1...v2026.7.0-next.2) (2026-07-06)
 
+### Bug Fixes
+
+* **deps:** update dependency commander to v15 ([290424a](https://github.com/linearis-oss/linearis/commit/290424ae2a7f53d3b014de822187429d4fc350b6))
+
 ## [2026.7.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.6.0...v2026.7.0-next.1) (2026-07-06)
+
+### Bug Fixes
+
+* **deps:** update dependency graphql to v16.14.2 ([ca72bf7](https://github.com/linearis-oss/linearis/commit/ca72bf7ac32f40643f8b34b7bcafe15675f07226))
 
 ## [2026.6.0](https://github.com/linearis-oss/linearis/compare/v2026.5.0...v2026.6.0) (2026-07-04)
 

@@ -23,6 +23,11 @@
       "groupName": "dev dependencies (non-major)"
     },
     {
+      "description": "Hold conventional-changelog-conventionalcommits on the 9.x line: v10 moved to the @conventional-changelog/writer@2 API (function template/commitPartial), which @semantic-release/release-notes-generator's Handlebars writer@8 cannot render. The result is silently empty release notes, not a build failure. Lift once release-notes-generator ships writer@2 support.",
+      "matchPackageNames": ["conventional-changelog-conventionalcommits"],
+      "allowedVersions": "<10"
+    },
+    {
       "description": "Group GitHub Actions updates (SHA-pinned actions + docker digests)",
       "matchManagers": ["github-actions"],
       "groupName": "github actions"
