@@ -1,7 +1,11 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import { notFoundError } from "../common/errors.js";
+import { firstOrThrow } from "../common/array.js";
+import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
-import { GetProjectRelationsDocument } from "../gql/graphql.js";
+import {
+  GetProjectRelationsDocument,
+  type ProjectRelationCoreFieldsFragment,
+} from "../gql/graphql.js";
 
 /** A resolved relation, plus which way round it is stored. */
 export interface ResolvedProjectRelation {
@@ -12,6 +16,22 @@ export interface ResolvedProjectRelation {
    * its `project`. Callers that write per-end fields must swap the two ends.
    */
   inverted: boolean;
+}
+
+/**
+ * One line of the candidate list shown when a project pair carries several
+ * relations. Names both ends in the relation's own direction, since that is
+ * how `relations list` prints them, and includes the milestone anchors —
+ * without them two relations of the same type look identical.
+ */
+function describeRelation(node: ProjectRelationCoreFieldsFragment): string {
+  const from = node.projectMilestone
+    ? `${node.project.name}/${node.projectMilestone.name}`
+    : node.project.name;
+  const to = node.relatedProjectMilestone
+    ? `${node.relatedProject.name}/${node.relatedProjectMilestone.name}`
+    : node.relatedProject.name;
+  return `${from} ${node.type} ${to} (${node.id})`;
 }
 
 /**
@@ -33,7 +53,7 @@ export interface ResolvedProjectRelation {
  * `projectMilestoneId`) are anchored to its `project`, not to whichever
  * endpoint the caller happened to type first.
  *
- * @throws Error if no relation links the two projects
+ * @throws Error if no relation links the two projects, or if more than one does
  */
 export async function resolveProjectRelation(
   client: GraphQLClient,
@@ -57,21 +77,46 @@ export async function resolveProjectRelation(
     throw notFoundError("Project", projectId);
   }
 
-  const forward = result.project.relations.nodes.find(
-    (relation) => relation.relatedProject.id === relatedProjectId,
-  );
-  if (forward) return { id: asUuid(forward.id), inverted: false };
+  const matches: {
+    node: ProjectRelationCoreFieldsFragment;
+    inverted: boolean;
+  }[] = [
+    ...result.project.relations.nodes
+      .filter((node) => node.relatedProject.id === relatedProjectId)
+      .map((node) => ({ node, inverted: false })),
+    ...result.project.inverseRelations.nodes
+      .filter((node) => node.project.id === relatedProjectId)
+      .map((node) => ({ node, inverted: true })),
+  ];
 
-  const inverse = result.project.inverseRelations.nodes.find(
-    (relation) => relation.project.id === relatedProjectId,
-  );
-  if (inverse) return { id: asUuid(inverse.id), inverted: true };
+  if (matches.length === 1) {
+    const match = firstOrThrow(matches, () =>
+      notFoundError(
+        "Project relation",
+        `between ${projectId} and ${relatedProjectId}`,
+      ),
+    );
+    return { id: asUuid(match.node.id), inverted: match.inverted };
+  }
+
+  // One pair of projects can carry several relations — different types, or the
+  // same type anchored to different milestones — and they may point either way
+  // round. Picking one would silently update or remove an arbitrary link, so
+  // list them and make the caller name the UUID instead.
+  if (matches.length > 1) {
+    throw multipleMatchesError(
+      "project relation",
+      `between ${projectId} and ${relatedProjectId}`,
+      matches.map((match) => describeRelation(match.node)),
+      "address the relation by UUID",
+    );
+  }
 
   // Both connections are bounded at 100 rows, and neither accepts a filter
   // that could narrow them to the counterpart. Past that bound "no match" is
   // indistinguishable from "not on this page", so say so rather than report a
-  // relation that may well exist as missing — `remove` would give up and `add`
-  // would go on to create a duplicate.
+  // relation that may well exist as missing — `update` and `remove` would give
+  // up on a relation that is really there.
   if (
     result.project.relations.pageInfo.hasNextPage ||
     result.project.inverseRelations.pageInfo.hasNextPage

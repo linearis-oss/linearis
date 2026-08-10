@@ -6,6 +6,8 @@ import { resolveProjectRelation } from "../../../src/resolvers/project-relation-
 const PROJECT_A = "550e8400-e29b-41d4-a716-446655440000";
 const PROJECT_B = "550e8400-e29b-41d4-a716-446655440001";
 const RELATION = "550e8400-e29b-41d4-a716-4466554400ff";
+const OTHER_RELATION = "550e8400-e29b-41d4-a716-4466554400fe";
+const MILESTONE = "550e8400-e29b-41d4-a716-446655440010";
 
 interface RelationPage {
   nodes: unknown[];
@@ -57,6 +59,78 @@ describe("resolveProjectRelation", () => {
     await expect(
       resolveProjectRelation(client, PROJECT_A, asUuid(PROJECT_B)),
     ).resolves.toEqual({ id: RELATION, inverted: true });
+  });
+
+  it("lists the candidates when the pair carries several relations", async () => {
+    const client = mockGqlClient({
+      relations: connection({
+        nodes: [
+          {
+            id: RELATION,
+            type: "blocks",
+            project: { id: PROJECT_A, name: "Alpha" },
+            projectMilestone: { id: MILESTONE, name: "M1" },
+            relatedProject: { id: PROJECT_B, name: "Beta" },
+            relatedProjectMilestone: null,
+          },
+          {
+            id: OTHER_RELATION,
+            type: "blocks",
+            project: { id: PROJECT_A, name: "Alpha" },
+            projectMilestone: { id: MILESTONE, name: "M2" },
+            relatedProject: { id: PROJECT_B, name: "Beta" },
+            relatedProjectMilestone: null,
+          },
+        ],
+      }),
+      inverseRelations: connection({ nodes: [] }),
+    });
+
+    const error = await resolveProjectRelation(
+      client,
+      PROJECT_A,
+      asUuid(PROJECT_B),
+    ).catch((caught: unknown) => caught as Error);
+
+    expect(error.message).toContain(
+      `Multiple project relations found matching "between ${PROJECT_A} and ${PROJECT_B}"`,
+    );
+    expect(error.message).toContain(`Alpha/M1 blocks Beta (${RELATION})`);
+    expect(error.message).toContain(`Alpha/M2 blocks Beta (${OTHER_RELATION})`);
+    expect(error.message).toContain("address the relation by UUID");
+  });
+
+  it("does not prefer the forward direction when both directions match", async () => {
+    const client = mockGqlClient({
+      relations: connection({
+        nodes: [
+          {
+            id: RELATION,
+            type: "blocks",
+            project: { id: PROJECT_A, name: "Alpha" },
+            projectMilestone: null,
+            relatedProject: { id: PROJECT_B, name: "Beta" },
+            relatedProjectMilestone: null,
+          },
+        ],
+      }),
+      inverseRelations: connection({
+        nodes: [
+          {
+            id: OTHER_RELATION,
+            type: "blocks",
+            project: { id: PROJECT_B, name: "Beta" },
+            projectMilestone: null,
+            relatedProject: { id: PROJECT_A, name: "Alpha" },
+            relatedProjectMilestone: null,
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      resolveProjectRelation(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).rejects.toThrow("Multiple project relations found");
   });
 
   it("throws when the two projects are not related", async () => {
