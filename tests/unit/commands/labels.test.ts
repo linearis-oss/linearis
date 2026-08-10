@@ -25,6 +25,12 @@ vi.mock("../../../src/resolvers/label-resolver.js", () => ({
   resolveLabelId: vi.fn().mockResolvedValue("resolved-label-uuid"),
 }));
 
+vi.mock("../../../src/resolvers/project-resolver.js", () => ({
+  resolveProjectLabelId: vi
+    .fn()
+    .mockResolvedValue("resolved-project-label-uuid"),
+}));
+
 vi.mock("../../../src/services/label-service.js", () => ({
   createLabel: vi.fn().mockResolvedValue({
     id: "lbl-new",
@@ -52,6 +58,17 @@ vi.mock("../../../src/services/label-service.js", () => ({
     nodes: [{ id: "lbl-1", name: "Bug", color: "#ff0000", type: "issue" }],
     pageInfo: { hasNextPage: false, endCursor: null },
   }),
+  retireLabel: vi.fn().mockResolvedValue({
+    id: "resolved-label-uuid",
+    name: "branch:unmerged",
+    retiredAt: "2026-08-10T00:00:00.000Z",
+    type: "issue",
+  }),
+  restoreLabel: vi.fn().mockResolvedValue({
+    id: "resolved-label-uuid",
+    name: "branch:unmerged",
+    type: "issue",
+  }),
   listProjectLabels: vi.fn().mockResolvedValue({
     nodes: [
       {
@@ -68,6 +85,7 @@ vi.mock("../../../src/services/label-service.js", () => ({
 import { setupLabelsCommands } from "../../../src/commands/labels.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import { resolveLabelId } from "../../../src/resolvers/label-resolver.js";
+import { resolveProjectLabelId } from "../../../src/resolvers/project-resolver.js";
 import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import {
   createLabel,
@@ -75,6 +93,8 @@ import {
   getLabel,
   listLabels,
   listProjectLabels,
+  restoreLabel,
+  retireLabel,
   updateLabel,
 } from "../../../src/services/label-service.js";
 
@@ -259,9 +279,11 @@ describe("labels create", () => {
     ]);
 
     expect(resolveTeamId).not.toHaveBeenCalled();
-    expect(createLabel).toHaveBeenCalledWith(expect.anything(), {
-      name: "branch:unmerged",
-    });
+    expect(createLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      { name: "branch:unmerged" },
+      "issue",
+    );
     expect(outputSuccess).toHaveBeenCalledWith({
       id: "lbl-new",
       name: "branch:unmerged",
@@ -288,12 +310,16 @@ describe("labels create", () => {
     ]);
 
     expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "DBL");
-    expect(createLabel).toHaveBeenCalledWith(expect.anything(), {
-      name: "branch:unmerged",
-      teamId: "resolved-team-uuid",
-      color: "#B45309",
-      description: "Created from DBL branch workflow",
-    });
+    expect(createLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        name: "branch:unmerged",
+        teamId: "resolved-team-uuid",
+        color: "#B45309",
+        description: "Created from DBL branch workflow",
+      },
+      "issue",
+    );
   });
 });
 
@@ -323,6 +349,7 @@ describe("labels read", () => {
     expect(getLabel).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-label-uuid",
+      "issue",
     );
   });
 });
@@ -364,6 +391,7 @@ describe("labels update", () => {
         color: "#1D4ED8",
         description: "Updated from DBL branch workflow",
       },
+      "issue",
     );
   });
 
@@ -383,9 +411,8 @@ describe("labels update", () => {
     expect(updateLabel).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-label-uuid",
-      {
-        description: "",
-      },
+      { description: "" },
+      "issue",
     );
   });
 });
@@ -415,6 +442,7 @@ describe("labels delete", () => {
     expect(deleteLabel).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-label-uuid",
+      "issue",
     );
     expect(outputSuccess).toHaveBeenCalledWith({
       id: "resolved-label-uuid",
@@ -662,5 +690,126 @@ describe("labels validation", () => {
       "Invalid --scope: team scope requires --team",
     );
     expect(resolveLabelId).not.toHaveBeenCalled();
+  });
+});
+
+describe("labels --type project", () => {
+  async function run(...argv: string[]): Promise<void> {
+    await createProgram().parseAsync(["node", "test", "labels", ...argv]);
+  }
+
+  it("creates a project label through the project resolver-free path", async () => {
+    await run("create", "Customer", "--type", "project", "--color", "#0000FF");
+
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(createLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      { name: "Customer", color: "#0000FF" },
+      "project",
+    );
+  });
+
+  it("resolves --parent against the same label kind", async () => {
+    await run("create", "Enterprise", "--type", "project", "--parent", "Tier");
+
+    expect(resolveProjectLabelId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Tier",
+    );
+    expect(resolveLabelId).not.toHaveBeenCalled();
+    expect(createLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      { name: "Enterprise", parentId: "resolved-project-label-uuid" },
+      "project",
+    );
+  });
+
+  it("reads a project label by name", async () => {
+    await run("read", "Customer", "--type", "project");
+
+    expect(resolveProjectLabelId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Customer",
+    );
+    expect(getLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-label-uuid",
+      "project",
+    );
+  });
+
+  it("updates a project label", async () => {
+    await run("update", "Customer", "--type", "project", "--name", "Client");
+
+    expect(updateLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-label-uuid",
+      { name: "Client" },
+      "project",
+    );
+  });
+
+  it("deletes a project label", async () => {
+    await run("delete", "Customer", "--type", "project");
+
+    expect(deleteLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-label-uuid",
+      "project",
+    );
+  });
+
+  it("rejects --team because project labels are workspace-scoped", async () => {
+    await run("delete", "Customer", "--type", "project", "--team", "DBL");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be used with --type project"),
+    );
+    expect(deleteLabel).not.toHaveBeenCalled();
+  });
+
+  it("rejects --scope because project labels are always workspace-scoped", async () => {
+    await run("read", "Customer", "--type", "project", "--scope", "workspace");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be used with --type project"),
+    );
+    expect(getLabel).not.toHaveBeenCalled();
+  });
+});
+
+describe("labels retire and restore", () => {
+  async function run(...argv: string[]): Promise<void> {
+    await createProgram().parseAsync(["node", "test", "labels", ...argv]);
+  }
+
+  it("retires an issue label by default", async () => {
+    await run("retire", "branch:unmerged");
+
+    expect(retireLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+      "issue",
+    );
+  });
+
+  it("retires a project label when asked", async () => {
+    await run("retire", "Customer", "--type", "project");
+
+    expect(retireLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-label-uuid",
+      "project",
+    );
+  });
+
+  it("restores a project label", async () => {
+    await run("restore", "Customer", "--type", "project");
+
+    expect(restoreLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-label-uuid",
+      "project",
+    );
   });
 });
