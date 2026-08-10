@@ -275,6 +275,21 @@ export function setupProjectRelationCommands(projects: Command): void {
             ends.toMilestoneId = null;
           }
 
+          // Before resolving: an empty update otherwise spends two project
+          // lookups and a relation query only to be rejected, and on the UUID
+          // path the caller is told the relation was not found rather than
+          // what they actually left out.
+          if (
+            Object.keys(ends).length === 0 &&
+            !options.fromMilestone &&
+            !options.toMilestone
+          ) {
+            throw invalidParameterError(
+              "update options",
+              "at least one option must be provided",
+            );
+          }
+
           const resolved = await resolveRelation(ctx, relation, options.blocks);
 
           if (options.fromMilestone || options.toMilestone) {
@@ -298,13 +313,6 @@ export function setupProjectRelationCommands(projects: Command): void {
                 relatedProjectId,
               );
             }
-          }
-
-          if (Object.keys(ends).length === 0) {
-            throw invalidParameterError(
-              "update options",
-              "at least one option must be provided",
-            );
           }
 
           outputSuccess(

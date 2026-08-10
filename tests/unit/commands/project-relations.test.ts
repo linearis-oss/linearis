@@ -57,6 +57,7 @@ vi.mock("../../../src/services/project-relation-service.js", async () => {
 import { setupProjectRelationCommands } from "../../../src/commands/projects/relations.js";
 import { resolveMilestoneId } from "../../../src/resolvers/milestone-resolver.js";
 import { resolveProjectRelation } from "../../../src/resolvers/project-relation-resolver.js";
+import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
 import {
   createProjectRelation,
   deleteProjectRelation,
@@ -242,6 +243,16 @@ describe("projects relations", () => {
       expect.stringContaining("at least one option must be provided"),
     );
     expect(updateProjectRelation).not.toHaveBeenCalled();
+  });
+
+  it("update rejects an empty update before resolving the relation", async () => {
+    await run("update", "Upstream", "--blocks", "Downstream");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("at least one option must be provided"),
+    );
+    expect(resolveProjectId).not.toHaveBeenCalled();
+    expect(resolveProjectRelation).not.toHaveBeenCalled();
   });
 
   it("update swaps both ends when the relation is stored inverted", async () => {
