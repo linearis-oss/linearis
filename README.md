@@ -110,7 +110,7 @@ linearis issues reply <root-thread-id> --body "I found the root cause"
 
 ## Coverage
 
-Linear's GraphQL API exposes **537 root operations** (164 queries, 373 mutations). Linearis wires about **75 of them** directly, plus a number of nested reads — chosen to cover planning and issue work end to end rather than the whole API.
+Linear's GraphQL API exposes **537 root operations** (164 queries, 373 mutations). Linearis wires **83 of them** directly, plus a number of nested reads — chosen to cover planning and issue work end to end rather than the whole API.
 
 The table below is the honest picture of the whole surface — what works today, and what you'll need the [Linear MCP](#linearis-vs-linear-mcp) or a raw API call for.
 
@@ -120,12 +120,12 @@ The table below is the honest picture of the whole surface — what works today,
 |---|---|---|---|
 | `auth` | ✅ | Interactive login, token status, logout | — |
 | Discussions | ✅ | Root threads and replies on issues, projects, and initiatives; edit, delete, resolve/unresolve; emoji reactions on any of them | Custom workspace emoji management |
-| `issues` | 🟡 | List, filter, full-text search, read, create, update, archive/unarchive, delete; assign labels/assignee/state/priority/project/cycle; relations (list/add/remove); activity history | Batch create/update, subscribe/unsubscribe, share links, reminders, external sync toggles |
+| `issues` | ✅ | List, filter, full-text search, read, create, update, batch create/update, archive/unarchive, delete/restore, snooze; assign labels/assignee/delegate/state/priority/project/cycle/team (including moves between teams); subscribe/unsubscribe, share/unshare, reminders; find the issue for a git branch (`from-branch`); relations (list/add/remove); activity history | Deliberately excluded: the AI-assist and integration-suggestion queries (Figma file lookup, filter/repository suggestions, title-from-customer-request) — see the Integrations row — and `issuePriorityValues`, a static list already in the help text |
 | `initiatives` | 🟡 | List, read, create, update, archive/unarchive, delete; attach/detach projects; initiative-to-initiative relations; initiative updates (list, read, create, update, archive/unarchive); discussions | Initiative labels, lead-team reassignment, relation reordering |
 | `projects` | 🟡 | List, read, create, update, archive/unarchive, delete; assign project labels by name (`--labels`, `--label-mode`, `--clear-labels`); discussions | Project updates (status posts), project-label CRUD, project relations, project status administration, Slack channel creation |
 | `documents` | 🟡 | List, read, create, update, delete | Content history, document full-text search, unarchive |
 | `milestones` | 🟡 | List, read, create, update (per project) | Delete, reordering/move between projects |
-| `attachments` | 🟡 | List on an issue, create from a URL, delete | Update, and the provider-specific link mutations (GitHub PR/issue, GitLab MR, Slack, Jira, Zendesk, Intercom, Front, Salesforce, Discord) |
+| `attachments` | 🟡 | List on an issue, create from a URL, delete, disable external sync | Update, and the provider-specific link mutations (GitHub PR/issue, GitLab MR, Slack, Jira, Zendesk, Intercom, Front, Salesforce, Discord) |
 | `files` | 🟡 | Upload a file, download via signed URL | Delete uploads, image-from-URL, CSV export reports |
 | `teams` | 🟡 | List, read, create, update; list/add/remove members | Delete, workflow-state administration, triage responsibility, git automation, SLA configuration |
 | `labels` | 🟠 | Issue labels: list, read, create, update, delete; project labels: list (`--type project`) | Project-label create/update/delete, initiative labels, retire/restore |
