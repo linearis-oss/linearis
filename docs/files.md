@@ -22,9 +22,9 @@ Each resolver converts a human-friendly identifier (name, key, or slug) into a U
 - **cycle-resolver.ts** -- `resolveCycleId(client, nameOrId, teamFilter?)`
 - **status-resolver.ts** -- `resolveStatusId(client, nameOrId, teamId?)`
 - **issue-resolver.ts** -- `resolveIssueId(client, issueIdOrIdentifier)`
-- **milestone-resolver.ts** -- `resolveMilestoneId(gqlClient, sdkClient, nameOrId, projectNameOrId?)`
+- **milestone-resolver.ts** -- `resolveMilestoneId(gqlClient, nameOrId, projectNameOrId?)` — a project scope is authoritative, never widened to the workspace
 - **project-status-resolver.ts** -- `resolveProjectStatusId(client, nameOrId, { includeArchived? })`
-- **project-relation-resolver.ts** -- `resolveProjectRelationId(client, relationOrProjectId, relatedProjectId?)` — a relation UUID, or the relation between two projects
+- **project-relation-resolver.ts** -- `resolveProjectRelation(client, relationOrProjectId, relatedProjectId?)` — returns `{ id, inverted }`; `inverted` tells callers writing per-end fields to swap the two ends
 
 ## Service Layer (`src/services/`)
 
