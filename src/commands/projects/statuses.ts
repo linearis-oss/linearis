@@ -1,10 +1,12 @@
 import type { Command } from "commander";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
+import type { UUID } from "../../common/identifier.js";
 import { commandAction, outputSuccess } from "../../common/output.js";
 import type { ProjectStatusType } from "../../gql/graphql.js";
 import { resolveProjectStatusId } from "../../resolvers/project-status-resolver.js";
 import {
+  type ArchivedProjectStatus,
   archiveProjectStatus,
   type CreateProjectStatusInput,
   createProjectStatus,
@@ -69,6 +71,31 @@ function parsePosition(value: string): number {
     throw invalidParameterError("--position", "must be a number");
   }
   return position;
+}
+
+/**
+ * Archives a status whose projects have just been moved elsewhere.
+ *
+ * The reassignment is already committed by the time the archive runs, and
+ * Linear offers no transaction to tie the two together — it will still refuse
+ * to archive, for instance, the last status of a type. Rolling the projects
+ * back would be a second guess at what the caller wanted, so the error says
+ * plainly where they ended up instead of leaving the caller to discover it.
+ */
+async function archiveAfterReassign(
+  ctx: ReturnType<typeof createContext>,
+  statusId: UUID,
+  reassignTo: string,
+): Promise<ArchivedProjectStatus> {
+  try {
+    return await archiveProjectStatus(ctx.gql, statusId);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+
+    throw new Error(
+      `${reason} — projects were already moved to "${reassignTo}" and were not moved back`,
+    );
+  }
 }
 
 export function setupProjectStatusCommands(projects: Command): void {
@@ -251,6 +278,11 @@ export function setupProjectStatusCommands(projects: Command): void {
             }
 
             await reassignProjectStatus(ctx.gql, statusId, newStatusId);
+
+            outputSuccess(
+              await archiveAfterReassign(ctx, statusId, options.reassignTo),
+            );
+            return;
           }
 
           const result = await archiveProjectStatus(ctx.gql, statusId);

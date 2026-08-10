@@ -144,6 +144,30 @@ describe("projects statuses", () => {
     );
   });
 
+  it("archive says where the projects went when it fails after reassigning", async () => {
+    vi.mocked(archiveProjectStatus).mockRejectedValueOnce(
+      new Error("Cannot archive the last status of this type"),
+    );
+
+    await run("statuses", "archive", "Done", "--reassign-to", "In Review");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('In Review\\" and were not moved back'),
+    );
+  });
+
+  it("archive reports a plain failure when nothing was reassigned", async () => {
+    vi.mocked(archiveProjectStatus).mockRejectedValueOnce(
+      new Error("Cannot archive the last status of this type"),
+    );
+
+    await run("statuses", "archive", "Done");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.not.stringContaining("were not moved back"),
+    );
+  });
+
   it("archive refuses to reassign a status onto itself", async () => {
     await run("statuses", "archive", "Done", "--reassign-to", "Done");
 
