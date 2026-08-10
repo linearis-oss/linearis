@@ -218,6 +218,54 @@ describe("listIssues", () => {
     }
   });
 
+  it("keeps updatedAt ordering by default and honours an override", async () => {
+    for (const [options, expected] of [
+      [{ limit: 10 }, "updatedAt"],
+      [{ limit: 10, orderBy: "createdAt" as const }, "createdAt"],
+    ] as const) {
+      const client = mockGqlClient({
+        issues: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+      await listIssues(client, options);
+      expect(client.request).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orderBy: expected }),
+      );
+    }
+  });
+
+  it("still excludes completed issues by default when a filter is given", async () => {
+    // Regression guard: parameterizing orderBy/includeArchived must not drop
+    // the implicit non-completed clause.
+    const client = mockGqlClient({
+      issues: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await listIssues(
+      client,
+      { limit: 10, orderBy: "createdAt", includeArchived: true },
+      { priority: { eq: 1 } },
+    );
+
+    expect(client.request).toHaveBeenCalledWith(
+      FilteredSearchIssuesDocument,
+      expect.objectContaining({
+        filter: {
+          and: [
+            { state: { type: { neq: "completed" } } },
+            { priority: { eq: 1 } },
+          ],
+        },
+      }),
+    );
+  });
+
   it("returns issues from query", async () => {
     const client = mockGqlClient({
       issues: {

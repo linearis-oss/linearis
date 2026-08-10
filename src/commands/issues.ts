@@ -34,7 +34,7 @@ import {
   type PaginationOptions,
 } from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { IssueRelationType } from "../gql/graphql.js";
+import type { IssueRelationType, PaginationOrderBy } from "../gql/graphql.js";
 import {
   type ResolveCreateIssueIdsInput,
   type ResolvedUpdateIssueIds,
@@ -116,6 +116,7 @@ interface FilterOptions extends RawFilterFlags {
   after?: string;
   query?: string;
   includeArchived?: boolean;
+  orderBy?: string;
 }
 
 interface CreateOptions {
@@ -616,11 +617,26 @@ async function resolveAndApplyRelations(
  */
 function buildIssueReadOptions(
   pagination: PaginationOptions,
-  options: Pick<FilterOptions, "includeArchived">,
+  options: Pick<FilterOptions, "includeArchived" | "orderBy">,
 ): IssueReadOptions {
-  return options.includeArchived
-    ? { ...pagination, includeArchived: true }
-    : pagination;
+  return {
+    ...pagination,
+    ...(options.includeArchived ? { includeArchived: true } : {}),
+    ...(options.orderBy ? { orderBy: parseOrderBy(options.orderBy) } : {}),
+  };
+}
+
+/**
+ * Maps the CLI's `created`/`updated` onto Linear's `PaginationOrderBy`.
+ *
+ * The API spells them `createdAt`/`updatedAt`; both spellings are accepted so a
+ * caller who read the field name in a payload is not told they are wrong.
+ */
+function parseOrderBy(value: string): PaginationOrderBy {
+  if (value === "created" || value === "createdAt") return "createdAt";
+  if (value === "updated" || value === "updatedAt") return "updatedAt";
+
+  throw invalidParameterError("--order-by", "must be 'created' or 'updated'");
 }
 
 function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
@@ -652,6 +668,12 @@ function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
     .option("--updated-before <date>", "updated before date (YYYY-MM-DD)")
     .option("--has-blockers", "only issues that are blocked")
     .option("--is-blocking", "only issues that block others")
+    .option("--unassigned", "only issues with no assignee")
+    .option(
+      "--state-type <type>",
+      "filter by state category (triage, backlog, unstarted, started, completed, canceled)",
+    )
+    .option("--subscriber <user>", "filter by subscriber")
     .option("--include-archived", "include archived issues in the results");
 }
 
@@ -733,10 +755,20 @@ export function setupIssuesCommands(program: Command): void {
       .command("list")
       .description("list issues with optional filters")
       .option("--query <query>", "deprecated: use `issues search <query>`")
+      .option("--order-by <field>", "created | updated (default: updated)")
       .option("-l, --limit <n>", "max results", "50")
       .option("--after <cursor>", "cursor for next page"),
   ).action(
     commandAction<[FilterOptions, Command]>(async (options, command) => {
+      // Full-text results come back relevance-ordered from the API, so
+      // --order-by has nothing to act on down that path.
+      if (options.orderBy && options.query) {
+        throw invalidParameterError(
+          "--order-by",
+          "cannot be combined with --query, whose results are relevance-ordered",
+        );
+      }
+
       const ctx = createContext(getRootOpts(command));
 
       const readOptions = buildIssueReadOptions(

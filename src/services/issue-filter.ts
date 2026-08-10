@@ -63,6 +63,17 @@ export function buildIssueFilter(
   if (options.updatedBefore) {
     fragments.push({ updatedAt: { lt: options.updatedBefore } });
   }
+  if (options.unassigned) {
+    fragments.push({ assignee: { null: true } });
+  }
+  if (options.stateType) {
+    fragments.push({ state: { type: { eq: options.stateType } } });
+  }
+  if (options.subscriberId) {
+    fragments.push({
+      subscribers: { some: { id: { eq: options.subscriberId } } },
+    });
+  }
   if (options.hasBlockers !== undefined) {
     fragments.push({ hasBlockedByRelations: { eq: options.hasBlockers } });
   }

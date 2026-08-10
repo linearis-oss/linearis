@@ -38,6 +38,7 @@ import {
   type IssueFilter,
   type IssueUpdateInput,
   IssueVcsBranchSearchDocument,
+  type PaginationOrderBy,
   RemindOnIssueDocument,
   SearchIssuesDocument,
   type SearchIssuesQuery,
@@ -166,6 +167,8 @@ export type UpdateIssueInput = BrandUuidFields<
  */
 export interface IssueReadOptions extends PaginationOptions {
   includeArchived?: boolean;
+  /** Defaults to `updatedAt` — most-recently-touched first. */
+  orderBy?: PaginationOrderBy;
 }
 
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
@@ -308,14 +311,19 @@ export async function listIssues(
   options: IssueReadOptions = {},
   filter?: IssueFilter,
 ): Promise<PaginatedResult<IssueListItem>> {
-  const { limit = 25, after, includeArchived = false } = options;
+  const {
+    limit = 25,
+    after,
+    includeArchived = false,
+    orderBy = "updatedAt",
+  } = options;
 
   if (filter) {
     const result = await client.request(FilteredSearchIssuesDocument, {
       first: limit,
       after,
       filter: buildListIssuesFilter(filter),
-      orderBy: "updatedAt",
+      orderBy,
       includeArchived,
     });
     return {
@@ -327,7 +335,7 @@ export async function listIssues(
   const result = await client.request(GetIssuesDocument, {
     first: limit,
     after,
-    orderBy: "updatedAt",
+    orderBy,
     includeArchived,
   });
   return {

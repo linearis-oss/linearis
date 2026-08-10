@@ -1,11 +1,13 @@
 import { resolveSearchFilterIds } from "../resolvers/issue-filter-resolver.js";
 import { resolveMilestoneId } from "../resolvers/milestone-resolver.js";
+import { resolveUserId } from "../resolvers/user-resolver.js";
 import type { CommandContext } from "./context.js";
 import { invalidParameterError } from "./errors.js";
 import { parseDueDate } from "./identifier.js";
 import {
   type IssueFilterOptions,
   parseCommaSeparated,
+  parseWorkflowStateType,
   type RawFilterFlags,
   validateDateRange,
   validateEstimate,
@@ -82,8 +84,21 @@ export async function resolveFilterOptions(
     validateEstimate(parsedEstimate);
   }
 
+  const parsedStateType = opts.stateType
+    ? parseWorkflowStateType(opts.stateType)
+    : undefined;
+
   // 2. Dependency validation
   validateFilterDependencies(opts);
+
+  // --unassigned and --assignee describe the same field in contradictory ways;
+  // combining them would silently produce a filter that matches nothing.
+  if (opts.unassigned && opts.assignee) {
+    throw invalidParameterError(
+      "--unassigned",
+      "cannot be combined with --assignee",
+    );
+  }
 
   // 3. Date range validation
   validateDateRange(opts.dueAfter, opts.dueBefore, "due date");
@@ -122,9 +137,12 @@ export async function resolveFilterOptions(
       )
     : {};
 
-  const milestoneId = opts.milestone
-    ? await resolveMilestoneId(ctx.gql, opts.milestone, opts.project)
-    : undefined;
+  const [milestoneId, subscriberId] = await Promise.all([
+    opts.milestone
+      ? resolveMilestoneId(ctx.gql, opts.milestone, opts.project)
+      : undefined,
+    opts.subscriber ? resolveUserId(ctx.gql, opts.subscriber) : undefined,
+  ]);
 
   const resolved: IssueFilterOptions = omitUndefined({
     ...batchResolved,
@@ -141,6 +159,9 @@ export async function resolveFilterOptions(
     updatedBefore: opts.updatedBefore,
     hasBlockers: opts.hasBlockers,
     isBlocking: opts.isBlocking,
+    unassigned: opts.unassigned,
+    stateType: parsedStateType,
+    subscriberId,
   });
 
   return resolved;
