@@ -58,7 +58,9 @@ interface UpdateLabelOptions extends LabelLookupOptions {
   color?: string;
   description?: string;
   parent?: string;
+  clearParent?: boolean;
   group?: boolean;
+  notGroup?: boolean;
 }
 
 function parseLabelType(value?: string): LabelType {
@@ -188,9 +190,32 @@ async function resolveLabelLookup(
   return { ctx, labelId, type };
 }
 
+/**
+ * Both label update inputs take `null` for `parentId` and `isGroup`, so every
+ * setter here has an inverse: without one a label could be moved into a group
+ * or turned into a group but never taken back out.
+ */
+function rejectContradictoryLabelFlags(options: UpdateLabelOptions): void {
+  if (options.parent && options.clearParent) {
+    throw invalidParameterError(
+      "--parent",
+      "cannot be combined with --clear-parent",
+    );
+  }
+
+  if (options.group && options.notGroup) {
+    throw invalidParameterError(
+      "--group",
+      "cannot be combined with --not-group",
+    );
+  }
+}
+
 function buildUpdateInput(options: UpdateLabelOptions): UpdateLabelInput {
   const input: UpdateLabelInput = {};
   const color = parseLabelColor(options.color);
+
+  rejectContradictoryLabelFlags(options);
 
   if (options.name) {
     input.name = options.name;
@@ -204,8 +229,14 @@ function buildUpdateInput(options: UpdateLabelOptions): UpdateLabelInput {
     input.description = options.description;
   }
 
+  if (options.clearParent) {
+    input.parentId = null;
+  }
+
   if (options.group) {
     input.isGroup = true;
+  } else if (options.notGroup) {
+    input.isGroup = false;
   }
 
   if (Object.keys(input).length === 0 && options.parent === undefined) {
@@ -232,7 +263,9 @@ export const LABELS_META: DomainMeta = {
     "restore undoes it.",
     "",
     "a label group (--group) contains child labels (--parent <group>); a",
-    "group is not itself applicable to issues or projects.",
+    "group is not itself applicable to issues or projects. update",
+    "--clear-parent lifts a label out of its group and --not-group turns a",
+    "group back into a plain label.",
     "",
     "use issues/projects create/update --labels plus update --label-mode",
     "remove or --clear-labels to apply or remove labels.",
@@ -394,7 +427,9 @@ export function setupLabelsCommands(program: Command): void {
     .option("--color <hex>", "new label color as a hex code")
     .option("--description <text>", "new label description")
     .option("--parent <label>", "move the label into this label group")
+    .option("--clear-parent", "move the label out of its label group")
     .option("--group", "turn the label into a label group")
+    .option("--not-group", "turn the label group back into a plain label")
     .action(
       handleCommand(async (...args: unknown[]) => {
         const [label, options, command] = args as [

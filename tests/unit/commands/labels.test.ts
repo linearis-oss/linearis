@@ -415,6 +415,85 @@ describe("labels update", () => {
       "issue",
     );
   });
+
+  it("lifts a label out of its group with --clear-parent", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:merged",
+      "--clear-parent",
+    ]);
+
+    expect(updateLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+      { parentId: null },
+      "issue",
+    );
+  });
+
+  it("turns a group back into a plain label with --not-group", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch",
+      "--not-group",
+    ]);
+
+    expect(updateLabel).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-label-uuid",
+      { isGroup: false },
+      "issue",
+    );
+  });
+
+  it("refuses --parent together with --clear-parent", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:merged",
+      "--parent",
+      "branch",
+      "--clear-parent",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be combined with --clear-parent"),
+    );
+    expect(updateLabel).not.toHaveBeenCalled();
+  });
+
+  it("refuses --group together with --not-group", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch",
+      "--group",
+      "--not-group",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("cannot be combined with --not-group"),
+    );
+    expect(updateLabel).not.toHaveBeenCalled();
+  });
 });
 
 describe("labels delete", () => {
