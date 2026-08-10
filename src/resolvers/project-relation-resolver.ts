@@ -3,6 +3,17 @@ import { notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import { GetProjectRelationsDocument } from "../gql/graphql.js";
 
+/** A resolved relation, plus which way round it is stored. */
+export interface ResolvedProjectRelation {
+  id: UUID;
+  /**
+   * True when the relation was found through `inverseRelations`, i.e. the
+   * project named first is the relation's `relatedProject` and the second is
+   * its `project`. Callers that write per-end fields must swap the two ends.
+   */
+  inverted: boolean;
+}
+
 /**
  * Resolves a project relation to its UUID.
  *
@@ -17,17 +28,20 @@ import { GetProjectRelationsDocument } from "../gql/graphql.js";
  * view is the pair of connections hanging off `Project`. This resolver
  * therefore reads the same `GetProjectRelations` document the service uses.
  * Both directions are searched because "the relation between A and B" is one
- * relation regardless of which project declared it.
+ * relation regardless of which project declared it — but the direction that
+ * matched is reported back, because the relation's own fields (`anchorType`,
+ * `projectMilestoneId`) are anchored to its `project`, not to whichever
+ * endpoint the caller happened to type first.
  *
  * @throws Error if no relation links the two projects
  */
-export async function resolveProjectRelationId(
+export async function resolveProjectRelation(
   client: GraphQLClient,
   relationOrProjectId: string,
   relatedProjectId?: UUID,
-): Promise<UUID> {
+): Promise<ResolvedProjectRelation> {
   if (isUuid(relationOrProjectId) && relatedProjectId === undefined) {
-    return asUuid(relationOrProjectId);
+    return { id: asUuid(relationOrProjectId), inverted: false };
   }
 
   if (relatedProjectId === undefined) {
@@ -46,12 +60,12 @@ export async function resolveProjectRelationId(
   const forward = result.project.relations.nodes.find(
     (relation) => relation.relatedProject.id === relatedProjectId,
   );
-  if (forward) return asUuid(forward.id);
+  if (forward) return { id: asUuid(forward.id), inverted: false };
 
   const inverse = result.project.inverseRelations.nodes.find(
     (relation) => relation.project.id === relatedProjectId,
   );
-  if (inverse) return asUuid(inverse.id);
+  if (inverse) return { id: asUuid(inverse.id), inverted: true };
 
   throw notFoundError(
     "Project relation",

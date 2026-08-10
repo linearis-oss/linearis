@@ -9,7 +9,7 @@ import {
 } from "../../common/output.js";
 import { buildPaginationOptions } from "../../common/types.js";
 import { resolveMilestoneId } from "../../resolvers/milestone-resolver.js";
-import { resolveProjectRelationId } from "../../resolvers/project-relation-resolver.js";
+import { resolveProjectRelation } from "../../resolvers/project-relation-resolver.js";
 import { resolveProjectId } from "../../resolvers/project-resolver.js";
 import {
   type CreateProjectRelationInput,
@@ -140,8 +140,8 @@ export function setupProjectRelationCommands(projects: Command): void {
       commandAction<[string, unknown, Command]>(
         async (relation, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const relationId = await resolveProjectRelationId(ctx.gql, relation);
-          outputSuccess(await getProjectRelation(ctx.gql, relationId));
+          const { id } = await resolveProjectRelation(ctx.gql, relation);
+          outputSuccess(await getProjectRelation(ctx.gql, id));
         },
       ),
     );
@@ -224,29 +224,29 @@ export function setupProjectRelationCommands(projects: Command): void {
 
           rejectContradictoryMilestoneFlags(options);
 
-          const input: UpdateProjectRelationInput = {};
+          const ends: RelationEnds = {};
 
           if (options.from !== undefined) {
-            input.anchorType = parseAnchor("--from", options.from);
+            ends.from = parseAnchor("--from", options.from);
           }
 
           if (options.to !== undefined) {
-            input.relatedAnchorType = parseAnchor("--to", options.to);
+            ends.to = parseAnchor("--to", options.to);
           }
 
           if (options.clearFromMilestone) {
-            input.projectMilestoneId = null;
+            ends.fromMilestoneId = null;
           }
 
           if (options.clearToMilestone) {
-            input.relatedProjectMilestoneId = null;
+            ends.toMilestoneId = null;
           }
 
-          const { relationId, projectId, relatedProjectId } =
+          const { relationId, inverted, projectId, relatedProjectId } =
             await resolveRelation(ctx, relation, options.blocks);
 
           if (options.fromMilestone) {
-            input.projectMilestoneId = await resolveMilestoneId(
+            ends.fromMilestoneId = await resolveMilestoneId(
               ctx.gql,
               options.fromMilestone,
               projectId,
@@ -254,14 +254,14 @@ export function setupProjectRelationCommands(projects: Command): void {
           }
 
           if (options.toMilestone) {
-            input.relatedProjectMilestoneId = await resolveMilestoneId(
+            ends.toMilestoneId = await resolveMilestoneId(
               ctx.gql,
               options.toMilestone,
               relatedProjectId,
             );
           }
 
-          if (Object.keys(input).length === 0) {
+          if (Object.keys(ends).length === 0) {
             throw invalidParameterError(
               "update options",
               "at least one option must be provided",
@@ -269,7 +269,11 @@ export function setupProjectRelationCommands(projects: Command): void {
           }
 
           outputSuccess(
-            await updateProjectRelation(ctx.gql, relationId, input),
+            await updateProjectRelation(
+              ctx.gql,
+              relationId,
+              orientToRelation(ends, inverted),
+            ),
           );
         },
       ),
@@ -298,6 +302,48 @@ export function setupProjectRelationCommands(projects: Command): void {
 }
 
 /**
+ * The two ends of a relation as the caller named them: `from` is the project
+ * given as the argument, `to` is the one given as `--blocks`.
+ */
+interface RelationEnds {
+  from?: ProjectRelationAnchor;
+  to?: ProjectRelationAnchor;
+  fromMilestoneId?: UUID | null;
+  toMilestoneId?: UUID | null;
+}
+
+/**
+ * Turn caller-oriented ends into the mutation's relation-oriented fields.
+ *
+ * `anchorType`/`projectMilestoneId` belong to the relation's own `project`,
+ * which is not necessarily the project the caller named first: a relation
+ * found through `inverseRelations` is stored the other way round. Writing the
+ * flags through unswapped would silently re-anchor the wrong project.
+ */
+function orientToRelation(
+  ends: RelationEnds,
+  inverted: boolean,
+): UpdateProjectRelationInput {
+  const [ownAnchor, farAnchor] = inverted
+    ? [ends.to, ends.from]
+    : [ends.from, ends.to];
+  const [ownMilestoneId, farMilestoneId] = inverted
+    ? [ends.toMilestoneId, ends.fromMilestoneId]
+    : [ends.fromMilestoneId, ends.toMilestoneId];
+
+  const input: UpdateProjectRelationInput = {};
+
+  if (ownAnchor !== undefined) input.anchorType = ownAnchor;
+  if (farAnchor !== undefined) input.relatedAnchorType = farAnchor;
+  if (ownMilestoneId !== undefined) input.projectMilestoneId = ownMilestoneId;
+  if (farMilestoneId !== undefined) {
+    input.relatedProjectMilestoneId = farMilestoneId;
+  }
+
+  return input;
+}
+
+/**
  * Accepts either a relation UUID or a project pair.
  *
  * Relation IDs appear nowhere but `relations list`, so requiring one would
@@ -305,8 +351,10 @@ export function setupProjectRelationCommands(projects: Command): void {
  * relation the same way they created it.
  *
  * The milestone flags read better when scoped to the right project, so the
- * endpoint IDs come back too. On the UUID path they are undefined, and
- * `resolveMilestoneId` falls back to a workspace-wide milestone lookup.
+ * endpoint IDs come back too, alongside `inverted` — the relation may be
+ * stored with the endpoints the other way round. On the UUID path the IDs are
+ * undefined and `resolveMilestoneId` falls back to a workspace-wide lookup;
+ * there is nothing to invert, since the caller addressed the relation itself.
  */
 async function resolveRelation(
   ctx: ReturnType<typeof createContext>,
@@ -314,11 +362,13 @@ async function resolveRelation(
   blocks: string | undefined,
 ): Promise<{
   relationId: UUID;
+  inverted: boolean;
   projectId?: UUID;
   relatedProjectId?: UUID;
 }> {
   if (blocks === undefined) {
-    return { relationId: await resolveProjectRelationId(ctx.gql, relation) };
+    const resolved = await resolveProjectRelation(ctx.gql, relation);
+    return { relationId: resolved.id, inverted: resolved.inverted };
   }
 
   const [projectId, relatedProjectId] = await Promise.all([
@@ -326,12 +376,15 @@ async function resolveRelation(
     resolveProjectId(ctx.gql, blocks),
   ]);
 
+  const resolved = await resolveProjectRelation(
+    ctx.gql,
+    projectId,
+    relatedProjectId,
+  );
+
   return {
-    relationId: await resolveProjectRelationId(
-      ctx.gql,
-      projectId,
-      relatedProjectId,
-    ),
+    relationId: resolved.id,
+    inverted: resolved.inverted,
     projectId,
     relatedProjectId,
   };

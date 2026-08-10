@@ -22,7 +22,9 @@ vi.mock("../../../src/resolvers/project-resolver.js", () => ({
 }));
 
 vi.mock("../../../src/resolvers/project-relation-resolver.js", () => ({
-  resolveProjectRelationId: vi.fn().mockResolvedValue("relation-uuid"),
+  resolveProjectRelation: vi
+    .fn()
+    .mockResolvedValue({ id: "relation-uuid", inverted: false }),
 }));
 
 vi.mock("../../../src/resolvers/milestone-resolver.js", () => ({
@@ -50,7 +52,7 @@ vi.mock("../../../src/services/project-relation-service.js", async () => {
 
 import { setupProjectRelationCommands } from "../../../src/commands/projects/relations.js";
 import { resolveMilestoneId } from "../../../src/resolvers/milestone-resolver.js";
-import { resolveProjectRelationId } from "../../../src/resolvers/project-relation-resolver.js";
+import { resolveProjectRelation } from "../../../src/resolvers/project-relation-resolver.js";
 import {
   createProjectRelation,
   deleteProjectRelation,
@@ -211,10 +213,41 @@ describe("projects relations", () => {
     expect(updateProjectRelation).not.toHaveBeenCalled();
   });
 
+  it("update swaps both ends when the relation is stored inverted", async () => {
+    vi.mocked(resolveProjectRelation).mockResolvedValueOnce({
+      id: "relation-uuid",
+      inverted: true,
+    });
+
+    await run(
+      "update",
+      "Downstream",
+      "--blocks",
+      "Upstream",
+      "--from",
+      "start",
+      "--to-milestone",
+      "Kickoff",
+    );
+
+    // The caller named Downstream first, but the relation belongs to Upstream:
+    // Downstream's anchor is the relation's *related* end.
+    expect(resolveMilestoneId).toHaveBeenCalledWith(
+      expect.anything(),
+      "Kickoff",
+      "project-uuid-1",
+    );
+    expect(updateProjectRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      "relation-uuid",
+      { relatedAnchorType: "start", projectMilestoneId: "milestone-uuid" },
+    );
+  });
+
   it("remove takes a relation UUID directly", async () => {
     await run("remove", "relation-uuid");
 
-    expect(resolveProjectRelationId).toHaveBeenCalledWith(
+    expect(resolveProjectRelation).toHaveBeenCalledWith(
       expect.anything(),
       "relation-uuid",
     );
@@ -227,7 +260,7 @@ describe("projects relations", () => {
   it("remove finds the relation from a project pair", async () => {
     await run("remove", "Upstream", "--blocks", "Downstream");
 
-    expect(resolveProjectRelationId).toHaveBeenCalledWith(
+    expect(resolveProjectRelation).toHaveBeenCalledWith(
       expect.anything(),
       "project-uuid-1",
       "project-uuid-2",
