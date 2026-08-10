@@ -11,7 +11,6 @@ import {
   GetInitiativeUpdateDocument,
   type GetInitiativeUpdateQuery,
   type InitiativeUpdateCreateInput,
-  type InitiativeUpdateHealthType,
   type InitiativeUpdateUpdateInput,
   ListInitiativeUpdatesDocument,
   type ListInitiativeUpdatesQuery,
@@ -56,22 +55,6 @@ export type UpdateInitiativeUpdateInput = Pick<
   InitiativeUpdateUpdateInput,
   "body" | "health"
 >;
-
-export function parseHealth(
-  value?: string,
-): InitiativeUpdateHealthType | undefined {
-  if (!value) return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "ontrack") return "onTrack";
-  if (normalized === "atrisk") return "atRisk";
-  if (normalized === "offtrack") return "offTrack";
-
-  throw invalidParameterError(
-    "--health",
-    'must be one of: "onTrack", "atRisk", "offTrack"',
-  );
-}
 
 export async function listInitiativeUpdates(
   client: GraphQLClient,

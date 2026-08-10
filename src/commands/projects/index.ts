@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { type DomainMeta, formatDomainUsage } from "../../common/usage.js";
 import { setupProjectEntityCommands } from "./entity.js";
+import { setupProjectUpdateCommands } from "./updates.js";
 
 export const PROJECTS_META: DomainMeta = {
   name: "projects",
@@ -14,9 +15,13 @@ export const PROJECTS_META: DomainMeta = {
     "",
     "projects have one put-away state, not two: `delete` trashes a project",
     "and `unarchive` restores it. there is no `archive` verb.",
+    "",
+    "a project's health is derived from its most recent status update, so",
+    "changing health means posting one with `projects updates create`.",
   ].join("\n"),
   arguments: {
     project: "project identifier (UUID or name)",
+    update: "project status update identifier (UUID)",
     name: "string",
   },
   seeAlso: [
@@ -32,6 +37,7 @@ export function setupProjectsCommands(program: Command): void {
     .description("Project operations");
 
   setupProjectEntityCommands(projects);
+  setupProjectUpdateCommands(projects);
 
   projects
     .command("usage")

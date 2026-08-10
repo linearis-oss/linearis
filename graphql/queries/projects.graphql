@@ -110,6 +110,15 @@ fragment ProjectDetailFields on Project {
       hasNextPage
     }
   }
+  # The project's `health` is derived from its latest status update, so the
+  # read that reports the health also reports where it came from.
+  healthUpdatedAt
+  lastUpdate {
+    id
+    health
+    body
+    createdAt
+  }
 }
 
 fragment ProjectDetailWithDefaultConnectionsFields on Project {

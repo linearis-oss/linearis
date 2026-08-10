@@ -30,3 +30,30 @@ export function parseSetMode(
 export function parseLabelMode(value: string | undefined): SetMode | undefined {
   return parseSetMode("--label-mode", value);
 }
+
+/**
+ * Health of a status update.
+ *
+ * Linear declares this twice — `InitiativeUpdateHealthType` and
+ * `ProjectUpdateHealthType` — with identical members, so one union serves
+ * both codegen enums.
+ */
+export type UpdateHealth = "onTrack" | "atRisk" | "offTrack";
+
+/**
+ * Parses `--health` case-insensitively, because the API spelling is
+ * camelCase and nobody types `atRisk` on a shell prompt reliably.
+ */
+export function parseHealth(value?: string): UpdateHealth | undefined {
+  if (!value) return undefined;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "ontrack") return "onTrack";
+  if (normalized === "atrisk") return "atRisk";
+  if (normalized === "offtrack") return "offTrack";
+
+  throw invalidParameterError(
+    "--health",
+    'must be one of: "onTrack", "atRisk", "offTrack"',
+  );
+}

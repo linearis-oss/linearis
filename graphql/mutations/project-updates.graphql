@@ -1,0 +1,52 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear project status updates
+#
+# `projectUpdateDelete` is deliberately not wired: Linear deprecates it
+# in favour of `projectUpdateArchive`, which is reversible.
+# ------------------------------------------------------------
+
+mutation CreateProjectUpdate($input: ProjectUpdateCreateInput!) {
+  projectUpdateCreate(input: $input) {
+    success
+    projectUpdate {
+      ...ProjectUpdateCoreFields
+    }
+  }
+}
+
+mutation EditProjectUpdate($id: String!, $input: ProjectUpdateUpdateInput!) {
+  projectUpdateUpdate(id: $id, input: $input) {
+    success
+    projectUpdate {
+      ...ProjectUpdateCoreFields
+    }
+  }
+}
+
+mutation ArchiveProjectUpdate($id: String!) {
+  projectUpdateArchive(id: $id) {
+    success
+    entity {
+      ...ProjectUpdateCoreFields
+    }
+  }
+}
+
+mutation UnarchiveProjectUpdate($id: String!) {
+  projectUpdateUnarchive(id: $id) {
+    success
+    entity {
+      ...ProjectUpdateCoreFields
+    }
+  }
+}
+
+# Nudge someone to post the next update
+#
+# The payload carries no entity — there is nothing to return but whether
+# the notification was created.
+mutation CreateProjectUpdateReminder($projectId: String!, $userId: String) {
+  createProjectUpdateReminder(projectId: $projectId, userId: $userId) {
+    success
+  }
+}
