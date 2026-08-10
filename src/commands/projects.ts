@@ -32,7 +32,6 @@ import {
   unresolveDiscussion,
 } from "../services/discussion-service.js";
 import {
-  archiveProject,
   type CreateProjectInput,
   createProject,
   deleteProject,
@@ -183,6 +182,9 @@ export const PROJECTS_META: DomainMeta = {
     "have a status (backlog, planned, started, paused, completed,",
     "canceled), priority (0-4), health (onTrack, atRisk, offTrack),",
     "and can be assigned labels, a lead, and members.",
+    "",
+    "projects have one put-away state, not two: `delete` trashes a project",
+    "and `unarchive` restores it. there is no `archive` verb.",
   ].join("\n"),
   arguments: {
     project: "project identifier (UUID or name)",
@@ -838,22 +840,8 @@ export function setupProjectsCommands(program: Command): void {
     );
 
   projects
-    .command("archive <project>")
-    .description("archive a project")
-    .action(
-      commandAction<[string, unknown, Command]>(
-        async (project, _unused1, command) => {
-          const ctx = createContext(getRootOpts(command));
-          const projectId = await resolveProjectId(ctx.gql, project);
-          const result = await archiveProject(ctx.gql, projectId);
-          outputSuccess(result);
-        },
-      ),
-    );
-
-  projects
     .command("unarchive <project>")
-    .description("unarchive a project")
+    .description("restore a project from the trash")
     .action(
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {
@@ -869,7 +857,7 @@ export function setupProjectsCommands(program: Command): void {
 
   projects
     .command("delete <project>")
-    .description("delete a project")
+    .description("move a project to the trash (restore with unarchive)")
     .action(
       commandAction<[string, unknown, Command]>(
         async (project, _unused1, command) => {

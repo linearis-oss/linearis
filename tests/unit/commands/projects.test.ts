@@ -35,7 +35,6 @@ vi.mock("../../../src/resolvers/user-resolver.js", () => ({
 }));
 
 vi.mock("../../../src/services/project-service.js", () => ({
-  archiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Archived" }),
   listProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
   getProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
   getProjectLabelIds: vi.fn().mockResolvedValue([]),
@@ -136,7 +135,6 @@ import {
   unresolveDiscussion,
 } from "../../../src/services/discussion-service.js";
 import {
-  archiveProject,
   createProject,
   deleteProject,
   getProject,
@@ -259,28 +257,11 @@ describe("projects lifecycle", () => {
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   });
 
-  it("archive resolves project and outputs result", async () => {
+  it("does not register an archive command", () => {
     const program = createProgram();
-    await program.parseAsync([
-      "node",
-      "test",
-      "projects",
-      "archive",
-      "My Project",
-    ]);
+    const projects = program.commands.find((c) => c.name() === "projects");
 
-    expect(resolveProjectId).toHaveBeenCalledWith(
-      expect.anything(),
-      "My Project",
-    );
-    expect(archiveProject).toHaveBeenCalledWith(
-      expect.anything(),
-      "resolved-project-uuid",
-    );
-    expect(outputSuccess).toHaveBeenCalledWith({
-      id: "proj-1",
-      name: "Archived",
-    });
+    expect(projects?.commands.map((c) => c.name())).not.toContain("archive");
   });
 
   it("unarchive resolves project and outputs result", async () => {

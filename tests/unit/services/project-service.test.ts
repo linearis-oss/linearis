@@ -5,14 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
-  ArchiveProjectDocument,
   GetProjectDocument,
   GetProjectLabelIdsDocument,
   GetProjectWithReactionsDocument,
   UpdateProjectDocument,
 } from "../../../src/gql/graphql.js";
 import {
-  archiveProject,
   createProject,
   deleteProject,
   getProject,
@@ -594,36 +592,6 @@ describe("updateProject", () => {
     await expect(
       updateProject(client, asUuid("proj-1"), { name: "Fail" }),
     ).rejects.toThrow('Failed to update project "proj-1"');
-  });
-});
-
-describe("archiveProject", () => {
-  it("returns archived project on success", async () => {
-    const client = mockGqlClient({
-      projectArchive: {
-        success: true,
-        entity: { id: "proj-1", name: "Archived Project" },
-      },
-    });
-
-    await expect(archiveProject(client, asUuid("proj-1"))).resolves.toEqual({
-      id: "proj-1",
-      name: "Archived Project",
-    });
-
-    expect(client.request).toHaveBeenCalledWith(ArchiveProjectDocument, {
-      id: "proj-1",
-    });
-  });
-
-  it("throws on failure", async () => {
-    const client = mockGqlClient({
-      projectArchive: { success: false, entity: null },
-    });
-
-    await expect(archiveProject(client, asUuid("proj-1"))).rejects.toThrow(
-      'Failed to archive project "proj-1"',
-    );
   });
 });
 

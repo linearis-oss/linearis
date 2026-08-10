@@ -10,8 +10,6 @@ import {
 } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
-  ArchiveProjectDocument,
-  type ArchiveProjectMutation,
   CreateProjectDocument,
   type CreateProjectMutation,
   DeleteProjectDocument,
@@ -36,9 +34,6 @@ export type CreatedProject = NonNullable<
 >;
 export type UpdatedProject = NonNullable<
   UpdateProjectMutation["projectUpdate"]["project"]
->;
-export type ArchivedProject = NonNullable<
-  ArchiveProjectMutation["projectArchive"]["entity"]
 >;
 export type UnarchivedProject = NonNullable<
   UnarchiveProjectMutation["projectUnarchive"]["entity"]
@@ -205,19 +200,12 @@ export async function updateProject(
   );
 }
 
-export async function archiveProject(
-  client: GraphQLClient,
-  id: UUID,
-): Promise<ArchivedProject> {
-  const result = await client.request(ArchiveProjectDocument, { id });
-
-  return requireMutationEntity(
-    result.projectArchive,
-    "entity",
-    `Failed to archive project "${id}"`,
-  );
-}
-
+/**
+ * Restores a project from the trash.
+ *
+ * Linear has one put-away state for projects, so this is the inverse of
+ * {@link deleteProject} — there is no separate archived state to restore from.
+ */
 export async function unarchiveProject(
   client: GraphQLClient,
   id: UUID,
@@ -231,6 +219,9 @@ export async function unarchiveProject(
   );
 }
 
+/**
+ * Trashes a project. Reversible via {@link unarchiveProject}.
+ */
 export async function deleteProject(
   client: GraphQLClient,
   id: UUID,

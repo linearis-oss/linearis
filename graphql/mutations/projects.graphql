@@ -30,15 +30,10 @@ mutation UpdateProject($id: String!, $input: ProjectUpdateInput!) {
   }
 }
 
-mutation ArchiveProject($id: String!) {
-  projectArchive(id: $id) {
-    success
-    entity {
-      ...ProjectDetailWithDefaultConnectionsFields
-    }
-  }
-}
-
+# Restore a trashed project
+#
+# Linear collapses "archived" and "trashed" into a single state, so this
+# restores whatever projectDelete put away.
 mutation UnarchiveProject($id: String!) {
   projectUnarchive(id: $id) {
     success
@@ -48,6 +43,9 @@ mutation UnarchiveProject($id: String!) {
   }
 }
 
+# Trash a project
+#
+# Reversible: UnarchiveProject restores it.
 mutation DeleteProject($id: String!) {
   projectDelete(id: $id) {
     success
