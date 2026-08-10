@@ -1,4 +1,9 @@
-import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
+import {
+  type DocumentNode,
+  type FragmentDefinitionNode,
+  Kind,
+  print,
+} from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
@@ -6,6 +11,7 @@ import {
   ArchiveIssueDocument,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
+  FindIssuesDocument,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   GetIssueByIdentifierWithAttachmentsDocument,
@@ -105,7 +111,51 @@ describe("attachment issue read documents", () => {
   });
 });
 
+describe("archived issue reachability", () => {
+  it("resolves identifiers against archived issues too", () => {
+    // resolveIssueId / the identifier read path go through these documents; if
+    // they stop including archived issues, `issues unarchive ENG-42` breaks.
+    const documents = [
+      FindIssuesDocument,
+      GetIssueByIdentifierDocument,
+      GetIssueByIdentifierWithCommentsDocument,
+      GetIssueByIdentifierWithReactionsDocument,
+      GetIssueByIdentifierWithAttachmentsDocument,
+    ];
+
+    for (const document of documents) {
+      expect(print(document)).toContain("includeArchived: true");
+    }
+  });
+
+  it("keeps list and search opt-in rather than always-archived", () => {
+    for (const document of [
+      GetIssuesDocument,
+      FilteredSearchIssuesDocument,
+      SearchIssuesDocument,
+    ]) {
+      expect(print(document)).toContain("$includeArchived: Boolean = false");
+    }
+  });
+});
+
 describe("listIssues", () => {
+  it("forwards includeArchived on both the filtered and unfiltered paths", async () => {
+    for (const filter of [undefined, { priority: { eq: 1 } }]) {
+      const client = mockGqlClient({
+        issues: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+      await listIssues(client, { limit: 10, includeArchived: true }, filter);
+      expect(client.request).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ includeArchived: true }),
+      );
+    }
+  });
+
   it("returns issues from query", async () => {
     const client = mockGqlClient({
       issues: {
@@ -146,6 +196,7 @@ describe("listIssues", () => {
       first: 25,
       after: undefined,
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -161,6 +212,7 @@ describe("listIssues", () => {
       first: 5,
       after: "cursor1",
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -198,6 +250,7 @@ describe("listIssues", () => {
         ],
       },
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -222,6 +275,7 @@ describe("listIssues", () => {
       after: undefined,
       filter,
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -237,6 +291,7 @@ describe("listIssues", () => {
       first: 25,
       after: undefined,
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 });
@@ -786,6 +841,7 @@ describe("searchIssues", () => {
       term: "query",
       first: 5,
       after: "prevCursor",
+      includeArchived: false,
     });
   });
 
@@ -803,6 +859,7 @@ describe("searchIssues", () => {
       term: "bug",
       first: 10,
       after: undefined,
+      includeArchived: false,
       filter,
     });
   });
@@ -819,6 +876,7 @@ describe("searchIssues", () => {
       term: "test",
       first: 25,
       after: undefined,
+      includeArchived: false,
     });
   });
 });

@@ -131,6 +131,15 @@ export type UpdateIssueInput = BrandUuidFields<
   | "cycleId"
 >;
 
+/**
+ * Pagination plus the read-scope knobs shared by `listIssues` and
+ * `searchIssues`. Archived issues are excluded unless asked for, matching the
+ * Linear API default and the historical CLI behavior.
+ */
+export interface IssueReadOptions extends PaginationOptions {
+  includeArchived?: boolean;
+}
+
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
 };
@@ -268,10 +277,10 @@ function normalizeIssueReactions<
 
 export async function listIssues(
   client: GraphQLClient,
-  options: PaginationOptions = {},
+  options: IssueReadOptions = {},
   filter?: IssueFilter,
 ): Promise<PaginatedResult<IssueListItem>> {
-  const { limit = 25, after } = options;
+  const { limit = 25, after, includeArchived = false } = options;
 
   if (filter) {
     const result = await client.request(FilteredSearchIssuesDocument, {
@@ -279,6 +288,7 @@ export async function listIssues(
       after,
       filter: buildListIssuesFilter(filter),
       orderBy: "updatedAt",
+      includeArchived,
     });
     return {
       nodes: result.issues?.nodes ?? [],
@@ -290,6 +300,7 @@ export async function listIssues(
     first: limit,
     after,
     orderBy: "updatedAt",
+    includeArchived,
   });
   return {
     nodes: result.issues?.nodes ?? [],
@@ -433,14 +444,15 @@ export async function getIssueByIdentifierWithAttachments(
 export async function searchIssues(
   client: GraphQLClient,
   term: string,
-  options: PaginationOptions = {},
+  options: IssueReadOptions = {},
   filter?: IssueFilter,
 ): Promise<PaginatedResult<IssueSearchResult>> {
-  const { limit = 25, after } = options;
+  const { limit = 25, after, includeArchived = false } = options;
   const variables: SearchIssuesQueryVariables = {
     term,
     first: limit,
     after,
+    includeArchived,
     ...(filter && { filter }),
   };
   const result = await client.request(SearchIssuesDocument, variables);

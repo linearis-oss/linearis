@@ -20,7 +20,10 @@ import {
 } from "../common/number-options.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
-import { buildPaginationOptions } from "../common/types.js";
+import {
+  buildPaginationOptions,
+  type PaginationOptions,
+} from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
 import type { IssueRelationType } from "../gql/graphql.js";
 import {
@@ -75,6 +78,7 @@ import {
   getIssueWithComments,
   getIssueWithCommentThreads,
   getIssueWithReactions,
+  type IssueReadOptions,
   listIssues,
   searchIssues,
   type UpdateIssueInput,
@@ -91,6 +95,7 @@ interface FilterOptions extends RawFilterFlags {
   limit: string;
   after?: string;
   query?: string;
+  includeArchived?: boolean;
 }
 
 interface CreateOptions {
@@ -492,6 +497,20 @@ async function resolveAndApplyRelations(
   }
 }
 
+/**
+ * Fold `--include-archived` into the pagination options. The key is left absent
+ * rather than set to `false` so the request matches the pre-flag shape exactly
+ * under `exactOptionalPropertyTypes`.
+ */
+function buildIssueReadOptions(
+  pagination: PaginationOptions,
+  options: Pick<FilterOptions, "includeArchived">,
+): IssueReadOptions {
+  return options.includeArchived
+    ? { ...pagination, includeArchived: true }
+    : pagination;
+}
+
 function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
   return cmd
     .option("--team <team>", "filter by team")
@@ -520,7 +539,8 @@ function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
     .option("--updated-after <date>", "updated after date (YYYY-MM-DD)")
     .option("--updated-before <date>", "updated before date (YYYY-MM-DD)")
     .option("--has-blockers", "only issues that are blocked")
-    .option("--is-blocking", "only issues that block others");
+    .option("--is-blocking", "only issues that block others")
+    .option("--include-archived", "include archived issues in the results");
 }
 
 export function setupIssuesCommands(program: Command): void {
@@ -605,9 +625,9 @@ export function setupIssuesCommands(program: Command): void {
     commandAction<[FilterOptions, Command]>(async (options, command) => {
       const ctx = createContext(getRootOpts(command));
 
-      const paginationOptions = buildPaginationOptions(
-        parseLimit(options.limit),
-        options.after,
+      const readOptions = buildIssueReadOptions(
+        buildPaginationOptions(parseLimit(options.limit), options.after),
+        options,
       );
 
       const filterOptions = await resolveFilterOptions(ctx, options);
@@ -617,14 +637,14 @@ export function setupIssuesCommands(program: Command): void {
         const result = await searchIssues(
           ctx.gql,
           options.query,
-          paginationOptions,
+          readOptions,
           filter,
         );
         outputSuccess(result);
         return;
       }
 
-      const result = await listIssues(ctx.gql, paginationOptions, filter);
+      const result = await listIssues(ctx.gql, readOptions, filter);
       outputSuccess(result);
     }),
   );
@@ -640,19 +660,14 @@ export function setupIssuesCommands(program: Command): void {
       async (query, options, command) => {
         const ctx = createContext(getRootOpts(command));
 
-        const paginationOptions = buildPaginationOptions(
-          parseLimit(options.limit),
-          options.after,
+        const readOptions = buildIssueReadOptions(
+          buildPaginationOptions(parseLimit(options.limit), options.after),
+          options,
         );
 
         const filterOptions = await resolveFilterOptions(ctx, options);
         const filter = buildIssueFilter(filterOptions);
-        const result = await searchIssues(
-          ctx.gql,
-          query,
-          paginationOptions,
-          filter,
-        );
+        const result = await searchIssues(ctx.gql, query, readOptions, filter);
         outputSuccess(result);
       },
     ),
