@@ -149,22 +149,27 @@ export async function resolveCreateIssueIds(
       ? parseIssueIdentifier(input.parentTicket)
       : null;
 
-  const userRefsPromise = resolveIssueUserRefs(client, input);
-
-  const response = await client.request(BatchResolveForCreateDocument, {
-    teamKey: teamIsUuid ? null : input.team,
-    teamName: teamIsUuid ? null : input.team,
-    teamId: teamIsUuid ? input.team : null,
-    assigneeQuery,
-    projectName,
-    projectId: projectIdVar,
-    labelFilter: buildLabelFilter(labelNames),
-    statusName,
-    cycleName,
-    milestoneName,
-    parentTeamKey: parent?.teamKey ?? null,
-    parentIssueNumber: parent?.issueNumber ?? null,
-  });
+  // Awaited together with the batch request: starting the user lookups without
+  // awaiting them in the same expression would leave a rejection unhandled
+  // whenever the batch request throws first, and an unhandled rejection kills
+  // the process with a stack trace instead of the JSON error envelope.
+  const [userRefs, response] = await Promise.all([
+    resolveIssueUserRefs(client, input),
+    client.request(BatchResolveForCreateDocument, {
+      teamKey: teamIsUuid ? null : input.team,
+      teamName: teamIsUuid ? null : input.team,
+      teamId: teamIsUuid ? input.team : null,
+      assigneeQuery,
+      projectName,
+      projectId: projectIdVar,
+      labelFilter: buildLabelFilter(labelNames),
+      statusName,
+      cycleName,
+      milestoneName,
+      parentTeamKey: parent?.teamKey ?? null,
+      parentIssueNumber: parent?.issueNumber ?? null,
+    }),
+  ]);
 
   // Team (required). Prefer key match, then name, then id — mirrors resolveTeamId.
   const teamNode = teamIsUuid
@@ -243,7 +248,7 @@ export async function resolveCreateIssueIds(
       : mapParent(response.parentIssues.nodes, input.parentTicket);
   }
 
-  return { ...resolved, ...(await userRefsPromise) };
+  return { ...resolved, ...userRefs };
 }
 
 /**
@@ -392,15 +397,19 @@ export async function resolveUpdateIssueIds(
       ? parseIssueIdentifier(input.parentTicket)
       : null;
 
-  const userRefsPromise = resolveIssueUserRefs(client, input);
-
+  // Both lookups are awaited in the same expression: starting one without
+  // awaiting it would leave a rejection unhandled whenever the other throws
+  // first, and an unhandled rejection kills the process with a stack trace
+  // instead of the JSON error envelope.
+  //
   // A team move rescopes the lookups: a status or cycle named alongside
   // `--team` belongs to the *destination* team's workflow, not the team the
   // issue is leaving. This is the one lookup that cannot be batched with the
   // rest, since its result is an input to them.
-  const destinationTeamId = input.team
-    ? await resolveTeamId(client, input.team)
-    : undefined;
+  const [userRefs, destinationTeamId] = await Promise.all([
+    resolveIssueUserRefs(client, input),
+    input.team ? resolveTeamId(client, input.team) : undefined,
+  ]);
   const scope: UpdateIssueContext = destinationTeamId
     ? { teamId: destinationTeamId }
     : context;
@@ -479,5 +488,5 @@ export async function resolveUpdateIssueIds(
       : mapParent(response.parentIssues.nodes, input.parentTicket);
   }
 
-  return { ...resolved, ...(await userRefsPromise) };
+  return { ...resolved, ...userRefs };
 }

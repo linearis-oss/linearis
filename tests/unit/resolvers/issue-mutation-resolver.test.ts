@@ -550,3 +550,61 @@ describe("resolveUpdateIssueIds user references", () => {
     expect(result.delegateId).toBe("carol-uuid");
   });
 });
+
+describe("user reference lookups and unhandled rejections", () => {
+  /**
+   * The user lookups run concurrently with the batch request. If one is only
+   * awaited on the success path, a failure of the other leaves its rejection
+   * unhandled — which in Node 22 tears the process down with a stack trace
+   * instead of letting handleCommand print the JSON error envelope.
+   */
+  async function collectUnhandled(
+    run: () => Promise<unknown>,
+  ): Promise<unknown[]> {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+
+    process.on("unhandledRejection", listener);
+    try {
+      await expect(run()).rejects.toThrow();
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+
+    return unhandled;
+  }
+
+  const failingClient = (): GraphQLClient =>
+    ({
+      request: vi
+        .fn()
+        .mockImplementation(() => Promise.reject(new Error("lookup failed"))),
+    }) as unknown as GraphQLClient;
+
+  it("surfaces create lookup failures without leaking a rejection", async () => {
+    const unhandled = await collectUnhandled(() =>
+      resolveCreateIssueIds(failingClient(), {
+        team: "ENG",
+        subscribers: ["alice"],
+        delegate: "carol",
+      }),
+    );
+
+    expect(unhandled).toEqual([]);
+  });
+
+  it("surfaces update lookup failures without leaking a rejection", async () => {
+    const unhandled = await collectUnhandled(() =>
+      resolveUpdateIssueIds(
+        failingClient(),
+        { team: "DES", subscribers: ["alice"], delegate: "carol" },
+        {},
+      ),
+    );
+
+    expect(unhandled).toEqual([]);
+  });
+});
