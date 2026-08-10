@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   buildBatchUpdateContext,
   parseBatchCreateEntries,
+  validateBatchUpdateEstimate,
 } from "../../../src/commands/issues-batch.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import type { ResolvedIssueRef } from "../../../src/resolvers/issue-resolver.js";
@@ -172,5 +174,102 @@ describe("buildBatchUpdateContext", () => {
     });
 
     expect(context).toEqual({});
+  });
+});
+
+describe("validateBatchUpdateEstimate", () => {
+  const ENG_TEAM = "22222222-2222-4222-8222-222222222222";
+  const OPS_TEAM = "55555555-5555-4555-8555-555555555555";
+
+  const target = (teamKey: string, teamId: string): ResolvedIssueRef => ({
+    ref: `${teamKey}-1`,
+    id: asUuid("11111111-1111-4111-8111-111111111111"),
+    teamId: asUuid(teamId),
+    teamKey,
+  });
+
+  const teamResponse = (
+    id: string,
+    key: string,
+    issueEstimationType: string,
+  ) => ({
+    teams: {
+      nodes: [
+        {
+          id,
+          key,
+          name: key,
+          issueEstimationType,
+          issueEstimationExtended: false,
+          issueEstimationAllowZero: false,
+        },
+      ],
+    },
+  });
+
+  it("rejects an estimate outside the team's scale before sending anything", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(teamResponse(ENG_TEAM, "ENG", "fibonacci"));
+    const client = { request } as unknown as GraphQLClient;
+
+    await expect(
+      validateBatchUpdateEstimate(client, [target("ENG", ENG_TEAM)], {
+        issues: "ENG-1",
+        estimate: "7",
+      }),
+    ).rejects.toThrow(/must be one of \[1, 2, 3, 5, 8\] for team "ENG"/);
+  });
+
+  it("accepts an estimate that is on the scale", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(teamResponse(ENG_TEAM, "ENG", "fibonacci"));
+    const client = { request } as unknown as GraphQLClient;
+
+    await expect(
+      validateBatchUpdateEstimate(client, [target("ENG", ENG_TEAM)], {
+        issues: "ENG-1",
+        estimate: "5",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("checks every team the batch spans, not just the first", async () => {
+    // One patch applies the same estimate to all targets, so an estimate that
+    // is valid on one team's scale and not another's must still be rejected.
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(teamResponse(ENG_TEAM, "ENG", "fibonacci"))
+      .mockResolvedValueOnce(teamResponse(OPS_TEAM, "OPS", "linear"));
+    const client = { request } as unknown as GraphQLClient;
+
+    await expect(
+      validateBatchUpdateEstimate(
+        client,
+        [target("ENG", ENG_TEAM), target("OPS", OPS_TEAM)],
+        { issues: "ENG-1,OPS-1", estimate: "8" },
+      ),
+    ).rejects.toThrow(/for team "OPS"/);
+  });
+
+  it("looks each distinct team up once and skips the lookup entirely without --estimate", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(teamResponse(ENG_TEAM, "ENG", "fibonacci"));
+    const client = { request } as unknown as GraphQLClient;
+
+    await validateBatchUpdateEstimate(
+      client,
+      [target("ENG", ENG_TEAM), target("ENG", ENG_TEAM)],
+      { issues: "ENG-1,ENG-2", estimate: "3" },
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+
+    await validateBatchUpdateEstimate(client, [target("ENG", ENG_TEAM)], {
+      issues: "ENG-1",
+      title: "no estimate here",
+    });
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

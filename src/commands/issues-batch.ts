@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Command } from "commander";
+import type { GraphQLClient } from "../client/graphql-client.js";
 import { createContext, getRootOpts } from "../common/context.js";
 import {
   invalidParameterError,
@@ -25,6 +26,7 @@ import {
   type ResolvedIssueRef,
   resolveIssueRefs,
 } from "../resolvers/issue-resolver.js";
+import { resolveTeamEstimateContext } from "../resolvers/team-resolver.js";
 import {
   batchCreateIssues,
   batchUpdateIssues,
@@ -414,6 +416,44 @@ export function buildBatchUpdateContext(
     : {};
 }
 
+/**
+ * Validates `--estimate` against the estimation scale of every team the batch
+ * touches.
+ *
+ * `issues update` and `batch create` both reject an off-scale estimate before
+ * sending anything; without this, `batch update` was the one path that let
+ * `--estimate 7` reach a fibonacci team and come back as a raw API error.
+ *
+ * Every distinct team is checked, not just the single-team case: one patch
+ * applies the same estimate to all targets, so it has to be valid on each of
+ * their scales. That is one extra lookup per distinct team, and a batch
+ * spanning teams is already the rare shape.
+ *
+ * Exported so the validation can be tested without driving a full command.
+ */
+export async function validateBatchUpdateEstimate(
+  client: GraphQLClient,
+  targets: readonly ResolvedIssueRef[],
+  options: BatchUpdateOptions,
+): Promise<void> {
+  if (options.estimate === undefined) return;
+
+  const estimate = parseEstimateOption(options.estimate);
+  const teamIds = [...new Set(targets.map((target) => target.teamId))];
+  const teams = await Promise.all(
+    teamIds.map((teamId) => resolveTeamEstimateContext(client, teamId)),
+  );
+
+  for (const team of teams) {
+    validateEstimateAgainstTeamConfig(estimate, {
+      teamKey: team.teamKey,
+      issueEstimationType: team.issueEstimationType,
+      issueEstimationExtended: team.issueEstimationExtended,
+      issueEstimationAllowZero: team.issueEstimationAllowZero,
+    });
+  }
+}
+
 function buildBatchUpdateResolverInput(
   options: BatchUpdateOptions,
 ): ResolveUpdateIssueIdsInput {
@@ -569,6 +609,8 @@ export function addBatchCommands(issues: Command): void {
         const ctx = createContext(getRootOpts(command));
         const targets = await resolveIssueRefs(ctx.gql, refs);
         const context = buildBatchUpdateContext(targets, options);
+
+        await validateBatchUpdateEstimate(ctx.gql, targets, options);
 
         const resolverInput = buildBatchUpdateResolverInput(options);
         const ids =
