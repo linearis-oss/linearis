@@ -266,24 +266,44 @@ export async function resolveCreateIssueIds(
  * Field-level memoization would collapse more, but status, cycle and milestone
  * lookups are scoped by the entry's own team and project, so a per-field cache
  * cannot be keyed correctly without duplicating that scoping here.
+ *
+ * Distinct reference sets are resolved in bounded waves rather than all at
+ * once. Collapsing helps the common batch that shares a team and project, but
+ * a heterogeneous import — the case this command exists for — has as many
+ * distinct sets as rows, and firing every `BatchResolveForCreate` (plus its
+ * user lookups) simultaneously is how a large import earns a rate-limit
+ * rejection instead of a result.
  */
+const BATCH_CREATE_RESOLVE_CONCURRENCY = 5;
+
 export async function resolveBatchCreateIssueIds(
   client: GraphQLClient,
   entries: readonly ResolveCreateIssueIdsInput[],
 ): Promise<ResolvedCreateIssueIds[]> {
-  const inFlight = new Map<string, Promise<ResolvedCreateIssueIds>>();
+  // Deduplicate first so the concurrency window counts real requests: a batch
+  // of 100 rows sharing one reference set should still cost one wave.
+  const keys = entries.map(batchCreateCacheKey);
+  const unique = new Map<string, ResolveCreateIssueIdsInput>();
+  for (const [index, key] of keys.entries()) {
+    if (!unique.has(key)) {
+      unique.set(key, entries[index] as ResolveCreateIssueIdsInput);
+    }
+  }
 
-  return Promise.all(
-    entries.map((entry) => {
-      const key = batchCreateCacheKey(entry);
-      const cached = inFlight.get(key);
-      if (cached) return cached;
+  const resolvedByKey = new Map<string, ResolvedCreateIssueIds>();
+  const pending = [...unique];
 
-      const pending = resolveCreateIssueIds(client, entry);
-      inFlight.set(key, pending);
-      return pending;
-    }),
-  );
+  for (let i = 0; i < pending.length; i += BATCH_CREATE_RESOLVE_CONCURRENCY) {
+    const wave = pending.slice(i, i + BATCH_CREATE_RESOLVE_CONCURRENCY);
+    const resolved = await Promise.all(
+      wave.map(([, entry]) => resolveCreateIssueIds(client, entry)),
+    );
+    for (const [offset, [key]] of wave.entries()) {
+      resolvedByKey.set(key, resolved[offset] as ResolvedCreateIssueIds);
+    }
+  }
+
+  return keys.map((key) => resolvedByKey.get(key) as ResolvedCreateIssueIds);
 }
 
 /**

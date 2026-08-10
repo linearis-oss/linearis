@@ -481,6 +481,56 @@ describe("resolveBatchCreateIssueIds", () => {
       resolveBatchCreateIssueIds(client, [{ team: "NOPE" }]),
     ).rejects.toThrow('Team "NOPE" not found');
   });
+
+  it("bounds how many distinct reference sets are in flight at once", async () => {
+    // A heterogeneous import has one distinct set per row, so an unbounded
+    // fan-out would issue every request simultaneously and invite a
+    // rate-limit rejection.
+    let inFlight = 0;
+    let peak = 0;
+    const request = vi.fn().mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return createResponse("team-uuid");
+    });
+    const client = { request } as unknown as GraphQLClient;
+
+    // Distinct assignee UUIDs: they pass straight through the mappers, so
+    // each entry is its own reference set without needing 20 response shapes.
+    const entries = Array.from({ length: 20 }, (_, i) => ({
+      team: "ENG",
+      assignee: `550e8400-e29b-41d4-a716-4466554400${String(i).padStart(2, "0")}`,
+    }));
+    const resolved = await resolveBatchCreateIssueIds(client, entries);
+
+    expect(resolved).toHaveLength(20);
+    expect(request).toHaveBeenCalledTimes(20);
+    // Exactly the wave size: still concurrent, just bounded.
+    expect(peak).toBe(5);
+  });
+
+  it("keeps input order when the deduplicated sets resolve out of order", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse("team-a"))
+      .mockResolvedValueOnce(createResponse("team-b", "DES"));
+    const client = { request } as unknown as GraphQLClient;
+
+    const resolved = await resolveBatchCreateIssueIds(client, [
+      { team: "ENG" },
+      { team: "DES" },
+      { team: "ENG" },
+    ]);
+
+    expect(resolved.map((ids) => ids.teamId)).toEqual([
+      "team-a",
+      "team-b",
+      "team-a",
+    ]);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("resolveUpdateIssueIds team move", () => {
