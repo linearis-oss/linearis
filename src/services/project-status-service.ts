@@ -96,11 +96,15 @@ export async function getProjectStatus(
  *
  * `position` is required by the API but rarely what a caller has in mind, so
  * an omitted position reads the current flow and takes the next slot.
+ *
+ * Archived statuses are counted: they keep their position and can be
+ * unarchived at any time, so skipping them would hand the new status a
+ * position that an archived one already holds.
  */
 async function nextProjectStatusPosition(
   client: GraphQLClient,
 ): Promise<number> {
-  const { nodes } = await listProjectStatuses(client);
+  const { nodes } = await listProjectStatuses(client, true);
   const highest = nodes.reduce(
     (max, status) => Math.max(max, status.position),
     0,

@@ -125,6 +125,34 @@ describe("createProjectStatus", () => {
     });
   });
 
+  it("counts archived statuses when picking the next position", async () => {
+    const { client, request } = mockGqlClient(
+      new Map<unknown, unknown>([
+        [
+          ListProjectStatusesDocument,
+          { projectStatuses: { nodes: [{ position: 2 }, { position: 9 }] } },
+        ],
+        [
+          CreateProjectStatusDocument,
+          { projectStatusCreate: { success: true, status: { id: "st-new" } } },
+        ],
+      ]),
+    );
+
+    await createProjectStatus(client, {
+      name: "Blocked",
+      type: "paused",
+      color: "#B45309",
+    });
+
+    expect(request).toHaveBeenCalledWith(ListProjectStatusesDocument, {
+      includeArchived: true,
+    });
+    expect(request).toHaveBeenCalledWith(CreateProjectStatusDocument, {
+      input: expect.objectContaining({ position: 10 }),
+    });
+  });
+
   it("uses an explicit position without reading the flow", async () => {
     const { client, request } = mockGqlClient(
       new Map<unknown, unknown>([
