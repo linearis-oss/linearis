@@ -22,8 +22,17 @@ import {
   type UpdateProjectStatusMutation,
 } from "../gql/graphql.js";
 
+/**
+ * How many statuses one page of the flow carries.
+ *
+ * Raises the API's default of 50, which a workspace with a long archive can
+ * pass. Stated here rather than left to the query default so the bound and
+ * the message that reports hitting it cannot drift apart.
+ */
+const PROJECT_STATUS_PAGE_SIZE = 250;
+
 // Project status projection types
-export type ProjectStatusListItem =
+type ProjectStatusListItem =
   ListProjectStatusesQuery["projectStatuses"]["nodes"][0];
 export type ProjectStatusDetail = NonNullable<
   GetProjectStatusQuery["projectStatus"]
@@ -54,15 +63,25 @@ export type CreateProjectStatusInput = Omit<
 };
 export type UpdateProjectStatusInput = ProjectStatusUpdateInput;
 
+export interface ProjectStatusListResult {
+  nodes: ProjectStatusListItem[];
+  /** True when the workspace holds more statuses than one page carries. */
+  truncated: boolean;
+}
+
 export async function listProjectStatuses(
   client: GraphQLClient,
   includeArchived = false,
-): Promise<{ nodes: ProjectStatusListItem[] }> {
+): Promise<ProjectStatusListResult> {
   const result = await client.request(ListProjectStatusesDocument, {
     includeArchived,
+    first: PROJECT_STATUS_PAGE_SIZE,
   });
 
-  return { nodes: result.projectStatuses.nodes };
+  return {
+    nodes: result.projectStatuses.nodes,
+    truncated: result.projectStatuses.pageInfo.hasNextPage,
+  };
 }
 
 /**
@@ -100,11 +119,24 @@ export async function getProjectStatus(
  * Archived statuses are counted: they keep their position and can be
  * unarchived at any time, so skipping them would hand the new status a
  * position that an archived one already holds.
+ *
+ * A truncated page defeats that reasoning for the same reason — the statuses
+ * it left out are exactly the ones whose positions would collide — so it is
+ * refused rather than turned into a position that looks free and is not.
  */
 async function nextProjectStatusPosition(
   client: GraphQLClient,
 ): Promise<number> {
-  const { nodes } = await listProjectStatuses(client, true);
+  const { nodes, truncated } = await listProjectStatuses(client, true);
+
+  if (truncated) {
+    throw new Error(
+      `The workspace has more than ${PROJECT_STATUS_PAGE_SIZE} project ` +
+        "statuses, so the end of the flow cannot be found. Pass an explicit " +
+        "`--position` to place the new status.",
+    );
+  }
+
   const highest = nodes.reduce(
     (max, status) => Math.max(max, status.position),
     0,

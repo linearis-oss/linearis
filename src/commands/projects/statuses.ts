@@ -112,6 +112,11 @@ export function setupProjectStatusCommands(projects: Command): void {
     .command("list")
     .description("list the workspace project statuses")
     .option("--include-archived", "include archived statuses")
+    .addHelpText(
+      "after",
+      "\nThe flow is read in one page of 250, with `truncated` set when the\n" +
+        "workspace holds more than that.",
+    )
     .action(
       commandAction<[StatusesListOptions, Command]>(
         async (options, command) => {

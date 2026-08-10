@@ -306,12 +306,18 @@ query SearchProjects(
 # so all statuses are fetched and filtered client-side.
 # archivedAt is selected so that an ambiguity between an archived status
 # and a live one of the same name can be spelled out to the caller.
-query GetProjectStatuses($includeArchived: Boolean = false) {
-  projectStatuses(includeArchived: $includeArchived) {
+# `first` raises the API's default page of 50, which archived statuses can
+# outgrow; pageInfo lets the resolver refuse rather than report a name it
+# simply did not fetch as missing.
+query GetProjectStatuses($includeArchived: Boolean = false, $first: Int = 250) {
+  projectStatuses(includeArchived: $includeArchived, first: $first) {
     nodes {
       id
       name
       archivedAt
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 }

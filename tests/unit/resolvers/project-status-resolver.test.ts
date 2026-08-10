@@ -4,10 +4,11 @@ import { resolveProjectStatusId } from "../../../src/resolvers/project-status-re
 
 function mockGqlClient(
   nodes: Array<{ id: string; name: string; archivedAt?: string | null }>,
+  hasNextPage = false,
 ) {
   return {
     request: vi.fn().mockResolvedValue({
-      projectStatuses: { nodes },
+      projectStatuses: { nodes, pageInfo: { hasNextPage } },
     }),
   } as unknown as GraphQLClient;
 }
@@ -41,6 +42,7 @@ describe("resolveProjectStatusId", () => {
 
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       includeArchived: false,
+      first: 250,
     });
   });
 
@@ -53,6 +55,7 @@ describe("resolveProjectStatusId", () => {
     expect(result).toBe("status-uuid");
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       includeArchived: true,
+      first: 250,
     });
   });
 
@@ -79,5 +82,42 @@ describe("resolveProjectStatusId", () => {
     await expect(resolveProjectStatusId(client, "Nonexistent")).rejects.toThrow(
       'Project status "Nonexistent" not found',
     );
+  });
+
+  it("refuses a miss past the page bound instead of reporting it missing", async () => {
+    const client = mockGqlClient([{ id: "other-uuid", name: "Started" }], true);
+
+    await expect(resolveProjectStatusId(client, "Retired")).rejects.toThrow(
+      "more than 250 project statuses",
+    );
+  });
+
+  it("refuses a lone match past the page bound", async () => {
+    const client = mockGqlClient(
+      [{ id: "status-uuid", name: "Started" }],
+      true,
+    );
+
+    await expect(resolveProjectStatusId(client, "Started")).rejects.toThrow(
+      "more than 250 project statuses",
+    );
+  });
+
+  it("still names an ambiguity found past the page bound", async () => {
+    const client = mockGqlClient(
+      [
+        {
+          id: "old-uuid",
+          name: "In Review",
+          archivedAt: "2026-01-01T00:00:00Z",
+        },
+        { id: "new-uuid", name: "In Review", archivedAt: null },
+      ],
+      true,
+    );
+
+    await expect(
+      resolveProjectStatusId(client, "In Review", { includeArchived: true }),
+    ).rejects.toThrow('Multiple project statuses found matching "In Review"');
   });
 });

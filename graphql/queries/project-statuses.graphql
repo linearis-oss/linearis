@@ -22,10 +22,21 @@ fragment ProjectStatusCoreFields on ProjectStatus {
 #
 # The connection takes no name filter, which is why
 # `resolveProjectStatusId()` matches names client-side.
-query ListProjectStatuses($includeArchived: Boolean = false) {
-  projectStatuses(includeArchived: $includeArchived) {
+#
+# `first` overrides the API's default page of 50: archived statuses keep
+# accumulating, so `--include-archived` can pass 50 in a long-lived
+# workspace. pageInfo is selected so a caller that hits even the raised
+# bound learns the list is partial instead of reading it as complete.
+query ListProjectStatuses(
+  $includeArchived: Boolean = false
+  $first: Int = 250
+) {
+  projectStatuses(includeArchived: $includeArchived, first: $first) {
     nodes {
       ...ProjectStatusCoreFields
+    }
+    pageInfo {
+      hasNextPage
     }
   }
 }

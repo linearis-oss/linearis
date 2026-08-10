@@ -40,13 +40,40 @@ describe("listProjectStatuses", () => {
   it("excludes archived statuses by default", async () => {
     const { client, request } = mockGqlClient(
       new Map([
-        [ListProjectStatusesDocument, { projectStatuses: { nodes: [] } }],
+        [
+          ListProjectStatusesDocument,
+          { projectStatuses: { nodes: [], pageInfo: { hasNextPage: false } } },
+        ],
       ]),
     );
 
-    await expect(listProjectStatuses(client)).resolves.toEqual({ nodes: [] });
+    await expect(listProjectStatuses(client)).resolves.toEqual({
+      nodes: [],
+      truncated: false,
+    });
     expect(request).toHaveBeenCalledWith(ListProjectStatusesDocument, {
       includeArchived: false,
+      first: 250,
+    });
+  });
+
+  it("reports a flow that outgrew the page bound as truncated", async () => {
+    const { client } = mockGqlClient(
+      new Map([
+        [
+          ListProjectStatusesDocument,
+          {
+            projectStatuses: {
+              nodes: [{ id: "st-1" }],
+              pageInfo: { hasNextPage: true },
+            },
+          },
+        ],
+      ]),
+    );
+
+    await expect(listProjectStatuses(client, true)).resolves.toMatchObject({
+      truncated: true,
     });
   });
 });
@@ -98,7 +125,12 @@ describe("createProjectStatus", () => {
       new Map<unknown, unknown>([
         [
           ListProjectStatusesDocument,
-          { projectStatuses: { nodes: [{ position: 2 }, { position: 5 }] } },
+          {
+            projectStatuses: {
+              nodes: [{ position: 2 }, { position: 5 }],
+              pageInfo: { hasNextPage: false },
+            },
+          },
         ],
         [
           CreateProjectStatusDocument,
@@ -130,7 +162,12 @@ describe("createProjectStatus", () => {
       new Map<unknown, unknown>([
         [
           ListProjectStatusesDocument,
-          { projectStatuses: { nodes: [{ position: 2 }, { position: 9 }] } },
+          {
+            projectStatuses: {
+              nodes: [{ position: 2 }, { position: 9 }],
+              pageInfo: { hasNextPage: false },
+            },
+          },
         ],
         [
           CreateProjectStatusDocument,
@@ -147,10 +184,40 @@ describe("createProjectStatus", () => {
 
     expect(request).toHaveBeenCalledWith(ListProjectStatusesDocument, {
       includeArchived: true,
+      first: 250,
     });
     expect(request).toHaveBeenCalledWith(CreateProjectStatusDocument, {
       input: expect.objectContaining({ position: 10 }),
     });
+  });
+
+  it("refuses to guess a position from a truncated flow", async () => {
+    const { client, request } = mockGqlClient(
+      new Map<unknown, unknown>([
+        [
+          ListProjectStatusesDocument,
+          {
+            projectStatuses: {
+              nodes: [{ position: 2 }],
+              pageInfo: { hasNextPage: true },
+            },
+          },
+        ],
+      ]),
+    );
+
+    await expect(
+      createProjectStatus(client, {
+        name: "Blocked",
+        type: "paused",
+        color: "#B45309",
+      }),
+    ).rejects.toThrow("more than 250 project statuses");
+
+    expect(request).not.toHaveBeenCalledWith(
+      CreateProjectStatusDocument,
+      expect.anything(),
+    );
   });
 
   it("uses an explicit position without reading the flow", async () => {
