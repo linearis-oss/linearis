@@ -279,34 +279,6 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
   }
 }
 
-# Get issues list with all relationships in single query
-#
-# Fetches paginated issues excluding completed ones,
-# ordered by most recently updated. Includes all relationships
-# for comprehensive issue data.
-query GetIssues(
-  $first: Int!
-  $after: String
-  $orderBy: PaginationOrderBy
-  $includeArchived: Boolean = false
-) {
-  issues(
-    first: $first
-    after: $after
-    orderBy: $orderBy
-    includeArchived: $includeArchived
-    filter: { state: { type: { neq: "completed" } } }
-  ) {
-    nodes {
-      ...CompleteIssueFields
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-
 # Get single issue by UUID with lean fields
 #
 # Fetches issue data by direct UUID lookup with the backward-compatible
@@ -417,8 +389,9 @@ query SearchIssues(
 
 # Search issues with advanced filters and all relationships in single query
 #
-# Supports filtering by team, assignee, project, and states.
-# Used by the advanced search functionality with multiple criteria.
+# Supports filtering by team, assignee, project, and states, and also backs the
+# unfiltered `issues list` — the implicit "hide completed" narrowing is built in
+# the service (buildListIssuesFilter) so that `--include-archived` can drop it.
 query FilteredSearchIssues(
   $first: Int!
   $after: String

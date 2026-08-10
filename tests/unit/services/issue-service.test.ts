@@ -22,7 +22,6 @@ import {
   GetIssueByIdWithAttachmentsDocument,
   GetIssueByIdWithCommentsDocument,
   GetIssueByIdWithReactionsDocument,
-  GetIssuesDocument,
   IssueVcsBranchSearchDocument,
   RemindOnIssueDocument,
   SearchIssuesDocument,
@@ -151,9 +150,9 @@ describe("issue read payload", () => {
       "delegate",
     ];
 
-    expect(scalarNames(GetIssuesDocument, "CompleteIssueFields")).toEqual(
-      expect.arrayContaining(expected),
-    );
+    expect(
+      scalarNames(FilteredSearchIssuesDocument, "CompleteIssueFields"),
+    ).toEqual(expect.arrayContaining(expected));
     expect(
       scalarNames(SearchIssuesDocument, "CompleteIssueSearchFields"),
     ).toEqual(expect.arrayContaining(expected));
@@ -161,7 +160,10 @@ describe("issue read payload", () => {
 
   it("keeps subscribers and sharedAccess off the list fragment", () => {
     // They belong to single-issue reads only — see IssueDetailOnlyFields.
-    const listFields = scalarNames(GetIssuesDocument, "CompleteIssueFields");
+    const listFields = scalarNames(
+      FilteredSearchIssuesDocument,
+      "CompleteIssueFields",
+    );
     expect(listFields).not.toContain("subscribers");
     expect(listFields).not.toContain("sharedAccess");
 
@@ -169,7 +171,9 @@ describe("issue read payload", () => {
     expect(print(GetIssueByIdWithCommentsDocument)).toContain(
       "IssueDetailOnlyFields",
     );
-    expect(print(GetIssuesDocument)).not.toContain("IssueDetailOnlyFields");
+    expect(print(FilteredSearchIssuesDocument)).not.toContain(
+      "IssueDetailOnlyFields",
+    );
   });
 });
 
@@ -192,7 +196,6 @@ describe("archived issue reachability", () => {
 
   it("keeps list and search opt-in rather than always-archived", () => {
     for (const document of [
-      GetIssuesDocument,
       FilteredSearchIssuesDocument,
       SearchIssuesDocument,
     ]) {
@@ -238,8 +241,8 @@ describe("listIssues", () => {
   });
 
   it("still excludes completed issues by default when a filter is given", async () => {
-    // Regression guard: parameterizing orderBy/includeArchived must not drop
-    // the implicit non-completed clause.
+    // Regression guard: parameterizing orderBy must not drop the implicit
+    // non-completed clause.
     const client = mockGqlClient({
       issues: {
         nodes: [],
@@ -249,7 +252,7 @@ describe("listIssues", () => {
 
     await listIssues(
       client,
-      { limit: 10, orderBy: "createdAt", includeArchived: true },
+      { limit: 10, orderBy: "createdAt" },
       { priority: { eq: 1 } },
     );
 
@@ -305,6 +308,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 25,
       after: undefined,
+      filter: { state: { type: { neq: "completed" } } },
       orderBy: "updatedAt",
       includeArchived: false,
     });
@@ -321,6 +325,7 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 5,
       after: "cursor1",
+      filter: { state: { type: { neq: "completed" } } },
       orderBy: "updatedAt",
       includeArchived: false,
     });
@@ -389,7 +394,7 @@ describe("listIssues", () => {
     });
   });
 
-  it("uses GetIssues query when no filter provided (no regression)", async () => {
+  it("applies the non-completed default on the unfiltered path too", async () => {
     const client = mockGqlClient({
       issues: {
         nodes: [],
@@ -397,12 +402,36 @@ describe("listIssues", () => {
       },
     });
     await listIssues(client);
-    expect(client.request).toHaveBeenCalledWith(GetIssuesDocument, {
+    expect(client.request).toHaveBeenCalledWith(FilteredSearchIssuesDocument, {
       first: 25,
       after: undefined,
+      filter: { state: { type: { neq: "completed" } } },
       orderBy: "updatedAt",
       includeArchived: false,
     });
+  });
+
+  it("drops the non-completed default when archived issues are requested", async () => {
+    // Archived issues are almost always completed, so keeping the implicit
+    // clause would make --include-archived hide what it was passed to show.
+    for (const [filter, expected] of [
+      [undefined, undefined],
+      [{ priority: { eq: 1 } }, { priority: { eq: 1 } }],
+    ] as const) {
+      const client = mockGqlClient({
+        issues: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+
+      await listIssues(client, { limit: 10, includeArchived: true }, filter);
+
+      expect(client.request).toHaveBeenCalledWith(
+        FilteredSearchIssuesDocument,
+        expect.objectContaining({ filter: expected, includeArchived: true }),
+      );
+    }
   });
 });
 

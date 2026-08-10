@@ -16,6 +16,7 @@ import {
   type CreateIssueMutation,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
+  type FilteredSearchIssuesQuery,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   type GetIssueByIdentifierQuery,
@@ -32,8 +33,6 @@ import {
   type GetIssueByIdWithCommentsQuery,
   GetIssueByIdWithReactionsDocument,
   type GetIssueByIdWithReactionsQuery,
-  GetIssuesDocument,
-  type GetIssuesQuery,
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
@@ -54,7 +53,7 @@ import {
 import { normalizeReactions } from "./reaction-service.js";
 
 // Issue projection types
-export type IssueListItem = GetIssuesQuery["issues"]["nodes"][0];
+export type IssueListItem = FilteredSearchIssuesQuery["issues"]["nodes"][0];
 export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
 export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
 export type IssueDetailWithComments = NonNullable<
@@ -187,7 +186,26 @@ function hasExplicitStateFilter(filter: IssueFilter): boolean {
   return filter.or?.some(hasExplicitStateFilter) ?? false;
 }
 
-function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
+/**
+ * Applies the implicit "hide completed work" narrowing that `issues list`
+ * has always had, unless the caller has already said something about state.
+ *
+ * `includeArchived` counts as saying something: archived issues are nearly
+ * always completed or canceled, so keeping the default clause would make
+ * `--include-archived` hide the very issues it was passed to surface.
+ */
+function buildListIssuesFilter(
+  filter: IssueFilter | undefined,
+  includeArchived: boolean,
+): IssueFilter | undefined {
+  if (includeArchived) {
+    return filter;
+  }
+
+  if (!filter) {
+    return NON_COMPLETED_ISSUES_FILTER;
+  }
+
   if (hasExplicitStateFilter(filter)) {
     return filter;
   }
@@ -318,23 +336,13 @@ export async function listIssues(
     orderBy = "updatedAt",
   } = options;
 
-  if (filter) {
-    const result = await client.request(FilteredSearchIssuesDocument, {
-      first: limit,
-      after,
-      filter: buildListIssuesFilter(filter),
-      orderBy,
-      includeArchived,
-    });
-    return {
-      nodes: result.issues?.nodes ?? [],
-      pageInfo: result.issues.pageInfo,
-    };
-  }
-
-  const result = await client.request(GetIssuesDocument, {
+  // One query for both the filtered and the unfiltered path: the default
+  // state narrowing lives in buildListIssuesFilter, so a query that hardcoded
+  // it could not honor `--include-archived`.
+  const result = await client.request(FilteredSearchIssuesDocument, {
     first: limit,
     after,
+    filter: buildListIssuesFilter(filter, includeArchived),
     orderBy,
     includeArchived,
   });
