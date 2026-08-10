@@ -1,3 +1,46 @@
+## [2026.8.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.8.0-next.1...v2026.8.0-next.2) (2026-08-10)
+
+### ⚠ BREAKING CHANGES
+
+* **milestones:** a milestone name that the scoped project does not carry
+now fails instead of resolving to a same-named milestone in another
+project.
+* **projects:** `linearis projects archive <project>` is removed. Use
+`linearis projects delete <project>` to trash a project and
+`linearis projects unarchive <project>` to restore it. Linear treats
+archived and trashed projects as one state, so the replacement is
+behaviourally identical.
+
+### Features
+
+* **labels:** full CRUD and retire/restore for project labels ([4bf8dcc](https://github.com/linearis-oss/linearis/commit/4bf8dcc50e69b764f87bc8c1712c2a72f3dcdd76))
+* **labels:** make the group and parent flags reversible ([59d5890](https://github.com/linearis-oss/linearis/commit/59d58900933f939aba1af08439d006f6bde51533))
+* **projects:** administer the workspace project status flow ([a6e1a16](https://github.com/linearis-oss/linearis/commit/a6e1a1613b0beb76a94c807b7dfb7caa7ee19403))
+* **projects:** chronological project activity timeline ([4e81324](https://github.com/linearis-oss/linearis/commit/4e813240026de27618e388c9322c919151e24f02))
+* **projects:** drop archive in favour of delete ([47b509e](https://github.com/linearis-oss/linearis/commit/47b509e79339d5882cfddfd32fca920217f02ce9))
+* **projects:** full-text search and external sync disable ([de351cf](https://github.com/linearis-oss/linearis/commit/de351cfda0b093261f1d3d4c6ae1e0830061bceb))
+* **projects:** manage project dependency relations ([bdd3de0](https://github.com/linearis-oss/linearis/commit/bdd3de0726ca334dc0de4220a120b139c71e1205))
+* **projects:** post and manage project status updates ([c66da2b](https://github.com/linearis-oss/linearis/commit/c66da2b7860438683fd90a39d3e8f91a9ce34709))
+* **projects:** read one dependency and page them workspace-wide ([2e9440c](https://github.com/linearis-oss/linearis/commit/2e9440c3b21b376b37eecaf7115203cd04341853))
+
+### Bug Fixes
+
+* **labels:** reject an empty --parent on update ([fd13029](https://github.com/linearis-oss/linearis/commit/fd13029a135cc2208640d31533425074971ef87c))
+* **labels:** scope --parent to the same team as the label ([d99ee89](https://github.com/linearis-oss/linearis/commit/d99ee89f6302f4e45a276acb73cbb65a4a9e0a99))
+* **milestones:** keep a milestone lookup inside its project ([b143d2b](https://github.com/linearis-oss/linearis/commit/b143d2bf1bd801e757fc913fda2f5157ada7c470))
+* **projects:** anchor relation updates to the right end ([9f5e87a](https://github.com/linearis-oss/linearis/commit/9f5e87ab3a05564297f9dc7e5bdafee01f8afbeb))
+* **projects:** bound and page the project status flow ([9ebdef7](https://github.com/linearis-oss/linearis/commit/9ebdef7301346bcd9ea222b5a1ba989698aa74e3))
+* **projects:** count archived statuses when appending ([1e3b428](https://github.com/linearis-oss/linearis/commit/1e3b4283e7cb375732fa1f1c54475a5f104dcf81))
+* **projects:** refuse a lone relation match past the page bound ([d5eb26d](https://github.com/linearis-oss/linearis/commit/d5eb26d58302b05756837b0c70827df46de2e526))
+* **projects:** refuse to guess between same-named project statuses ([1be4ab1](https://github.com/linearis-oss/linearis/commit/1be4ab102f03ce6582f02100090e46c4f268fac2))
+* **projects:** refuse to guess which relation a project pair means ([fe3508c](https://github.com/linearis-oss/linearis/commit/fe3508c6ec2d8c5e817c4f7b584a4ae97bd68aa5))
+* **projects:** reject a malformed status position ([e01ca0e](https://github.com/linearis-oss/linearis/commit/e01ca0e900d3c731784d2d75aa84a88ae4d81c20))
+* **projects:** reject an empty relation update before resolving it ([d94e51e](https://github.com/linearis-oss/linearis/commit/d94e51eab34fdc55825f448b6b59b95ba47478e6))
+* **projects:** reject pagination flags on per-project relations ([ed7cc89](https://github.com/linearis-oss/linearis/commit/ed7cc89e22368bea83373a8a7b989bc9b81c535b))
+* **projects:** report the relation page bound instead of a miss ([b3886e4](https://github.com/linearis-oss/linearis/commit/b3886e4bc55774d441d021f272664495893487f9))
+* **projects:** say where the projects went when archiving fails ([30664cd](https://github.com/linearis-oss/linearis/commit/30664cd7583443140eebf76a64287d0888bd09aa))
+* **projects:** scope relation milestones on the UUID path ([5824b02](https://github.com/linearis-oss/linearis/commit/5824b02c2a3d3cc51cf36af67f81efa009b3f8ec))
+
 ## [2026.8.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.7.0...v2026.8.0-next.1) (2026-08-10)
 
 ### Features
