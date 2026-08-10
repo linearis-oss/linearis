@@ -51,9 +51,9 @@ export interface ListLabelOptions extends PaginationOptions {
  * Service-owned input types (UUIDs pre-resolved by the command).
  *
  * `IssueLabelCreateInput` and `ProjectLabelCreateInput` declare the same
- * fields apart from `teamId`, which project labels do not have because they
- * are always workspace-scoped. One input type therefore covers both, and the
- * project path drops `teamId`.
+ * fields, so one input type covers both. `ProjectLabelCreateInput.teamId` is
+ * marked `[Internal]` and scopes the label to a team when set; the CLI creates
+ * project labels at workspace scope only, so the project path drops it.
  */
 export type CreateLabelInput = BrandUuidFields<
   Pick<
