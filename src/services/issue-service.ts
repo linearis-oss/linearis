@@ -1,14 +1,22 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { firstOrThrow } from "../common/array.js";
+import { notFoundError } from "../common/errors.js";
 import type { BrandUuidFields, UUID } from "../common/identifier.js";
-import { requireMutationEntity } from "../common/mutation-payload.js";
+import {
+  requireMutationEntity,
+  requireMutationSuccess,
+} from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   ArchiveIssueDocument,
+  BatchCreateIssuesDocument,
+  type BatchCreateIssuesMutation,
+  BatchUpdateIssuesDocument,
   CreateIssueDocument,
   type CreateIssueMutation,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
+  type FilteredSearchIssuesQuery,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   type GetIssueByIdentifierQuery,
@@ -25,22 +33,27 @@ import {
   type GetIssueByIdWithCommentsQuery,
   GetIssueByIdWithReactionsDocument,
   type GetIssueByIdWithReactionsQuery,
-  GetIssuesDocument,
-  type GetIssuesQuery,
   type IssueCreateInput,
   type IssueFilter,
   type IssueUpdateInput,
+  IssueVcsBranchSearchDocument,
+  type PaginationOrderBy,
+  RemindOnIssueDocument,
   SearchIssuesDocument,
   type SearchIssuesQuery,
   type SearchIssuesQueryVariables,
+  ShareIssueDocument,
+  SubscribeToIssueDocument,
   UnarchiveIssueDocument,
+  UnshareIssueDocument,
+  UnsubscribeFromIssueDocument,
   UpdateIssueDocument,
   type UpdateIssueMutation,
 } from "../gql/graphql.js";
 import { normalizeReactions } from "./reaction-service.js";
 
 // Issue projection types
-export type IssueListItem = GetIssuesQuery["issues"]["nodes"][0];
+export type IssueListItem = FilteredSearchIssuesQuery["issues"]["nodes"][0];
 export type IssueDetail = NonNullable<GetIssueByIdQuery["issue"]>;
 export type IssueByIdentifier = GetIssueByIdentifierQuery["issues"]["nodes"][0];
 export type IssueDetailWithComments = NonNullable<
@@ -78,6 +91,9 @@ export type CreatedIssue = NonNullable<
 export type UpdatedIssue = NonNullable<
   UpdateIssueMutation["issueUpdate"]["issue"]
 >;
+/** An issue as returned by the batch mutations (no comment payload). */
+export type BatchIssue =
+  BatchCreateIssuesMutation["issueBatchCreate"]["issues"][0];
 
 // Service-owned input types (UUIDs pre-resolved by the command).
 export type CreateIssueInput = BrandUuidFields<
@@ -96,6 +112,8 @@ export type CreateIssueInput = BrandUuidFields<
     | "stateId"
     | "parentId"
     | "dueDate"
+    | "subscriberIds"
+    | "delegateId"
   >,
   | "teamId"
   | "assigneeId"
@@ -105,6 +123,8 @@ export type CreateIssueInput = BrandUuidFields<
   | "cycleId"
   | "stateId"
   | "parentId"
+  | "subscriberIds"
+  | "delegateId"
 >;
 export type UpdateIssueInput = BrandUuidFields<
   Pick<
@@ -121,6 +141,11 @@ export type UpdateIssueInput = BrandUuidFields<
     | "projectMilestoneId"
     | "cycleId"
     | "dueDate"
+    | "teamId"
+    | "subscriberIds"
+    | "delegateId"
+    | "snoozedUntilAt"
+    | "trashed"
   >,
   | "stateId"
   | "assigneeId"
@@ -129,7 +154,21 @@ export type UpdateIssueInput = BrandUuidFields<
   | "parentId"
   | "projectMilestoneId"
   | "cycleId"
+  | "teamId"
+  | "subscriberIds"
+  | "delegateId"
 >;
+
+/**
+ * Pagination plus the read-scope knobs shared by `listIssues` and
+ * `searchIssues`. Archived issues are excluded unless asked for, matching the
+ * Linear API default and the historical CLI behavior.
+ */
+export interface IssueReadOptions extends PaginationOptions {
+  includeArchived?: boolean;
+  /** Defaults to `updatedAt` — most-recently-touched first. */
+  orderBy?: PaginationOrderBy;
+}
 
 const NON_COMPLETED_ISSUES_FILTER: IssueFilter = {
   state: { type: { neq: "completed" } },
@@ -147,7 +186,26 @@ function hasExplicitStateFilter(filter: IssueFilter): boolean {
   return filter.or?.some(hasExplicitStateFilter) ?? false;
 }
 
-function buildListIssuesFilter(filter: IssueFilter): IssueFilter {
+/**
+ * Applies the implicit "hide completed work" narrowing that `issues list`
+ * has always had, unless the caller has already said something about state.
+ *
+ * `includeArchived` counts as saying something: archived issues are nearly
+ * always completed or canceled, so keeping the default clause would make
+ * `--include-archived` hide the very issues it was passed to surface.
+ */
+function buildListIssuesFilter(
+  filter: IssueFilter | undefined,
+  includeArchived: boolean,
+): IssueFilter | undefined {
+  if (includeArchived) {
+    return filter;
+  }
+
+  if (!filter) {
+    return NON_COMPLETED_ISSUES_FILTER;
+  }
+
   if (hasExplicitStateFilter(filter)) {
     return filter;
   }
@@ -268,28 +326,25 @@ function normalizeIssueReactions<
 
 export async function listIssues(
   client: GraphQLClient,
-  options: PaginationOptions = {},
+  options: IssueReadOptions = {},
   filter?: IssueFilter,
 ): Promise<PaginatedResult<IssueListItem>> {
-  const { limit = 25, after } = options;
+  const {
+    limit = 25,
+    after,
+    includeArchived = false,
+    orderBy = "updatedAt",
+  } = options;
 
-  if (filter) {
-    const result = await client.request(FilteredSearchIssuesDocument, {
-      first: limit,
-      after,
-      filter: buildListIssuesFilter(filter),
-      orderBy: "updatedAt",
-    });
-    return {
-      nodes: result.issues?.nodes ?? [],
-      pageInfo: result.issues.pageInfo,
-    };
-  }
-
-  const result = await client.request(GetIssuesDocument, {
+  // One query for both the filtered and the unfiltered path: the default
+  // state narrowing lives in buildListIssuesFilter, so a query that hardcoded
+  // it could not honor `--include-archived`.
+  const result = await client.request(FilteredSearchIssuesDocument, {
     first: limit,
     after,
-    orderBy: "updatedAt",
+    filter: buildListIssuesFilter(filter, includeArchived),
+    orderBy,
+    includeArchived,
   });
   return {
     nodes: result.issues?.nodes ?? [],
@@ -433,14 +488,15 @@ export async function getIssueByIdentifierWithAttachments(
 export async function searchIssues(
   client: GraphQLClient,
   term: string,
-  options: PaginationOptions = {},
+  options: IssueReadOptions = {},
   filter?: IssueFilter,
 ): Promise<PaginatedResult<IssueSearchResult>> {
-  const { limit = 25, after } = options;
+  const { limit = 25, after, includeArchived = false } = options;
   const variables: SearchIssuesQueryVariables = {
     term,
     first: limit,
     after,
+    includeArchived,
     ...(filter && { filter }),
   };
   const result = await client.request(SearchIssuesDocument, variables);
@@ -448,6 +504,28 @@ export async function searchIssues(
     nodes: result.searchIssues?.nodes ?? [],
     pageInfo: result.searchIssues.pageInfo,
   };
+}
+
+/**
+ * Finds the issue a VCS branch belongs to.
+ *
+ * The reverse of the `branchName` field on a read payload.
+ *
+ * @throws Error if no issue owns the branch
+ */
+export async function findIssueByBranch(
+  client: GraphQLClient,
+  branchName: string,
+): Promise<IssueDetail> {
+  const result = await client.request(IssueVcsBranchSearchDocument, {
+    branchName,
+  });
+
+  if (!result.issueVcsBranchSearch) {
+    throw notFoundError("Issue for branch", branchName);
+  }
+
+  return result.issueVcsBranchSearch;
 }
 
 export async function createIssue(
@@ -480,6 +558,34 @@ export async function updateIssue(
   );
 }
 
+/**
+ * Restores an issue from the trash.
+ *
+ * `issues delete` maps to `issueDelete`, which trashes rather than destroys;
+ * `trashed: false` is the only way back, and `issueUnarchive` does not cover it
+ * — archiving and trashing are separate states.
+ */
+export async function restoreIssue(
+  client: GraphQLClient,
+  id: UUID,
+): Promise<UpdatedIssue> {
+  return updateIssue(client, id, { trashed: false });
+}
+
+/**
+ * Snoozes an issue until an instant, or wakes it with `null`.
+ *
+ * `snoozedById` is left to the API, which attributes the snooze to the
+ * authenticated user.
+ */
+export async function snoozeIssue(
+  client: GraphQLClient,
+  id: UUID,
+  snoozedUntilAt: string | null,
+): Promise<UpdatedIssue> {
+  return updateIssue(client, id, { snoozedUntilAt });
+}
+
 export async function archiveIssue(
   client: GraphQLClient,
   id: UUID,
@@ -503,6 +609,139 @@ export async function unarchiveIssue(
     result.issueUnarchive,
     "entity",
     `Failed to unarchive issue "${id}"`,
+  );
+}
+
+/**
+ * Creates many issues in one `issueBatchCreate` transaction.
+ *
+ * Ordering of the returned issues follows the API response, which need not
+ * match the input order — callers should key off `identifier`/`title` rather
+ * than position.
+ */
+export async function batchCreateIssues(
+  client: GraphQLClient,
+  inputs: readonly CreateIssueInput[],
+): Promise<BatchIssue[]> {
+  const issues: IssueCreateInput[] = [...inputs];
+  const result = await client.request(BatchCreateIssuesDocument, {
+    input: { issues },
+  });
+
+  requireMutationSuccess(
+    result.issueBatchCreate,
+    `Failed to create ${inputs.length} issues`,
+  );
+
+  return result.issueBatchCreate.issues;
+}
+
+/** Applies one patch to every issue in an explicit UUID list. */
+export async function batchUpdateIssues(
+  client: GraphQLClient,
+  ids: readonly UUID[],
+  input: UpdateIssueInput,
+): Promise<BatchIssue[]> {
+  const gqlInput: IssueUpdateInput = input;
+  const result = await client.request(BatchUpdateIssuesDocument, {
+    ids: [...ids],
+    input: gqlInput,
+  });
+
+  requireMutationSuccess(
+    result.issueBatchUpdate,
+    `Failed to update ${ids.length} issues`,
+  );
+
+  return result.issueBatchUpdate.issues;
+}
+
+/**
+ * Adds a user to an issue's subscriber list.
+ *
+ * `issueSubscribe` also accepts `userEmail`, but the CLI resolves user
+ * references to UUIDs in the resolver layer, so only `userId` is used.
+ */
+export async function subscribeToIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(SubscribeToIssueDocument, { id, userId });
+
+  return requireMutationEntity(
+    result.issueSubscribe,
+    "issue",
+    `Failed to subscribe user "${userId}" to issue "${id}"`,
+  );
+}
+
+export async function unsubscribeFromIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(UnsubscribeFromIssueDocument, {
+    id,
+    userId,
+  });
+
+  return requireMutationEntity(
+    result.issueUnsubscribe,
+    "issue",
+    `Failed to unsubscribe user "${userId}" from issue "${id}"`,
+  );
+}
+
+/**
+ * Grants a user access to an issue they cannot otherwise see.
+ *
+ * Note this is an access grant, not a link generator — the issue's permalink
+ * is the `url` field on any read payload.
+ */
+export async function shareIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(ShareIssueDocument, { id, userId });
+
+  return requireMutationEntity(
+    result.issueShare,
+    "issue",
+    `Failed to share issue "${id}" with user "${userId}"`,
+  );
+}
+
+export async function unshareIssue(
+  client: GraphQLClient,
+  id: UUID,
+  userId: UUID,
+): Promise<UpdatedIssue> {
+  const result = await client.request(UnshareIssueDocument, { id, userId });
+
+  return requireMutationEntity(
+    result.issueUnshare,
+    "issue",
+    `Failed to unshare issue "${id}" from user "${userId}"`,
+  );
+}
+
+/** Schedules a reminder for the authenticated user at an ISO-8601 instant. */
+export async function remindOnIssue(
+  client: GraphQLClient,
+  id: UUID,
+  reminderAt: string,
+): Promise<UpdatedIssue> {
+  const result = await client.request(RemindOnIssueDocument, {
+    id,
+    reminderAt,
+  });
+
+  return requireMutationEntity(
+    result.issueReminder,
+    "issue",
+    `Failed to set a reminder on issue "${id}"`,
   );
 }
 

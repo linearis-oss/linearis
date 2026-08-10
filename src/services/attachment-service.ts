@@ -9,6 +9,8 @@ import {
   type AttachmentCreateInput,
   type AttachmentCreateMutation,
   AttachmentDeleteDocument,
+  AttachmentExternalSyncDisableDocument,
+  type AttachmentExternalSyncDisableMutation,
   type AttachmentFilter,
   ListAttachmentsDocument,
   type ListAttachmentsQuery,
@@ -19,6 +21,9 @@ export type AttachmentListItem =
   ListAttachmentsQuery["issue"]["attachments"]["nodes"][0];
 export type CreatedAttachment =
   AttachmentCreateMutation["attachmentCreate"]["attachment"];
+export type ExternalSyncDisabledIssue = NonNullable<
+  AttachmentExternalSyncDisableMutation["issueExternalSyncDisable"]["issue"]
+>;
 
 // Service-owned input type (UUIDs pre-resolved by the command).
 export type CreateAttachmentInput = BrandUuidFields<
@@ -87,6 +92,28 @@ export async function deleteAttachment(
   );
 
   return { id: result.attachmentDelete.entityId, success: true };
+}
+
+/**
+ * Stops syncing the issue with the external resource behind an attachment.
+ *
+ * The mutation is `issueExternalSyncDisable`, but it is keyed by attachment
+ * rather than issue, which is why it belongs here and not on the issue
+ * service: one issue can carry several synced attachments.
+ */
+export async function disableExternalSync(
+  client: GraphQLClient,
+  attachmentId: UUID,
+): Promise<ExternalSyncDisabledIssue> {
+  const result = await client.request(AttachmentExternalSyncDisableDocument, {
+    attachmentId,
+  });
+
+  return requireMutationEntity(
+    result.issueExternalSyncDisable,
+    "issue",
+    `Failed to disable external sync for attachment "${attachmentId}"`,
+  );
 }
 
 export async function listAttachments(

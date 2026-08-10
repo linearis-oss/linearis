@@ -10,6 +10,7 @@ import {
   type CreateAttachmentInput,
   createAttachment,
   deleteAttachment,
+  disableExternalSync,
   listAttachments,
 } from "../services/attachment-service.js";
 
@@ -22,12 +23,14 @@ export const ATTACHMENTS_META: DomainMeta = {
     "title, subtitle, sourceType (e.g. 'github', 'slack'), and metadata",
     "with integration-specific data. creating an attachment with the same",
     "url on the same issue updates the existing record (idempotent).",
+    "attachments created by an integration can keep the issue in sync with",
+    "the external resource; `disable-sync` stops that for one attachment.",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
     id: "attachment UUID",
   },
-  seeAlso: ["issues read --with-attachments"],
+  seeAlso: ["issues read --with-attachments", "attachments disable-sync <id>"],
 };
 
 interface ListOptions {
@@ -138,6 +141,22 @@ export function setupAttachmentsCommands(program: Command): void {
         const [id, , command] = args as [string, unknown, Command];
         const ctx = createContext(getRootOpts(command));
         const result = await deleteAttachment(ctx.gql, asUuid(id));
+        outputSuccess(result);
+      }),
+    );
+
+  attachments
+    .command("disable-sync <id>")
+    .description("stop syncing the issue with an attachment's external source")
+    .addHelpText(
+      "after",
+      "\nKeyed by attachment, not by issue: an issue can carry several synced attachments and they are disabled one at a time.",
+    )
+    .action(
+      handleCommand(async (...args: unknown[]) => {
+        const [id, , command] = args as [string, unknown, Command];
+        const ctx = createContext(getRootOpts(command));
+        const result = await disableExternalSync(ctx.gql, asUuid(id));
         outputSuccess(result);
       }),
     );

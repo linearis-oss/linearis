@@ -46,6 +46,7 @@ CLI orchestration. Each file registers a command group via a `setup*Commands(pro
 
 - **auth.ts** -- `auth login`, `auth status`, `auth logout` — interactive authentication (for humans)
 - **issues.ts** -- `issue list`, `issue search`, `issue read`, `issue create`, `issue update`
+- **issues-batch.ts** -- `issues batch create`, `issues batch update` — the bulk subgroup, split out because it takes a JSON document rather than flags
 - **documents.ts** -- Document commands with attachment support
 - **project-milestones.ts** -- Milestone CRUD commands
 - **cycles.ts** -- Cycle listing and detail reading
@@ -66,7 +67,9 @@ Shared utilities used across all layers.
 - **encryption.ts** -- AES-256-CBC encryption for token storage.
 - **output.ts** -- `outputSuccess()`, `outputError()`, and `handleCommand()` wrapper for consistent JSON output and error handling.
 - **errors.ts** -- `notFoundError()`, `multipleMatchesError()`, `invalidParameterError()`, `requiresParameterError()`.
-- **identifier.ts** -- `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`.
+- **identifier.ts** -- `isUuid()`, `parseIssueIdentifier()`, `tryParseIssueIdentifier()`, `parseDueDate()` (Linear's timeless `TimelessDate`).
+- **datetime.ts** -- `parseDateTimeOption(flag, value, now?)` for the `DateTime` flags (`remind --at`, `snooze --until`): ISO-8601 or a `+2h`/`+3d` offset, normalized to UTC.
+- **git.ts** -- `getCurrentBranch()` for `issues from-branch`; shells out via `execFileSync`, never a shell.
 - **types.ts** -- Type aliases derived from codegen output (e.g., `Issue`, `IssueDetail`, `Document`).
 - **embed-parser.ts** -- `extractEmbeds()`, `isLinearUploadUrl()`, `extractFilenameFromUrl()` for parsing embedded files in markdown content.
 - **usage.ts** -- Token-optimized two-tier usage system with `DomainMeta` interface, `formatOverview()` for tier 1 (all domains), and `formatDomainUsage()` for tier 2 (domain detail). Generates USAGE.md via build pipeline.
@@ -99,6 +102,15 @@ Source `.graphql` files that feed into code generation.
 - `mutations/attachments.graphql`
 - `mutations/files.graphql`
 - `mutations/project-milestones.graphql`
+
+## Input Schemas (`schemas/`)
+
+Hand-written JSON Schemas for the commands that take a JSON document instead of flags. Nothing reads them at runtime — they exist for callers (editors, validators, agents) and are shipped in the npm package via `files` in `package.json`.
+
+- **issues-batch-create.schema.json** -- the `issues batch create` document (an array of issues to create).
+- **issues-batch-update.schema.json** -- the `issues batch update` document (`issues` plus the one `patch` they share, where `null` clears a field).
+
+Both are kept in step with their parsers in `src/commands/issues-batch.ts` (`parseBatchCreateEntries`, `parseBatchUpdateDocument`) by `tests/unit/commands/issues-batch-schema.test.ts`; extend both when adding a field.
 
 ## Tests (`tests/`)
 

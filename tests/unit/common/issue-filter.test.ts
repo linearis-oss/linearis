@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   parseCommaSeparated,
+  parseWorkflowStateType,
   validateDateRange,
   validateEstimate,
   validateFilterDependencies,
   validatePriority,
+  WORKFLOW_STATE_TYPES,
 } from "../../../src/common/issue-filter.js";
 
 describe("validatePriority", () => {
@@ -156,5 +158,19 @@ describe("parseCommaSeparated", () => {
 
   it("throws on only whitespace segment", () => {
     expect(() => parseCommaSeparated("a, ,b")).toThrow("empty");
+  });
+});
+
+describe("parseWorkflowStateType", () => {
+  it("accepts every documented category", () => {
+    for (const type of WORKFLOW_STATE_TYPES) {
+      expect(parseWorkflowStateType(type)).toBe(type);
+    }
+  });
+
+  it("rejects anything else, listing the valid values", () => {
+    expect(() => parseWorkflowStateType("done")).toThrow(
+      "Invalid --state-type: must be one of triage, backlog, unstarted, started, completed, canceled",
+    );
   });
 });

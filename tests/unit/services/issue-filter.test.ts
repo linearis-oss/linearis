@@ -184,3 +184,23 @@ describe("buildIssueFilter", () => {
     });
   });
 });
+
+describe("buildIssueFilter state, assignee and subscriber scoping", () => {
+  it("maps --unassigned to a null assignee", () => {
+    expect(buildIssueFilter({ unassigned: true })).toEqual({
+      and: [{ assignee: { null: true } }],
+    });
+  });
+
+  it("maps --state-type to the state category", () => {
+    expect(buildIssueFilter({ stateType: "started" })).toEqual({
+      and: [{ state: { type: { eq: "started" } } }],
+    });
+  });
+
+  it("maps --subscriber to a subscribers.some clause", () => {
+    expect(buildIssueFilter({ subscriberId: "user-1" })).toEqual({
+      and: [{ subscribers: { some: { id: { eq: "user-1" } } } }],
+    });
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
+  resolveBatchCreateIssueIds,
   resolveCreateIssueIds,
   resolveUpdateIssueIds,
 } from "../../../src/resolvers/issue-mutation-resolver.js";
@@ -410,5 +411,328 @@ describe("resolveUpdateIssueIds", () => {
     );
 
     expect(result).toEqual({ assigneeId: UUID, projectId: UUID });
+  });
+});
+
+describe("resolveBatchCreateIssueIds", () => {
+  const createResponse = (teamId: string, teamKey = "ENG") => ({
+    teams: {
+      nodes: [
+        {
+          id: teamId,
+          key: teamKey,
+          name: "Engineering",
+          issueEstimationType: "fibonacci",
+          issueEstimationExtended: false,
+          issueEstimationAllowZero: false,
+        },
+      ],
+    },
+    assignees: { nodes: [] },
+    projects: { nodes: [] },
+    labels: { nodes: [] },
+    statuses: { nodes: [] },
+    cycles: { nodes: [] },
+    parentIssues: { nodes: [] },
+  });
+
+  it("collapses entries that name the same references onto one request", async () => {
+    const request = vi.fn().mockResolvedValue(createResponse("team-uuid"));
+    const client = { request } as unknown as GraphQLClient;
+
+    const resolved = await resolveBatchCreateIssueIds(client, [
+      { team: "ENG" },
+      { team: "ENG" },
+      { team: "ENG" },
+    ]);
+
+    expect(resolved.map((ids) => ids.teamId)).toEqual([
+      "team-uuid",
+      "team-uuid",
+      "team-uuid",
+    ]);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves distinct reference sets separately, preserving input order", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse("team-a"))
+      .mockResolvedValueOnce(createResponse("team-b", "DES"));
+    const client = { request } as unknown as GraphQLClient;
+
+    const resolved = await resolveBatchCreateIssueIds(client, [
+      { team: "ENG" },
+      { team: "DES" },
+    ]);
+
+    expect(resolved.map((ids) => ids.teamId)).toEqual(["team-a", "team-b"]);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("propagates a not-found reference instead of skipping the entry", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ...createResponse("team-uuid"),
+      teams: { nodes: [] },
+    });
+    const client = { request } as unknown as GraphQLClient;
+
+    await expect(
+      resolveBatchCreateIssueIds(client, [{ team: "NOPE" }]),
+    ).rejects.toThrow('Team "NOPE" not found');
+  });
+
+  it("bounds how many distinct reference sets are in flight at once", async () => {
+    // A heterogeneous import has one distinct set per row, so an unbounded
+    // fan-out would issue every request simultaneously and invite a
+    // rate-limit rejection.
+    let inFlight = 0;
+    let peak = 0;
+    const request = vi.fn().mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return createResponse("team-uuid");
+    });
+    const client = { request } as unknown as GraphQLClient;
+
+    // Distinct assignee UUIDs: they pass straight through the mappers, so
+    // each entry is its own reference set without needing 20 response shapes.
+    const entries = Array.from({ length: 20 }, (_, i) => ({
+      team: "ENG",
+      assignee: `550e8400-e29b-41d4-a716-4466554400${String(i).padStart(2, "0")}`,
+    }));
+    const resolved = await resolveBatchCreateIssueIds(client, entries);
+
+    expect(resolved).toHaveLength(20);
+    expect(request).toHaveBeenCalledTimes(20);
+    // Exactly the wave size: still concurrent, just bounded.
+    expect(peak).toBe(5);
+  });
+
+  it("keeps input order when the deduplicated sets resolve out of order", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(createResponse("team-a"))
+      .mockResolvedValueOnce(createResponse("team-b", "DES"));
+    const client = { request } as unknown as GraphQLClient;
+
+    const resolved = await resolveBatchCreateIssueIds(client, [
+      { team: "ENG" },
+      { team: "DES" },
+      { team: "ENG" },
+    ]);
+
+    expect(resolved.map((ids) => ids.teamId)).toEqual([
+      "team-a",
+      "team-b",
+      "team-a",
+    ]);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("resolveUpdateIssueIds team move", () => {
+  it("scopes the status lookup to the destination team, not the current one", async () => {
+    // resolveTeamId runs first (FindTeams), then the batch request.
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        teams: { nodes: [{ id: "des-team", key: "DES", name: "Design" }] },
+      })
+      .mockResolvedValueOnce(
+        buildResponse({
+          statuses: [
+            {
+              id: "des-review",
+              name: "In Review",
+              team: { id: "des-team", key: "DES" },
+            },
+          ],
+        }),
+      );
+    const client = { request } as unknown as GraphQLClient;
+
+    const result = await resolveUpdateIssueIds(
+      client,
+      { team: "DES", status: "In Review" },
+      { teamId: "eng-team" as never, teamKey: "ENG" },
+    );
+
+    expect(result.teamId).toBe("des-team");
+    expect(result.stateId).toBe("des-review");
+    expect(request).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ teamId: "des-team", teamKey: null }),
+    );
+  });
+});
+
+describe("resolveUpdateIssueIds user references", () => {
+  it("resolves subscribers and delegate through the user resolver", async () => {
+    const request = vi.fn().mockImplementation((_document, variables) => {
+      const filter = (
+        variables as { filter?: Record<string, unknown> } | undefined
+      )?.filter;
+
+      if (filter && "displayName" in filter) {
+        const name = (filter as { displayName: { eqIgnoreCase: string } })
+          .displayName.eqIgnoreCase;
+        return Promise.resolve({
+          users: {
+            nodes: [{ id: `${name}-uuid`, name, email: `${name}@x.io` }],
+          },
+        });
+      }
+
+      return Promise.resolve(buildResponse({}));
+    });
+    const client = { request } as unknown as GraphQLClient;
+
+    const result = await resolveUpdateIssueIds(
+      client,
+      { subscribers: ["alice", "bob"], delegate: "carol" },
+      {},
+    );
+
+    expect(result.subscriberIds).toEqual(["alice-uuid", "bob-uuid"]);
+    expect(result.delegateId).toBe("carol-uuid");
+  });
+});
+
+describe("the `me` assignee alias", () => {
+  /**
+   * `viewer` is queried without variables; every other request in these
+   * resolvers passes some. That is enough to route the mock.
+   */
+  function mockGqlWithViewer(nodes: Nodes, viewerId = "viewer-uuid") {
+    const request = vi.fn().mockImplementation((_document, variables) =>
+      variables === undefined
+        ? Promise.resolve({
+            viewer: { id: viewerId, name: "Me", email: "me@example.com" },
+          })
+        : Promise.resolve(buildResponse(nodes)),
+    );
+    return { client: { request } as unknown as GraphQLClient, request };
+  }
+
+  it("resolves a create assignee against the viewer", async () => {
+    const { client, request } = mockGqlWithViewer({
+      teams: [{ id: "team-uuid", key: "ENG", name: "Engineering" }],
+    });
+
+    const result = await resolveCreateIssueIds(client, {
+      team: "ENG",
+      assignee: "me",
+    });
+
+    expect(result.assigneeId).toBe("viewer-uuid");
+    // "me" is not a display name — sending it as one would only come back
+    // empty and be reported as an unknown user.
+    expect(request).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assigneeQuery: null }),
+    );
+  });
+
+  it("accepts the @me spelling and ignores case", async () => {
+    const { client } = mockGqlWithViewer({
+      teams: [{ id: "team-uuid", key: "ENG", name: "Engineering" }],
+    });
+
+    const result = await resolveCreateIssueIds(client, {
+      team: "ENG",
+      assignee: "@ME",
+    });
+
+    expect(result.assigneeId).toBe("viewer-uuid");
+  });
+
+  it("resolves an update assignee against the viewer", async () => {
+    const { client } = mockGqlWithViewer({});
+
+    const result = await resolveUpdateIssueIds(client, { assignee: "me" }, {});
+
+    expect(result.assigneeId).toBe("viewer-uuid");
+  });
+
+  it("still resolves a named assignee through the batch response", async () => {
+    const { client } = mockGqlWithViewer({
+      teams: [{ id: "team-uuid", key: "ENG", name: "Engineering" }],
+      assignees: [
+        {
+          id: "user-uuid",
+          name: "John",
+          email: "john@example.com",
+          displayName: "John Doe",
+        },
+      ],
+    });
+
+    const result = await resolveCreateIssueIds(client, {
+      team: "ENG",
+      assignee: "John Doe",
+    });
+
+    expect(result.assigneeId).toBe("user-uuid");
+  });
+});
+
+describe("user reference lookups and unhandled rejections", () => {
+  /**
+   * The user lookups run concurrently with the batch request. If one is only
+   * awaited on the success path, a failure of the other leaves its rejection
+   * unhandled — which in Node 22 tears the process down with a stack trace
+   * instead of letting handleCommand print the JSON error envelope.
+   */
+  async function collectUnhandled(
+    run: () => Promise<unknown>,
+  ): Promise<unknown[]> {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+
+    process.on("unhandledRejection", listener);
+    try {
+      await expect(run()).rejects.toThrow();
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+
+    return unhandled;
+  }
+
+  const failingClient = (): GraphQLClient =>
+    ({
+      request: vi
+        .fn()
+        .mockImplementation(() => Promise.reject(new Error("lookup failed"))),
+    }) as unknown as GraphQLClient;
+
+  it("surfaces create lookup failures without leaking a rejection", async () => {
+    const unhandled = await collectUnhandled(() =>
+      resolveCreateIssueIds(failingClient(), {
+        team: "ENG",
+        subscribers: ["alice"],
+        delegate: "carol",
+      }),
+    );
+
+    expect(unhandled).toEqual([]);
+  });
+
+  it("surfaces update lookup failures without leaking a rejection", async () => {
+    const unhandled = await collectUnhandled(() =>
+      resolveUpdateIssueIds(
+        failingClient(),
+        { team: "DES", subscribers: ["alice"], delegate: "carol" },
+        {},
+      ),
+    );
+
+    expect(unhandled).toEqual([]);
   });
 });

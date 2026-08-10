@@ -4,6 +4,7 @@ import type { CommandContext } from "../../../src/common/context.js";
 import { resolveFilterOptions } from "../../../src/common/resolve-filters.js";
 import { resolveSearchFilterIds } from "../../../src/resolvers/issue-filter-resolver.js";
 import { resolveMilestoneId } from "../../../src/resolvers/milestone-resolver.js";
+import { resolveUserId } from "../../../src/resolvers/user-resolver.js";
 
 vi.mock("../../../src/resolvers/issue-filter-resolver.js", () => ({
   resolveSearchFilterIds: vi.fn().mockResolvedValue({
@@ -20,6 +21,10 @@ vi.mock("../../../src/resolvers/issue-filter-resolver.js", () => ({
 
 vi.mock("../../../src/resolvers/milestone-resolver.js", () => ({
   resolveMilestoneId: vi.fn().mockResolvedValue("milestone-uuid"),
+}));
+
+vi.mock("../../../src/resolvers/user-resolver.js", () => ({
+  resolveUserId: vi.fn().mockResolvedValue("subscriber-uuid"),
 }));
 
 function mockContext(): CommandContext {
@@ -205,5 +210,46 @@ describe("resolveFilterOptions", () => {
       resolveFilterOptions(mockContext(), { dueBefore: "not-a-date" }),
     ).rejects.toThrow("--due-before");
     expect(resolveSearchFilterIds).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveFilterOptions state and subscriber flags", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects --unassigned together with --assignee", async () => {
+    // The two describe the same field in contradictory ways; combining them
+    // would silently build a filter that matches nothing.
+    await expect(
+      resolveFilterOptions(mockContext(), {
+        unassigned: true,
+        assignee: "alice",
+      }),
+    ).rejects.toThrow(
+      "Invalid --unassigned: cannot be combined with --assignee",
+    );
+  });
+
+  it("validates --state-type before making any request", async () => {
+    await expect(
+      resolveFilterOptions(mockContext(), { stateType: "done" }),
+    ).rejects.toThrow(/Invalid --state-type/);
+    expect(resolveSearchFilterIds).not.toHaveBeenCalled();
+  });
+
+  it("resolves --subscriber to a user UUID", async () => {
+    const result = await resolveFilterOptions(mockContext(), {
+      subscriber: "alice",
+      stateType: "started",
+      unassigned: true,
+    });
+
+    expect(resolveUserId).toHaveBeenCalledWith(expect.anything(), "alice");
+    expect(result).toMatchObject({
+      subscriberId: "subscriber-uuid",
+      stateType: "started",
+      unassigned: true,
+    });
   });
 });

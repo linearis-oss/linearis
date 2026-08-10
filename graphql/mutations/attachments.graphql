@@ -22,6 +22,20 @@ mutation AttachmentCreate($input: AttachmentCreateInput!) {
   }
 }
 
+# Stop syncing an issue with the external resource behind an attachment
+#
+# Despite the `issue*` prefix the mutation is keyed by attachment, not issue:
+# a single issue can carry several synced attachments and they are disabled
+# one at a time. It returns the affected issue.
+mutation AttachmentExternalSyncDisable($attachmentId: String!) {
+  issueExternalSyncDisable(attachmentId: $attachmentId) {
+    success
+    issue {
+      ...CompleteIssueFields
+    }
+  }
+}
+
 # Delete an attachment
 #
 # Deletes an attachment and returns success status.

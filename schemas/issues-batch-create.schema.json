@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json",
+  "title": "linearis issues batch create document",
+  "description": "Input document for `linearis issues batch create --file <path>` (or `--json <json>`). A JSON array of issues to create in a single transaction. The keys mirror the `issues create` flags with the leading dashes dropped; unknown keys are rejected rather than ignored.",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/entry" },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "team"],
+      "dependentRequired": {
+        "projectMilestone": ["project"]
+      },
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Issue title."
+        },
+        "team": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Team key (ENG), team name, or team UUID. Every entry names its own team."
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Issue description in Markdown."
+        },
+        "assignee": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Assignee as display name, email, UUID, or `me`."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "description": "1=urgent, 2=high, 3=medium, 4=low. Omit for no priority."
+        },
+        "estimate": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Estimate points. Validated against the team's estimation scale (fibonacci, exponential, linear, or t-shirt sizes), so the accepted values depend on the team."
+        },
+        "project": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Project name or UUID."
+        },
+        "projectMilestone": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Milestone name or UUID. Milestones are scoped by project, so `project` must be set as well."
+        },
+        "cycle": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Cycle number, name, `current`/`next`/`previous`, or UUID."
+        },
+        "status": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Workflow state name (Todo, In Progress, ...) or UUID, resolved within the entry's team."
+        },
+        "parentTicket": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Parent issue as identifier (ABC-123) or UUID."
+        },
+        "labels": {
+          "description": "Label names or UUIDs, either as an array or as a comma-separated string.",
+          "oneOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            },
+            { "$ref": "#/$defs/nonEmptyString" }
+          ]
+        },
+        "subscribers": {
+          "description": "Users to subscribe on creation, each a display name, email, UUID, or `me`. Either an array or a comma-separated string.",
+          "oneOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            },
+            { "$ref": "#/$defs/nonEmptyString" }
+          ]
+        },
+        "delegate": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Delegate as display name, email, UUID, or `me`. A delegate acts for the assignee."
+        },
+        "dueDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Due date as YYYY-MM-DD. The date must exist in the calendar."
+        }
+      }
+    }
+  },
+  "examples": [
+    [
+      {
+        "title": "Fix login redirect loop",
+        "team": "ENG",
+        "description": "Users bounce between /login and /dashboard after SSO.",
+        "assignee": "alice",
+        "priority": 1,
+        "labels": ["bug", "auth"],
+        "dueDate": "2026-09-01"
+      },
+      {
+        "title": "Document the SSO flow",
+        "team": "ENG",
+        "project": "Q3 Auth",
+        "projectMilestone": "Beta",
+        "status": "Todo",
+        "estimate": 2,
+        "subscribers": ["bob", "carol@example.com"],
+        "delegate": "me"
+      }
+    ]
+  ]
+}

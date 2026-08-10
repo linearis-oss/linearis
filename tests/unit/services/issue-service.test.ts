@@ -1,11 +1,19 @@
-import { type DocumentNode, type FragmentDefinitionNode, Kind } from "graphql";
+import {
+  type DocumentNode,
+  type FragmentDefinitionNode,
+  Kind,
+  print,
+} from "graphql";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import {
   ArchiveIssueDocument,
+  BatchCreateIssuesDocument,
+  BatchUpdateIssuesDocument,
   DeleteIssueDocument,
   FilteredSearchIssuesDocument,
+  FindIssuesDocument,
   GetIssueByIdDocument,
   GetIssueByIdentifierDocument,
   GetIssueByIdentifierWithAttachmentsDocument,
@@ -14,14 +22,23 @@ import {
   GetIssueByIdWithAttachmentsDocument,
   GetIssueByIdWithCommentsDocument,
   GetIssueByIdWithReactionsDocument,
-  GetIssuesDocument,
+  IssueVcsBranchSearchDocument,
+  RemindOnIssueDocument,
   SearchIssuesDocument,
+  ShareIssueDocument,
+  SubscribeToIssueDocument,
   UnarchiveIssueDocument,
+  UnshareIssueDocument,
+  UnsubscribeFromIssueDocument,
+  UpdateIssueDocument,
 } from "../../../src/gql/graphql.js";
 import {
   archiveIssue,
+  batchCreateIssues,
+  batchUpdateIssues,
   createIssue,
   deleteIssue,
+  findIssueByBranch,
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
@@ -33,8 +50,15 @@ import {
   getIssueWithCommentThreads,
   getIssueWithReactions,
   listIssues,
+  remindOnIssue,
+  restoreIssue,
   searchIssues,
+  shareIssue,
+  snoozeIssue,
+  subscribeToIssue,
   unarchiveIssue,
+  unshareIssue,
+  unsubscribeFromIssue,
   updateIssue,
 } from "../../../src/services/issue-service.js";
 
@@ -105,7 +129,146 @@ describe("attachment issue read documents", () => {
   });
 });
 
+describe("issue read payload", () => {
+  const scalarNames = (document: DocumentNode, fragment: string): string[] =>
+    getFragment(document, fragment)
+      .selectionSet.selections.filter(
+        (selection) => selection.kind === Kind.FIELD,
+      )
+      .map((selection) => selection.name.value);
+
+  it("exposes the issue url and lifecycle timestamps on list and search", () => {
+    const expected = [
+      "url",
+      "startedAt",
+      "completedAt",
+      "canceledAt",
+      "archivedAt",
+      "snoozedUntilAt",
+      "trashed",
+      "creator",
+      "delegate",
+    ];
+
+    expect(
+      scalarNames(FilteredSearchIssuesDocument, "CompleteIssueFields"),
+    ).toEqual(expect.arrayContaining(expected));
+    expect(
+      scalarNames(SearchIssuesDocument, "CompleteIssueSearchFields"),
+    ).toEqual(expect.arrayContaining(expected));
+  });
+
+  it("keeps subscribers and sharedAccess off the list fragment", () => {
+    // They belong to single-issue reads only — see IssueDetailOnlyFields.
+    const listFields = scalarNames(
+      FilteredSearchIssuesDocument,
+      "CompleteIssueFields",
+    );
+    expect(listFields).not.toContain("subscribers");
+    expect(listFields).not.toContain("sharedAccess");
+
+    expect(print(GetIssueByIdDocument)).toContain("IssueDetailOnlyFields");
+    expect(print(GetIssueByIdWithCommentsDocument)).toContain(
+      "IssueDetailOnlyFields",
+    );
+    expect(print(FilteredSearchIssuesDocument)).not.toContain(
+      "IssueDetailOnlyFields",
+    );
+  });
+});
+
+describe("archived issue reachability", () => {
+  it("resolves identifiers against archived issues too", () => {
+    // resolveIssueId / the identifier read path go through these documents; if
+    // they stop including archived issues, `issues unarchive ENG-42` breaks.
+    const documents = [
+      FindIssuesDocument,
+      GetIssueByIdentifierDocument,
+      GetIssueByIdentifierWithCommentsDocument,
+      GetIssueByIdentifierWithReactionsDocument,
+      GetIssueByIdentifierWithAttachmentsDocument,
+    ];
+
+    for (const document of documents) {
+      expect(print(document)).toContain("includeArchived: true");
+    }
+  });
+
+  it("keeps list and search opt-in rather than always-archived", () => {
+    for (const document of [
+      FilteredSearchIssuesDocument,
+      SearchIssuesDocument,
+    ]) {
+      expect(print(document)).toContain("$includeArchived: Boolean = false");
+    }
+  });
+});
+
 describe("listIssues", () => {
+  it("forwards includeArchived on both the filtered and unfiltered paths", async () => {
+    for (const filter of [undefined, { priority: { eq: 1 } }]) {
+      const client = mockGqlClient({
+        issues: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+      await listIssues(client, { limit: 10, includeArchived: true }, filter);
+      expect(client.request).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ includeArchived: true }),
+      );
+    }
+  });
+
+  it("keeps updatedAt ordering by default and honours an override", async () => {
+    for (const [options, expected] of [
+      [{ limit: 10 }, "updatedAt"],
+      [{ limit: 10, orderBy: "createdAt" as const }, "createdAt"],
+    ] as const) {
+      const client = mockGqlClient({
+        issues: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+      await listIssues(client, options);
+      expect(client.request).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orderBy: expected }),
+      );
+    }
+  });
+
+  it("still excludes completed issues by default when a filter is given", async () => {
+    // Regression guard: parameterizing orderBy must not drop the implicit
+    // non-completed clause.
+    const client = mockGqlClient({
+      issues: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await listIssues(
+      client,
+      { limit: 10, orderBy: "createdAt" },
+      { priority: { eq: 1 } },
+    );
+
+    expect(client.request).toHaveBeenCalledWith(
+      FilteredSearchIssuesDocument,
+      expect.objectContaining({
+        filter: {
+          and: [
+            { state: { type: { neq: "completed" } } },
+            { priority: { eq: 1 } },
+          ],
+        },
+      }),
+    );
+  });
+
   it("returns issues from query", async () => {
     const client = mockGqlClient({
       issues: {
@@ -145,7 +308,9 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 25,
       after: undefined,
+      filter: { state: { type: { neq: "completed" } } },
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -160,7 +325,9 @@ describe("listIssues", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       first: 5,
       after: "cursor1",
+      filter: { state: { type: { neq: "completed" } } },
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -198,6 +365,7 @@ describe("listIssues", () => {
         ],
       },
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
@@ -222,10 +390,11 @@ describe("listIssues", () => {
       after: undefined,
       filter,
       orderBy: "updatedAt",
+      includeArchived: false,
     });
   });
 
-  it("uses GetIssues query when no filter provided (no regression)", async () => {
+  it("applies the non-completed default on the unfiltered path too", async () => {
     const client = mockGqlClient({
       issues: {
         nodes: [],
@@ -233,11 +402,36 @@ describe("listIssues", () => {
       },
     });
     await listIssues(client);
-    expect(client.request).toHaveBeenCalledWith(GetIssuesDocument, {
+    expect(client.request).toHaveBeenCalledWith(FilteredSearchIssuesDocument, {
       first: 25,
       after: undefined,
+      filter: { state: { type: { neq: "completed" } } },
       orderBy: "updatedAt",
+      includeArchived: false,
     });
+  });
+
+  it("drops the non-completed default when archived issues are requested", async () => {
+    // Archived issues are almost always completed, so keeping the implicit
+    // clause would make --include-archived hide what it was passed to show.
+    for (const [filter, expected] of [
+      [undefined, undefined],
+      [{ priority: { eq: 1 } }, { priority: { eq: 1 } }],
+    ] as const) {
+      const client = mockGqlClient({
+        issues: {
+          nodes: [],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        },
+      });
+
+      await listIssues(client, { limit: 10, includeArchived: true }, filter);
+
+      expect(client.request).toHaveBeenCalledWith(
+        FilteredSearchIssuesDocument,
+        expect.objectContaining({ filter: expected, includeArchived: true }),
+      );
+    }
   });
 });
 
@@ -786,6 +980,7 @@ describe("searchIssues", () => {
       term: "query",
       first: 5,
       after: "prevCursor",
+      includeArchived: false,
     });
   });
 
@@ -803,6 +998,7 @@ describe("searchIssues", () => {
       term: "bug",
       first: 10,
       after: undefined,
+      includeArchived: false,
       filter,
     });
   });
@@ -819,6 +1015,7 @@ describe("searchIssues", () => {
       term: "test",
       first: 25,
       after: undefined,
+      includeArchived: false,
     });
   });
 });
@@ -902,6 +1099,230 @@ describe("deleteIssue", () => {
 
     await expect(deleteIssue(client, asUuid("issue-1"))).rejects.toThrow(
       'Failed to delete issue "issue-1"',
+    );
+  });
+});
+
+describe("subscriber and sharing mutations", () => {
+  const issueId = asUuid("issue-1");
+  const userId = asUuid("user-1");
+
+  const cases = [
+    {
+      name: "subscribeToIssue",
+      call: subscribeToIssue,
+      document: SubscribeToIssueDocument,
+      payloadKey: "issueSubscribe",
+      failure: 'Failed to subscribe user "user-1" to issue "issue-1"',
+    },
+    {
+      name: "unsubscribeFromIssue",
+      call: unsubscribeFromIssue,
+      document: UnsubscribeFromIssueDocument,
+      payloadKey: "issueUnsubscribe",
+      failure: 'Failed to unsubscribe user "user-1" from issue "issue-1"',
+    },
+    {
+      name: "shareIssue",
+      call: shareIssue,
+      document: ShareIssueDocument,
+      payloadKey: "issueShare",
+      failure: 'Failed to share issue "issue-1" with user "user-1"',
+    },
+    {
+      name: "unshareIssue",
+      call: unshareIssue,
+      document: UnshareIssueDocument,
+      payloadKey: "issueUnshare",
+      failure: 'Failed to unshare issue "issue-1" from user "user-1"',
+    },
+  ] as const;
+
+  it.each(cases)("$name returns the updated issue", async (testCase) => {
+    const client = mockGqlClient({
+      [testCase.payloadKey]: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(testCase.call(client, issueId, userId)).resolves.toEqual({
+      id: "issue-1",
+    });
+    expect(client.request).toHaveBeenCalledWith(testCase.document, {
+      id: "issue-1",
+      userId: "user-1",
+    });
+  });
+
+  it.each(cases)("$name throws when the mutation fails", async (testCase) => {
+    const client = mockGqlClient({
+      [testCase.payloadKey]: { success: false, issue: null },
+    });
+
+    await expect(testCase.call(client, issueId, userId)).rejects.toThrow(
+      testCase.failure,
+    );
+  });
+});
+
+describe("remindOnIssue", () => {
+  it("passes the reminder instant through untouched", async () => {
+    const client = mockGqlClient({
+      issueReminder: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(
+      remindOnIssue(client, asUuid("issue-1"), "2026-08-14T09:00:00.000Z"),
+    ).resolves.toEqual({ id: "issue-1" });
+    expect(client.request).toHaveBeenCalledWith(RemindOnIssueDocument, {
+      id: "issue-1",
+      reminderAt: "2026-08-14T09:00:00.000Z",
+    });
+  });
+
+  it("throws when the mutation fails", async () => {
+    const client = mockGqlClient({
+      issueReminder: { success: false, issue: null },
+    });
+
+    await expect(
+      remindOnIssue(client, asUuid("issue-1"), "2026-08-14T09:00:00.000Z"),
+    ).rejects.toThrow('Failed to set a reminder on issue "issue-1"');
+  });
+});
+
+describe("batchCreateIssues", () => {
+  it("wraps the inputs in the batch input shape", async () => {
+    const client = mockGqlClient({
+      issueBatchCreate: { success: true, issues: [{ id: "issue-1" }] },
+    });
+
+    await expect(
+      batchCreateIssues(client, [
+        { title: "A", teamId: asUuid("team-1") },
+        { title: "B", teamId: asUuid("team-1") },
+      ]),
+    ).resolves.toEqual([{ id: "issue-1" }]);
+
+    expect(client.request).toHaveBeenCalledWith(BatchCreateIssuesDocument, {
+      input: {
+        issues: [
+          { title: "A", teamId: "team-1" },
+          { title: "B", teamId: "team-1" },
+        ],
+      },
+    });
+  });
+
+  it("throws when the transaction reports failure", async () => {
+    const client = mockGqlClient({
+      issueBatchCreate: { success: false, issues: [] },
+    });
+
+    await expect(
+      batchCreateIssues(client, [{ title: "A", teamId: asUuid("team-1") }]),
+    ).rejects.toThrow("Failed to create 1 issues");
+  });
+});
+
+describe("batchUpdateIssues", () => {
+  it("sends the id list and one shared patch", async () => {
+    const client = mockGqlClient({
+      issueBatchUpdate: { success: true, issues: [{ id: "issue-1" }] },
+    });
+
+    await expect(
+      batchUpdateIssues(client, [asUuid("issue-1"), asUuid("issue-2")], {
+        priority: 2,
+      }),
+    ).resolves.toEqual([{ id: "issue-1" }]);
+
+    expect(client.request).toHaveBeenCalledWith(BatchUpdateIssuesDocument, {
+      ids: ["issue-1", "issue-2"],
+      input: { priority: 2 },
+    });
+  });
+
+  it("throws when the transaction reports failure", async () => {
+    const client = mockGqlClient({
+      issueBatchUpdate: { success: false, issues: [] },
+    });
+
+    await expect(
+      batchUpdateIssues(client, [asUuid("issue-1")], { priority: 2 }),
+    ).rejects.toThrow("Failed to update 1 issues");
+  });
+});
+
+describe("findIssueByBranch", () => {
+  it("returns the issue owning the branch", async () => {
+    const client = mockGqlClient({
+      issueVcsBranchSearch: { id: "issue-1", identifier: "ENG-1" },
+    });
+
+    await expect(
+      findIssueByBranch(client, "fabian/eng-1-login"),
+    ).resolves.toEqual({ id: "issue-1", identifier: "ENG-1" });
+    expect(client.request).toHaveBeenCalledWith(IssueVcsBranchSearchDocument, {
+      branchName: "fabian/eng-1-login",
+    });
+  });
+
+  it("throws when the branch belongs to no issue", async () => {
+    const client = mockGqlClient({ issueVcsBranchSearch: null });
+
+    await expect(findIssueByBranch(client, "main")).rejects.toThrow(
+      'Issue for branch "main" not found',
+    );
+  });
+});
+
+describe("restoreIssue", () => {
+  it("untrashes via issueUpdate, since issueUnarchive does not cover trash", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(restoreIssue(client, asUuid("issue-1"))).resolves.toEqual({
+      id: "issue-1",
+    });
+    expect(client.request).toHaveBeenCalledWith(UpdateIssueDocument, {
+      id: "issue-1",
+      input: { trashed: false },
+    });
+  });
+});
+
+describe("snoozeIssue", () => {
+  it("sets the snooze instant", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await snoozeIssue(client, asUuid("issue-1"), "2026-08-20T00:00:00.000Z");
+    expect(client.request).toHaveBeenCalledWith(UpdateIssueDocument, {
+      id: "issue-1",
+      input: { snoozedUntilAt: "2026-08-20T00:00:00.000Z" },
+    });
+  });
+
+  it("wakes the issue with an explicit null", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await snoozeIssue(client, asUuid("issue-1"), null);
+    expect(client.request).toHaveBeenCalledWith(UpdateIssueDocument, {
+      id: "issue-1",
+      input: { snoozedUntilAt: null },
+    });
+  });
+
+  it("surfaces a failed update", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: false, issue: null },
+    });
+
+    await expect(snoozeIssue(client, asUuid("issue-1"), null)).rejects.toThrow(
+      "Failed to update issue",
     );
   });
 });
