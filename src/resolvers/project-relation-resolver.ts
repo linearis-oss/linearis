@@ -12,11 +12,12 @@ import { GetProjectRelationsDocument } from "../gql/graphql.js";
  * `remove` would be to run `relations list` first and copy an opaque UUID.
  *
  * ARCHITECTURAL EXCEPTION: Linear exposes no lean lookup for project
- * relations — the connections hang off `Project`, and there is no
- * `projectRelations` root query to filter. This resolver therefore reads the
- * same `GetProjectRelations` document the service uses. Both directions are
- * searched because "the relation between A and B" is one relation regardless
- * of which project declared it.
+ * relations. The `projectRelations` root connection accepts no filter
+ * argument at all, so it cannot be narrowed to a project; the only scoped
+ * view is the pair of connections hanging off `Project`. This resolver
+ * therefore reads the same `GetProjectRelations` document the service uses.
+ * Both directions are searched because "the relation between A and B" is one
+ * relation regardless of which project declared it.
  *
  * @throws Error if no relation links the two projects
  */

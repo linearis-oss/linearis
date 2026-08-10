@@ -9,6 +9,8 @@ import {
 import {
   createProjectRelation,
   deleteProjectRelation,
+  getProjectRelation,
+  listAllProjectRelations,
   listProjectRelations,
   updateProjectRelation,
 } from "../../../src/services/project-relation-service.js";
@@ -197,5 +199,46 @@ describe("deleteProjectRelation", () => {
     await expect(
       deleteProjectRelation(client, asUuid("rel-1")),
     ).rejects.toThrow('Failed to delete project relation "rel-1"');
+  });
+});
+
+describe("getProjectRelation", () => {
+  it("returns the relation when found", async () => {
+    const client = mockGqlClient({ projectRelation: { id: "rel-1" } });
+
+    await expect(getProjectRelation(client, asUuid("rel-1"))).resolves.toEqual({
+      id: "rel-1",
+    });
+  });
+
+  it("throws when the relation is missing", async () => {
+    const client = mockGqlClient({ projectRelation: null });
+
+    await expect(getProjectRelation(client, asUuid("rel-1"))).rejects.toThrow(
+      'Project relation "rel-1" not found',
+    );
+  });
+});
+
+describe("listAllProjectRelations", () => {
+  it("pages the unfiltered workspace connection", async () => {
+    const client = mockGqlClient({
+      projectRelations: {
+        nodes: [{ id: "rel-1" }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    });
+
+    await expect(
+      listAllProjectRelations(client, { limit: 10, after: "cursor-1" }),
+    ).resolves.toEqual({
+      nodes: [{ id: "rel-1" }],
+      pageInfo: { hasNextPage: false, endCursor: null },
+    });
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      first: 10,
+      after: "cursor-1",
+    });
   });
 });

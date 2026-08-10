@@ -5,12 +5,15 @@ import {
   requireMutationEntity,
   requireMutationSuccess,
 } from "../common/mutation-payload.js";
+import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
   CreateProjectRelationDocument,
   type CreateProjectRelationMutation,
   DeleteProjectRelationDocument,
+  GetProjectRelationDocument,
   GetProjectRelationsDocument,
   type GetProjectRelationsQuery,
+  ListAllProjectRelationsDocument,
   type ProjectRelationCoreFieldsFragment,
   UpdateProjectRelationDocument,
   type UpdateProjectRelationMutation,
@@ -106,6 +109,43 @@ export async function listProjectRelations(
     truncated:
       project.relations.pageInfo.hasNextPage ||
       project.inverseRelations.pageInfo.hasNextPage,
+  };
+}
+
+export async function getProjectRelation(
+  client: GraphQLClient,
+  id: UUID,
+): Promise<ProjectRelation> {
+  const result = await client.request(GetProjectRelationDocument, { id });
+
+  if (!result.projectRelation) {
+    throw notFoundError("Project relation", id);
+  }
+
+  return result.projectRelation;
+}
+
+/**
+ * Every dependency in the workspace.
+ *
+ * The root connection accepts no filter, so this cannot be narrowed to one
+ * project — {@link listProjectRelations} covers that. Useful when the
+ * question is "what depends on what" rather than "what does this depend on".
+ */
+export async function listAllProjectRelations(
+  client: GraphQLClient,
+  options: PaginationOptions = {},
+): Promise<PaginatedResult<ProjectRelation>> {
+  const { limit = 50, after } = options;
+
+  const result = await client.request(ListAllProjectRelationsDocument, {
+    first: limit,
+    after,
+  });
+
+  return {
+    nodes: result.projectRelations.nodes,
+    pageInfo: result.projectRelations.pageInfo,
   };
 }
 

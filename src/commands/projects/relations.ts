@@ -2,7 +2,12 @@ import type { Command } from "commander";
 import { createContext, getRootOpts } from "../../common/context.js";
 import { invalidParameterError } from "../../common/errors.js";
 import type { UUID } from "../../common/identifier.js";
-import { commandAction, outputSuccess } from "../../common/output.js";
+import {
+  commandAction,
+  outputSuccess,
+  parseLimit,
+} from "../../common/output.js";
+import { buildPaginationOptions } from "../../common/types.js";
 import { resolveMilestoneId } from "../../resolvers/milestone-resolver.js";
 import { resolveProjectRelationId } from "../../resolvers/project-relation-resolver.js";
 import { resolveProjectId } from "../../resolvers/project-resolver.js";
@@ -10,6 +15,8 @@ import {
   type CreateProjectRelationInput,
   createProjectRelation,
   deleteProjectRelation,
+  getProjectRelation,
+  listAllProjectRelations,
   listProjectRelations,
   PROJECT_RELATION_ANCHORS,
   type ProjectRelationAnchor,
@@ -51,6 +58,11 @@ interface RelationRemoveOptions {
   blocks?: string;
 }
 
+interface RelationListOptions {
+  limit: string;
+  after?: string;
+}
+
 function parseAnchor(flag: string, value: string): ProjectRelationAnchor {
   const match = PROJECT_RELATION_ANCHORS.find((anchor) => anchor === value);
   if (!match) {
@@ -87,15 +99,49 @@ export function setupProjectRelationCommands(projects: Command): void {
     .addHelpText("after", ANCHOR_HELP);
 
   relations
-    .command("list <project>")
-    .description("list a project's dependencies in both directions")
+    .command("list [project]")
+    .description("list dependencies for a project, or across the workspace")
+    .addHelpText(
+      "after",
+      "\nWith a project, both directions are returned separately.\n" +
+        "Without one, the workspace-wide connection is paged instead — it\n" +
+        "takes no filter, so -l/--after are the only knobs it has.",
+    )
+    .option("-l, --limit <n>", "max results (workspace-wide only)", "50")
+    .option("--after <cursor>", "cursor for next page (workspace-wide only)")
+    .action(
+      commandAction<[string | undefined, RelationListOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          if (project === undefined) {
+            outputSuccess(
+              await listAllProjectRelations(
+                ctx.gql,
+                buildPaginationOptions(
+                  parseLimit(options.limit),
+                  options.after,
+                ),
+              ),
+            );
+            return;
+          }
+
+          const projectId = await resolveProjectId(ctx.gql, project);
+          outputSuccess(await listProjectRelations(ctx.gql, projectId));
+        },
+      ),
+    );
+
+  relations
+    .command("read <relation>")
+    .description("read one dependency by UUID")
     .action(
       commandAction<[string, unknown, Command]>(
-        async (project, _unused1, command) => {
+        async (relation, _unused1, command) => {
           const ctx = createContext(getRootOpts(command));
-          const projectId = await resolveProjectId(ctx.gql, project);
-          const result = await listProjectRelations(ctx.gql, projectId);
-          outputSuccess(result);
+          const relationId = await resolveProjectRelationId(ctx.gql, relation);
+          outputSuccess(await getProjectRelation(ctx.gql, relationId));
         },
       ),
     );

@@ -36,6 +36,10 @@ vi.mock("../../../src/services/project-relation-service.js", async () => {
   return {
     PROJECT_RELATION_ANCHORS: actual.PROJECT_RELATION_ANCHORS,
     listProjectRelations: vi.fn().mockResolvedValue({ relations: [] }),
+    listAllProjectRelations: vi
+      .fn()
+      .mockResolvedValue({ nodes: [], pageInfo: {} }),
+    getProjectRelation: vi.fn().mockResolvedValue({ id: "rel-1" }),
     createProjectRelation: vi.fn().mockResolvedValue({ id: "rel-1" }),
     updateProjectRelation: vi.fn().mockResolvedValue({ id: "rel-1" }),
     deleteProjectRelation: vi
@@ -50,6 +54,8 @@ import { resolveProjectRelationId } from "../../../src/resolvers/project-relatio
 import {
   createProjectRelation,
   deleteProjectRelation,
+  getProjectRelation,
+  listAllProjectRelations,
   listProjectRelations,
   updateProjectRelation,
 } from "../../../src/services/project-relation-service.js";
@@ -75,6 +81,25 @@ describe("projects relations", () => {
     expect(listProjectRelations).toHaveBeenCalledWith(
       expect.anything(),
       "project-uuid-1",
+    );
+  });
+
+  it("list without a project pages the workspace-wide connection", async () => {
+    await run("list", "--limit", "10");
+
+    expect(listAllProjectRelations).toHaveBeenCalledWith(expect.anything(), {
+      limit: 10,
+      after: undefined,
+    });
+    expect(listProjectRelations).not.toHaveBeenCalled();
+  });
+
+  it("read resolves the relation and returns it", async () => {
+    await run("read", "relation-uuid");
+
+    expect(getProjectRelation).toHaveBeenCalledWith(
+      expect.anything(),
+      "relation-uuid",
     );
   });
 

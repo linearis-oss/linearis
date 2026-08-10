@@ -33,6 +33,30 @@ fragment ProjectRelationCoreFields on ProjectRelation {
   }
 }
 
+query GetProjectRelation($id: String!) {
+  projectRelation(id: $id) {
+    ...ProjectRelationCoreFields
+  }
+}
+
+# Every dependency in the workspace
+#
+# The root connection takes no filter argument, so it cannot be narrowed
+# to one project — that is what GetProjectRelations is for. This is the
+# whole-workspace view, and the only way to page dependencies without
+# already knowing which project to ask about.
+query ListAllProjectRelations($first: Int = 50, $after: String) {
+  projectRelations(first: $first, after: $after) {
+    nodes {
+      ...ProjectRelationCoreFields
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+
 # Both directions of a project's dependencies
 #
 # `relations` are the ones this project declares; `inverseRelations` are
