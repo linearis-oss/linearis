@@ -157,6 +157,20 @@ describe("resolveProjectRelation", () => {
     ).rejects.toThrow("more than 100 dependencies in one direction");
   });
 
+  it("refuses a lone match when a duplicate could sit past the page bound", async () => {
+    const client = mockGqlClient({
+      relations: connection({
+        nodes: [{ id: RELATION, relatedProject: { id: PROJECT_B } }],
+        hasNextPage: true,
+      }),
+      inverseRelations: connection({ nodes: [] }),
+    });
+
+    await expect(
+      resolveProjectRelation(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).rejects.toThrow("more than 100 dependencies in one direction");
+  });
+
   it("throws when the project does not exist", async () => {
     const client = mockGqlClient(null);
 

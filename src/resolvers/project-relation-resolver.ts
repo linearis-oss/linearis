@@ -89,16 +89,6 @@ export async function resolveProjectRelation(
       .map((node) => ({ node, inverted: true })),
   ];
 
-  if (matches.length === 1) {
-    const match = firstOrThrow(matches, () =>
-      notFoundError(
-        "Project relation",
-        `between ${projectId} and ${relatedProjectId}`,
-      ),
-    );
-    return { id: asUuid(match.node.id), inverted: match.inverted };
-  }
-
   // One pair of projects can carry several relations — different types, or the
   // same type anchored to different milestones — and they may point either way
   // round. Picking one would silently update or remove an arbitrary link, so
@@ -113,23 +103,35 @@ export async function resolveProjectRelation(
   }
 
   // Both connections are bounded at 100 rows, and neither accepts a filter
-  // that could narrow them to the counterpart. Past that bound "no match" is
-  // indistinguishable from "not on this page", so say so rather than report a
-  // relation that may well exist as missing — `update` and `remove` would give
-  // up on a relation that is really there.
+  // that could narrow them to the counterpart. Past that bound the page tells
+  // us nothing about the rest: no match here may still be a match there, and a
+  // single match here may have a twin there that would have made the pair
+  // ambiguous. Either way the safe answer is to refuse, so this runs before
+  // the single-match return rather than only on zero matches.
   if (
     result.project.relations.pageInfo.hasNextPage ||
     result.project.inverseRelations.pageInfo.hasNextPage
   ) {
     throw new Error(
       `Project "${projectId}" has more than 100 dependencies in one ` +
-        `direction, and none of the first 100 links it to "${relatedProjectId}". ` +
-        "Find the relation with `projects relations list` and address it by UUID.",
+        `direction, so its links to "${relatedProjectId}" cannot be listed in ` +
+        "full. Find the relation with `projects relations list` and address it " +
+        "by UUID.",
     );
   }
 
-  throw notFoundError(
-    "Project relation",
-    `between ${projectId} and ${relatedProjectId}`,
+  if (matches.length === 0) {
+    throw notFoundError(
+      "Project relation",
+      `between ${projectId} and ${relatedProjectId}`,
+    );
+  }
+
+  const match = firstOrThrow(matches, () =>
+    notFoundError(
+      "Project relation",
+      `between ${projectId} and ${relatedProjectId}`,
+    ),
   );
+  return { id: asUuid(match.node.id), inverted: match.inverted };
 }
