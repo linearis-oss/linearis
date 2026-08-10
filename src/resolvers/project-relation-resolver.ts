@@ -7,6 +7,14 @@ import {
   type ProjectRelationCoreFieldsFragment,
 } from "../gql/graphql.js";
 
+/**
+ * Rows read from each direction of a project's dependencies. Neither
+ * connection accepts a filter, so the whole page is fetched and matched
+ * client-side; 100 covers any realistic project while keeping the read well
+ * inside Linear's complexity budget.
+ */
+const PROJECT_RELATION_PAGE_SIZE = 100;
+
 /** A resolved relation, plus which way round it is stored. */
 export interface ResolvedProjectRelation {
   id: UUID;
@@ -71,6 +79,7 @@ export async function resolveProjectRelation(
   const projectId = asUuid(relationOrProjectId);
   const result = await client.request(GetProjectRelationsDocument, {
     projectId,
+    first: PROJECT_RELATION_PAGE_SIZE,
   });
 
   if (!result.project) {
@@ -102,7 +111,7 @@ export async function resolveProjectRelation(
     );
   }
 
-  // Both connections are bounded at 100 rows, and neither accepts a filter
+  // Both connections are bounded, and neither accepts a filter
   // that could narrow them to the counterpart. Past that bound the page tells
   // us nothing about the rest: no match here may still be a match there, and a
   // single match here may have a twin there that would have made the pair
@@ -113,10 +122,10 @@ export async function resolveProjectRelation(
     result.project.inverseRelations.pageInfo.hasNextPage
   ) {
     throw new Error(
-      `Project "${projectId}" has more than 100 dependencies in one ` +
-        `direction, so its links to "${relatedProjectId}" cannot be listed in ` +
-        "full. Find the relation with `projects relations list` and address it " +
-        "by UUID.",
+      `Project "${projectId}" has more than ${PROJECT_RELATION_PAGE_SIZE} ` +
+        `dependencies in one direction, so its links to "${relatedProjectId}" ` +
+        "cannot be listed in full. Find the relation with `projects relations " +
+        "list` and address it by UUID.",
     );
   }
 

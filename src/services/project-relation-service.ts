@@ -31,6 +31,16 @@ import {
 const PROJECT_RELATION_TYPE = "dependency";
 
 /**
+ * Rows read from each direction of a project's dependencies.
+ *
+ * Neither connection accepts a cursor the CLI could surface — `relations list`
+ * reports `truncated` instead — so this bound is the whole read. 100 covers
+ * any realistic project while keeping the query inside Linear's complexity
+ * budget.
+ */
+const PROJECT_RELATION_PAGE_SIZE = 100;
+
+/**
  * Which end of a project a relation attaches to.
  *
  * Also untyped `String!` in the schema. `"start"` and `"end"` are the values
@@ -60,7 +70,7 @@ export interface ProjectRelationsResult {
   relations: ProjectRelation[];
   /** Dependencies other projects declare on this one. */
   inverseRelations: ProjectRelation[];
-  /** True when either connection was cut off at its 100-row bound. */
+  /** True when either connection was cut off at `PROJECT_RELATION_PAGE_SIZE`. */
   truncated: boolean;
 }
 
@@ -87,6 +97,7 @@ async function fetchProjectRelations(
 ): Promise<ProjectRelationsProject> {
   const result = await client.request(GetProjectRelationsDocument, {
     projectId,
+    first: PROJECT_RELATION_PAGE_SIZE,
   });
 
   if (!result.project) {

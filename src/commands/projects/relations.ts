@@ -67,9 +67,10 @@ const DEFAULT_LIMIT = "50";
 
 /**
  * `relations list <project>` reads both directions of one project in a single
- * query capped at 100 each and reports `truncated` instead of a cursor, so
- * `-l`/`--after` have nothing to act on. Accepting them silently would answer
- * a different question than the one asked.
+ * query capped at a fixed page size each and reports `truncated` rather than
+ * a cursor (see `PROJECT_RELATION_PAGE_SIZE`), so `-l`/`--after` have nothing
+ * to act on. Accepting them silently would answer a different question than
+ * the one asked.
  */
 function rejectPaginationForProject(
   command: Command,
