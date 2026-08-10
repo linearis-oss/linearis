@@ -37,8 +37,8 @@ const UNIT_MILLISECONDS: Record<string, number> = {
  * @param value - Either `+<n>[mhdw]` or an ISO-8601 date / date-time
  * @param now - Reference instant for relative values; injected so the parser
  *   stays pure and testable
- * @throws Error if the value matches neither form, or names a date that does
- *   not exist (e.g. `2026-02-30`)
+ * @throws Error if the value matches neither form, names a date that does not
+ *   exist (e.g. `2026-02-30`), or lands outside the range a `Date` can hold
  */
 export function parseDateTimeOption(
   flag: string,
@@ -59,7 +59,19 @@ export function parseDateTimeOption(
       );
     }
 
-    return new Date(now.getTime() + amount * unitMs).toISOString();
+    // A large enough offset lands outside the representable range of a Date
+    // (±100 million days), where `toISOString()` throws a bare RangeError that
+    // names neither the flag nor the value. Report it like every other bad
+    // value here instead.
+    const instant = new Date(now.getTime() + amount * unitMs);
+    if (Number.isNaN(instant.getTime())) {
+      throw invalidParameterError(
+        flag,
+        `"${value}" is too far in the future to represent`,
+      );
+    }
+
+    return instant.toISOString();
   }
 
   const iso = ISO_REGEX.exec(value);

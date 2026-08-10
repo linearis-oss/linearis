@@ -52,6 +52,14 @@ describe("parseDateTimeOption", () => {
     );
   });
 
+  it("rejects an offset that overflows the Date range, naming the flag", () => {
+    // Without the range check this reached toISOString() and came back as a
+    // bare RangeError("Invalid time value") mentioning neither flag nor value.
+    expect(() => parseDateTimeOption("--at", "+99999999w", now)).toThrow(
+      /Invalid --at: "\+99999999w" is too far in the future/,
+    );
+  });
+
   it("rejects a day that does not exist", () => {
     expect(() => parseDateTimeOption("--at", "2026-02-30", now)).toThrow(
       /is not a real date/,
