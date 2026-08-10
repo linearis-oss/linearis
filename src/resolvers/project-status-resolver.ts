@@ -13,16 +13,22 @@ import { GetProjectStatusesDocument } from "../gql/graphql.js";
  *
  * @param client - GraphQL client for querying project statuses
  * @param nameOrId - Status name or UUID
+ * @param options.includeArchived - Search archived statuses too. Needed by
+ *   `projects statuses unarchive`, where the status being named is by
+ *   definition not in the default set.
  * @returns Status UUID
  * @throws Error if status name not found
  */
 export async function resolveProjectStatusId(
   client: GraphQLClient,
   nameOrId: string,
+  options: { includeArchived?: boolean } = {},
 ): Promise<UUID> {
   if (isUuid(nameOrId)) return asUuid(nameOrId);
 
-  const result = await client.request(GetProjectStatusesDocument);
+  const result = await client.request(GetProjectStatusesDocument, {
+    includeArchived: options.includeArchived ?? false,
+  });
   const match = result.projectStatuses.nodes.find(
     (s) => s.name.toLowerCase() === nameOrId.toLowerCase(),
   );

@@ -228,8 +228,8 @@ query GetProjectWithReactions($id: String!, $first: Int, $after: String) {
 # Fetches project statuses for name-to-UUID resolution.
 # The API does not support filter args on this connection,
 # so all statuses are fetched and filtered client-side.
-query GetProjectStatuses {
-  projectStatuses {
+query GetProjectStatuses($includeArchived: Boolean = false) {
+  projectStatuses(includeArchived: $includeArchived) {
     nodes {
       id
       name

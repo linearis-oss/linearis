@@ -33,6 +33,27 @@ describe("resolveProjectStatusId", () => {
     expect(result).toBe("status-uuid");
   });
 
+  it("excludes archived statuses unless asked", async () => {
+    const client = mockGqlClient([{ id: "status-uuid", name: "Started" }]);
+    await resolveProjectStatusId(client, "Started");
+
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      includeArchived: false,
+    });
+  });
+
+  it("searches archived statuses when asked", async () => {
+    const client = mockGqlClient([{ id: "status-uuid", name: "Retired" }]);
+    const result = await resolveProjectStatusId(client, "Retired", {
+      includeArchived: true,
+    });
+
+    expect(result).toBe("status-uuid");
+    expect(client.request).toHaveBeenCalledWith(expect.anything(), {
+      includeArchived: true,
+    });
+  });
+
   it("throws when status not found", async () => {
     const client = mockGqlClient([]);
     await expect(resolveProjectStatusId(client, "Nonexistent")).rejects.toThrow(

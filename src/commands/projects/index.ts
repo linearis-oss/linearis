@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { type DomainMeta, formatDomainUsage } from "../../common/usage.js";
 import { setupProjectEntityCommands } from "./entity.js";
+import { setupProjectStatusCommands } from "./statuses.js";
 import { setupProjectUpdateCommands } from "./updates.js";
 
 export const PROJECTS_META: DomainMeta = {
@@ -18,10 +19,14 @@ export const PROJECTS_META: DomainMeta = {
     "",
     "a project's health is derived from its most recent status update, so",
     "changing health means posting one with `projects updates create`.",
+    "",
+    "project statuses are workspace-scoped, not per-team: `projects",
+    "statuses` administers the one ordered flow every project draws from.",
   ].join("\n"),
   arguments: {
     project: "project identifier (UUID or name)",
     update: "project status update identifier (UUID)",
+    status: "project status identifier (UUID or name)",
     name: "string",
   },
   seeAlso: [
@@ -38,6 +43,7 @@ export function setupProjectsCommands(program: Command): void {
 
   setupProjectEntityCommands(projects);
   setupProjectUpdateCommands(projects);
+  setupProjectStatusCommands(projects);
 
   projects
     .command("usage")
