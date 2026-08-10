@@ -223,14 +223,6 @@ query GetProjectWithReactions($id: String!, $first: Int, $after: String) {
   }
 }
 
-# Full-text search across projects
-#
-# Ranked by relevance rather than by `updatedAt`, so there is no orderBy
-# knob here — asking for one would silently discard the ranking that
-# makes the search worth running.
-#
-# `searchProjects` is rate-limited more tightly than the plain
-# `projects` connection; use `projects list` when a filter would do.
 # The search fields, mirroring ProjectListFields
 #
 # `searchProjects` returns `ProjectSearchResult`, a sibling type of
@@ -275,6 +267,14 @@ fragment ProjectSearchFields on ProjectSearchResult {
   }
 }
 
+# Full-text search across projects
+#
+# Ranked by relevance rather than by `updatedAt`, so there is no orderBy
+# knob here — asking for one would silently discard the ranking that
+# makes the search worth running.
+#
+# `searchProjects` is rate-limited more tightly than the plain
+# `projects` connection; use `projects list` when a filter would do.
 query SearchProjects(
   $term: String!
   $first: Int = 25
