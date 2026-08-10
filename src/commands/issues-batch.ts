@@ -6,7 +6,7 @@ import {
   requiresParameterError,
 } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
-import { parseDueDate, type UUID } from "../common/identifier.js";
+import { isUuid, parseDueDate, type UUID } from "../common/identifier.js";
 import { parseCommaSeparated } from "../common/issue-filter.js";
 import {
   parseEstimateOption,
@@ -348,8 +348,14 @@ function toCreateInput(
  * the same team. Rejecting the mixed-team case is better than resolving
  * against an arbitrary one of them and moving four issues into a fifth team's
  * workflow state.
+ *
+ * A UUID needs no team to resolve against, so it is the documented escape
+ * hatch and must pass the guard — `resolveUpdateIssueIds` hands UUIDs straight
+ * through without consulting the scope.
+ *
+ * Exported so that escape hatch can be tested without driving a full command.
  */
-function buildBatchUpdateContext(
+export function buildBatchUpdateContext(
   targets: readonly ResolvedIssueRef[],
   options: BatchUpdateOptions,
 ): UpdateIssueContext {
@@ -358,10 +364,11 @@ function buildBatchUpdateContext(
 
   if (teamKeys.length > 1) {
     for (const flag of ["status", "cycle"] as const) {
-      if (options[flag] !== undefined) {
+      const value = options[flag];
+      if (value !== undefined && !isUuid(value)) {
         throw invalidParameterError(
           `--${flag}`,
-          `cannot be resolved across teams ${teamKeys.join(", ")} — pass a UUID, or split the batch per team`,
+          `cannot be resolved by name across teams ${teamKeys.join(", ")} — pass a UUID, or split the batch per team`,
         );
       }
     }
