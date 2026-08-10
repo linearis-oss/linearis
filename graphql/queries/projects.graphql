@@ -304,11 +304,14 @@ query SearchProjects(
 # Fetches project statuses for name-to-UUID resolution.
 # The API does not support filter args on this connection,
 # so all statuses are fetched and filtered client-side.
+# archivedAt is selected so that an ambiguity between an archived status
+# and a live one of the same name can be spelled out to the caller.
 query GetProjectStatuses($includeArchived: Boolean = false) {
   projectStatuses(includeArchived: $includeArchived) {
     nodes {
       id
       name
+      archivedAt
     }
   }
 }

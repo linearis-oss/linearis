@@ -7,6 +7,18 @@ export function notFoundError(
   return new Error(`${entityType} "${identifier}"${contextStr} not found`);
 }
 
+/**
+ * Pluralises an entity type for the message below.
+ *
+ * Entity types here are short English noun phrases, so the sibilant rule
+ * covers every one of them: "status" needs "statuses", not "statuss".
+ */
+function pluralize(entityType: string): string {
+  return /(?:s|x|z|ch|sh)$/.test(entityType)
+    ? `${entityType}es`
+    : `${entityType}s`;
+}
+
 export function multipleMatchesError(
   entityType: string,
   identifier: string,
@@ -15,7 +27,7 @@ export function multipleMatchesError(
 ): Error {
   const matchList = matches.join(", ");
   return new Error(
-    `Multiple ${entityType}s found matching "${identifier}". ` +
+    `Multiple ${pluralize(entityType)} found matching "${identifier}". ` +
       `Candidates: ${matchList}. ` +
       `Please ${disambiguation}.`,
   );

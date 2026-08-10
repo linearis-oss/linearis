@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { resolveProjectStatusId } from "../../../src/resolvers/project-status-resolver.js";
 
-function mockGqlClient(nodes: Array<{ id: string; name: string }>) {
+function mockGqlClient(
+  nodes: Array<{ id: string; name: string; archivedAt?: string | null }>,
+) {
   return {
     request: vi.fn().mockResolvedValue({
       projectStatuses: { nodes },
@@ -52,6 +54,24 @@ describe("resolveProjectStatusId", () => {
     expect(client.request).toHaveBeenCalledWith(expect.anything(), {
       includeArchived: true,
     });
+  });
+
+  it("refuses to choose between an archived and a live status of the same name", async () => {
+    const client = mockGqlClient([
+      { id: "old-uuid", name: "In Review", archivedAt: "2026-01-01T00:00:00Z" },
+      { id: "new-uuid", name: "In Review", archivedAt: null },
+    ]);
+
+    const error = await resolveProjectStatusId(client, "In Review", {
+      includeArchived: true,
+    }).catch((caught: unknown) => caught as Error);
+
+    expect(error.message).toContain(
+      'Multiple project statuses found matching "In Review"',
+    );
+    expect(error.message).toContain("In Review (archived) (old-uuid)");
+    expect(error.message).toContain("In Review (new-uuid)");
+    expect(error.message).toContain("address the status by UUID");
   });
 
   it("throws when status not found", async () => {

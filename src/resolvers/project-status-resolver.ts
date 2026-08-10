@@ -1,5 +1,6 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import { notFoundError } from "../common/errors.js";
+import { firstOrThrow } from "../common/array.js";
+import { multipleMatchesError, notFoundError } from "../common/errors.js";
 import { asUuid, isUuid, type UUID } from "../common/identifier.js";
 import { GetProjectStatusesDocument } from "../gql/graphql.js";
 
@@ -17,7 +18,7 @@ import { GetProjectStatusesDocument } from "../gql/graphql.js";
  *   `projects statuses unarchive`, where the status being named is by
  *   definition not in the default set.
  * @returns Status UUID
- * @throws Error if status name not found
+ * @throws Error if status name not found, or if several statuses share it
  */
 export async function resolveProjectStatusId(
   client: GraphQLClient,
@@ -29,13 +30,31 @@ export async function resolveProjectStatusId(
   const result = await client.request(GetProjectStatusesDocument, {
     includeArchived: options.includeArchived ?? false,
   });
-  const match = result.projectStatuses.nodes.find(
+  const matches = result.projectStatuses.nodes.filter(
     (s) => s.name.toLowerCase() === nameOrId.toLowerCase(),
   );
 
-  if (!match) {
+  if (matches.length === 0) {
     throw notFoundError("Project status", nameOrId);
   }
 
+  // Names are only unique among live statuses: archiving one frees its name
+  // for a replacement. With includeArchived the old and the new are both in
+  // the list, and nothing in a name tells them apart, so say which is which
+  // rather than let list order decide what gets updated or unarchived.
+  if (matches.length > 1) {
+    throw multipleMatchesError(
+      "project status",
+      nameOrId,
+      matches.map(
+        (s) => `${s.name}${s.archivedAt ? " (archived)" : ""} (${s.id})`,
+      ),
+      "address the status by UUID",
+    );
+  }
+
+  const match = firstOrThrow(matches, () =>
+    notFoundError("Project status", nameOrId),
+  );
   return asUuid(match.id);
 }
