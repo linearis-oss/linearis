@@ -179,13 +179,35 @@ describe("buildBatchUpdateContext", () => {
     }
   });
 
-  it("lets a UUID status or cycle through as the documented escape hatch", () => {
+  it("rejects named labels spanning teams", () => {
+    // Labels can be team-scoped, so two teams may each own a "bug"; the name
+    // lookup takes the first hit and half the batch gets the wrong label.
+    expect(() =>
+      buildBatchUpdateContext([target("ENG"), target("OPS")], {
+        issues: "ENG-1,OPS-1",
+        labels: "bug",
+      }),
+    ).toThrow(/--labels: cannot be resolved by name across teams ENG, OPS/);
+  });
+
+  it("rejects a label list that mixes a UUID with a name", () => {
+    expect(() =>
+      buildBatchUpdateContext([target("ENG"), target("OPS")], {
+        issues: "ENG-1,OPS-1",
+        labels: "66666666-6666-4666-8666-666666666666,bug",
+      }),
+    ).toThrow(/--labels/);
+  });
+
+  it("lets a UUID status, cycle or label through as the documented escape hatch", () => {
     // The error message advises passing a UUID; a UUID needs no team to
     // resolve against, so the guard must not reject it as well.
     const context = buildBatchUpdateContext([target("ENG"), target("OPS")], {
       issues: "ENG-1,OPS-1",
       status: "33333333-3333-4333-8333-333333333333",
       cycle: "44444444-4444-4444-8444-444444444444",
+      labels:
+        "66666666-6666-4666-8666-666666666666,77777777-7777-4777-8777-777777777777",
     });
 
     expect(context).toEqual({});

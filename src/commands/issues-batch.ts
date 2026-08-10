@@ -391,15 +391,20 @@ function toCreateInput(
 /**
  * Derives the lookup scope for a batch patch from the targets themselves.
  *
- * `issueBatchUpdate` applies one `stateId`/`cycleId` to every target, so a
- * status or cycle named by word is only meaningful when all targets live in
- * the same team. Rejecting the mixed-team case is better than resolving
- * against an arbitrary one of them and moving four issues into a fifth team's
- * workflow state.
+ * `issueBatchUpdate` applies one `stateId`/`cycleId`/`labelIds` to every
+ * target, so a status, cycle or label named by word is only meaningful when all
+ * targets live in the same team. Rejecting the mixed-team case is better than
+ * resolving against an arbitrary one of them and moving four issues into a
+ * fifth team's workflow state.
+ *
+ * Labels are in that set because Linear labels may be team-scoped: two teams
+ * can each own a "bug", the name lookup matches both, and the first hit wins —
+ * so half the batch would silently get the other team's label.
  *
  * A UUID needs no team to resolve against, so it is the documented escape
  * hatch and must pass the guard — `resolveUpdateIssueIds` hands UUIDs straight
- * through without consulting the scope.
+ * through without consulting the scope. `--labels` is checked entry by entry,
+ * since it takes a list that may mix UUIDs and names.
  *
  * Exported so that escape hatch can be tested without driving a full command.
  */
@@ -411,14 +416,23 @@ export function buildBatchUpdateContext(
   const [onlyTarget] = targets;
 
   if (teamKeys.length > 1) {
+    const crossTeam = (flag: string): never => {
+      throw invalidParameterError(
+        flag,
+        `cannot be resolved by name across teams ${teamKeys.join(", ")} — pass a UUID, or split the batch per team`,
+      );
+    };
+
     for (const flag of ["status", "cycle"] as const) {
       const value = options[flag];
-      if (value !== undefined && !isUuid(value)) {
-        throw invalidParameterError(
-          `--${flag}`,
-          `cannot be resolved by name across teams ${teamKeys.join(", ")} — pass a UUID, or split the batch per team`,
-        );
-      }
+      if (value !== undefined && !isUuid(value)) crossTeam(`--${flag}`);
+    }
+
+    if (
+      options.labels !== undefined &&
+      parseCommaSeparated(options.labels).some((label) => !isUuid(label))
+    ) {
+      crossTeam("--labels");
     }
 
     return {};
