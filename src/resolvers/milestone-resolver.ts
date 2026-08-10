@@ -14,6 +14,13 @@ import { resolveProjectId } from "./project-resolver.js";
  * Accepts UUID or milestone name. When multiple milestones match a name,
  * use projectNameOrId to scope the search to a specific project.
  *
+ * A project scope is authoritative: a name that project does not carry is
+ * "not found", not an invitation to search the rest of the workspace.
+ * Milestone names repeat across projects ("Beta", "Launch"), so a fallback
+ * would silently resolve to a stranger's milestone — and the callers that
+ * pass a scope (`--project`, the per-end relation flags) all mean the
+ * milestone to belong to that project.
+ *
  * ARCHITECTURAL EXCEPTION: This resolver queries milestones directly via
  * GraphQL (FindProjectMilestoneScoped / FindProjectMilestoneGlobal) because
  * the Linear API exposes no lean lookup fragment for milestones by name. All
@@ -37,7 +44,7 @@ export async function resolveMilestoneId(
     name: string;
     project?: { name: string } | null;
   };
-  let nodes: MilestoneNode[] = [];
+  let nodes: MilestoneNode[];
 
   if (projectNameOrId) {
     const projectId = await resolveProjectId(gqlClient, projectNameOrId);
@@ -46,10 +53,7 @@ export async function resolveMilestoneId(
       projectId,
     });
     nodes = (result.project?.projectMilestones?.nodes as MilestoneNode[]) || [];
-  }
-
-  // Fall back to global search if no project scope or not found
-  if (nodes.length === 0) {
+  } else {
     const globalResult = await gqlClient.request(
       FindProjectMilestoneGlobalDocument,
       { name: nameOrId },
@@ -58,7 +62,11 @@ export async function resolveMilestoneId(
   }
 
   if (nodes.length === 0) {
-    throw notFoundError("Milestone", nameOrId);
+    throw notFoundError(
+      "Milestone",
+      nameOrId,
+      projectNameOrId ? `in project "${projectNameOrId}"` : undefined,
+    );
   }
 
   if (nodes.length > 1) {

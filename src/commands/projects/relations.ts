@@ -350,11 +350,12 @@ function orientToRelation(
  * make every edit a two-step operation. `--blocks` lets callers name the
  * relation the same way they created it.
  *
- * The milestone flags read better when scoped to the right project, so the
- * endpoint IDs come back too, alongside `inverted` — the relation may be
- * stored with the endpoints the other way round. On the UUID path the IDs are
- * undefined and `resolveMilestoneId` falls back to a workspace-wide lookup;
- * there is nothing to invert, since the caller addressed the relation itself.
+ * The milestone flags must be scoped to the right project, so the endpoint IDs
+ * come back too, alongside `inverted` — the relation may be stored with the
+ * endpoints the other way round. On the UUID path the IDs are undefined and
+ * `resolveMilestoneId` searches the workspace, which is all it can do when the
+ * caller addressed the relation itself rather than naming its two ends; there
+ * is nothing to invert on that path either.
  */
 async function resolveRelation(
   ctx: ReturnType<typeof createContext>,
