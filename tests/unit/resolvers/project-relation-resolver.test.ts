@@ -7,6 +7,15 @@ const PROJECT_A = "550e8400-e29b-41d4-a716-446655440000";
 const PROJECT_B = "550e8400-e29b-41d4-a716-446655440001";
 const RELATION = "550e8400-e29b-41d4-a716-4466554400ff";
 
+interface RelationPage {
+  nodes: unknown[];
+  hasNextPage?: boolean;
+}
+
+function connection({ nodes, hasNextPage = false }: RelationPage): unknown {
+  return { nodes, pageInfo: { hasNextPage } };
+}
+
 function mockGqlClient(project: unknown): GraphQLClient {
   return {
     request: vi.fn().mockResolvedValue({ project }),
@@ -26,10 +35,10 @@ describe("resolveProjectRelation", () => {
 
   it("finds the relation the project declares", async () => {
     const client = mockGqlClient({
-      relations: {
+      relations: connection({
         nodes: [{ id: RELATION, relatedProject: { id: PROJECT_B } }],
-      },
-      inverseRelations: { nodes: [] },
+      }),
+      inverseRelations: connection({ nodes: [] }),
     });
 
     await expect(
@@ -39,10 +48,10 @@ describe("resolveProjectRelation", () => {
 
   it("reports the inverted direction when the other project declared it", async () => {
     const client = mockGqlClient({
-      relations: { nodes: [] },
-      inverseRelations: {
+      relations: connection({ nodes: [] }),
+      inverseRelations: connection({
         nodes: [{ id: RELATION, project: { id: PROJECT_B } }],
-      },
+      }),
     });
 
     await expect(
@@ -52,8 +61,8 @@ describe("resolveProjectRelation", () => {
 
   it("throws when the two projects are not related", async () => {
     const client = mockGqlClient({
-      relations: { nodes: [] },
-      inverseRelations: { nodes: [] },
+      relations: connection({ nodes: [] }),
+      inverseRelations: connection({ nodes: [] }),
     });
 
     await expect(
@@ -61,6 +70,17 @@ describe("resolveProjectRelation", () => {
     ).rejects.toThrow(
       `Project relation "between ${PROJECT_A} and ${PROJECT_B}" not found`,
     );
+  });
+
+  it("reports the page bound rather than a false miss", async () => {
+    const client = mockGqlClient({
+      relations: connection({ nodes: [], hasNextPage: true }),
+      inverseRelations: connection({ nodes: [] }),
+    });
+
+    await expect(
+      resolveProjectRelation(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).rejects.toThrow("more than 100 dependencies in one direction");
   });
 
   it("throws when the project does not exist", async () => {

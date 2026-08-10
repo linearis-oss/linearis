@@ -67,6 +67,22 @@ export async function resolveProjectRelation(
   );
   if (inverse) return { id: asUuid(inverse.id), inverted: true };
 
+  // Both connections are bounded at 100 rows, and neither accepts a filter
+  // that could narrow them to the counterpart. Past that bound "no match" is
+  // indistinguishable from "not on this page", so say so rather than report a
+  // relation that may well exist as missing — `remove` would give up and `add`
+  // would go on to create a duplicate.
+  if (
+    result.project.relations.pageInfo.hasNextPage ||
+    result.project.inverseRelations.pageInfo.hasNextPage
+  ) {
+    throw new Error(
+      `Project "${projectId}" has more than 100 dependencies in one ` +
+        `direction, and none of the first 100 links it to "${relatedProjectId}". ` +
+        "Find the relation with `projects relations list` and address it by UUID.",
+    );
+  }
+
   throw notFoundError(
     "Project relation",
     `between ${projectId} and ${relatedProjectId}`,
