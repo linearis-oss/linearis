@@ -1,5 +1,10 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
 import { asUuid, type UUID } from "../common/identifier.js";
+import {
+  compareTimelineEntries,
+  paginateTimeline,
+  type TimelineEntry,
+} from "../common/timeline.js";
 import { collectConnection } from "../common/types.js";
 import {
   GetProjectActivityRefDocument,
@@ -201,51 +206,12 @@ async function fetchCommentThreadItems(
   return buildCommentThreadItems(roots, candidates);
 }
 
-interface TimelineEntry {
-  createdAt: string;
-  id: string;
-  item: ProjectActivityItem;
-}
-
-function toTimelineEntry(item: ProjectActivityItem): TimelineEntry {
+function toTimelineEntry(
+  item: ProjectActivityItem,
+): TimelineEntry<ProjectActivityItem> {
   return item.type === "commentThread"
     ? { createdAt: item.root.createdAt, id: item.root.id, item }
     : { createdAt: item.createdAt, id: item.id, item };
-}
-
-function compareTimelineEntries(a: TimelineEntry, b: TimelineEntry): number {
-  const byCreatedAt = a.createdAt.localeCompare(b.createdAt);
-  return byCreatedAt !== 0 ? byCreatedAt : a.id.localeCompare(b.id);
-}
-
-interface TimelinePage {
-  nodes: ProjectActivityItem[];
-  hasNextPage: boolean;
-  endCursor: string | null;
-}
-
-/** Slice a sorted timeline using an opaque id cursor (mirrors `issues activity`). */
-function paginateTimeline(
-  entries: readonly TimelineEntry[],
-  limit: number,
-  after?: string,
-): TimelinePage {
-  const startIndex =
-    after === undefined
-      ? 0
-      : entries.findIndex((entry) => entry.id === after) + 1;
-
-  if (after !== undefined && startIndex === 0) {
-    throw new Error(`Activity cursor "${after}" not found`);
-  }
-
-  const page = entries.slice(startIndex, startIndex + limit);
-
-  return {
-    nodes: page.map((entry) => entry.item),
-    hasNextPage: startIndex + limit < entries.length,
-    endCursor: page.at(-1)?.id ?? null,
-  };
 }
 
 /**
