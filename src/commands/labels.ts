@@ -246,7 +246,10 @@ function buildUpdateInput(options: UpdateLabelOptions): UpdateLabelInput {
     input.isGroup = false;
   }
 
-  if (Object.keys(input).length === 0 && options.parent === undefined) {
+  // An empty --parent never reaches the mutation (the action only sets
+  // parentId when the value is truthy), so it must not satisfy this guard
+  // either — otherwise the update reports success having sent nothing.
+  if (Object.keys(input).length === 0 && !options.parent) {
     throw invalidParameterError(
       "label update",
       "at least one option must be provided",

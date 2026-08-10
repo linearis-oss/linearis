@@ -748,6 +748,29 @@ describe("labels validation", () => {
     expect(updateLabel).not.toHaveBeenCalled();
   });
 
+  it("rejects update whose only field is an empty --parent", async () => {
+    const program = createProgram();
+
+    await program.parseAsync([
+      "node",
+      "test",
+      "labels",
+      "update",
+      "branch:unmerged",
+      "--parent",
+      "",
+    ]);
+
+    const errorOutput = JSON.parse(
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
+    ) as { error: string };
+
+    expect(errorOutput.error).toBe(
+      "Invalid label update: at least one option must be provided",
+    );
+    expect(updateLabel).not.toHaveBeenCalled();
+  });
+
   it("rejects team scope without a team filter for read", async () => {
     const program = createProgram();
 
