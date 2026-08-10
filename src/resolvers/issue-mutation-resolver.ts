@@ -266,6 +266,9 @@ export async function resolveCreateIssueIds(
   return { ...resolved, ...userRefs };
 }
 
+/** How many distinct reference sets resolve at once (see below for why). */
+const BATCH_CREATE_RESOLVE_CONCURRENCY = 5;
+
 /**
  * Resolves the human identifiers for a whole batch of issues to create.
  *
@@ -274,23 +277,20 @@ export async function resolveCreateIssueIds(
  * a batch must not quietly accept a team name that `issues create` would
  * reject. What changes is the round-trip count: entries naming the same set of
  * references (the usual case, where a batch shares a team and project and
- * differs only in title) are collapsed onto one in-flight request via a
- * promise cache, so the cost is one `BatchResolveForCreate` per *distinct*
- * reference set rather than per row.
+ * differs only in title) are deduplicated up front, so the cost is one
+ * `BatchResolveForCreate` per *distinct* reference set rather than per row.
  *
  * Field-level memoization would collapse more, but status, cycle and milestone
  * lookups are scoped by the entry's own team and project, so a per-field cache
  * cannot be keyed correctly without duplicating that scoping here.
  *
- * Distinct reference sets are resolved in bounded waves rather than all at
- * once. Collapsing helps the common batch that shares a team and project, but
- * a heterogeneous import — the case this command exists for — has as many
+ * The distinct sets are then resolved in bounded waves rather than all at once.
+ * Deduplication helps the common batch that shares a team and project, but a
+ * heterogeneous import — the case this command exists for — has as many
  * distinct sets as rows, and firing every `BatchResolveForCreate` (plus its
  * user lookups) simultaneously is how a large import earns a rate-limit
  * rejection instead of a result.
  */
-const BATCH_CREATE_RESOLVE_CONCURRENCY = 5;
-
 export async function resolveBatchCreateIssueIds(
   client: GraphQLClient,
   entries: readonly ResolveCreateIssueIdsInput[],
