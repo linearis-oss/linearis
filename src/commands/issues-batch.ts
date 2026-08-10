@@ -316,7 +316,18 @@ function optionalInteger(
 /** Accepts both a JSON array and the comma-separated form the flags take. */
 function parseStringList(value: unknown, key: string, at: string): string[] {
   if (typeof value === "string") {
-    return parseCommaSeparated(value);
+    // parseCommaSeparated speaks in flags, not documents: on `"a,,b"` it would
+    // report a bare "comma-separated list", leaving the caller to guess which
+    // of a hundred entries it came from. Restate it with the same locator the
+    // array branch uses.
+    try {
+      return parseCommaSeparated(value);
+    } catch {
+      throw invalidParameterError(
+        at,
+        `has "${key}" with empty segments in its comma-separated value`,
+      );
+    }
   }
 
   if (

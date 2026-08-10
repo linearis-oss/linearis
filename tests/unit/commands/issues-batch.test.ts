@@ -70,6 +70,20 @@ describe("parseBatchCreateEntries", () => {
     expect(entry?.subscribers).toEqual(["bob", "carol"]);
   });
 
+  it("locates the entry when a comma-separated list has empty segments", () => {
+    // parseCommaSeparated speaks in flags: on its own it reports a bare
+    // "comma-separated list", which in a hundred-entry document says nothing
+    // about where to look.
+    expect(() =>
+      parseBatchCreateEntries(
+        JSON.stringify([
+          { title: "A", team: "ENG" },
+          { title: "B", team: "ENG", labels: "a,,b" },
+        ]),
+      ),
+    ).toThrow(/batch document entry 1: has "labels" with empty segments/);
+  });
+
   it("names the offending key when a list is not a list of strings", () => {
     expect(() =>
       parseBatchCreateEntries(
