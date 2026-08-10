@@ -1,3 +1,7 @@
+import type {
+  InitiativeUpdateHealthType,
+  ProjectUpdateHealthType,
+} from "../gql/graphql.js";
 import { invalidParameterError } from "./errors.js";
 
 /** Linear priority scale: 0=none, 1=urgent, 2=high, 3=medium, 4=low. */
@@ -35,10 +39,19 @@ export function parseLabelMode(value: string | undefined): SetMode | undefined {
  * Health of a status update.
  *
  * Linear declares this twice — `InitiativeUpdateHealthType` and
- * `ProjectUpdateHealthType` — with identical members, so one union serves
- * both codegen enums.
+ * `ProjectUpdateHealthType` — with identical members, so one union serves both
+ * codegen enums. The `satisfies` pins that claim to the schema: the
+ * intersection keeps only members both enums still declare, so a value dropped
+ * from either one fails to compile here instead of failing at the API.
  */
-export type UpdateHealth = "onTrack" | "atRisk" | "offTrack";
+const UPDATE_HEALTHS = [
+  "onTrack",
+  "atRisk",
+  "offTrack",
+] as const satisfies readonly (InitiativeUpdateHealthType &
+  ProjectUpdateHealthType)[];
+
+export type UpdateHealth = (typeof UPDATE_HEALTHS)[number];
 
 /**
  * Parses `--health` case-insensitively, because the API spelling is
@@ -48,12 +61,13 @@ export function parseHealth(value?: string): UpdateHealth | undefined {
   if (!value) return undefined;
 
   const normalized = value.trim().toLowerCase();
-  if (normalized === "ontrack") return "onTrack";
-  if (normalized === "atrisk") return "atRisk";
-  if (normalized === "offtrack") return "offTrack";
+  const match = UPDATE_HEALTHS.find(
+    (health) => health.toLowerCase() === normalized,
+  );
+  if (match) return match;
 
   throw invalidParameterError(
     "--health",
-    'must be one of: "onTrack", "atRisk", "offTrack"',
+    `must be one of: ${UPDATE_HEALTHS.map((health) => `"${health}"`).join(", ")}`,
   );
 }
