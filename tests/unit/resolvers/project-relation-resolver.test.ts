@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
 import { resolveProjectRelation } from "../../../src/resolvers/project-relation-resolver.js";
+import { captureRejection } from "../helpers/capture-rejection.js";
 
 const PROJECT_A = "550e8400-e29b-41d4-a716-446655440000";
 const PROJECT_B = "550e8400-e29b-41d4-a716-446655440001";
@@ -86,11 +87,9 @@ describe("resolveProjectRelation", () => {
       inverseRelations: connection({ nodes: [] }),
     });
 
-    const error = await resolveProjectRelation(
-      client,
-      PROJECT_A,
-      asUuid(PROJECT_B),
-    ).catch((caught: unknown) => caught as Error);
+    const error = await captureRejection(
+      resolveProjectRelation(client, PROJECT_A, asUuid(PROJECT_B)),
+    );
 
     expect(error.message).toContain(
       `Multiple project relations found matching "between ${PROJECT_A} and ${PROJECT_B}"`,

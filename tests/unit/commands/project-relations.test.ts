@@ -55,6 +55,7 @@ vi.mock("../../../src/services/project-relation-service.js", async () => {
 });
 
 import { setupProjectRelationCommands } from "../../../src/commands/projects/relations.js";
+import { asUuid } from "../../../src/common/identifier.js";
 import { resolveMilestoneId } from "../../../src/resolvers/milestone-resolver.js";
 import { resolveProjectRelation } from "../../../src/resolvers/project-relation-resolver.js";
 import { resolveProjectId } from "../../../src/resolvers/project-resolver.js";
@@ -257,7 +258,7 @@ describe("projects relations", () => {
 
   it("update swaps both ends when the relation is stored inverted", async () => {
     vi.mocked(resolveProjectRelation).mockResolvedValueOnce({
-      id: "relation-uuid",
+      id: asUuid("relation-uuid"),
       inverted: true,
     });
 

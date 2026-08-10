@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { resolveProjectStatusId } from "../../../src/resolvers/project-status-resolver.js";
+import { captureRejection } from "../helpers/capture-rejection.js";
 
 function mockGqlClient(
   nodes: Array<{ id: string; name: string; archivedAt?: string | null }>,
@@ -65,9 +66,9 @@ describe("resolveProjectStatusId", () => {
       { id: "new-uuid", name: "In Review", archivedAt: null },
     ]);
 
-    const error = await resolveProjectStatusId(client, "In Review", {
-      includeArchived: true,
-    }).catch((caught: unknown) => caught as Error);
+    const error = await captureRejection(
+      resolveProjectStatusId(client, "In Review", { includeArchived: true }),
+    );
 
     expect(error.message).toContain(
       'Multiple project statuses found matching "In Review"',
