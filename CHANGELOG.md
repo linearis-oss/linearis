@@ -1,3 +1,38 @@
+## [2026.8.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.7.0...v2026.8.0-next.1) (2026-08-10)
+
+### Features
+
+* **attachments:** add disable-sync ([9e7cf04](https://github.com/linearis-oss/linearis/commit/9e7cf044fe240dc665f31a51f5f2b8b820bd6f3c))
+* **issues:** accept subscribers and delegate in batch create ([67ea490](https://github.com/linearis-oss/linearis/commit/67ea490da975d9cc5ded0d2ba2b82ed302710347))
+* **issues:** add batch create and batch update ([fb68bcf](https://github.com/linearis-oss/linearis/commit/fb68bcfd2cc2a47bc9dde0018d88bc2d2374a8f4))
+* **issues:** add from-branch to find an issue by its git branch ([1c0ee8c](https://github.com/linearis-oss/linearis/commit/1c0ee8c97864dea24a4ba2b895f18a4c07639f32))
+* **issues:** add order-by, unassigned, state-type and subscriber filters ([2e01ad3](https://github.com/linearis-oss/linearis/commit/2e01ad344b9dbd3f815b7c15a957283687b4faf2))
+* **issues:** add restore and snooze ([00bf191](https://github.com/linearis-oss/linearis/commit/00bf1919625da595cd51b7f51b7185b24cbd655b))
+* **issues:** add subscribe, share and remind commands ([1530903](https://github.com/linearis-oss/linearis/commit/1530903ddf5962faf53365f17c9600f540b553d7))
+* **issues:** let batch update clear a cycle or milestone ([70aafb9](https://github.com/linearis-oss/linearis/commit/70aafb94c28741056ea49eebf8d5184f96d05f69))
+* **issues:** publish a JSON Schema for batch create documents ([13ed81a](https://github.com/linearis-oss/linearis/commit/13ed81a20e27d97d079b49ab9770564a70095781))
+* **issues:** return url, creator, delegate and lifecycle timestamps ([2d4885e](https://github.com/linearis-oss/linearis/commit/2d4885e9c737bcd1c3e8d7657969c91eb3046ba8))
+* **issues:** support team moves, subscribers and delegates ([8c96db1](https://github.com/linearis-oss/linearis/commit/8c96db11c2f3d61c8cb37174c6e92d633a51f936))
+* **issues:** take batch update from a JSON document too ([60b9491](https://github.com/linearis-oss/linearis/commit/60b94914b724155e4ee9993558e6fc7f13225fd6))
+
+### Bug Fixes
+
+* **issues:** await user lookups so failures stay JSON ([cd42347](https://github.com/linearis-oss/linearis/commit/cd42347d321d51d609ddda92a3434baeebd40a45))
+* **issues:** guard batch update labels across teams too ([c716701](https://github.com/linearis-oss/linearis/commit/c7167010810526ca8d0c790ead1cc0788fb0bd22))
+* **issues:** let a UUID pass the mixed-team batch guard ([5a248a8](https://github.com/linearis-oss/linearis/commit/5a248a8c102af4c3be7a6e4f7f9adcc21464bf22))
+* **issues:** locate the entry when a batch list is malformed ([b83ea52](https://github.com/linearis-oss/linearis/commit/b83ea52695a356ba9650cc68b506010a3ed7bd66))
+* **issues:** make --include-archived surface archived issues ([cb14ec7](https://github.com/linearis-oss/linearis/commit/cb14ec7469a8d421c4ccbd7c7e3112fe95a566d3))
+* **issues:** make archived issues reachable by identifier ([6ac9829](https://github.com/linearis-oss/linearis/commit/6ac98297ed9d4c675d0e77ec59e395313efa4f84))
+* **issues:** name the flag when a relative offset overflows ([634f846](https://github.com/linearis-oss/linearis/commit/634f846900a27993c5ccff402db90e7bc6aa7560))
+* **issues:** resolve a `me` assignee against the viewer ([d5f8198](https://github.com/linearis-oss/linearis/commit/d5f81985ab9632db78b968a043398260c97a336b))
+* **issues:** validate a moved issue's estimate against its new team ([c8d94f1](https://github.com/linearis-oss/linearis/commit/c8d94f1518f0066d5b7153c4a5d0c26f75a430b8))
+* **issues:** validate batch update estimates against the team scale ([31634dc](https://github.com/linearis-oss/linearis/commit/31634dce7b6ebf384475f0188adeb4941b77f6f3))
+* **release:** pin conventionalcommits preset to the writer-v8-compatible line ([fc0276d](https://github.com/linearis-oss/linearis/commit/fc0276d163cf7edce50c41c0533afd902a18a534))
+
+### Performance Improvements
+
+* **issues:** bound the fan-out of batch create ID resolution ([f623be9](https://github.com/linearis-oss/linearis/commit/f623be9c49de173d872c66774a0e0e90dcd61ace))
+
 ## [2026.7.0](https://github.com/linearis-oss/linearis/compare/v2026.6.0...v2026.7.0) (2026-08-07)
 
 ### Features
