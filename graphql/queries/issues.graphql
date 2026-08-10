@@ -17,17 +17,32 @@ fragment CompleteIssueFields on Issue {
   identifier
   title
   description
+  url
   branchName
   priority
   estimate
   dueDate
   createdAt
   updatedAt
+  startedAt
+  completedAt
+  canceledAt
+  archivedAt
+  snoozedUntilAt
+  trashed
   state {
     id
     name
   }
+  creator {
+    id
+    name
+  }
   assignee {
+    id
+    name
+  }
+  delegate {
     id
     name
   }
@@ -90,6 +105,26 @@ fragment CompleteIssueFields on Issue {
   }
 }
 
+# Per-issue detail that is deliberately absent from CompleteIssueFields
+#
+# A subscriber roster and a sharing summary are worth one round-trip when the
+# caller asked for one issue, but they would multiply across every row of a
+# 50-issue list for no benefit — so they hang off the single-read fragments
+# only, not off the shared list fragment.
+fragment IssueDetailOnlyFields on Issue {
+  subscribers {
+    nodes {
+      id
+      name
+    }
+  }
+  sharedAccess {
+    isShared
+    sharedWithCount
+    viewerHasOnlySharedAccess
+  }
+}
+
 # Minimal comment fields preserved for default issue reads
 fragment IssueReadDefaultCommentFields on Comment {
   id
@@ -115,6 +150,7 @@ fragment IssueReadCommentFields on Comment {
 # discussion metadata behind explicit flags.
 fragment CompleteIssueWithDefaultCommentsFields on Issue {
   ...CompleteIssueFields
+  ...IssueDetailOnlyFields
   comments {
     nodes {
       ...IssueReadDefaultCommentFields
@@ -129,6 +165,7 @@ fragment CompleteIssueWithDefaultCommentsFields on Issue {
 # relationships (state, assignee, team, project, labels, comments).
 fragment CompleteIssueWithCommentsFields on Issue {
   ...CompleteIssueFields
+  ...IssueDetailOnlyFields
   comments {
     nodes {
       ...IssueReadCommentFields
@@ -154,17 +191,32 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
   identifier
   title
   description
+  url
   branchName
   priority
   estimate
   dueDate
   createdAt
   updatedAt
+  startedAt
+  completedAt
+  canceledAt
+  archivedAt
+  snoozedUntilAt
+  trashed
   state {
     id
     name
   }
+  creator {
+    id
+    name
+  }
   assignee {
+    id
+    name
+  }
+  delegate {
     id
     name
   }

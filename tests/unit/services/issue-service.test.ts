@@ -111,6 +111,49 @@ describe("attachment issue read documents", () => {
   });
 });
 
+describe("issue read payload", () => {
+  const scalarNames = (document: DocumentNode, fragment: string): string[] =>
+    getFragment(document, fragment)
+      .selectionSet.selections.filter(
+        (selection) => selection.kind === Kind.FIELD,
+      )
+      .map((selection) => selection.name.value);
+
+  it("exposes the issue url and lifecycle timestamps on list and search", () => {
+    const expected = [
+      "url",
+      "startedAt",
+      "completedAt",
+      "canceledAt",
+      "archivedAt",
+      "snoozedUntilAt",
+      "trashed",
+      "creator",
+      "delegate",
+    ];
+
+    expect(scalarNames(GetIssuesDocument, "CompleteIssueFields")).toEqual(
+      expect.arrayContaining(expected),
+    );
+    expect(
+      scalarNames(SearchIssuesDocument, "CompleteIssueSearchFields"),
+    ).toEqual(expect.arrayContaining(expected));
+  });
+
+  it("keeps subscribers and sharedAccess off the list fragment", () => {
+    // They belong to single-issue reads only — see IssueDetailOnlyFields.
+    const listFields = scalarNames(GetIssuesDocument, "CompleteIssueFields");
+    expect(listFields).not.toContain("subscribers");
+    expect(listFields).not.toContain("sharedAccess");
+
+    expect(print(GetIssueByIdDocument)).toContain("IssueDetailOnlyFields");
+    expect(print(GetIssueByIdWithCommentsDocument)).toContain(
+      "IssueDetailOnlyFields",
+    );
+    expect(print(GetIssuesDocument)).not.toContain("IssueDetailOnlyFields");
+  });
+});
+
 describe("archived issue reachability", () => {
   it("resolves identifiers against archived issues too", () => {
     // resolveIssueId / the identifier read path go through these documents; if
