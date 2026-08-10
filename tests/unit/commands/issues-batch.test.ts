@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   buildBatchUpdateContext,
+  buildBatchUpdateInput,
   parseBatchCreateEntries,
   validateBatchUpdateEstimate,
 } from "../../../src/commands/issues-batch.js";
@@ -271,5 +272,34 @@ describe("validateBatchUpdateEstimate", () => {
       title: "no estimate here",
     });
     expect(request).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("buildBatchUpdateInput", () => {
+  const CYCLE = asUuid("66666666-6666-4666-8666-666666666666");
+  const MILESTONE = asUuid("77777777-7777-4777-8777-777777777777");
+
+  it("detaches the cycle with --clear-cycle", () => {
+    expect(
+      buildBatchUpdateInput({ issues: "ENG-1", clearCycle: true }, {}),
+    ).toEqual({ cycleId: null });
+  });
+
+  it("detaches the milestone with --clear-project-milestone", () => {
+    expect(
+      buildBatchUpdateInput(
+        { issues: "ENG-1", clearProjectMilestone: true },
+        {},
+      ),
+    ).toEqual({ projectMilestoneId: null });
+  });
+
+  it("still sets a cycle or milestone when the clear flags are absent", () => {
+    expect(
+      buildBatchUpdateInput(
+        { issues: "ENG-1", cycle: "Cycle 4", projectMilestone: "Beta" },
+        { cycleId: CYCLE, projectMilestoneId: MILESTONE },
+      ),
+    ).toEqual({ cycleId: CYCLE, projectMilestoneId: MILESTONE });
   });
 });

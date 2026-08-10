@@ -90,7 +90,9 @@ interface BatchUpdateOptions {
   parentTicket?: string;
   clearParentTicket?: boolean;
   projectMilestone?: string;
+  clearProjectMilestone?: boolean;
   cycle?: string;
+  clearCycle?: boolean;
   dueDate?: string;
   clearDueDate?: boolean;
 }
@@ -465,9 +467,10 @@ function buildBatchUpdateResolverInput(
   if (!options.clearLabels && options.labels) {
     input.labels = parseCommaSeparated(options.labels);
   }
-  if (options.projectMilestone)
+  if (!options.clearProjectMilestone && options.projectMilestone) {
     input.projectMilestone = options.projectMilestone;
-  if (options.cycle) input.cycle = options.cycle;
+  }
+  if (!options.clearCycle && options.cycle) input.cycle = options.cycle;
   if (options.status) input.status = options.status;
   if (!options.clearParentTicket && options.parentTicket) {
     input.parentTicket = options.parentTicket;
@@ -489,6 +492,13 @@ function validateBatchUpdateOptions(options: BatchUpdateOptions): void {
       "--clear-parent-ticket",
       options.clearParentTicket,
     ],
+    [
+      "--project-milestone",
+      options.projectMilestone,
+      "--clear-project-milestone",
+      options.clearProjectMilestone,
+    ],
+    ["--cycle", options.cycle, "--clear-cycle", options.clearCycle],
   ];
 
   for (const [flag, value, clearFlag, clearValue] of exclusions) {
@@ -596,7 +606,9 @@ export function addBatchCommands(issues: Command): void {
       "--project-milestone <ms>",
       "set project milestone (requires --project)",
     )
+    .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
+    .option("--clear-cycle", "remove issues from their cycle")
     .option("--estimate <n>", "new estimate")
     .option("--clear-estimate", "clear estimate")
     .option("--due-date <date>", "set due date (YYYY-MM-DD)")
@@ -637,7 +649,14 @@ export function addBatchCommands(issues: Command): void {
     );
 }
 
-function buildBatchUpdateInput(
+/**
+ * Turns the flags into the single patch every target receives.
+ *
+ * Exported so the clear-versus-set branches can be asserted without driving a
+ * full command; `null` and "absent" mean different things to the API, and only
+ * the built input shows which one a flag produced.
+ */
+export function buildBatchUpdateInput(
   options: BatchUpdateOptions,
   ids: {
     assigneeId?: UUID;
@@ -690,8 +709,20 @@ function buildBatchUpdateInput(
     input.parentId = ids.parentId;
   }
 
-  if (ids.projectMilestoneId) input.projectMilestoneId = ids.projectMilestoneId;
-  if (ids.cycleId) input.cycleId = ids.cycleId;
+  // --clear-project already nulls the milestone above; the explicit flag has
+  // to work on its own too, for a batch that stays in its project.
+  if (options.clearProjectMilestone) {
+    input.projectMilestoneId = null;
+  } else if (ids.projectMilestoneId) {
+    input.projectMilestoneId = ids.projectMilestoneId;
+  }
+
+  if (options.clearCycle) {
+    input.cycleId = null;
+  } else if (ids.cycleId) {
+    input.cycleId = ids.cycleId;
+  }
+
   if (ids.stateId) input.stateId = ids.stateId;
 
   if (options.clearDueDate) {
