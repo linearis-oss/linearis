@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { type DomainMeta, formatDomainUsage } from "../../common/usage.js";
 import { setupProjectEntityCommands } from "./entity.js";
+import { setupProjectRelationCommands } from "./relations.js";
 import { setupProjectStatusCommands } from "./statuses.js";
 import { setupProjectUpdateCommands } from "./updates.js";
 
@@ -30,11 +31,17 @@ export const PROJECTS_META: DomainMeta = {
     "but not the item shape: Linear's ProjectHistory carries one opaque",
     "`entries` object instead of typed from/to fields, so history items are",
     "passed through verbatim rather than normalized into `changes[]`.",
+    "",
+    "project relations are scheduling dependencies, not issue-style link",
+    "types: each end anchors to a project's start or end (or to one of its",
+    'milestones). `--from end --to start` is the default and means "this',
+    'must finish before that starts".',
   ].join("\n"),
   arguments: {
     project: "project identifier (UUID or name)",
     update: "project status update identifier (UUID)",
     status: "project status identifier (UUID or name)",
+    relation: "project relation UUID, or a project when --blocks is given",
     name: "string",
   },
   seeAlso: [
@@ -53,6 +60,7 @@ export function setupProjectsCommands(program: Command): void {
   setupProjectEntityCommands(projects);
   setupProjectUpdateCommands(projects);
   setupProjectStatusCommands(projects);
+  setupProjectRelationCommands(projects);
 
   projects
     .command("usage")

@@ -1,0 +1,80 @@
+import { describe, expect, it, vi } from "vitest";
+import type { GraphQLClient } from "../../../src/client/graphql-client.js";
+import { asUuid } from "../../../src/common/identifier.js";
+import { resolveProjectRelationId } from "../../../src/resolvers/project-relation-resolver.js";
+
+const PROJECT_A = "550e8400-e29b-41d4-a716-446655440000";
+const PROJECT_B = "550e8400-e29b-41d4-a716-446655440001";
+const RELATION = "550e8400-e29b-41d4-a716-4466554400ff";
+
+function mockGqlClient(project: unknown): GraphQLClient {
+  return {
+    request: vi.fn().mockResolvedValue({ project }),
+  } as unknown as GraphQLClient;
+}
+
+describe("resolveProjectRelationId", () => {
+  it("returns a bare UUID as-is without calling the API", async () => {
+    const client = mockGqlClient(null);
+
+    await expect(resolveProjectRelationId(client, RELATION)).resolves.toBe(
+      RELATION,
+    );
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
+  it("finds the relation the project declares", async () => {
+    const client = mockGqlClient({
+      relations: {
+        nodes: [{ id: RELATION, relatedProject: { id: PROJECT_B } }],
+      },
+      inverseRelations: { nodes: [] },
+    });
+
+    await expect(
+      resolveProjectRelationId(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).resolves.toBe(RELATION);
+  });
+
+  it("finds the relation declared in the other direction", async () => {
+    const client = mockGqlClient({
+      relations: { nodes: [] },
+      inverseRelations: {
+        nodes: [{ id: RELATION, project: { id: PROJECT_B } }],
+      },
+    });
+
+    await expect(
+      resolveProjectRelationId(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).resolves.toBe(RELATION);
+  });
+
+  it("throws when the two projects are not related", async () => {
+    const client = mockGqlClient({
+      relations: { nodes: [] },
+      inverseRelations: { nodes: [] },
+    });
+
+    await expect(
+      resolveProjectRelationId(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).rejects.toThrow(
+      `Project relation "between ${PROJECT_A} and ${PROJECT_B}" not found`,
+    );
+  });
+
+  it("throws when the project does not exist", async () => {
+    const client = mockGqlClient(null);
+
+    await expect(
+      resolveProjectRelationId(client, PROJECT_A, asUuid(PROJECT_B)),
+    ).rejects.toThrow(`Project "${PROJECT_A}" not found`);
+  });
+
+  it("rejects a non-UUID relation given without a counterpart", async () => {
+    const client = mockGqlClient(null);
+
+    await expect(
+      resolveProjectRelationId(client, "not-a-uuid"),
+    ).rejects.toThrow('Project relation "not-a-uuid" not found');
+  });
+});

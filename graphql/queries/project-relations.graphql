@@ -1,0 +1,62 @@
+# ------------------------------------------------------------
+# GraphQL queries for Linear project dependency relations
+#
+# A project relation links a point on one project to a point on
+# another: "this must finish before that starts". Both `type` and the
+# two anchor fields are plain `String!` in the schema with no enum, so
+# the accepted literals were read off a live workspace rather than
+# derived from the schema. See `src/services/project-relation-service.ts`.
+# ------------------------------------------------------------
+
+fragment ProjectRelationCoreFields on ProjectRelation {
+  id
+  type
+  anchorType
+  relatedAnchorType
+  createdAt
+  updatedAt
+  project {
+    id
+    name
+  }
+  projectMilestone {
+    id
+    name
+  }
+  relatedProject {
+    id
+    name
+  }
+  relatedProjectMilestone {
+    id
+    name
+  }
+}
+
+# Both directions of a project's dependencies
+#
+# `relations` are the ones this project declares; `inverseRelations` are
+# the ones pointing at it. A caller asking "what does this depend on"
+# needs both, so they are fetched together and merged by the service.
+query GetProjectRelations($projectId: String!) {
+  project(id: $projectId) {
+    id
+    name
+    relations(first: 100) {
+      nodes {
+        ...ProjectRelationCoreFields
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+    inverseRelations(first: 100) {
+      nodes {
+        ...ProjectRelationCoreFields
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+}
