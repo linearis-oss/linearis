@@ -1,19 +1,22 @@
 import type { Command } from "commander";
-import { createContext, getRootOpts } from "../common/context.js";
-import { type Priority, parseLabelMode } from "../common/domain-values.js";
-import { resolveReactionEmojiInput } from "../common/emoji.js";
-import { invalidParameterError } from "../common/errors.js";
-import { asUuid } from "../common/identifier.js";
-import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
-import { buildPaginationOptions } from "../common/types.js";
-import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
+import { createContext, getRootOpts } from "../../common/context.js";
+import { type Priority, parseLabelMode } from "../../common/domain-values.js";
+import { resolveReactionEmojiInput } from "../../common/emoji.js";
+import { invalidParameterError } from "../../common/errors.js";
+import { asUuid } from "../../common/identifier.js";
+import {
+  commandAction,
+  outputSuccess,
+  parseLimit,
+} from "../../common/output.js";
+import { buildPaginationOptions } from "../../common/types.js";
 import {
   resolveProjectId,
   resolveProjectLabelIds,
-} from "../resolvers/project-resolver.js";
-import { resolveProjectStatusId } from "../resolvers/project-status-resolver.js";
-import { resolveTeamId } from "../resolvers/team-resolver.js";
-import { resolveUserId } from "../resolvers/user-resolver.js";
+} from "../../resolvers/project-resolver.js";
+import { resolveProjectStatusId } from "../../resolvers/project-status-resolver.js";
+import { resolveTeamId } from "../../resolvers/team-resolver.js";
+import { resolveUserId } from "../../resolvers/user-resolver.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -30,7 +33,7 @@ import {
   resolveDiscussion,
   startProjectDiscussion,
   unresolveDiscussion,
-} from "../services/discussion-service.js";
+} from "../../services/discussion-service.js";
 import {
   type CreateProjectInput,
   createProject,
@@ -41,7 +44,7 @@ import {
   type UpdateProjectInput,
   unarchiveProject,
   updateProject,
-} from "../services/project-service.js";
+} from "../../services/project-service.js";
 
 interface ListOptions {
   limit: string;
@@ -173,30 +176,6 @@ interface UpdateOptions {
   clearLabels?: boolean;
 }
 
-export const PROJECTS_META: DomainMeta = {
-  name: "projects",
-  summary: "groups of issues toward a goal",
-  context: [
-    "a project collects related issues across teams. projects can have",
-    "milestones to track progress toward deadlines or phases. projects",
-    "have a status (backlog, planned, started, paused, completed,",
-    "canceled), priority (0-4), health (onTrack, atRisk, offTrack),",
-    "and can be assigned labels, a lead, and members.",
-    "",
-    "projects have one put-away state, not two: `delete` trashes a project",
-    "and `unarchive` restores it. there is no `archive` verb.",
-  ].join("\n"),
-  arguments: {
-    project: "project identifier (UUID or name)",
-    name: "string",
-  },
-  seeAlso: [
-    "milestones list --project",
-    "documents list --project",
-    "issues create --project",
-  ],
-};
-
 function parsePriority(value: string): Priority {
   const priority = Number.parseInt(value, 10);
   if (Number.isNaN(priority) || priority < 0 || priority > 4) {
@@ -251,11 +230,7 @@ function getUpdateTeamNames(options: UpdateOptions): string[] | undefined {
   return parseCommaSeparatedOption(options.teams ? "--teams" : "--team", teams);
 }
 
-export function setupProjectsCommands(program: Command): void {
-  const projects = program
-    .command("projects")
-    .description("Project operations");
-
+export function setupProjectEntityCommands(projects: Command): void {
   projects
     .command("list")
     .description("list projects")
@@ -870,11 +845,4 @@ export function setupProjectsCommands(program: Command): void {
         },
       ),
     );
-
-  projects
-    .command("usage")
-    .description("show detailed usage for projects")
-    .action(() => {
-      console.log(formatDomainUsage(projects, PROJECTS_META));
-    });
 }

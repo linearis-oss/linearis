@@ -127,7 +127,7 @@ Shared utilities used across layers.
 - **src/commands/cycles.ts** - Cycle listing and reading
 - **src/commands/teams.ts** - Team listing
 - **src/commands/users.ts** - User listing
-- **src/commands/projects.ts** - Project listing
+- **src/commands/projects/** - Project commands (`index.ts` registers the domain, `entity.ts` holds CRUD and discussions)
 - **src/commands/labels.ts** - Label listing
 - **src/commands/comments.ts** - Comment creation
 - **src/commands/embeds.ts** - File operations

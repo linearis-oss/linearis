@@ -110,7 +110,7 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
     .mockResolvedValue({ id: "reaction-1", success: true }),
 }));
 
-import { setupProjectsCommands } from "../../../src/commands/projects.js";
+import { setupProjectsCommands } from "../../../src/commands/projects/index.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import {
   resolveProjectId,
