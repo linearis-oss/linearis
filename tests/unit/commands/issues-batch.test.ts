@@ -24,6 +24,8 @@ describe("parseBatchCreateEntries", () => {
           parentTicket: "ENG-1",
           description: "body",
           dueDate: "2026-09-01",
+          subscribers: ["bob"],
+          delegate: "carol",
         },
       ]),
     );
@@ -43,16 +45,34 @@ describe("parseBatchCreateEntries", () => {
         parentTicket: "ENG-1",
         description: "body",
         dueDate: "2026-09-01",
+        subscribers: ["bob"],
+        delegate: "carol",
       },
     ]);
   });
 
-  it("accepts labels in the comma-separated flag form", () => {
+  it("accepts labels and subscribers in the comma-separated flag form", () => {
     const [entry] = parseBatchCreateEntries(
-      JSON.stringify([{ title: "T", team: "ENG", labels: "bug, urgent" }]),
+      JSON.stringify([
+        {
+          title: "T",
+          team: "ENG",
+          labels: "bug, urgent",
+          subscribers: "bob, carol",
+        },
+      ]),
     );
 
     expect(entry?.labels).toEqual(["bug", "urgent"]);
+    expect(entry?.subscribers).toEqual(["bob", "carol"]);
+  });
+
+  it("names the offending key when a list is not a list of strings", () => {
+    expect(() =>
+      parseBatchCreateEntries(
+        JSON.stringify([{ title: "T", team: "ENG", subscribers: [1] }]),
+      ),
+    ).toThrow(/entry 0: has "subscribers" that is not a non-empty array/);
   });
 
   it("rejects an unknown key rather than dropping it", () => {

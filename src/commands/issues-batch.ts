@@ -62,6 +62,8 @@ interface BatchCreateEntry {
   status?: string;
   parentTicket?: string;
   dueDate?: string;
+  subscribers?: string[];
+  delegate?: string;
 }
 
 interface BatchCreateOptions {
@@ -121,6 +123,8 @@ export const KNOWN_ENTRY_KEYS: ReadonlySet<string> = new Set([
   "status",
   "parentTicket",
   "dueDate",
+  "subscribers",
+  "delegate",
 ]);
 
 /** Reads the batch document from `--json`, a file, or stdin via `--file -`. */
@@ -208,6 +212,7 @@ function parseBatchCreateEntry(
     "cycle",
     "status",
     "parentTicket",
+    "delegate",
   ] as const) {
     const value = optionalString(record, key, at);
     if (value !== undefined) parsedEntry[key] = value;
@@ -229,7 +234,15 @@ function parseBatchCreateEntry(
   if (dueDate !== undefined) parsedEntry.dueDate = parseDueDate(dueDate);
 
   if (record["labels"] !== undefined) {
-    parsedEntry.labels = parseLabels(record["labels"], at);
+    parsedEntry.labels = parseStringList(record["labels"], "labels", at);
+  }
+
+  if (record["subscribers"] !== undefined) {
+    parsedEntry.subscribers = parseStringList(
+      record["subscribers"],
+      "subscribers",
+      at,
+    );
   }
 
   if (
@@ -297,7 +310,7 @@ function optionalInteger(
 }
 
 /** Accepts both a JSON array and the comma-separated form the flags take. */
-function parseLabels(value: unknown, at: string): string[] {
+function parseStringList(value: unknown, key: string, at: string): string[] {
   if (typeof value === "string") {
     return parseCommaSeparated(value);
   }
@@ -305,11 +318,11 @@ function parseLabels(value: unknown, at: string): string[] {
   if (
     !Array.isArray(value) ||
     value.length === 0 ||
-    !value.every((label) => typeof label === "string" && label.trim() !== "")
+    !value.every((item) => typeof item === "string" && item.trim() !== "")
   ) {
     throw invalidParameterError(
       at,
-      'has "labels" that is not a non-empty array of strings',
+      `has "${key}" that is not a non-empty array of strings`,
     );
   }
 
@@ -331,6 +344,8 @@ function toResolverInput(entry: BatchCreateEntry): ResolveCreateIssueIdsInput {
   if (entry.cycle !== undefined) input.cycle = entry.cycle;
   if (entry.status !== undefined) input.status = entry.status;
   if (entry.parentTicket !== undefined) input.parentTicket = entry.parentTicket;
+  if (entry.subscribers !== undefined) input.subscribers = entry.subscribers;
+  if (entry.delegate !== undefined) input.delegate = entry.delegate;
 
   return input;
 }
@@ -352,6 +367,8 @@ function toCreateInput(
   if (ids.cycleId) input.cycleId = ids.cycleId;
   if (ids.stateId) input.stateId = ids.stateId;
   if (ids.parentId) input.parentId = ids.parentId;
+  if (ids.subscriberIds) input.subscriberIds = ids.subscriberIds;
+  if (ids.delegateId) input.delegateId = ids.delegateId;
 
   return input;
 }
