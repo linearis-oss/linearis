@@ -91,7 +91,23 @@ interface BatchUpdateOptions {
   clearDueDate?: boolean;
 }
 
-const KNOWN_ENTRY_KEYS: ReadonlySet<string> = new Set([
+/**
+ * Where the published copy of `schemas/issues-batch-create.schema.json` lives.
+ *
+ * Pinned to the raw file on the default branch rather than a tag: the schema
+ * tracks the parser below, and a caller validating against it wants the
+ * contract of the CLI they will actually run, not the one at release time.
+ */
+const BATCH_CREATE_SCHEMA_URL =
+  "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json";
+
+/**
+ * Exported so the schema drift test can assert that
+ * `schemas/issues-batch-create.schema.json` still describes exactly the keys
+ * this parser accepts — the schema is what callers write against, so the two
+ * silently diverging is worse than either being wrong on its own.
+ */
+export const KNOWN_ENTRY_KEYS: ReadonlySet<string> = new Set([
   "title",
   "team",
   "description",
@@ -446,9 +462,16 @@ export function addBatchCommands(issues: Command): void {
         "The document is a JSON array whose keys mirror the `issues create` flags:",
         '  [{"title":"Fix login","team":"ENG","assignee":"alice","labels":["bug"]}]',
         "Unknown keys are rejected rather than ignored.",
+        "",
+        `The full input contract is published as JSON Schema (draft 2020-12) at ${BATCH_CREATE_SCHEMA_URL}`,
+        "Point an editor or a validator at it to check a document before sending it:",
+        "  check-jsonschema --schemafile <schema-url> issues.json",
       ].join("\n"),
     )
-    .option("--file <path>", "path to the JSON document, or - for stdin")
+    .option(
+      "--file <path>",
+      "path to the JSON document, or - for stdin (see `issues usage` for the JSON Schema)",
+    )
     .option("--json <json>", "the JSON document inline")
     .action(
       commandAction<[BatchCreateOptions, Command]>(async (options, command) => {

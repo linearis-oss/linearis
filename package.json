@@ -10,6 +10,7 @@
   },
   "files": [
     "dist/",
+    "schemas/",
     "README.md",
     "LICENSE.md",
     "USAGE.md"

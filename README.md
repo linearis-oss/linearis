@@ -108,6 +108,44 @@ linearis issues replies <root-thread-id>
 linearis issues reply <root-thread-id> --body "I found the root cause"
 ```
 
+### Batch issue creation
+
+`issues batch create` is the one command that takes a JSON document instead of flags: a JSON array with one object per issue, keys named after the `issues create` flags with the leading dashes dropped. Unknown keys are rejected rather than ignored, so a typo fails the command instead of quietly dropping a field.
+
+```bash
+# From a file
+linearis issues batch create --file issues.json
+
+# From stdin
+generate-issues | linearis issues batch create --file -
+
+# Inline, for one-offs
+linearis issues batch create --json '[{"title":"Fix login","team":"ENG"}]'
+```
+
+The document format is published as JSON Schema (draft 2020-12) at [`schemas/issues-batch-create.schema.json`](schemas/issues-batch-create.schema.json). It ships in the npm package and is served raw from the default branch, so you can validate a document before spending an API call on it:
+
+```bash
+check-jsonschema \
+  --schemafile https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json \
+  issues.json
+```
+
+Editors pick it up the same way. In VS Code, map it once in `.vscode/settings.json` and any matching file gets completion and inline validation:
+
+```json
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["*.linear-issues.json"],
+      "url": "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json"
+    }
+  ]
+}
+```
+
+The schema is the input contract only — it cannot know your team's workflow states, label names, or estimation scale. A document that validates can still be rejected by the CLI when a name does not resolve, and the whole batch is one transaction: either every issue is created or none is.
+
 ## Coverage
 
 Linear's GraphQL API exposes **537 root operations** (164 queries, 373 mutations). Linearis wires **83 of them** directly, plus a number of nested reads — chosen to cover planning and issue work end to end rather than the whole API.
@@ -231,6 +269,7 @@ npx skills add linearis-oss/linearis
 
 - [MIGRATION_2026.4.9.md](MIGRATION_2026.4.9.md) — migrating from the deprecated `comments` domain to discussions (v2026.4.9).
 - [`docs/`](docs/) — architecture, development, testing, and build-system references.
+- [`schemas/`](schemas/) — JSON Schemas for the commands that take a JSON document ([batch issue creation](#batch-issue-creation)).
 - [`docs/ci-run-model.md`](docs/ci-run-model.md) — the authoritative CI/release trigger matrix.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guidelines.
 - [SECURITY.md](SECURITY.md) — how to report security issues.

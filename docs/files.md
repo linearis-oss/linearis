@@ -103,6 +103,12 @@ Source `.graphql` files that feed into code generation.
 - `mutations/files.graphql`
 - `mutations/project-milestones.graphql`
 
+## Input Schemas (`schemas/`)
+
+Hand-written JSON Schemas for the commands that take a JSON document instead of flags. Nothing reads them at runtime — they exist for callers (editors, validators, agents) and are shipped in the npm package via `files` in `package.json`.
+
+- **issues-batch-create.schema.json** -- the `issues batch create` document. Kept in step with `parseBatchCreateEntries` in `src/commands/issues-batch.ts` by `tests/unit/commands/issues-batch-schema.test.ts`; extend both when adding a field.
+
 ## Tests (`tests/`)
 
 Unit tests mirror the source structure. Resolver and service tests both mock the `GraphQLClient` (`request`); common tests require no mocks.
