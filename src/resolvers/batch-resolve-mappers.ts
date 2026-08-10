@@ -4,6 +4,7 @@ import type {
   BatchResolveForCreateQuery,
   IssueLabelFilter,
 } from "../gql/graphql.js";
+import { isViewerAlias } from "./user-resolver.js";
 
 /**
  * Pure mappers shared by the batch resolvers (issue create/update and issue
@@ -36,6 +37,20 @@ export type ParentNode =
 export function buildLabelFilter(names: string[]): IssueLabelFilter {
   if (names.length === 0) return { name: { in: [] } };
   return { or: names.map((name) => ({ name: { eqIgnoreCase: name } })) };
+}
+
+/**
+ * Builds the `$assigneeQuery`/`$creatorQuery` variable for a user reference.
+ *
+ * Yields `null` — a lookup the batch query skips — for every reference the
+ * query cannot match by display name or email: an absent flag, a UUID, and the
+ * `me` alias, which names the caller rather than a value and is resolved
+ * against `viewer` by the caller instead. Sending `me` as a name would only
+ * come back empty, and {@link mapUser} would report it as an unknown user.
+ */
+export function buildUserQuery(ref: string | undefined): string | null {
+  if (!ref || isUuid(ref) || isViewerAlias(ref)) return null;
+  return ref;
 }
 
 /**

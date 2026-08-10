@@ -12,6 +12,7 @@ import {
 } from "../gql/graphql.js";
 import {
   buildLabelFilter,
+  buildUserQuery,
   mapCycle,
   mapLabels,
   mapMilestone,
@@ -23,7 +24,11 @@ import {
   type TeamNode,
 } from "./batch-resolve-mappers.js";
 import { resolveTeamId, type TeamEstimateContext } from "./team-resolver.js";
-import { resolveUserId } from "./user-resolver.js";
+import {
+  isViewerAlias,
+  resolveUserId,
+  resolveViewerId,
+} from "./user-resolver.js";
 
 /**
  * Batch resolver for issue create / update.
@@ -98,25 +103,34 @@ export interface ResolvedCreateIssueIds {
  * Resolves the user-valued references that the `BatchResolve*` queries cannot.
  *
  * `--subscribers` is a list and `--delegate` a second single user, neither of
- * which the batch query's one `$assigneeQuery` variable can express, and a
- * `me` alias needs the viewer lookup. They go through `resolveUserId` in
- * parallel instead, which keeps the name/email disambiguation identical to
- * every other user flag and costs nothing when the flags are absent.
+ * which the batch query's one `$assigneeQuery` variable can express. They go
+ * through `resolveUserId` in parallel instead, which keeps the name/email
+ * disambiguation identical to every other user flag and costs nothing when the
+ * flags are absent.
+ *
+ * `--assignee` normally *is* the batch query's variable, but `me` matches no
+ * display name or email, so that one spelling is diverted here too — otherwise
+ * an alias the help text and the JSON Schema both advertise would come back as
+ * `User "me" not found`.
  */
 async function resolveIssueUserRefs(
   client: GraphQLClient,
-  input: { subscribers?: string[]; delegate?: string },
-): Promise<{ subscriberIds?: UUID[]; delegateId?: UUID }> {
-  const [subscriberIds, delegateId] = await Promise.all([
+  input: { subscribers?: string[]; delegate?: string; assignee?: string },
+): Promise<{ subscriberIds?: UUID[]; delegateId?: UUID; assigneeId?: UUID }> {
+  const [subscriberIds, delegateId, assigneeId] = await Promise.all([
     input.subscribers
       ? Promise.all(input.subscribers.map((ref) => resolveUserId(client, ref)))
       : undefined,
     input.delegate ? resolveUserId(client, input.delegate) : undefined,
+    input.assignee && isViewerAlias(input.assignee)
+      ? resolveViewerId(client)
+      : undefined,
   ]);
 
   return {
     ...(subscriberIds && { subscriberIds }),
     ...(delegateId && { delegateId }),
+    ...(assigneeId && { assigneeId }),
   };
 }
 
@@ -129,8 +143,7 @@ export async function resolveCreateIssueIds(
   input: ResolveCreateIssueIdsInput,
 ): Promise<ResolvedCreateIssueIds> {
   const teamIsUuid = isUuid(input.team);
-  const assigneeQuery =
-    input.assignee && !isUuid(input.assignee) ? input.assignee : null;
+  const assigneeQuery = buildUserQuery(input.assignee);
   const projectName =
     input.project && !isUuid(input.project) ? input.project : null;
   const projectIdVar =
@@ -197,10 +210,12 @@ export async function resolveCreateIssueIds(
     };
   }
 
-  if (input.assignee) {
-    resolved.assigneeId = isUuid(input.assignee)
-      ? asUuid(input.assignee)
-      : mapUser(response.assignees.nodes, input.assignee);
+  // A `me` assignee has no name to match; it is resolved against `viewer` in
+  // userRefs and spread over `resolved` on the way out.
+  if (assigneeQuery) {
+    resolved.assigneeId = mapUser(response.assignees.nodes, assigneeQuery);
+  } else if (input.assignee && isUuid(input.assignee)) {
+    resolved.assigneeId = asUuid(input.assignee);
   }
 
   let matchedProject: ProjectNode | undefined;
@@ -391,8 +406,7 @@ export async function resolveUpdateIssueIds(
   input: ResolveUpdateIssueIdsInput,
   context: UpdateIssueContext,
 ): Promise<ResolvedUpdateIssueIds> {
-  const assigneeQuery =
-    input.assignee && !isUuid(input.assignee) ? input.assignee : null;
+  const assigneeQuery = buildUserQuery(input.assignee);
 
   // projectName scopes both --project resolution and milestone lookup: the new
   // project when --project is a name, else the issue's current project.
@@ -452,10 +466,11 @@ export async function resolveUpdateIssueIds(
     ? { teamId: destinationTeamId }
     : {};
 
-  if (input.assignee) {
-    resolved.assigneeId = isUuid(input.assignee)
-      ? asUuid(input.assignee)
-      : mapUser(response.assignees.nodes, input.assignee);
+  // As in create: `me` carries no name to match and arrives via userRefs.
+  if (assigneeQuery) {
+    resolved.assigneeId = mapUser(response.assignees.nodes, assigneeQuery);
+  } else if (input.assignee && isUuid(input.assignee)) {
+    resolved.assigneeId = asUuid(input.assignee);
   }
 
   // The projects field matches by projectNameVar/projectIdVar; the matched node

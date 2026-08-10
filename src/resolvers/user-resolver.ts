@@ -7,6 +7,17 @@ import { FindUsersDocument, GetViewerDocument } from "../gql/graphql.js";
 const VIEWER_ALIASES: ReadonlySet<string> = new Set(["me", "@me"]);
 
 /**
+ * True when a user reference names the caller rather than a lookup value.
+ *
+ * Exported for the batch resolvers: they resolve most user references through
+ * a name/email GraphQL filter, and `me` matches neither, so they have to divert
+ * it to {@link resolveViewerId} before building the query.
+ */
+export function isViewerAlias(nameOrEmailOrId: string): boolean {
+  return VIEWER_ALIASES.has(nameOrEmailOrId.toLowerCase());
+}
+
+/**
  * Resolves the authenticated user's UUID.
  *
  * ARCHITECTURAL EXCEPTION: this resolver queries `viewer` directly rather than
@@ -31,7 +42,7 @@ export async function resolveUserId(
 ): Promise<UUID> {
   if (isUuid(nameOrEmailOrId)) return asUuid(nameOrEmailOrId);
 
-  if (VIEWER_ALIASES.has(nameOrEmailOrId.toLowerCase())) {
+  if (isViewerAlias(nameOrEmailOrId)) {
     return resolveViewerId(client);
   }
 

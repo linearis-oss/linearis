@@ -601,6 +601,84 @@ describe("resolveUpdateIssueIds user references", () => {
   });
 });
 
+describe("the `me` assignee alias", () => {
+  /**
+   * `viewer` is queried without variables; every other request in these
+   * resolvers passes some. That is enough to route the mock.
+   */
+  function mockGqlWithViewer(nodes: Nodes, viewerId = "viewer-uuid") {
+    const request = vi.fn().mockImplementation((_document, variables) =>
+      variables === undefined
+        ? Promise.resolve({
+            viewer: { id: viewerId, name: "Me", email: "me@example.com" },
+          })
+        : Promise.resolve(buildResponse(nodes)),
+    );
+    return { client: { request } as unknown as GraphQLClient, request };
+  }
+
+  it("resolves a create assignee against the viewer", async () => {
+    const { client, request } = mockGqlWithViewer({
+      teams: [{ id: "team-uuid", key: "ENG", name: "Engineering" }],
+    });
+
+    const result = await resolveCreateIssueIds(client, {
+      team: "ENG",
+      assignee: "me",
+    });
+
+    expect(result.assigneeId).toBe("viewer-uuid");
+    // "me" is not a display name — sending it as one would only come back
+    // empty and be reported as an unknown user.
+    expect(request).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assigneeQuery: null }),
+    );
+  });
+
+  it("accepts the @me spelling and ignores case", async () => {
+    const { client } = mockGqlWithViewer({
+      teams: [{ id: "team-uuid", key: "ENG", name: "Engineering" }],
+    });
+
+    const result = await resolveCreateIssueIds(client, {
+      team: "ENG",
+      assignee: "@ME",
+    });
+
+    expect(result.assigneeId).toBe("viewer-uuid");
+  });
+
+  it("resolves an update assignee against the viewer", async () => {
+    const { client } = mockGqlWithViewer({});
+
+    const result = await resolveUpdateIssueIds(client, { assignee: "me" }, {});
+
+    expect(result.assigneeId).toBe("viewer-uuid");
+  });
+
+  it("still resolves a named assignee through the batch response", async () => {
+    const { client } = mockGqlWithViewer({
+      teams: [{ id: "team-uuid", key: "ENG", name: "Engineering" }],
+      assignees: [
+        {
+          id: "user-uuid",
+          name: "John",
+          email: "john@example.com",
+          displayName: "John Doe",
+        },
+      ],
+    });
+
+    const result = await resolveCreateIssueIds(client, {
+      team: "ENG",
+      assignee: "John Doe",
+    });
+
+    expect(result.assigneeId).toBe("user-uuid");
+  });
+});
+
 describe("user reference lookups and unhandled rejections", () => {
   /**
    * The user lookups run concurrently with the batch request. If one is only
