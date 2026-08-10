@@ -93,8 +93,10 @@ import {
   type IssueReadOptions,
   listIssues,
   remindOnIssue,
+  restoreIssue,
   searchIssues,
   shareIssue,
+  snoozeIssue,
   subscribeToIssue,
   type UpdateIssueInput,
   unarchiveIssue,
@@ -205,6 +207,28 @@ interface ShareOptions {
 
 interface RemindOptions {
   at: string;
+}
+
+interface SnoozeOptions {
+  until?: string;
+  clear?: boolean;
+}
+
+/** `--until <when>` snoozes; `--clear` wakes. Exactly one is required. */
+function parseSnoozeTarget(options: SnoozeOptions): string | null {
+  if (options.until && options.clear) {
+    throw invalidParameterError("--until", "cannot be used with --clear");
+  }
+
+  if (options.clear) {
+    return null;
+  }
+
+  if (!options.until) {
+    throw invalidParameterError("--until", "is required (or pass --clear)");
+  }
+
+  return parseDateTimeOption("--until", options.until);
 }
 
 /**
@@ -1897,6 +1921,47 @@ export function setupIssuesCommands(program: Command): void {
           const ctx = createContext(getRootOpts(command));
           const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await unarchiveIssue(ctx.gql, issueId);
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("restore <issue>")
+    .description("restore an issue from the trash")
+    .addHelpText(
+      "after",
+      "\n`issues delete` trashes rather than destroys, and this is the way back. Archiving is a separate state — use `issues unarchive` for that.",
+    )
+    .action(
+      commandAction<[string, unknown, Command]>(
+        async (issue, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await restoreIssue(ctx.gql, issueId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("snooze <issue>")
+    .description("snooze an issue until a given time, or wake it")
+    .addHelpText(
+      "after",
+      "\n--until accepts an ISO-8601 instant (2026-08-20T09:00:00Z) or a relative offset (+2h, +3d).",
+    )
+    .option("--until <when>", "snooze until this instant")
+    .option("--clear", "wake the issue now")
+    .action(
+      commandAction<[string, SnoozeOptions, Command]>(
+        async (issue, options, command) => {
+          const snoozedUntilAt = parseSnoozeTarget(options);
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await snoozeIssue(ctx.gql, issueId, snoozedUntilAt);
+
           outputSuccess(result);
         },
       ),

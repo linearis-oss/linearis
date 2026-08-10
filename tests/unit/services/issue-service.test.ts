@@ -31,6 +31,7 @@ import {
   UnarchiveIssueDocument,
   UnshareIssueDocument,
   UnsubscribeFromIssueDocument,
+  UpdateIssueDocument,
 } from "../../../src/gql/graphql.js";
 import {
   archiveIssue,
@@ -51,8 +52,10 @@ import {
   getIssueWithReactions,
   listIssues,
   remindOnIssue,
+  restoreIssue,
   searchIssues,
   shareIssue,
+  snoozeIssue,
   subscribeToIssue,
   unarchiveIssue,
   unshareIssue,
@@ -1191,6 +1194,58 @@ describe("findIssueByBranch", () => {
 
     await expect(findIssueByBranch(client, "main")).rejects.toThrow(
       'Issue for branch "main" not found',
+    );
+  });
+});
+
+describe("restoreIssue", () => {
+  it("untrashes via issueUpdate, since issueUnarchive does not cover trash", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(restoreIssue(client, asUuid("issue-1"))).resolves.toEqual({
+      id: "issue-1",
+    });
+    expect(client.request).toHaveBeenCalledWith(UpdateIssueDocument, {
+      id: "issue-1",
+      input: { trashed: false },
+    });
+  });
+});
+
+describe("snoozeIssue", () => {
+  it("sets the snooze instant", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await snoozeIssue(client, asUuid("issue-1"), "2026-08-20T00:00:00.000Z");
+    expect(client.request).toHaveBeenCalledWith(UpdateIssueDocument, {
+      id: "issue-1",
+      input: { snoozedUntilAt: "2026-08-20T00:00:00.000Z" },
+    });
+  });
+
+  it("wakes the issue with an explicit null", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await snoozeIssue(client, asUuid("issue-1"), null);
+    expect(client.request).toHaveBeenCalledWith(UpdateIssueDocument, {
+      id: "issue-1",
+      input: { snoozedUntilAt: null },
+    });
+  });
+
+  it("surfaces a failed update", async () => {
+    const client = mockGqlClient({
+      issueUpdate: { success: false, issue: null },
+    });
+
+    await expect(snoozeIssue(client, asUuid("issue-1"), null)).rejects.toThrow(
+      "Failed to update issue",
     );
   });
 });

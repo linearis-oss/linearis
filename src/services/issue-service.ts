@@ -144,6 +144,8 @@ export type UpdateIssueInput = BrandUuidFields<
     | "teamId"
     | "subscriberIds"
     | "delegateId"
+    | "snoozedUntilAt"
+    | "trashed"
   >,
   | "stateId"
   | "assigneeId"
@@ -538,6 +540,34 @@ export async function updateIssue(
     "issue",
     "Failed to update issue",
   );
+}
+
+/**
+ * Restores an issue from the trash.
+ *
+ * `issues delete` maps to `issueDelete`, which trashes rather than destroys;
+ * `trashed: false` is the only way back, and `issueUnarchive` does not cover it
+ * — archiving and trashing are separate states.
+ */
+export async function restoreIssue(
+  client: GraphQLClient,
+  id: UUID,
+): Promise<UpdatedIssue> {
+  return updateIssue(client, id, { trashed: false });
+}
+
+/**
+ * Snoozes an issue until an instant, or wakes it with `null`.
+ *
+ * `snoozedById` is left to the API, which attributes the snooze to the
+ * authenticated user.
+ */
+export async function snoozeIssue(
+  client: GraphQLClient,
+  id: UUID,
+  snoozedUntilAt: string | null,
+): Promise<UpdatedIssue> {
+  return updateIssue(client, id, { snoozedUntilAt });
 }
 
 export async function archiveIssue(
