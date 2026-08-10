@@ -47,6 +47,7 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
+import { resolveTeamEstimateContext } from "../resolvers/team-resolver.js";
 import { resolveUserId, resolveViewerId } from "../resolvers/user-resolver.js";
 import { getIssueActivity } from "../services/activity-service.js";
 import {
@@ -1631,8 +1632,18 @@ export function setupIssuesCommands(program: Command): void {
 
           const ctx = createContext(getRootOpts(command));
 
+          // The estimate has to satisfy the scale of the team that ends up
+          // owning the issue. With --team that is the destination, not the
+          // team the issue is leaving: validating against the current team
+          // would reject a value the move makes legal and wave through one it
+          // makes illegal, which then comes back as a raw API error.
+          const destinationEstimateTeam =
+            parsedEstimate !== undefined && options.team
+              ? await resolveTeamEstimateContext(ctx.gql, options.team)
+              : undefined;
+
           const issueEstimateContext =
-            parsedEstimate !== undefined
+            parsedEstimate !== undefined && !destinationEstimateTeam
               ? await resolveIssueEstimateContext(ctx.gql, issue)
               : undefined;
 
@@ -1640,15 +1651,15 @@ export function setupIssuesCommands(program: Command): void {
             ? issueEstimateContext.issueId
             : await resolveIssueId(ctx.gql, issue);
 
-          if (parsedEstimate !== undefined && issueEstimateContext) {
+          const estimateTeam =
+            destinationEstimateTeam ?? issueEstimateContext?.team;
+
+          if (parsedEstimate !== undefined && estimateTeam) {
             validateEstimateAgainstTeamConfig(parsedEstimate, {
-              teamKey: issueEstimateContext.team.teamKey,
-              issueEstimationType:
-                issueEstimateContext.team.issueEstimationType,
-              issueEstimationExtended:
-                issueEstimateContext.team.issueEstimationExtended,
-              issueEstimationAllowZero:
-                issueEstimateContext.team.issueEstimationAllowZero,
+              teamKey: estimateTeam.teamKey,
+              issueEstimationType: estimateTeam.issueEstimationType,
+              issueEstimationExtended: estimateTeam.issueEstimationExtended,
+              issueEstimationAllowZero: estimateTeam.issueEstimationAllowZero,
             });
           }
 

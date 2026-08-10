@@ -45,6 +45,17 @@ vi.mock("../../../src/resolvers/issue-resolver.js", () => ({
   }),
 }));
 
+vi.mock("../../../src/resolvers/team-resolver.js", () => ({
+  resolveTeamEstimateContext: vi.fn().mockResolvedValue({
+    teamId: "destination-team-uuid",
+    teamKey: "OPS",
+    teamName: "Operations",
+    issueEstimationType: "fibonacci",
+    issueEstimationExtended: false,
+    issueEstimationAllowZero: false,
+  }),
+}));
+
 vi.mock("../../../src/services/issue-service.js", () => ({
   archiveIssue: vi.fn().mockResolvedValue({ id: "resolved-issue-uuid" }),
   createIssue: vi.fn().mockResolvedValue({ id: "new-issue-id" }),
@@ -188,6 +199,7 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../../../src/resolvers/issue-resolver.js";
+import { resolveTeamEstimateContext } from "../../../src/resolvers/team-resolver.js";
 import {
   createDiscussionCommentReaction,
   deleteDiscussionComment,
@@ -773,6 +785,72 @@ describe("issues update --estimate", () => {
     ]);
 
     expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("validates against the destination team when --team moves the issue", async () => {
+    // 8 is off the current team's linear scale but on the destination's
+    // fibonacci one, and the estimate lands on the destination.
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--team",
+      "OPS",
+      "--estimate",
+      "8",
+    ]);
+
+    expect(resolveTeamEstimateContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "OPS",
+    );
+    expect(resolveIssueEstimateContext).not.toHaveBeenCalled();
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ estimate: 8 }),
+    );
+  });
+
+  it("rejects an estimate off the destination team's scale", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--team",
+      "OPS",
+      "--estimate",
+      "4",
+    ]);
+
+    const error = JSON.parse(
+      vi.mocked(console.error).mock.calls[0]?.[0] as string,
+    ) as { error: string };
+    expect(error.error).toBe(
+      'Invalid --estimate: must be one of [1, 2, 3, 5, 8] for team "OPS" (fibonacci)',
+    );
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("skips the destination lookup when --team is absent", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--estimate",
+      "3",
+    ]);
+
+    expect(resolveTeamEstimateContext).not.toHaveBeenCalled();
   });
 
   it("skips scale validation when --clear-estimate is used", async () => {
