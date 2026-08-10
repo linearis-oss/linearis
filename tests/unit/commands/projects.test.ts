@@ -46,6 +46,14 @@ vi.mock("../../../src/services/project-service.js", () => ({
   updateProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
 }));
 
+vi.mock("../../../src/services/project-activity-service.js", () => ({
+  getProjectActivity: vi.fn().mockResolvedValue({
+    project: { id: "proj-1", name: "Auth" },
+    activity: [],
+    pageInfo: { hasNextPage: false, endCursor: null },
+  }),
+}));
+
 vi.mock("../../../src/services/discussion-service.js", () => ({
   startProjectDiscussion: vi
     .fn()
@@ -136,6 +144,7 @@ import {
   startProjectDiscussion,
   unresolveDiscussion,
 } from "../../../src/services/discussion-service.js";
+import { getProjectActivity } from "../../../src/services/project-activity-service.js";
 import {
   applyProjectLabels,
   createProject,
@@ -1265,5 +1274,59 @@ describe("projects disable-sync", () => {
       expect.stringContaining("Invalid --source"),
     );
     expect(disableProjectExternalSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects activity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("resolves the project and forwards the timeline flags", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "activity",
+      "My Project",
+      "--limit",
+      "10",
+      "--comments-only",
+      "--with-reactions",
+    ]);
+
+    expect(resolveProjectId).toHaveBeenCalledWith(
+      expect.anything(),
+      "My Project",
+    );
+    expect(getProjectActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      {
+        limit: 10,
+        after: undefined,
+        commentsOnly: true,
+        withReactions: true,
+      },
+    );
+  });
+
+  it("defaults both timeline flags to false", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "activity",
+      "My Project",
+    ]);
+
+    expect(getProjectActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({ commentsOnly: false, withReactions: false }),
+    );
   });
 });

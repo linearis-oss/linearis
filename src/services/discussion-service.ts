@@ -446,6 +446,45 @@ export async function fetchAllIssueDiscussionReplyCandidatesWithReactions(
 }
 
 /**
+ * The project counterparts of {@link fetchAllIssueDiscussionReplyCandidates},
+ * used by the project activity timeline for the same reason: it resolves the
+ * project up front and has no thread context to derive the entity from.
+ */
+export async function fetchAllProjectDiscussionReplyCandidates(
+  client: GraphQLClient,
+  projectId: UUID,
+): Promise<DiscussionCommentFieldsFragment[]> {
+  const nodes = await collectConnection(async (after) => {
+    const result = await client.request(
+      ListProjectDiscussionReplyCandidatesDocument,
+      { projectId, first: DISCUSSION_REPLY_FETCH_LIMIT, after },
+    );
+
+    return result.comments;
+  });
+
+  return nodes.sort(compareDiscussionCommentsChronologically);
+}
+
+export async function fetchAllProjectDiscussionReplyCandidatesWithReactions(
+  client: GraphQLClient,
+  projectId: UUID,
+): Promise<DiscussionThreadWithReactions[]> {
+  const nodes = await collectConnection(async (after) => {
+    const result = await client.request(
+      ListProjectDiscussionReplyCandidatesWithReactionsDocument,
+      { projectId, first: DISCUSSION_REPLY_FETCH_LIMIT, after },
+    );
+
+    return result.comments;
+  });
+
+  return normalizeDiscussionCommentsReactions(
+    nodes.sort(compareDiscussionCommentsChronologically),
+  );
+}
+
+/**
  * Index reply candidates by their `parentId`, with each sibling list sorted
  * chronologically. Building this once lets callers extract many threads'
  * replies without rescanning the full candidate list per thread.

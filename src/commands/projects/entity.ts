@@ -35,6 +35,7 @@ import {
   startProjectDiscussion,
   unresolveDiscussion,
 } from "../../services/discussion-service.js";
+import { getProjectActivity } from "../../services/project-activity-service.js";
 import {
   applyProjectLabels,
   type CreateProjectInput,
@@ -69,6 +70,13 @@ interface SearchOptions {
 
 interface DisableSyncOptions {
   source: string;
+}
+
+interface ActivityOptions {
+  limit: string;
+  after?: string;
+  commentsOnly?: boolean;
+  withReactions?: boolean;
 }
 
 interface DiscussionsOptions {
@@ -342,6 +350,39 @@ export function setupProjectEntityCommands(projects: Command): void {
               options.issuesFirst,
             ),
           });
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  projects
+    .command("activity <project>")
+    .description(
+      "chronological timeline: discussions, history events, status updates",
+    )
+    .addHelpText(
+      "after",
+      "\nHistory items carry Linear's opaque `entries` object verbatim.\n" +
+        "`ProjectHistory` has no typed from/to fields the way `IssueHistory`\n" +
+        "does, so this is not the normalized `changes[]` shape that\n" +
+        "`issues activity` returns.",
+    )
+    .option("-l, --limit <n>", "max timeline items", "50")
+    .option("--after <cursor>", "cursor for next page")
+    .option("--comments-only", "exclude history events and status updates")
+    .option("--with-reactions", "include normalized comment reactions")
+    .action(
+      commandAction<[string, ActivityOptions, Command]>(
+        async (project, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+
+          const projectId = await resolveProjectId(ctx.gql, project);
+          const result = await getProjectActivity(ctx.gql, projectId, {
+            ...buildPaginationOptions(parseLimit(options.limit), options.after),
+            commentsOnly: Boolean(options.commentsOnly),
+            withReactions: Boolean(options.withReactions),
+          });
+
           outputSuccess(result);
         },
       ),
