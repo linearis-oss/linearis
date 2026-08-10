@@ -108,43 +108,40 @@ linearis issues replies <root-thread-id>
 linearis issues reply <root-thread-id> --body "I found the root cause"
 ```
 
-### Batch issue creation
+### Batch operations
 
-`issues batch create` is the one command that takes a JSON document instead of flags: a JSON array with one object per issue, keys named after the `issues create` flags with the leading dashes dropped. Unknown keys are rejected rather than ignored, so a typo fails the command instead of quietly dropping a field.
+Both batch commands take a JSON document instead of flags, and apply it in a single transaction — either every issue changes or none does. Unknown keys are rejected rather than ignored, so a typo fails the command instead of quietly dropping a field.
 
-```bash
-# From a file
-linearis issues batch create --file issues.json
+`issues batch create` takes an array with one object per issue, keys named after the `issues create` flags:
 
-# From stdin
-generate-issues | linearis issues batch create --file -
-
-# Inline, for one-offs
-linearis issues batch create --json '[{"title":"Fix login","team":"ENG"}]'
+```json
+[
+  { "title": "Fix login redirect loop", "team": "ENG", "labels": ["bug"] },
+  { "title": "Document the SSO flow", "team": "ENG", "project": "Q3 Auth" }
+]
 ```
 
-The document format is published as JSON Schema (draft 2020-12) at [`schemas/issues-batch-create.schema.json`](schemas/issues-batch-create.schema.json). It ships in the npm package and is served raw from the default branch, so you can validate a document before spending an API call on it:
-
-```bash
-check-jsonschema \
-  --schemafile https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json \
-  issues.json
-```
-
-Editors pick it up the same way. In VS Code, map it once in `.vscode/settings.json` and any matching file gets completion and inline validation:
+`issues batch update` takes the targets plus the one patch they share, keys named after the `issues update` flags, where `null` clears a field:
 
 ```json
 {
-  "json.schemas": [
-    {
-      "fileMatch": ["*.linear-issues.json"],
-      "url": "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json"
-    }
-  ]
+  "issues": ["ENG-42", "ENG-43"],
+  "patch": { "status": "In Progress", "assignee": "alice", "cycle": null }
 }
 ```
 
-The schema is the input contract only — it cannot know your team's workflow states, label names, or estimation scale. A document that validates can still be rejected by the CLI when a name does not resolve, and the whole batch is one transaction: either every issue is created or none is.
+```bash
+linearis issues batch create --file issues.json
+linearis issues batch update --file patch.json
+
+# - reads stdin, and --json takes the document inline for one-offs
+generate-issues | linearis issues batch create --file -
+linearis issues batch update --json '{"issues":["ENG-42"],"patch":{"status":"Done"}}'
+```
+
+Both formats are published as JSON Schema (draft 2020-12) in [`schemas/`](schemas/), shipped in the npm package and served raw from the default branch — point a validator or an editor at them to check a document before spending an API call on it.
+
+A schema is the input contract only: it cannot know your team's workflow states, label names, or estimation scale, so a document that validates can still be rejected when a name does not resolve.
 
 ## Coverage
 
@@ -269,7 +266,7 @@ npx skills add linearis-oss/linearis
 
 - [MIGRATION_2026.4.9.md](MIGRATION_2026.4.9.md) — migrating from the deprecated `comments` domain to discussions (v2026.4.9).
 - [`docs/`](docs/) — architecture, development, testing, and build-system references.
-- [`schemas/`](schemas/) — JSON Schemas for the commands that take a JSON document ([batch issue creation](#batch-issue-creation)).
+- [`schemas/`](schemas/) — JSON Schemas for the commands that take a JSON document ([batch operations](#batch-operations)).
 - [`docs/ci-run-model.md`](docs/ci-run-model.md) — the authoritative CI/release trigger matrix.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guidelines.
 - [SECURITY.md](SECURITY.md) — how to report security issues.
