@@ -111,6 +111,25 @@ describe("projects statuses", () => {
     expect(createProjectStatus).not.toHaveBeenCalled();
   });
 
+  it("create rejects a position with trailing junk", async () => {
+    await run(
+      "statuses",
+      "create",
+      "Blocked",
+      "--type",
+      "paused",
+      "--color",
+      "#B45309",
+      "--position",
+      "1O",
+    );
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --position"),
+    );
+    expect(createProjectStatus).not.toHaveBeenCalled();
+  });
+
   it("update maps --not-indefinite to false", async () => {
     await run("statuses", "update", "Done", "--not-indefinite");
 

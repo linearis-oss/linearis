@@ -66,11 +66,12 @@ function parseStatusType(value: string): ProjectStatusType {
 }
 
 function parsePosition(value: string): number {
-  const position = Number.parseFloat(value);
-  if (!Number.isFinite(position)) {
+  // Number.parseFloat stops at the first non-numeric character, so "1O" would
+  // silently become position 1. Match the whole string before converting.
+  if (!/^-?\d+(\.\d+)?$/.test(value)) {
     throw invalidParameterError("--position", "must be a number");
   }
-  return position;
+  return Number.parseFloat(value);
 }
 
 /**
