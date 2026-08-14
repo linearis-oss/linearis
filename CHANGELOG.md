@@ -1,3 +1,73 @@
+## [2026.8.0](https://github.com/linearis-oss/linearis/compare/v2026.7.0...v2026.8.0) (2026-08-14)
+
+### ⚠ BREAKING CHANGES
+
+* **milestones:** a milestone name that the scoped project does not carry
+now fails instead of resolving to a same-named milestone in another
+project.
+* **projects:** `linearis projects archive <project>` is removed. Use
+`linearis projects delete <project>` to trash a project and
+`linearis projects unarchive <project>` to restore it. Linear treats
+archived and trashed projects as one state, so the replacement is
+behaviourally identical.
+
+### Features
+
+* **attachments:** add disable-sync ([9e7cf04](https://github.com/linearis-oss/linearis/commit/9e7cf044fe240dc665f31a51f5f2b8b820bd6f3c))
+* **issues:** accept subscribers and delegate in batch create ([67ea490](https://github.com/linearis-oss/linearis/commit/67ea490da975d9cc5ded0d2ba2b82ed302710347))
+* **issues:** add batch create and batch update ([fb68bcf](https://github.com/linearis-oss/linearis/commit/fb68bcfd2cc2a47bc9dde0018d88bc2d2374a8f4))
+* **issues:** add from-branch to find an issue by its git branch ([1c0ee8c](https://github.com/linearis-oss/linearis/commit/1c0ee8c97864dea24a4ba2b895f18a4c07639f32))
+* **issues:** add order-by, unassigned, state-type and subscriber filters ([2e01ad3](https://github.com/linearis-oss/linearis/commit/2e01ad344b9dbd3f815b7c15a957283687b4faf2))
+* **issues:** add restore and snooze ([00bf191](https://github.com/linearis-oss/linearis/commit/00bf1919625da595cd51b7f51b7185b24cbd655b))
+* **issues:** add subscribe, share and remind commands ([1530903](https://github.com/linearis-oss/linearis/commit/1530903ddf5962faf53365f17c9600f540b553d7))
+* **issues:** let batch update clear a cycle or milestone ([70aafb9](https://github.com/linearis-oss/linearis/commit/70aafb94c28741056ea49eebf8d5184f96d05f69))
+* **issues:** publish a JSON Schema for batch create documents ([13ed81a](https://github.com/linearis-oss/linearis/commit/13ed81a20e27d97d079b49ab9770564a70095781))
+* **issues:** return url, creator, delegate and lifecycle timestamps ([2d4885e](https://github.com/linearis-oss/linearis/commit/2d4885e9c737bcd1c3e8d7657969c91eb3046ba8))
+* **issues:** support team moves, subscribers and delegates ([8c96db1](https://github.com/linearis-oss/linearis/commit/8c96db11c2f3d61c8cb37174c6e92d633a51f936))
+* **issues:** take batch update from a JSON document too ([60b9491](https://github.com/linearis-oss/linearis/commit/60b94914b724155e4ee9993558e6fc7f13225fd6))
+* **labels:** full CRUD and retire/restore for project labels ([4bf8dcc](https://github.com/linearis-oss/linearis/commit/4bf8dcc50e69b764f87bc8c1712c2a72f3dcdd76))
+* **labels:** make the group and parent flags reversible ([59d5890](https://github.com/linearis-oss/linearis/commit/59d58900933f939aba1af08439d006f6bde51533))
+* **projects:** administer the workspace project status flow ([a6e1a16](https://github.com/linearis-oss/linearis/commit/a6e1a1613b0beb76a94c807b7dfb7caa7ee19403))
+* **projects:** chronological project activity timeline ([4e81324](https://github.com/linearis-oss/linearis/commit/4e813240026de27618e388c9322c919151e24f02))
+* **projects:** drop archive in favour of delete ([47b509e](https://github.com/linearis-oss/linearis/commit/47b509e79339d5882cfddfd32fca920217f02ce9))
+* **projects:** full-text search and external sync disable ([de351cf](https://github.com/linearis-oss/linearis/commit/de351cfda0b093261f1d3d4c6ae1e0830061bceb))
+* **projects:** manage project dependency relations ([bdd3de0](https://github.com/linearis-oss/linearis/commit/bdd3de0726ca334dc0de4220a120b139c71e1205))
+* **projects:** post and manage project status updates ([c66da2b](https://github.com/linearis-oss/linearis/commit/c66da2b7860438683fd90a39d3e8f91a9ce34709))
+* **projects:** read one dependency and page them workspace-wide ([2e9440c](https://github.com/linearis-oss/linearis/commit/2e9440c3b21b376b37eecaf7115203cd04341853))
+
+### Bug Fixes
+
+* **issues:** await user lookups so failures stay JSON ([cd42347](https://github.com/linearis-oss/linearis/commit/cd42347d321d51d609ddda92a3434baeebd40a45))
+* **issues:** guard batch update labels across teams too ([c716701](https://github.com/linearis-oss/linearis/commit/c7167010810526ca8d0c790ead1cc0788fb0bd22))
+* **issues:** let a UUID pass the mixed-team batch guard ([5a248a8](https://github.com/linearis-oss/linearis/commit/5a248a8c102af4c3be7a6e4f7f9adcc21464bf22))
+* **issues:** locate the entry when a batch list is malformed ([b83ea52](https://github.com/linearis-oss/linearis/commit/b83ea52695a356ba9650cc68b506010a3ed7bd66))
+* **issues:** make --include-archived surface archived issues ([cb14ec7](https://github.com/linearis-oss/linearis/commit/cb14ec7469a8d421c4ccbd7c7e3112fe95a566d3))
+* **issues:** make archived issues reachable by identifier ([6ac9829](https://github.com/linearis-oss/linearis/commit/6ac98297ed9d4c675d0e77ec59e395313efa4f84))
+* **issues:** name the flag when a relative offset overflows ([634f846](https://github.com/linearis-oss/linearis/commit/634f846900a27993c5ccff402db90e7bc6aa7560))
+* **issues:** resolve a `me` assignee against the viewer ([d5f8198](https://github.com/linearis-oss/linearis/commit/d5f81985ab9632db78b968a043398260c97a336b))
+* **issues:** validate a moved issue's estimate against its new team ([c8d94f1](https://github.com/linearis-oss/linearis/commit/c8d94f1518f0066d5b7153c4a5d0c26f75a430b8))
+* **issues:** validate batch update estimates against the team scale ([31634dc](https://github.com/linearis-oss/linearis/commit/31634dce7b6ebf384475f0188adeb4941b77f6f3))
+* **labels:** reject an empty --parent on update ([fd13029](https://github.com/linearis-oss/linearis/commit/fd13029a135cc2208640d31533425074971ef87c))
+* **labels:** scope --parent to the same team as the label ([d99ee89](https://github.com/linearis-oss/linearis/commit/d99ee89f6302f4e45a276acb73cbb65a4a9e0a99))
+* **milestones:** keep a milestone lookup inside its project ([b143d2b](https://github.com/linearis-oss/linearis/commit/b143d2bf1bd801e757fc913fda2f5157ada7c470))
+* **projects:** anchor relation updates to the right end ([9f5e87a](https://github.com/linearis-oss/linearis/commit/9f5e87ab3a05564297f9dc7e5bdafee01f8afbeb))
+* **projects:** bound and page the project status flow ([9ebdef7](https://github.com/linearis-oss/linearis/commit/9ebdef7301346bcd9ea222b5a1ba989698aa74e3))
+* **projects:** count archived statuses when appending ([1e3b428](https://github.com/linearis-oss/linearis/commit/1e3b4283e7cb375732fa1f1c54475a5f104dcf81))
+* **projects:** refuse a lone relation match past the page bound ([d5eb26d](https://github.com/linearis-oss/linearis/commit/d5eb26d58302b05756837b0c70827df46de2e526))
+* **projects:** refuse to guess between same-named project statuses ([1be4ab1](https://github.com/linearis-oss/linearis/commit/1be4ab102f03ce6582f02100090e46c4f268fac2))
+* **projects:** refuse to guess which relation a project pair means ([fe3508c](https://github.com/linearis-oss/linearis/commit/fe3508c6ec2d8c5e817c4f7b584a4ae97bd68aa5))
+* **projects:** reject a malformed status position ([e01ca0e](https://github.com/linearis-oss/linearis/commit/e01ca0e900d3c731784d2d75aa84a88ae4d81c20))
+* **projects:** reject an empty relation update before resolving it ([d94e51e](https://github.com/linearis-oss/linearis/commit/d94e51eab34fdc55825f448b6b59b95ba47478e6))
+* **projects:** reject pagination flags on per-project relations ([ed7cc89](https://github.com/linearis-oss/linearis/commit/ed7cc89e22368bea83373a8a7b989bc9b81c535b))
+* **projects:** report the relation page bound instead of a miss ([b3886e4](https://github.com/linearis-oss/linearis/commit/b3886e4bc55774d441d021f272664495893487f9))
+* **projects:** say where the projects went when archiving fails ([30664cd](https://github.com/linearis-oss/linearis/commit/30664cd7583443140eebf76a64287d0888bd09aa))
+* **projects:** scope relation milestones on the UUID path ([5824b02](https://github.com/linearis-oss/linearis/commit/5824b02c2a3d3cc51cf36af67f81efa009b3f8ec))
+* **release:** pin conventionalcommits preset to the writer-v8-compatible line ([fc0276d](https://github.com/linearis-oss/linearis/commit/fc0276d163cf7edce50c41c0533afd902a18a534))
+
+### Performance Improvements
+
+* **issues:** bound the fan-out of batch create ID resolution ([f623be9](https://github.com/linearis-oss/linearis/commit/f623be9c49de173d872c66774a0e0e90dcd61ace))
+
 ## [2026.8.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.8.0-next.1...v2026.8.0-next.2) (2026-08-10)
 
 ### ⚠ BREAKING CHANGES
