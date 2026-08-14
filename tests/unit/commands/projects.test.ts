@@ -35,14 +35,23 @@ vi.mock("../../../src/resolvers/user-resolver.js", () => ({
 }));
 
 vi.mock("../../../src/services/project-service.js", () => ({
-  archiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Archived" }),
   listProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
+  searchProjects: vi.fn().mockResolvedValue({ nodes: [], pageInfo: {} }),
+  disableProjectExternalSync: vi.fn().mockResolvedValue({ id: "proj-1" }),
   getProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
-  getProjectLabelIds: vi.fn().mockResolvedValue([]),
+  applyProjectLabels: vi.fn().mockResolvedValue({ id: "proj-1" }),
   createProject: vi.fn().mockResolvedValue({ id: "proj-new" }),
   deleteProject: vi.fn().mockResolvedValue({ id: "proj-1", success: true }),
   unarchiveProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "Active" }),
   updateProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
+}));
+
+vi.mock("../../../src/services/project-activity-service.js", () => ({
+  getProjectActivity: vi.fn().mockResolvedValue({
+    project: { id: "proj-1", name: "Auth" },
+    activity: [],
+    pageInfo: { hasNextPage: false, endCursor: null },
+  }),
 }));
 
 vi.mock("../../../src/services/discussion-service.js", () => ({
@@ -111,7 +120,7 @@ vi.mock("../../../src/services/discussion-service.js", () => ({
     .mockResolvedValue({ id: "reaction-1", success: true }),
 }));
 
-import { setupProjectsCommands } from "../../../src/commands/projects.js";
+import { setupProjectsCommands } from "../../../src/commands/projects/index.js";
 import { outputSuccess } from "../../../src/common/output.js";
 import {
   resolveProjectId,
@@ -135,13 +144,15 @@ import {
   startProjectDiscussion,
   unresolveDiscussion,
 } from "../../../src/services/discussion-service.js";
+import { getProjectActivity } from "../../../src/services/project-activity-service.js";
 import {
-  archiveProject,
+  applyProjectLabels,
   createProject,
   deleteProject,
+  disableProjectExternalSync,
   getProject,
-  getProjectLabelIds,
   listProjects,
+  searchProjects,
   unarchiveProject,
   updateProject,
 } from "../../../src/services/project-service.js";
@@ -259,28 +270,11 @@ describe("projects lifecycle", () => {
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   });
 
-  it("archive resolves project and outputs result", async () => {
+  it("does not register an archive command", () => {
     const program = createProgram();
-    await program.parseAsync([
-      "node",
-      "test",
-      "projects",
-      "archive",
-      "My Project",
-    ]);
+    const projects = program.commands.find((c) => c.name() === "projects");
 
-    expect(resolveProjectId).toHaveBeenCalledWith(
-      expect.anything(),
-      "My Project",
-    );
-    expect(archiveProject).toHaveBeenCalledWith(
-      expect.anything(),
-      "resolved-project-uuid",
-    );
-    expect(outputSuccess).toHaveBeenCalledWith({
-      id: "proj-1",
-      name: "Archived",
-    });
+    expect(projects?.commands.map((c) => c.name())).not.toContain("archive");
   });
 
   it("unarchive resolves project and outputs result", async () => {
@@ -1057,11 +1051,7 @@ describe("projects update", () => {
     );
   });
 
-  it("adds labels without dropping existing project labels", async () => {
-    vi.mocked(getProjectLabelIds).mockResolvedValueOnce([
-      "existing-label-uuid",
-    ] as Awaited<ReturnType<typeof getProjectLabelIds>>);
-
+  it("adds labels incrementally, without reading the current set", async () => {
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -1075,28 +1065,20 @@ describe("projects update", () => {
       "add",
     ]);
 
-    expect(getProjectLabelIds).toHaveBeenCalledWith(
-      expect.anything(),
-      "resolved-project-uuid",
-    );
     expect(resolveProjectLabelIds).toHaveBeenCalledWith(expect.anything(), [
       "Q3",
     ]);
-    expect(updateProject).toHaveBeenCalledWith(
+    // No read-modify-write, and no labelIds on the update input at all.
+    expect(updateProject).not.toHaveBeenCalled();
+    expect(applyProjectLabels).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-project-uuid",
-      expect.objectContaining({
-        labelIds: ["existing-label-uuid", "resolved-label-uuid"],
-      }),
+      ["resolved-label-uuid"],
+      "add",
     );
   });
 
-  it("removes selected project labels without clearing all labels", async () => {
-    vi.mocked(getProjectLabelIds).mockResolvedValueOnce([
-      "keep-label-uuid",
-      "resolved-label-uuid",
-    ] as Awaited<ReturnType<typeof getProjectLabelIds>>);
-
+  it("removes labels incrementally", async () => {
     const program = createProgram();
     await program.parseAsync([
       "node",
@@ -1110,10 +1092,58 @@ describe("projects update", () => {
       "remove",
     ]);
 
+    expect(updateProject).not.toHaveBeenCalled();
+    expect(applyProjectLabels).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      ["resolved-label-uuid"],
+      "remove",
+    );
+  });
+
+  it("applies field updates and incremental labels in one invocation", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--name",
+      "Renamed",
+      "--labels",
+      "Q3",
+      "--label-mode",
+      "add",
+    ]);
+
     expect(updateProject).toHaveBeenCalledWith(
       expect.anything(),
       "resolved-project-uuid",
-      expect.objectContaining({ labelIds: ["keep-label-uuid"] }),
+      expect.objectContaining({ name: "Renamed" }),
+    );
+    expect(applyProjectLabels).toHaveBeenCalled();
+    // Labels run last, so the emitted project reflects both changes.
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "proj-1" });
+  });
+
+  it("still replaces the whole set without a label mode", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "projects",
+      "update",
+      "My Project",
+      "--labels",
+      "Q3",
+    ]);
+
+    expect(applyProjectLabels).not.toHaveBeenCalled();
+    expect(updateProject).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({ labelIds: ["resolved-label-uuid"] }),
     );
   });
 
@@ -1153,5 +1183,150 @@ describe("projects update", () => {
       expect.stringContaining("must be one of 'add', 'remove', or 'overwrite'"),
     );
     expect(updateProject).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("passes the term and pagination through", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "search",
+      "auth",
+      "--limit",
+      "10",
+    ]);
+
+    expect(resolveTeamId).not.toHaveBeenCalled();
+    expect(searchProjects).toHaveBeenCalledWith(expect.anything(), "auth", {
+      limit: 10,
+      after: undefined,
+      includeArchived: false,
+    });
+  });
+
+  it("resolves --team before searching", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "search",
+      "auth",
+      "--team",
+      "ENG",
+    ]);
+
+    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "ENG");
+    expect(searchProjects).toHaveBeenCalledWith(
+      expect.anything(),
+      "auth",
+      expect.objectContaining({ teamId: "resolved-team-uuid" }),
+    );
+  });
+});
+
+describe("projects disable-sync", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("resolves the project and forwards the source", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "disable-sync",
+      "My Project",
+      "--source",
+      "jira",
+    ]);
+
+    expect(disableProjectExternalSync).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      "jira",
+    );
+  });
+
+  it("rejects a source Linear does not sync from", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "disable-sync",
+      "My Project",
+      "--source",
+      "gitlab",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid --source"),
+    );
+    expect(disableProjectExternalSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects activity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("resolves the project and forwards the timeline flags", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "activity",
+      "My Project",
+      "--limit",
+      "10",
+      "--comments-only",
+      "--with-reactions",
+    ]);
+
+    expect(resolveProjectId).toHaveBeenCalledWith(
+      expect.anything(),
+      "My Project",
+    );
+    expect(getProjectActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      {
+        limit: 10,
+        after: undefined,
+        commentsOnly: true,
+        withReactions: true,
+      },
+    );
+  });
+
+  it("defaults both timeline flags to false", async () => {
+    await createProgram().parseAsync([
+      "node",
+      "test",
+      "projects",
+      "activity",
+      "My Project",
+    ]);
+
+    expect(getProjectActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-project-uuid",
+      expect.objectContaining({ commentsOnly: false, withReactions: false }),
+    );
   });
 });

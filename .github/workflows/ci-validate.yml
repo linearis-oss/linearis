@@ -268,13 +268,53 @@ jobs:
           fi
 
           base_ref="origin/${GITHUB_BASE_REF:-main}"
-          output=$(git log "$base_ref"..HEAD --name-status --pretty=format: -- CHANGELOG.md | sed '/^$/d')
 
-          if [ -n "$output" ]; then
+          # Repairing notes the release workflow itself lost is the one
+          # legitimate reason for a PR to touch CHANGELOG.md — see
+          # "Changelog ownership" in CONTRIBUTING.md. Exempt commits whose
+          # subject is exactly the reserved backfill subject, and only when
+          # they change nothing outside CHANGELOG.md and only add lines.
+          exempt_subject="chore(release): backfill changelog notes"
+
+          # Capture into a variable rather than feeding `git log` straight into
+          # a here-string: a here-string swallows the command substitution's
+          # exit status, so an unresolvable "$base_ref" would read as an empty
+          # commit list and the guard would silently pass.
+          candidates=$(git log "$base_ref"..HEAD --format=%H -- CHANGELOG.md)
+
+          offenders=""
+          while read -r sha; do
+            [ -n "$sha" ] || continue
+            subject=$(git log -1 --format=%s "$sha")
+            if [ "$subject" = "$exempt_subject" ]; then
+              violation=""
+
+              extra=$(git show --name-only --pretty=format: "$sha" | sed '/^$/d' | grep -v '^CHANGELOG.md$' || true)
+              if [ -n "$extra" ]; then
+                echo "::error::$exempt_subject commit $sha also touches files other than CHANGELOG.md"
+                echo "$extra"
+                violation="yes"
+              fi
+
+              deletions=$(git show --numstat --pretty=format: "$sha" -- CHANGELOG.md | awk 'NF { total += $2 } END { print total + 0 }')
+              if [ "$deletions" -ne 0 ]; then
+                echo "::error::$exempt_subject commit $sha removes $deletions CHANGELOG.md line(s); a backfill may only add notes"
+                violation="yes"
+              fi
+
+              if [ -z "$violation" ]; then
+                continue
+              fi
+            fi
+            offenders="$offenders$sha $subject"$'\n'
+          done <<< "$candidates"
+
+          if [ -n "$offenders" ]; then
             echo "::error::CHANGELOG.md is release-workflow-owned and must not appear in PR branch history"
             echo "Drop or amend commits that touch CHANGELOG.md, then push with --force-with-lease"
+            echo "The only exception is an additions-only, CHANGELOG.md-only commit whose subject is exactly: $exempt_subject"
             echo
-            echo "$output"
+            echo "$offenders"
             exit 1
           fi
 

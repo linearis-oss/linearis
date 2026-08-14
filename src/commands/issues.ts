@@ -2,10 +2,16 @@ import type { Command } from "commander";
 import { firstOrThrow } from "../common/array.js";
 import type { CommandContext } from "../common/context.js";
 import { createContext, getRootOpts } from "../common/context.js";
-import { parseLabelMode } from "../common/domain-values.js";
+import { parseDateTimeOption } from "../common/datetime.js";
+import {
+  parseLabelMode,
+  parseSetMode,
+  type SetMode,
+} from "../common/domain-values.js";
 import { resolveReactionEmojiInput } from "../common/emoji.js";
 import { invalidParameterError } from "../common/errors.js";
 import { validateEstimateAgainstTeamConfig } from "../common/estimate-validation.js";
+import { getCurrentBranch } from "../common/git.js";
 import {
   asUuid,
   isUuid,
@@ -13,16 +19,22 @@ import {
   parseIssueIdentifier,
   type UUID,
 } from "../common/identifier.js";
-import type { RawFilterFlags } from "../common/issue-filter.js";
+import {
+  parseCommaSeparated,
+  type RawFilterFlags,
+} from "../common/issue-filter.js";
 import {
   parseEstimateOption,
   parsePriorityOption,
 } from "../common/number-options.js";
 import { commandAction, outputSuccess, parseLimit } from "../common/output.js";
 import { resolveFilterOptions } from "../common/resolve-filters.js";
-import { buildPaginationOptions } from "../common/types.js";
+import {
+  buildPaginationOptions,
+  type PaginationOptions,
+} from "../common/types.js";
 import { type DomainMeta, formatDomainUsage } from "../common/usage.js";
-import type { IssueRelationType } from "../gql/graphql.js";
+import type { IssueRelationType, PaginationOrderBy } from "../gql/graphql.js";
 import {
   type ResolveCreateIssueIdsInput,
   type ResolvedUpdateIssueIds,
@@ -35,6 +47,8 @@ import {
   resolveIssueEstimateContext,
   resolveIssueId,
 } from "../resolvers/issue-resolver.js";
+import { resolveTeamEstimateContext } from "../resolvers/team-resolver.js";
+import { resolveUserId, resolveViewerId } from "../resolvers/user-resolver.js";
 import { getIssueActivity } from "../services/activity-service.js";
 import {
   createDiscussionCommentReaction,
@@ -65,6 +79,7 @@ import {
   type CreateIssueInput,
   createIssue,
   deleteIssue,
+  findIssueByBranch,
   getIssue,
   getIssueByIdentifier,
   getIssueByIdentifierWithAttachments,
@@ -75,10 +90,19 @@ import {
   getIssueWithComments,
   getIssueWithCommentThreads,
   getIssueWithReactions,
+  type IssueDetail,
+  type IssueReadOptions,
   listIssues,
+  remindOnIssue,
+  restoreIssue,
   searchIssues,
+  shareIssue,
+  snoozeIssue,
+  subscribeToIssue,
   type UpdateIssueInput,
   unarchiveIssue,
+  unshareIssue,
+  unsubscribeFromIssue,
   updateIssue,
 } from "../services/issue-service.js";
 import {
@@ -86,11 +110,14 @@ import {
   deleteOwnReactionByEmoji,
   deleteOwnReactionById,
 } from "../services/reaction-service.js";
+import { addBatchCommands } from "./issues-batch.js";
 
 interface FilterOptions extends RawFilterFlags {
   limit: string;
   after?: string;
   query?: string;
+  includeArchived?: boolean;
+  orderBy?: string;
 }
 
 interface CreateOptions {
@@ -105,6 +132,8 @@ interface CreateOptions {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  subscribers?: string;
+  delegate?: string;
   dueDate?: string;
   blocks?: string;
   blockedBy?: string;
@@ -133,6 +162,12 @@ interface UpdateOptions {
   clearProjectMilestone?: boolean;
   cycle?: string;
   clearCycle?: boolean;
+  team?: string;
+  subscribers?: string;
+  subscriberMode?: string;
+  clearSubscribers?: boolean;
+  delegate?: string;
+  clearDelegate?: boolean;
   dueDate?: string;
   clearDueDate?: boolean;
   blocks?: string;
@@ -162,6 +197,90 @@ function validateReadOptions(options: ReadOptions): void {
       "cannot be combined with --with-attachments, --with-comments, or --with-comment-threads",
     );
   }
+}
+
+interface SubscriberOptions {
+  user?: string;
+}
+
+interface ShareOptions {
+  with: string;
+}
+
+interface RemindOptions {
+  at: string;
+}
+
+interface SnoozeOptions {
+  until?: string;
+  clear?: boolean;
+}
+
+/** `--until <when>` snoozes; `--clear` wakes. Exactly one is required. */
+function parseSnoozeTarget(options: SnoozeOptions): string | null {
+  if (options.until && options.clear) {
+    throw invalidParameterError("--until", "cannot be used with --clear");
+  }
+
+  if (options.clear) {
+    return null;
+  }
+
+  if (!options.until) {
+    throw invalidParameterError("--until", "is required (or pass --clear)");
+  }
+
+  return parseDateTimeOption("--until", options.until);
+}
+
+/**
+ * Resolves the issue and the user a subscribe/share command acts on.
+ *
+ * The two lookups are independent, so they run concurrently. An omitted user
+ * means the caller themselves — subscribing yourself is the overwhelmingly
+ * common case, and `me` is accepted as the explicit spelling of the same thing
+ * (see `resolveUserId`).
+ */
+async function resolveIssueAndUser(
+  ctx: CommandContext,
+  issue: string,
+  user: string | undefined,
+): Promise<[UUID, UUID]> {
+  return Promise.all([
+    resolveIssueId(ctx.gql, issue),
+    user === undefined
+      ? resolveViewerId(ctx.gql)
+      : resolveUserId(ctx.gql, user),
+  ]);
+}
+
+/**
+ * Combines a set-valued flag with the issue's current members.
+ *
+ * `overwrite` (and an omitted mode) replaces, matching the API's own
+ * replace-the-list semantics for `labelIds`/`subscriberIds`; `add` and
+ * `remove` are computed here from the issue's current values because the API
+ * has no incremental form for either field.
+ */
+function applySetMode(
+  mode: SetMode | undefined,
+  current: readonly UUID[],
+  requested: readonly UUID[],
+): UUID[] {
+  if (mode === "add") {
+    return [...new Set([...current, ...requested])];
+  }
+
+  if (mode === "remove") {
+    return current.filter((id) => !requested.includes(id));
+  }
+
+  return [...requested];
+}
+
+/** The issue's current subscriber UUIDs, for `--subscriber-mode add|remove`. */
+function currentSubscriberIds(issue: IssueDetail | undefined): UUID[] {
+  return (issue?.subscribers?.nodes ?? []).map((user) => asUuid(user.id));
 }
 
 interface ReactionOptions {
@@ -267,18 +386,69 @@ export const ISSUES_META: DomainMeta = {
     "issues can have labels, a due date, belong to a project, be part of a",
     "cycle (sprint), and reference a project milestone. parent-child",
     "relationships and issue relations (blocks, blocked-by, relates-to,",
-    "duplicate-of) are supported.",
+    "duplicate-of) are supported. an issue can also be moved between teams",
+    "with `update --team`.",
+    "",
+    "an issue has three separate 'put it away' states, and they do not",
+    "overlap: archive (`archive`/`unarchive`), trash (`delete`/`restore`),",
+    "and snooze until a time (`snooze --until|--clear`). archived issues are",
+    "reachable by identifier everywhere, but excluded from `list`/`search`",
+    "unless you pass --include-archived.",
+    "",
+    "`list` also hides completed issues by default. saying anything about",
+    "state lifts that narrowing: --status and --state-type replace it with",
+    "what you asked for, and --include-archived drops it too. so on `list`",
+    "--include-archived widens the result twice — archived issues are nearly",
+    "always completed, and keeping the default clause would hide the very",
+    "issues the flag was passed to surface. to see completed work without",
+    "archived issues, pass --state-type completed instead.",
+    "",
+    "full-text search does not narrow by state: `search`, and `list --query`",
+    "which runs the same query, return completed issues whether or not you",
+    "pass --include-archived. there --include-archived only adds archived",
+    "issues. filter with --state-type if you want a state-bounded search.",
+    "",
+    "people attach to an issue in four ways: assignee (one, owns it),",
+    "delegate (one, acts for the assignee), subscribers (many, get notified),",
+    "and shared access (`share --with`, which grants a user visibility of an",
+    "issue they otherwise could not see — it does not produce a link; the",
+    "issue's permalink is the `url` field on any read).",
+    "",
+    "both batch commands take a JSON document instead of flags, with unknown",
+    "keys rejected rather than ignored. `batch create` takes an array with one",
+    "object per issue, keys named after the `issues create` flags. `batch",
+    'update` takes {"issues": [...], "patch": {...}}, keys named after the',
+    "`issues update` flags, where null clears a field the way --clear-* does.",
+    "each contract is published as JSON Schema (draft 2020-12) in `schemas/`,",
+    "also shipped in the npm package and served raw from the repository's",
+    "default branch:",
+    "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-create.schema.json",
+    "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-update.schema.json",
+    "write the document against the schema, validate it locally, then pass it",
+    "with --file (or - for stdin).",
   ].join("\n"),
   arguments: {
     issue: "issue identifier (UUID or ABC-123)",
     title: "string",
     query: "full-text search term",
+    user: "display name, email, UUID, or `me` for yourself",
+    when: "ISO-8601 instant (2026-08-14T09:00:00Z) or offset (+2h, +3d)",
   },
   seeAlso: [
     "issues activity <issue>",
+    "issues batch create --file issues.json",
+    "issues batch update --issues ENG-1,ENG-2 --status Done",
+    "issues batch update --file patch.json",
+    "issues from-branch",
+    "issues subscribe <issue> [--user <user>]",
+    "issues share <issue> --with <user>",
+    "issues remind <issue> --at +2h",
+    "issues snooze <issue> --until 2026-08-20",
+    "issues restore <issue>",
     "comments create <issue>",
     "documents list --issue <issue>",
     "attachments list <issue>",
+    "attachments disable-sync <id>",
     "issues read --with-attachments",
     "issues archive <issue>",
     "issues unarchive <issue>",
@@ -492,6 +662,35 @@ async function resolveAndApplyRelations(
   }
 }
 
+/**
+ * Fold `--include-archived` into the pagination options. The key is left absent
+ * rather than set to `false` so the request matches the pre-flag shape exactly
+ * under `exactOptionalPropertyTypes`.
+ */
+function buildIssueReadOptions(
+  pagination: PaginationOptions,
+  options: Pick<FilterOptions, "includeArchived" | "orderBy">,
+): IssueReadOptions {
+  return {
+    ...pagination,
+    ...(options.includeArchived ? { includeArchived: true } : {}),
+    ...(options.orderBy ? { orderBy: parseOrderBy(options.orderBy) } : {}),
+  };
+}
+
+/**
+ * Maps the CLI's `created`/`updated` onto Linear's `PaginationOrderBy`.
+ *
+ * The API spells them `createdAt`/`updatedAt`; both spellings are accepted so a
+ * caller who read the field name in a payload is not told they are wrong.
+ */
+function parseOrderBy(value: string): PaginationOrderBy {
+  if (value === "created" || value === "createdAt") return "createdAt";
+  if (value === "updated" || value === "updatedAt") return "updatedAt";
+
+  throw invalidParameterError("--order-by", "must be 'created' or 'updated'");
+}
+
 function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
   return cmd
     .option("--team <team>", "filter by team")
@@ -520,11 +719,23 @@ function addFilterOptions(cmd: ReturnType<Command["command"]>): typeof cmd {
     .option("--updated-after <date>", "updated after date (YYYY-MM-DD)")
     .option("--updated-before <date>", "updated before date (YYYY-MM-DD)")
     .option("--has-blockers", "only issues that are blocked")
-    .option("--is-blocking", "only issues that block others");
+    .option("--is-blocking", "only issues that block others")
+    .option("--unassigned", "only issues with no assignee")
+    .option(
+      "--state-type <type>",
+      "filter by state category (triage, backlog, unstarted, started, completed, canceled)",
+    )
+    .option("--subscriber <user>", "filter by subscriber")
+    .option(
+      "--include-archived",
+      "include archived issues (on `list`, also drops the default 'hide completed' narrowing; full-text search never applies it)",
+    );
 }
 
 export function setupIssuesCommands(program: Command): void {
   const issues = program.command("issues").description("Issue operations");
+
+  addBatchCommands(issues);
 
   const relations = issues
     .command("relations")
@@ -599,15 +810,25 @@ export function setupIssuesCommands(program: Command): void {
       .command("list")
       .description("list issues with optional filters")
       .option("--query <query>", "deprecated: use `issues search <query>`")
+      .option("--order-by <field>", "created | updated (default: updated)")
       .option("-l, --limit <n>", "max results", "50")
       .option("--after <cursor>", "cursor for next page"),
   ).action(
     commandAction<[FilterOptions, Command]>(async (options, command) => {
+      // Full-text results come back relevance-ordered from the API, so
+      // --order-by has nothing to act on down that path.
+      if (options.orderBy && options.query) {
+        throw invalidParameterError(
+          "--order-by",
+          "cannot be combined with --query, whose results are relevance-ordered",
+        );
+      }
+
       const ctx = createContext(getRootOpts(command));
 
-      const paginationOptions = buildPaginationOptions(
-        parseLimit(options.limit),
-        options.after,
+      const readOptions = buildIssueReadOptions(
+        buildPaginationOptions(parseLimit(options.limit), options.after),
+        options,
       );
 
       const filterOptions = await resolveFilterOptions(ctx, options);
@@ -617,14 +838,14 @@ export function setupIssuesCommands(program: Command): void {
         const result = await searchIssues(
           ctx.gql,
           options.query,
-          paginationOptions,
+          readOptions,
           filter,
         );
         outputSuccess(result);
         return;
       }
 
-      const result = await listIssues(ctx.gql, paginationOptions, filter);
+      const result = await listIssues(ctx.gql, readOptions, filter);
       outputSuccess(result);
     }),
   );
@@ -640,19 +861,14 @@ export function setupIssuesCommands(program: Command): void {
       async (query, options, command) => {
         const ctx = createContext(getRootOpts(command));
 
-        const paginationOptions = buildPaginationOptions(
-          parseLimit(options.limit),
-          options.after,
+        const readOptions = buildIssueReadOptions(
+          buildPaginationOptions(parseLimit(options.limit), options.after),
+          options,
         );
 
         const filterOptions = await resolveFilterOptions(ctx, options);
         const filter = buildIssueFilter(filterOptions);
-        const result = await searchIssues(
-          ctx.gql,
-          query,
-          paginationOptions,
-          filter,
-        );
+        const result = await searchIssues(ctx.gql, query, readOptions, filter);
         outputSuccess(result);
       },
     ),
@@ -1142,6 +1358,8 @@ export function setupIssuesCommands(program: Command): void {
     .option("--status <status>", "set status")
     .option("--estimate <n>", "set estimate")
     .option("--parent-ticket <issue>", "set parent issue")
+    .option("--subscribers <users>", "subscribe users (comma-separated)")
+    .option("--delegate <user>", "delegate to a user")
     .option("--due-date <date>", "due date (YYYY-MM-DD)")
     .option("--blocks <issue>", "this issue blocks <issue>")
     .option("--blocked-by <issue>", "this issue is blocked by <issue>")
@@ -1190,6 +1408,10 @@ export function setupIssuesCommands(program: Command): void {
           if (options.status) idsInput.status = options.status;
           if (options.parentTicket)
             idsInput.parentTicket = options.parentTicket;
+          if (options.subscribers) {
+            idsInput.subscribers = parseCommaSeparated(options.subscribers);
+          }
+          if (options.delegate) idsInput.delegate = options.delegate;
 
           const ids = await resolveCreateIssueIds(ctx.gql, idsInput);
 
@@ -1249,6 +1471,14 @@ export function setupIssuesCommands(program: Command): void {
             input.parentId = ids.parentId;
           }
 
+          if (ids.subscriberIds) {
+            input.subscriberIds = ids.subscriberIds;
+          }
+
+          if (ids.delegateId) {
+            input.delegateId = ids.delegateId;
+          }
+
           if (options.dueDate) {
             input.dueDate = parseDueDate(options.dueDate);
           }
@@ -1292,6 +1522,12 @@ export function setupIssuesCommands(program: Command): void {
     .option("--clear-project-milestone", "clear project milestone")
     .option("--cycle <cycle>", "set cycle")
     .option("--clear-cycle", "clear cycle")
+    .option("--team <team>", "move the issue to another team")
+    .option("--subscribers <users>", "subscribers to apply (comma-separated)")
+    .option("--subscriber-mode <mode>", "add | remove | overwrite")
+    .option("--clear-subscribers", "remove all subscribers")
+    .option("--delegate <user>", "set delegate")
+    .option("--clear-delegate", "clear delegate")
     .option("--estimate <n>", "new estimate")
     .option("--clear-estimate", "clear estimate")
     .option("--due-date <date>", "set due date (YYYY-MM-DD)")
@@ -1363,7 +1599,35 @@ export function setupIssuesCommands(program: Command): void {
             throw new Error("--clear-labels cannot be used with --label-mode");
           }
 
+          if (options.subscriberMode && !options.subscribers) {
+            throw new Error(
+              "--subscriber-mode requires --subscribers to be specified",
+            );
+          }
+
+          if (options.clearSubscribers && options.subscribers) {
+            throw new Error(
+              "--clear-subscribers cannot be used with --subscribers",
+            );
+          }
+
+          if (options.clearSubscribers && options.subscriberMode) {
+            throw new Error(
+              "--clear-subscribers cannot be used with --subscriber-mode",
+            );
+          }
+
+          if (options.delegate && options.clearDelegate) {
+            throw new Error(
+              "Cannot use --delegate and --clear-delegate together",
+            );
+          }
+
           const labelMode = parseLabelMode(options.labelMode);
+          const subscriberMode = parseSetMode(
+            "--subscriber-mode",
+            options.subscriberMode,
+          );
 
           const parsedPriority =
             options.priority !== undefined
@@ -1378,8 +1642,18 @@ export function setupIssuesCommands(program: Command): void {
 
           const ctx = createContext(getRootOpts(command));
 
+          // The estimate has to satisfy the scale of the team that ends up
+          // owning the issue. With --team that is the destination, not the
+          // team the issue is leaving: validating against the current team
+          // would reject a value the move makes legal and wave through one it
+          // makes illegal, which then comes back as a raw API error.
+          const destinationEstimateTeam =
+            parsedEstimate !== undefined && options.team
+              ? await resolveTeamEstimateContext(ctx.gql, options.team)
+              : undefined;
+
           const issueEstimateContext =
-            parsedEstimate !== undefined
+            parsedEstimate !== undefined && !destinationEstimateTeam
               ? await resolveIssueEstimateContext(ctx.gql, issue)
               : undefined;
 
@@ -1387,15 +1661,15 @@ export function setupIssuesCommands(program: Command): void {
             ? issueEstimateContext.issueId
             : await resolveIssueId(ctx.gql, issue);
 
-          if (parsedEstimate !== undefined && issueEstimateContext) {
+          const estimateTeam =
+            destinationEstimateTeam ?? issueEstimateContext?.team;
+
+          if (parsedEstimate !== undefined && estimateTeam) {
             validateEstimateAgainstTeamConfig(parsedEstimate, {
-              teamKey: issueEstimateContext.team.teamKey,
-              issueEstimationType:
-                issueEstimateContext.team.issueEstimationType,
-              issueEstimationExtended:
-                issueEstimateContext.team.issueEstimationExtended,
-              issueEstimationAllowZero:
-                issueEstimateContext.team.issueEstimationAllowZero,
+              teamKey: estimateTeam.teamKey,
+              issueEstimationType: estimateTeam.issueEstimationType,
+              issueEstimationExtended: estimateTeam.issueEstimationExtended,
+              issueEstimationAllowZero: estimateTeam.issueEstimationAllowZero,
             });
           }
 
@@ -1403,7 +1677,10 @@ export function setupIssuesCommands(program: Command): void {
             options.status ||
             options.projectMilestone ||
             options.cycle ||
-            (options.labels && (labelMode === "add" || labelMode === "remove"));
+            (options.labels &&
+              (labelMode === "add" || labelMode === "remove")) ||
+            (options.subscribers &&
+              (subscriberMode === "add" || subscriberMode === "remove"));
           const issueContext = needsContext
             ? await getIssue(ctx.gql, resolvedIssueId)
             : undefined;
@@ -1443,6 +1720,13 @@ export function setupIssuesCommands(program: Command): void {
           if (!options.clearParentTicket && options.parentTicket) {
             updIdsInput.parentTicket = options.parentTicket;
           }
+          if (options.team) updIdsInput.team = options.team;
+          if (!options.clearSubscribers && options.subscribers) {
+            updIdsInput.subscribers = parseCommaSeparated(options.subscribers);
+          }
+          if (!options.clearDelegate && options.delegate) {
+            updIdsInput.delegate = options.delegate;
+          }
 
           const needsResolution =
             updIdsInput.assignee !== undefined ||
@@ -1451,7 +1735,10 @@ export function setupIssuesCommands(program: Command): void {
             updIdsInput.projectMilestone !== undefined ||
             updIdsInput.cycle !== undefined ||
             updIdsInput.status !== undefined ||
-            updIdsInput.parentTicket !== undefined;
+            updIdsInput.parentTicket !== undefined ||
+            updIdsInput.team !== undefined ||
+            updIdsInput.subscribers !== undefined ||
+            updIdsInput.delegate !== undefined;
 
           const ids: ResolvedUpdateIssueIds = needsResolution
             ? await resolveUpdateIssueIds(ctx.gql, updIdsInput, updContext)
@@ -1504,15 +1791,7 @@ export function setupIssuesCommands(program: Command): void {
                 ? issueContext.labels.nodes.map((l) => asUuid(l.id))
                 : [];
 
-            if (labelMode === "add") {
-              input.labelIds = [...new Set([...currentLabels, ...labelIds])];
-            } else if (labelMode === "remove") {
-              input.labelIds = currentLabels.filter(
-                (id) => !labelIds.includes(id),
-              );
-            } else {
-              input.labelIds = labelIds;
-            }
+            input.labelIds = applySetMode(labelMode, currentLabels, labelIds);
           }
 
           if (options.clearParentTicket) {
@@ -1539,6 +1818,26 @@ export function setupIssuesCommands(program: Command): void {
             input.cycleId = ids.cycleId;
           }
 
+          if (ids.teamId) {
+            input.teamId = ids.teamId;
+          }
+
+          if (options.clearSubscribers) {
+            input.subscriberIds = [];
+          } else if (options.subscribers && ids.subscriberIds) {
+            input.subscriberIds = applySetMode(
+              subscriberMode,
+              currentSubscriberIds(issueContext),
+              ids.subscriberIds,
+            );
+          }
+
+          if (options.clearDelegate) {
+            input.delegateId = null;
+          } else if (ids.delegateId) {
+            input.delegateId = ids.delegateId;
+          }
+
           if (options.clearDueDate) {
             input.dueDate = null;
           } else if (options.dueDate) {
@@ -1554,6 +1853,142 @@ export function setupIssuesCommands(program: Command): void {
               relationActions,
             );
           }
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("from-branch [branch]")
+    .description("find the issue a git branch belongs to")
+    .addHelpText(
+      "after",
+      "\nWith no argument the current checkout's branch is used, so this works as `linearis issues from-branch` inside a worktree.",
+    )
+    .action(
+      commandAction<[string | undefined, unknown, Command]>(
+        async (branch, _unused1, command) => {
+          const branchName = branch ?? getCurrentBranch();
+          const ctx = createContext(getRootOpts(command));
+          const result = await findIssueByBranch(ctx.gql, branchName);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("subscribe <issue>")
+    .description("subscribe a user to an issue's notifications")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("--user <user>", "user to subscribe (defaults to you)")
+    .action(
+      commandAction<[string, SubscriberOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.user,
+          );
+          const result = await subscribeToIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("unsubscribe <issue>")
+    .description("remove a user from an issue's subscribers")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .option("--user <user>", "user to unsubscribe (defaults to you)")
+    .action(
+      commandAction<[string, SubscriberOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.user,
+          );
+          const result = await unsubscribeFromIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("share <issue>")
+    .description("grant a user access to an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.\nThis grants access; it does not mint a link. The issue's permalink is the \`url\` field on \`issues read\`.`,
+    )
+    .requiredOption("--with <user>", "user to grant access to")
+    .action(
+      commandAction<[string, ShareOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.with,
+          );
+          const result = await shareIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("unshare <issue>")
+    .description("revoke a user's access to an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.`,
+    )
+    .requiredOption("--with <user>", "user to revoke access from")
+    .action(
+      commandAction<[string, ShareOptions, Command]>(
+        async (issue, options, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const [issueId, userId] = await resolveIssueAndUser(
+            ctx,
+            issue,
+            options.with,
+          );
+          const result = await unshareIssue(ctx.gql, issueId, userId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("remind <issue>")
+    .description("schedule a reminder for yourself on an issue")
+    .addHelpText(
+      "after",
+      `\nWhen passing issue IDs, both UUID and identifiers like ABC-123 are supported.\n--at accepts an ISO-8601 instant (2026-08-14T09:00:00Z) or a relative offset (+2h, +3d).`,
+    )
+    .requiredOption("--at <when>", "when to be reminded")
+    .action(
+      commandAction<[string, RemindOptions, Command]>(
+        async (issue, options, command) => {
+          const reminderAt = parseDateTimeOption("--at", options.at);
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await remindOnIssue(ctx.gql, issueId, reminderAt);
 
           outputSuccess(result);
         },
@@ -1583,6 +2018,47 @@ export function setupIssuesCommands(program: Command): void {
           const ctx = createContext(getRootOpts(command));
           const issueId = await resolveIssueId(ctx.gql, issue);
           const result = await unarchiveIssue(ctx.gql, issueId);
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("restore <issue>")
+    .description("restore an issue from the trash")
+    .addHelpText(
+      "after",
+      "\n`issues delete` trashes rather than destroys, and this is the way back. Archiving is a separate state — use `issues unarchive` for that.",
+    )
+    .action(
+      commandAction<[string, unknown, Command]>(
+        async (issue, _unused1, command) => {
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await restoreIssue(ctx.gql, issueId);
+
+          outputSuccess(result);
+        },
+      ),
+    );
+
+  issues
+    .command("snooze <issue>")
+    .description("snooze an issue until a given time, or wake it")
+    .addHelpText(
+      "after",
+      "\n--until accepts an ISO-8601 instant (2026-08-20T09:00:00Z) or a relative offset (+2h, +3d).",
+    )
+    .option("--until <when>", "snooze until this instant")
+    .option("--clear", "wake the issue now")
+    .action(
+      commandAction<[string, SnoozeOptions, Command]>(
+        async (issue, options, command) => {
+          const snoozedUntilAt = parseSnoozeTarget(options);
+          const ctx = createContext(getRootOpts(command));
+          const issueId = await resolveIssueId(ctx.gql, issue);
+          const result = await snoozeIssue(ctx.gql, issueId, snoozedUntilAt);
+
           outputSuccess(result);
         },
       ),

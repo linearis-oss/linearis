@@ -1,27 +1,28 @@
 import type { GraphQLClient } from "../client/graphql-client.js";
-import {
-  asUuid,
-  type BrandUuidFields,
-  type UUID,
-} from "../common/identifier.js";
+import type { BrandUuidFields, UUID } from "../common/identifier.js";
 import {
   requireMutationEntity,
   requireMutationSuccess,
 } from "../common/mutation-payload.js";
 import type { PaginatedResult, PaginationOptions } from "../common/types.js";
 import {
-  ArchiveProjectDocument,
-  type ArchiveProjectMutation,
+  AddProjectLabelDocument,
+  type AddProjectLabelMutation,
   CreateProjectDocument,
   type CreateProjectMutation,
   DeleteProjectDocument,
+  DisableProjectExternalSyncDocument,
+  type DisableProjectExternalSyncMutation,
+  type ExternalSyncService,
   GetProjectDocument,
-  GetProjectLabelIdsDocument,
   type GetProjectQuery,
   GetProjectsDocument,
   type GetProjectsQuery,
   type ProjectCreateInput,
   type ProjectUpdateInput,
+  RemoveProjectLabelDocument,
+  SearchProjectsDocument,
+  type SearchProjectsQuery,
   UnarchiveProjectDocument,
   type UnarchiveProjectMutation,
   UpdateProjectDocument,
@@ -37,11 +38,16 @@ export type CreatedProject = NonNullable<
 export type UpdatedProject = NonNullable<
   UpdateProjectMutation["projectUpdate"]["project"]
 >;
-export type ArchivedProject = NonNullable<
-  ArchiveProjectMutation["projectArchive"]["entity"]
->;
 export type UnarchivedProject = NonNullable<
   UnarchiveProjectMutation["projectUnarchive"]["entity"]
+>;
+export type ProjectSearchResult =
+  SearchProjectsQuery["searchProjects"]["nodes"][0];
+export type LabelledProject = NonNullable<
+  AddProjectLabelMutation["projectAddLabel"]["project"]
+>;
+export type SyncDisabledProject = NonNullable<
+  DisableProjectExternalSyncMutation["projectExternalSyncDisable"]["project"]
 >;
 export type DeletedProject = {
   id: string;
@@ -92,6 +98,11 @@ export interface ProjectListOptions extends PaginationOptions {
   includeArchived?: boolean;
 }
 
+export interface ProjectSearchOptions extends ProjectListOptions {
+  /** Narrows the search to projects owned by one team. */
+  teamId?: UUID;
+}
+
 export interface ProjectDetailOptions {
   milestonesFirst?: number;
   issuesFirst?: number;
@@ -125,6 +136,34 @@ export async function listProjects(
   };
 }
 
+/**
+ * Full-text search across projects.
+ *
+ * Results come back relevance-ordered from the API, so there is no
+ * `orderBy` knob — supplying one would discard the ranking that makes the
+ * search worth running. Mirrors `searchIssues`.
+ */
+export async function searchProjects(
+  client: GraphQLClient,
+  term: string,
+  options: ProjectSearchOptions = {},
+): Promise<PaginatedResult<ProjectSearchResult>> {
+  const { limit = 25, after, includeArchived = false, teamId } = options;
+
+  const result = await client.request(SearchProjectsDocument, {
+    term,
+    first: limit,
+    after,
+    includeArchived,
+    teamId,
+  });
+
+  return {
+    nodes: result.searchProjects.nodes,
+    pageInfo: result.searchProjects.pageInfo,
+  };
+}
+
 export async function getProject(
   client: GraphQLClient,
   id: UUID,
@@ -147,28 +186,6 @@ export async function getProject(
   }
 
   return result.project;
-}
-
-export async function getProjectLabelIds(
-  client: GraphQLClient,
-  id: UUID,
-): Promise<UUID[]> {
-  const result = await client.request(GetProjectLabelIdsDocument, { id });
-
-  if (!result.project) {
-    throw new Error(`Project with ID "${id}" not found`);
-  }
-
-  // labelIds is a full-replacement input on projectUpdate; merging from a
-  // truncated read would silently delete every label past the page limit.
-  if (result.project.labels.pageInfo.hasNextPage) {
-    throw new Error(
-      `Project with ID "${id}" has more labels than a single read can ` +
-        "return; refusing to modify labels from a truncated label set",
-    );
-  }
-
-  return result.project.labels.nodes.map((label) => asUuid(label.id));
 }
 
 export async function createProject(
@@ -205,19 +222,54 @@ export async function updateProject(
   );
 }
 
-export async function archiveProject(
+/**
+ * Adds or removes labels one at a time.
+ *
+ * `projectAddLabel`/`projectRemoveLabel` are incremental, so unlike the
+ * full-replacement `labelIds` input they need no read of the project's
+ * current labels and cannot drop labels this call never saw. Each mutation
+ * takes a single label, so a multi-label request is a sequence; it runs in
+ * order rather than concurrently, which leaves a comprehensible prefix
+ * applied if one of them fails.
+ *
+ * Returns the project as of the last mutation.
+ */
+export async function applyProjectLabels(
   client: GraphQLClient,
   id: UUID,
-): Promise<ArchivedProject> {
-  const result = await client.request(ArchiveProjectDocument, { id });
+  labelIds: UUID[],
+  mode: "add" | "remove",
+): Promise<LabelledProject> {
+  let project: LabelledProject | undefined;
 
-  return requireMutationEntity(
-    result.projectArchive,
-    "entity",
-    `Failed to archive project "${id}"`,
-  );
+  for (const labelId of labelIds) {
+    const payload =
+      mode === "add"
+        ? (await client.request(AddProjectLabelDocument, { id, labelId }))
+            .projectAddLabel
+        : (await client.request(RemoveProjectLabelDocument, { id, labelId }))
+            .projectRemoveLabel;
+
+    project = requireMutationEntity(
+      payload,
+      "project",
+      `Failed to ${mode} label "${labelId}" on project "${id}"`,
+    );
+  }
+
+  if (!project) {
+    throw new Error(`No labels given to ${mode} on project "${id}"`);
+  }
+
+  return project;
 }
 
+/**
+ * Restores a project from the trash.
+ *
+ * Linear has one put-away state for projects, so this is the inverse of
+ * {@link deleteProject} — there is no separate archived state to restore from.
+ */
 export async function unarchiveProject(
   client: GraphQLClient,
   id: UUID,
@@ -231,6 +283,32 @@ export async function unarchiveProject(
   );
 }
 
+/**
+ * Stops one external tracker from pushing updates into the project.
+ *
+ * The link itself survives; only the sync stops. Mirrors the attachment
+ * equivalent.
+ */
+export async function disableProjectExternalSync(
+  client: GraphQLClient,
+  projectId: UUID,
+  syncSource: ExternalSyncService,
+): Promise<SyncDisabledProject> {
+  const result = await client.request(DisableProjectExternalSyncDocument, {
+    projectId,
+    syncSource,
+  });
+
+  return requireMutationEntity(
+    result.projectExternalSyncDisable,
+    "project",
+    `Failed to disable ${syncSource} sync on project "${projectId}"`,
+  );
+}
+
+/**
+ * Trashes a project. Reversible via {@link unarchiveProject}.
+ */
 export async function deleteProject(
   client: GraphQLClient,
   id: UUID,

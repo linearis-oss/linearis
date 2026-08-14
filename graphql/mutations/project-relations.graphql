@@ -1,0 +1,31 @@
+# ------------------------------------------------------------
+# GraphQL mutations for Linear project dependency relations
+# ------------------------------------------------------------
+
+mutation CreateProjectRelation($input: ProjectRelationCreateInput!) {
+  projectRelationCreate(input: $input) {
+    success
+    projectRelation {
+      ...ProjectRelationCoreFields
+    }
+  }
+}
+
+mutation UpdateProjectRelation(
+  $id: String!
+  $input: ProjectRelationUpdateInput!
+) {
+  projectRelationUpdate(id: $id, input: $input) {
+    success
+    projectRelation {
+      ...ProjectRelationCoreFields
+    }
+  }
+}
+
+mutation DeleteProjectRelation($id: String!) {
+  projectRelationDelete(id: $id) {
+    success
+    entityId
+  }
+}

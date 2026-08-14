@@ -39,10 +39,30 @@ describe("resolveMilestoneId", () => {
     const gql = mockGqlClient(
       { projects: { nodes: [{ id: "proj-uuid" }] } },
       { project: { projectMilestones: { nodes: [] } } },
-      { projectMilestones: { nodes: [] } },
     );
     await expect(
       resolveMilestoneId(gql, "Nonexistent", "My Project"),
-    ).rejects.toThrow('Milestone "Nonexistent" not found');
+    ).rejects.toThrow(
+      'Milestone "Nonexistent" in project "My Project" not found',
+    );
+  });
+
+  it("does not fall back to the workspace when scoped to a project", async () => {
+    const gql = mockGqlClient(
+      { projects: { nodes: [{ id: "proj-uuid" }] } },
+      { project: { projectMilestones: { nodes: [] } } },
+      { projectMilestones: { nodes: [{ id: "other-uuid", name: "Launch" }] } },
+    );
+    await expect(
+      resolveMilestoneId(gql, "Launch", "My Project"),
+    ).rejects.toThrow('Milestone "Launch" in project "My Project" not found');
+    expect(gql.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("searches the workspace when no project scope is given", async () => {
+    const gql = mockGqlClient({
+      projectMilestones: { nodes: [{ id: "ms-uuid", name: "Launch" }] },
+    });
+    expect(await resolveMilestoneId(gql, "Launch")).toBe("ms-uuid");
   });
 });

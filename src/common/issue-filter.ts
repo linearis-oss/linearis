@@ -23,6 +23,9 @@ export interface IssueFilterOptions {
   updatedBefore?: string;
   hasBlockers?: boolean;
   isBlocking?: boolean;
+  unassigned?: boolean;
+  stateType?: WorkflowStateType;
+  subscriberId?: string;
 }
 
 export interface RawFilterFlags {
@@ -47,6 +50,37 @@ export interface RawFilterFlags {
   updatedBefore?: string;
   hasBlockers?: boolean;
   isBlocking?: boolean;
+  unassigned?: boolean;
+  stateType?: string;
+  subscriber?: string;
+}
+
+/**
+ * Workflow-state categories, as documented on `WorkflowState.type`.
+ *
+ * `duplicate` is omitted: it is not a category a caller filters a work list by,
+ * and Linear surfaces duplicates through the relation instead.
+ */
+export const WORKFLOW_STATE_TYPES = [
+  "triage",
+  "backlog",
+  "unstarted",
+  "started",
+  "completed",
+  "canceled",
+] as const;
+
+export type WorkflowStateType = (typeof WORKFLOW_STATE_TYPES)[number];
+
+export function parseWorkflowStateType(value: string): WorkflowStateType {
+  if ((WORKFLOW_STATE_TYPES as readonly string[]).includes(value)) {
+    return value as WorkflowStateType;
+  }
+
+  throw invalidParameterError(
+    "--state-type",
+    `must be one of ${WORKFLOW_STATE_TYPES.join(", ")}`,
+  );
 }
 
 export function validatePriority(value: number): void {

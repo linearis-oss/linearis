@@ -1,5 +1,8 @@
 # ------------------------------------------------------------
-# GraphQL mutations for Linear issue labels
+# GraphQL mutations for Linear issue and project labels
+#
+# The two label kinds are separate types with parallel mutations;
+# `labels --type issue|project` picks between them.
 # ------------------------------------------------------------
 
 mutation CreateIssueLabel($input: IssueLabelCreateInput!) {
@@ -24,5 +27,70 @@ mutation DeleteIssueLabel($id: String!) {
   issueLabelDelete(id: $id) {
     success
     entityId
+  }
+}
+
+# Retire an issue label
+#
+# Retired labels stay on the issues that already carry them but cannot be
+# applied to new ones — a softer alternative to delete.
+mutation RetireIssueLabel($id: String!) {
+  issueLabelRetire(id: $id) {
+    success
+    issueLabel {
+      ...LabelFields
+    }
+  }
+}
+
+mutation RestoreIssueLabel($id: String!) {
+  issueLabelRestore(id: $id) {
+    success
+    issueLabel {
+      ...LabelFields
+    }
+  }
+}
+
+mutation CreateProjectLabel($input: ProjectLabelCreateInput!) {
+  projectLabelCreate(input: $input) {
+    success
+    projectLabel {
+      ...ProjectLabelFields
+    }
+  }
+}
+
+mutation UpdateProjectLabel($id: String!, $input: ProjectLabelUpdateInput!) {
+  projectLabelUpdate(id: $id, input: $input) {
+    success
+    projectLabel {
+      ...ProjectLabelFields
+    }
+  }
+}
+
+mutation DeleteProjectLabel($id: String!) {
+  projectLabelDelete(id: $id) {
+    success
+    entityId
+  }
+}
+
+mutation RetireProjectLabel($id: String!) {
+  projectLabelRetire(id: $id) {
+    success
+    projectLabel {
+      ...ProjectLabelFields
+    }
+  }
+}
+
+mutation RestoreProjectLabel($id: String!) {
+  projectLabelRestore(id: $id) {
+    success
+    projectLabel {
+      ...ProjectLabelFields
+    }
   }
 }

@@ -12,6 +12,7 @@ import {
 } from "../gql/graphql.js";
 import {
   buildLabelFilter,
+  buildUserQuery,
   mapCycle,
   mapLabels,
   mapMilestone,
@@ -22,7 +23,12 @@ import {
   type ProjectNode,
   type TeamNode,
 } from "./batch-resolve-mappers.js";
-import type { TeamEstimateContext } from "./team-resolver.js";
+import { resolveTeamId, type TeamEstimateContext } from "./team-resolver.js";
+import {
+  isViewerAlias,
+  resolveUserId,
+  resolveViewerId,
+} from "./user-resolver.js";
 
 /**
  * Batch resolver for issue create / update.
@@ -72,6 +78,9 @@ export interface ResolveCreateIssueIdsInput {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  /** User references (name, email, UUID or `me`) to subscribe on creation. */
+  subscribers?: string[];
+  delegate?: string;
   /** When true, resolve the team's estimation config for `--estimate` validation. */
   withEstimateContext?: boolean;
 }
@@ -86,6 +95,43 @@ export interface ResolvedCreateIssueIds {
   cycleId?: UUID;
   stateId?: UUID;
   parentId?: UUID;
+  subscriberIds?: UUID[];
+  delegateId?: UUID;
+}
+
+/**
+ * Resolves the user-valued references that the `BatchResolve*` queries cannot.
+ *
+ * `--subscribers` is a list and `--delegate` a second single user, neither of
+ * which the batch query's one `$assigneeQuery` variable can express. They go
+ * through `resolveUserId` in parallel instead, which keeps the name/email
+ * disambiguation identical to every other user flag and costs nothing when the
+ * flags are absent.
+ *
+ * `--assignee` normally *is* the batch query's variable, but `me` matches no
+ * display name or email, so that one spelling is diverted here too — otherwise
+ * an alias the help text and the JSON Schema both advertise would come back as
+ * `User "me" not found`.
+ */
+async function resolveIssueUserRefs(
+  client: GraphQLClient,
+  input: { subscribers?: string[]; delegate?: string; assignee?: string },
+): Promise<{ subscriberIds?: UUID[]; delegateId?: UUID; assigneeId?: UUID }> {
+  const [subscriberIds, delegateId, assigneeId] = await Promise.all([
+    input.subscribers
+      ? Promise.all(input.subscribers.map((ref) => resolveUserId(client, ref)))
+      : undefined,
+    input.delegate ? resolveUserId(client, input.delegate) : undefined,
+    input.assignee && isViewerAlias(input.assignee)
+      ? resolveViewerId(client)
+      : undefined,
+  ]);
+
+  return {
+    ...(subscriberIds && { subscriberIds }),
+    ...(delegateId && { delegateId }),
+    ...(assigneeId && { assigneeId }),
+  };
 }
 
 /**
@@ -97,8 +143,7 @@ export async function resolveCreateIssueIds(
   input: ResolveCreateIssueIdsInput,
 ): Promise<ResolvedCreateIssueIds> {
   const teamIsUuid = isUuid(input.team);
-  const assigneeQuery =
-    input.assignee && !isUuid(input.assignee) ? input.assignee : null;
+  const assigneeQuery = buildUserQuery(input.assignee);
   const projectName =
     input.project && !isUuid(input.project) ? input.project : null;
   const projectIdVar =
@@ -117,20 +162,27 @@ export async function resolveCreateIssueIds(
       ? parseIssueIdentifier(input.parentTicket)
       : null;
 
-  const response = await client.request(BatchResolveForCreateDocument, {
-    teamKey: teamIsUuid ? null : input.team,
-    teamName: teamIsUuid ? null : input.team,
-    teamId: teamIsUuid ? input.team : null,
-    assigneeQuery,
-    projectName,
-    projectId: projectIdVar,
-    labelFilter: buildLabelFilter(labelNames),
-    statusName,
-    cycleName,
-    milestoneName,
-    parentTeamKey: parent?.teamKey ?? null,
-    parentIssueNumber: parent?.issueNumber ?? null,
-  });
+  // Awaited together with the batch request: starting the user lookups without
+  // awaiting them in the same expression would leave a rejection unhandled
+  // whenever the batch request throws first, and an unhandled rejection kills
+  // the process with a stack trace instead of the JSON error envelope.
+  const [userRefs, response] = await Promise.all([
+    resolveIssueUserRefs(client, input),
+    client.request(BatchResolveForCreateDocument, {
+      teamKey: teamIsUuid ? null : input.team,
+      teamName: teamIsUuid ? null : input.team,
+      teamId: teamIsUuid ? input.team : null,
+      assigneeQuery,
+      projectName,
+      projectId: projectIdVar,
+      labelFilter: buildLabelFilter(labelNames),
+      statusName,
+      cycleName,
+      milestoneName,
+      parentTeamKey: parent?.teamKey ?? null,
+      parentIssueNumber: parent?.issueNumber ?? null,
+    }),
+  ]);
 
   // Team (required). Prefer key match, then name, then id — mirrors resolveTeamId.
   const teamNode = teamIsUuid
@@ -158,10 +210,12 @@ export async function resolveCreateIssueIds(
     };
   }
 
-  if (input.assignee) {
-    resolved.assigneeId = isUuid(input.assignee)
-      ? asUuid(input.assignee)
-      : mapUser(response.assignees.nodes, input.assignee);
+  // A `me` assignee has no name to match; it is resolved against `viewer` in
+  // userRefs and spread over `resolved` on the way out.
+  if (assigneeQuery) {
+    resolved.assigneeId = mapUser(response.assignees.nodes, assigneeQuery);
+  } else if (input.assignee && isUuid(input.assignee)) {
+    resolved.assigneeId = asUuid(input.assignee);
   }
 
   let matchedProject: ProjectNode | undefined;
@@ -209,7 +263,83 @@ export async function resolveCreateIssueIds(
       : mapParent(response.parentIssues.nodes, input.parentTicket);
   }
 
-  return resolved;
+  return { ...resolved, ...userRefs };
+}
+
+/** How many distinct reference sets resolve at once (see below for why). */
+const BATCH_CREATE_RESOLVE_CONCURRENCY = 5;
+
+/**
+ * Resolves the human identifiers for a whole batch of issues to create.
+ *
+ * Each entry still resolves through {@link resolveCreateIssueIds}, so the
+ * disambiguation and not-found semantics are identical to a single create —
+ * a batch must not quietly accept a team name that `issues create` would
+ * reject. What changes is the round-trip count: entries naming the same set of
+ * references (the usual case, where a batch shares a team and project and
+ * differs only in title) are deduplicated up front, so the cost is one
+ * `BatchResolveForCreate` per *distinct* reference set rather than per row.
+ *
+ * Field-level memoization would collapse more, but status, cycle and milestone
+ * lookups are scoped by the entry's own team and project, so a per-field cache
+ * cannot be keyed correctly without duplicating that scoping here.
+ *
+ * The distinct sets are then resolved in bounded waves rather than all at once.
+ * Deduplication helps the common batch that shares a team and project, but a
+ * heterogeneous import — the case this command exists for — has as many
+ * distinct sets as rows, and firing every `BatchResolveForCreate` (plus its
+ * user lookups) simultaneously is how a large import earns a rate-limit
+ * rejection instead of a result.
+ */
+export async function resolveBatchCreateIssueIds(
+  client: GraphQLClient,
+  entries: readonly ResolveCreateIssueIdsInput[],
+): Promise<ResolvedCreateIssueIds[]> {
+  // Deduplicate first so the concurrency window counts real requests: a batch
+  // of 100 rows sharing one reference set should still cost one wave.
+  const keys = entries.map(batchCreateCacheKey);
+  const unique = new Map<string, ResolveCreateIssueIdsInput>();
+  for (const [index, key] of keys.entries()) {
+    if (!unique.has(key)) {
+      unique.set(key, entries[index] as ResolveCreateIssueIdsInput);
+    }
+  }
+
+  const resolvedByKey = new Map<string, ResolvedCreateIssueIds>();
+  const pending = [...unique];
+
+  for (let i = 0; i < pending.length; i += BATCH_CREATE_RESOLVE_CONCURRENCY) {
+    const wave = pending.slice(i, i + BATCH_CREATE_RESOLVE_CONCURRENCY);
+    const resolved = await Promise.all(
+      wave.map(([, entry]) => resolveCreateIssueIds(client, entry)),
+    );
+    for (const [offset, [key]] of wave.entries()) {
+      resolvedByKey.set(key, resolved[offset] as ResolvedCreateIssueIds);
+    }
+  }
+
+  return keys.map((key) => resolvedByKey.get(key) as ResolvedCreateIssueIds);
+}
+
+/**
+ * Stable cache key over exactly the fields {@link resolveCreateIssueIds} reads.
+ * Title and description are absent by construction — they never reach the
+ * resolver — so two entries with the same key resolve to the same UUIDs.
+ */
+function batchCreateCacheKey(entry: ResolveCreateIssueIdsInput): string {
+  return JSON.stringify([
+    entry.team,
+    entry.assignee ?? null,
+    entry.project ?? null,
+    entry.labels ?? null,
+    entry.projectMilestone ?? null,
+    entry.cycle ?? null,
+    entry.status ?? null,
+    entry.parentTicket ?? null,
+    entry.subscribers ?? null,
+    entry.delegate ?? null,
+    entry.withEstimateContext ?? false,
+  ]);
 }
 
 function findTeamNode(nodes: TeamNode[], raw: string): TeamNode | undefined {
@@ -241,6 +371,10 @@ export interface ResolveUpdateIssueIdsInput {
   cycle?: string;
   status?: string;
   parentTicket?: string;
+  /** Destination team for a move; also rescopes status / cycle resolution. */
+  team?: string;
+  subscribers?: string[];
+  delegate?: string;
 }
 
 export interface ResolvedUpdateIssueIds {
@@ -252,6 +386,10 @@ export interface ResolvedUpdateIssueIds {
   cycleId?: UUID;
   stateId?: UUID;
   parentId?: UUID;
+  teamId?: UUID;
+  /** Resolved subscriber UUIDs (add/remove/overwrite set math stays in the command). */
+  subscriberIds?: UUID[];
+  delegateId?: UUID;
 }
 
 /**
@@ -268,8 +406,7 @@ export async function resolveUpdateIssueIds(
   input: ResolveUpdateIssueIdsInput,
   context: UpdateIssueContext,
 ): Promise<ResolvedUpdateIssueIds> {
-  const assigneeQuery =
-    input.assignee && !isUuid(input.assignee) ? input.assignee : null;
+  const assigneeQuery = buildUserQuery(input.assignee);
 
   // projectName scopes both --project resolution and milestone lookup: the new
   // project when --project is a name, else the issue's current project.
@@ -294,6 +431,23 @@ export async function resolveUpdateIssueIds(
       ? parseIssueIdentifier(input.parentTicket)
       : null;
 
+  // Both lookups are awaited in the same expression: starting one without
+  // awaiting it would leave a rejection unhandled whenever the other throws
+  // first, and an unhandled rejection kills the process with a stack trace
+  // instead of the JSON error envelope.
+  //
+  // A team move rescopes the lookups: a status or cycle named alongside
+  // `--team` belongs to the *destination* team's workflow, not the team the
+  // issue is leaving. This is the one lookup that cannot be batched with the
+  // rest, since its result is an input to them.
+  const [userRefs, destinationTeamId] = await Promise.all([
+    resolveIssueUserRefs(client, input),
+    input.team ? resolveTeamId(client, input.team) : undefined,
+  ]);
+  const scope: UpdateIssueContext = destinationTeamId
+    ? { teamId: destinationTeamId }
+    : context;
+
   const response = await client.request(BatchResolveForUpdateDocument, {
     assigneeQuery,
     projectName: projectNameVar,
@@ -301,19 +455,22 @@ export async function resolveUpdateIssueIds(
     labelFilter: buildLabelFilter(labelNames),
     statusName,
     cycleName,
-    teamKey: context.teamKey ?? null,
-    teamId: context.teamId ?? null,
+    teamKey: scope.teamKey ?? null,
+    teamId: scope.teamId ?? null,
     milestoneName,
     parentTeamKey: parent?.teamKey ?? null,
     parentIssueNumber: parent?.issueNumber ?? null,
   });
 
-  const resolved: ResolvedUpdateIssueIds = {};
+  const resolved: ResolvedUpdateIssueIds = destinationTeamId
+    ? { teamId: destinationTeamId }
+    : {};
 
-  if (input.assignee) {
-    resolved.assigneeId = isUuid(input.assignee)
-      ? asUuid(input.assignee)
-      : mapUser(response.assignees.nodes, input.assignee);
+  // As in create: `me` carries no name to match and arrives via userRefs.
+  if (assigneeQuery) {
+    resolved.assigneeId = mapUser(response.assignees.nodes, assigneeQuery);
+  } else if (input.assignee && isUuid(input.assignee)) {
+    resolved.assigneeId = asUuid(input.assignee);
   }
 
   // The projects field matches by projectNameVar/projectIdVar; the matched node
@@ -347,7 +504,7 @@ export async function resolveUpdateIssueIds(
   if (input.cycle) {
     resolved.cycleId = isUuid(input.cycle)
       ? asUuid(input.cycle)
-      : mapCycle(response.cycles.nodes, input.cycle, context.teamKey);
+      : mapCycle(response.cycles.nodes, input.cycle, scope.teamKey);
   }
 
   if (input.status) {
@@ -356,7 +513,7 @@ export async function resolveUpdateIssueIds(
       : mapStatus(
           response.statuses.nodes,
           input.status,
-          context.teamId ? `for team ${context.teamId}` : undefined,
+          scope.teamId ? `for team ${scope.teamId}` : undefined,
         );
   }
 
@@ -366,5 +523,5 @@ export async function resolveUpdateIssueIds(
       : mapParent(response.parentIssues.nodes, input.parentTicket);
   }
 
-  return resolved;
+  return { ...resolved, ...userRefs };
 }

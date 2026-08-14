@@ -34,6 +34,18 @@ describe("multipleMatchesError", () => {
     expect(err.message).toContain("id-1, id-2");
     expect(err.message).toContain("use an ID");
   });
+
+  it("pluralizes a sibilant entity type with -es", () => {
+    const err = multipleMatchesError(
+      "project status",
+      "In Review",
+      ["id-1", "id-2"],
+      "use an ID",
+    );
+    expect(err.message).toContain(
+      'Multiple project statuses found matching "In Review"',
+    );
+  });
 });
 
 describe("invalidParameterError", () => {

@@ -24,7 +24,10 @@ import {
   MILESTONES_META,
   setupMilestonesCommands,
 } from "./commands/milestones.js";
-import { PROJECTS_META, setupProjectsCommands } from "./commands/projects.js";
+import {
+  PROJECTS_META,
+  setupProjectsCommands,
+} from "./commands/projects/index.js";
 import { setupTeamsCommands, TEAMS_META } from "./commands/teams.js";
 import { setupUsersCommands, USERS_META } from "./commands/users.js";
 import { setupVersionCommands, VERSION_META } from "./commands/version.js";

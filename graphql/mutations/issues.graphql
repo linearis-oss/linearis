@@ -51,6 +51,84 @@ mutation UnarchiveIssue($id: String!) {
   }
 }
 
+# Create many issues in one transaction
+#
+# The batch payload returns the created issues without the per-issue comment
+# thread: a freshly created issue has no comments, and CompleteIssueFields
+# keeps the response proportional to the batch size.
+mutation BatchCreateIssues($input: IssueBatchCreateInput!) {
+  issueBatchCreate(input: $input) {
+    success
+    issues {
+      ...CompleteIssueFields
+    }
+  }
+}
+
+# Apply one patch to an explicit list of issues
+mutation BatchUpdateIssues($ids: [UUID!]!, $input: IssueUpdateInput!) {
+  issueBatchUpdate(ids: $ids, input: $input) {
+    success
+    issues {
+      ...CompleteIssueFields
+    }
+  }
+}
+
+# Subscribe a user to an issue's notifications
+#
+# The API accepts either userId or userEmail; the CLI always resolves to a
+# UUID first (resolvers own ID resolution), so only userId is threaded through.
+mutation SubscribeToIssue($id: String!, $userId: String!) {
+  issueSubscribe(id: $id, userId: $userId) {
+    success
+    issue {
+      ...CompleteIssueWithDefaultCommentsFields
+    }
+  }
+}
+
+mutation UnsubscribeFromIssue($id: String!, $userId: String!) {
+  issueUnsubscribe(id: $id, userId: $userId) {
+    success
+    issue {
+      ...CompleteIssueWithDefaultCommentsFields
+    }
+  }
+}
+
+# Grant a user access to an issue they could not otherwise see
+#
+# Despite the name this does not mint a shareable link — the issue's own
+# permalink is the `url` field on the read payload.
+mutation ShareIssue($id: String!, $userId: String!) {
+  issueShare(id: $id, userId: $userId) {
+    success
+    issue {
+      ...CompleteIssueWithDefaultCommentsFields
+    }
+  }
+}
+
+mutation UnshareIssue($id: String!, $userId: String!) {
+  issueUnshare(id: $id, userId: $userId) {
+    success
+    issue {
+      ...CompleteIssueWithDefaultCommentsFields
+    }
+  }
+}
+
+# Schedule a reminder for the viewer on an issue
+mutation RemindOnIssue($id: String!, $reminderAt: DateTime!) {
+  issueReminder(id: $id, reminderAt: $reminderAt) {
+    success
+    issue {
+      ...CompleteIssueWithDefaultCommentsFields
+    }
+  }
+}
+
 mutation DeleteIssue($id: String!) {
   issueDelete(id: $id) {
     success

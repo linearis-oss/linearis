@@ -9,14 +9,17 @@ import {
 import { BatchResolveForSearchDocument } from "../gql/graphql.js";
 import {
   buildLabelFilter,
+  buildUserQuery,
   mapCycle,
   mapLabels,
   mapParent,
   mapProjectId,
   mapUser,
+  type UserNode,
 } from "./batch-resolve-mappers.js";
 import { resolveCycleId } from "./cycle-resolver.js";
 import { resolveStatusId } from "./status-resolver.js";
+import { isViewerAlias, resolveViewerId } from "./user-resolver.js";
 
 export interface SearchFilterResolutionInput {
   team?: string;
@@ -58,10 +61,11 @@ export async function resolveSearchFilterIds(
   const team = input.team;
   const teamIsUuid = team ? isUuid(team) : false;
 
-  const assigneeQuery =
-    input.assignee && !isUuid(input.assignee) ? input.assignee : null;
-  const creatorQuery =
-    input.creator && !isUuid(input.creator) ? input.creator : null;
+  const assigneeQuery = buildUserQuery(input.assignee);
+  const creatorQuery = buildUserQuery(input.creator);
+  const wantsViewer =
+    (!!input.assignee && isViewerAlias(input.assignee)) ||
+    (!!input.creator && isViewerAlias(input.creator));
   const projectName =
     input.project && !isUuid(input.project) ? input.project : null;
   const projectIdVar =
@@ -74,20 +78,29 @@ export async function resolveSearchFilterIds(
       ? parseIssueIdentifier(input.parent)
       : null;
 
-  const response = await gqlClient.request(BatchResolveForSearchDocument, {
-    teamKey: team && !teamIsUuid ? team : null,
-    teamName: team && !teamIsUuid ? team : null,
-    teamId: team && teamIsUuid ? team : null,
-    assigneeQuery,
-    creatorQuery,
-    projectName,
-    projectId: projectIdVar,
-    labelFilter: buildLabelFilter(labelNames),
-    cycleName,
-    parentTeamKey: parent?.teamKey ?? null,
-    parentIssueNumber: parent?.issueNumber ?? null,
-    milestoneName: null,
-  });
+  // The viewer lookup is awaited together with the batch request: starting it
+  // without awaiting it in the same expression would leave a rejection
+  // unhandled whenever the batch request throws first, and an unhandled
+  // rejection kills the process with a stack trace instead of the JSON error
+  // envelope. One lookup serves both flags — `--assignee me --creator me` is a
+  // perfectly ordinary "what am I working on that I filed" query.
+  const [viewerId, response] = await Promise.all([
+    wantsViewer ? resolveViewerId(gqlClient) : undefined,
+    gqlClient.request(BatchResolveForSearchDocument, {
+      teamKey: team && !teamIsUuid ? team : null,
+      teamName: team && !teamIsUuid ? team : null,
+      teamId: team && teamIsUuid ? team : null,
+      assigneeQuery,
+      creatorQuery,
+      projectName,
+      projectId: projectIdVar,
+      labelFilter: buildLabelFilter(labelNames),
+      cycleName,
+      parentTeamKey: parent?.teamKey ?? null,
+      parentIssueNumber: parent?.issueNumber ?? null,
+      milestoneName: null,
+    }),
+  ]);
 
   const resolved: SearchFilterResolution = {};
 
@@ -98,15 +111,21 @@ export async function resolveSearchFilterIds(
   }
 
   if (input.assignee) {
-    resolved.assigneeId = isUuid(input.assignee)
-      ? asUuid(input.assignee)
-      : mapUser(response.assignees.nodes, input.assignee);
+    resolved.assigneeId = pickUserId(
+      input.assignee,
+      assigneeQuery,
+      response.assignees.nodes,
+      viewerId,
+    );
   }
 
   if (input.creator) {
-    resolved.creatorId = isUuid(input.creator)
-      ? asUuid(input.creator)
-      : mapUser(response.creators.nodes, input.creator);
+    resolved.creatorId = pickUserId(
+      input.creator,
+      creatorQuery,
+      response.creators.nodes,
+      viewerId,
+    );
   }
 
   if (input.project) {
@@ -162,6 +181,25 @@ export async function resolveSearchFilterIds(
   }
 
   return resolved;
+}
+
+/**
+ * Picks the id for one user-valued filter flag.
+ *
+ * `query` is non-null exactly when the batch response holds candidates to match
+ * against; otherwise the reference is a UUID that passes through, or the `me`
+ * alias, which takes the viewer id fetched alongside the batch request.
+ */
+function pickUserId(
+  raw: string,
+  query: string | null,
+  nodes: UserNode[],
+  viewerId: UUID | undefined,
+): UUID {
+  if (query) return mapUser(nodes, query);
+  if (isUuid(raw)) return asUuid(raw);
+  if (viewerId) return viewerId;
+  throw notFoundError("User", raw);
 }
 
 type SearchTeamNode = { id: string; key: string; name: string };

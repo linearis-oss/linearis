@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/linearis-oss/linearis/next/schemas/issues-batch-update.schema.json",
+  "title": "linearis issues batch update document",
+  "description": "Input document for `linearis issues batch update --file <path>` (or `--json <json>`). One patch applied to an explicit list of issues in a single transaction. The patch keys mirror the `issues update` flags with the leading dashes dropped; `null` clears a field, the way the `--clear-*` flags do. Unknown keys are rejected rather than ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["issues", "patch"],
+  "properties": {
+    "issues": {
+      "description": "Issues to patch, each an identifier (ABC-123) or UUID. Either an array or a comma-separated string.",
+      "$ref": "#/$defs/stringList"
+    },
+    "patch": { "$ref": "#/$defs/patch" }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "stringList": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        { "$ref": "#/$defs/nonEmptyString" }
+      ]
+    },
+    "nullableString": {
+      "oneOf": [{ "$ref": "#/$defs/nonEmptyString" }, { "type": "null" }]
+    },
+    "patch": {
+      "description": "The fields to change. Every listed issue receives this same patch, so a status, cycle or label named by word requires all targets to share one team — pass a UUID otherwise.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "dependentSchemas": {
+        "projectMilestone": {
+          "anyOf": [
+            { "properties": { "projectMilestone": { "type": "null" } } },
+            {
+              "required": ["project"],
+              "properties": { "project": { "type": "string" } }
+            }
+          ]
+        }
+      },
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "New title for every listed issue."
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "New description in Markdown, replacing the current one."
+        },
+        "status": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Workflow state name (Todo, In Progress, ...) or UUID. A name resolves within the targets' single team."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "description": "1=urgent, 2=high, 3=medium, 4=low."
+        },
+        "estimate": {
+          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }],
+          "description": "Estimate points, or null to clear. Validated against the estimation scale of every team the batch spans, so the accepted values depend on those teams."
+        },
+        "assignee": {
+          "$ref": "#/$defs/nullableString",
+          "description": "Assignee as display name, email, UUID, or `me`. Null unassigns."
+        },
+        "project": {
+          "$ref": "#/$defs/nullableString",
+          "description": "Project name or UUID. Null removes the issues from their project, and their project milestone with it."
+        },
+        "labels": {
+          "description": "Label names or UUIDs, either as an array or as a comma-separated string. Overwrites the current labels; null removes them all. Named labels may be team-scoped, so they require all targets to share one team.",
+          "oneOf": [{ "$ref": "#/$defs/stringList" }, { "type": "null" }]
+        },
+        "parentTicket": {
+          "$ref": "#/$defs/nullableString",
+          "description": "Parent issue as identifier (ABC-123) or UUID. Null detaches from the parent."
+        },
+        "projectMilestone": {
+          "$ref": "#/$defs/nullableString",
+          "description": "Milestone name or UUID. Milestones are scoped by project, so setting one requires `project` as well. Null detaches from the milestone."
+        },
+        "cycle": {
+          "$ref": "#/$defs/nullableString",
+          "description": "Cycle number, name, `current`/`next`/`previous`, or UUID. Null removes the issues from their cycle."
+        },
+        "dueDate": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            { "type": "null" }
+          ],
+          "description": "Due date as YYYY-MM-DD, or null to clear. The date must exist in the calendar."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "issues": ["ENG-42", "ENG-43", "ENG-44"],
+      "patch": {
+        "status": "In Progress",
+        "assignee": "alice",
+        "priority": 2,
+        "cycle": "current",
+        "dueDate": null
+      }
+    }
+  ]
+}

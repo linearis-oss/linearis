@@ -3,9 +3,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import { asUuid } from "../../../src/common/identifier.js";
+import { AttachmentExternalSyncDisableDocument } from "../../../src/gql/graphql.js";
 import {
   createAttachment,
   deleteAttachment,
+  disableExternalSync,
   listAttachments,
 } from "../../../src/services/attachment-service.js";
 
@@ -111,6 +113,34 @@ describe("listAttachments", () => {
     expect(client.request).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ filter }),
+    );
+  });
+});
+
+describe("disableExternalSync", () => {
+  it("returns the affected issue", async () => {
+    const client = mockGqlClient({
+      issueExternalSyncDisable: { success: true, issue: { id: "issue-1" } },
+    });
+
+    await expect(
+      disableExternalSync(client, asUuid("attachment-1")),
+    ).resolves.toEqual({ id: "issue-1" });
+    expect(client.request).toHaveBeenCalledWith(
+      AttachmentExternalSyncDisableDocument,
+      { attachmentId: "attachment-1" },
+    );
+  });
+
+  it("names the attachment when the mutation fails", async () => {
+    const client = mockGqlClient({
+      issueExternalSyncDisable: { success: false, issue: null },
+    });
+
+    await expect(
+      disableExternalSync(client, asUuid("attachment-1")),
+    ).rejects.toThrow(
+      'Failed to disable external sync for attachment "attachment-1"',
     );
   });
 });

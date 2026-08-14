@@ -4,6 +4,7 @@ import type { GraphQLClient } from "../../../src/client/graphql-client.js";
 import {
   resolveIssueEstimateContext,
   resolveIssueId,
+  resolveIssueRefs,
 } from "../../../src/resolvers/issue-resolver.js";
 
 type IssueNode = {
@@ -128,5 +129,93 @@ describe("resolveIssueEstimateContext", () => {
     await expect(
       resolveIssueEstimateContext(client, "ENG-999"),
     ).rejects.toThrow('Issue "ENG-999" not found');
+  });
+});
+
+describe("resolveIssueRefs", () => {
+  const nodes = [
+    {
+      id: "550e8400-e29b-41d4-a716-4466554400e1",
+      number: 1,
+      team: { id: teamId, key: "ENG" },
+    },
+    { id: "eng-2-uuid", number: 2, team: { id: teamId, key: "ENG" } },
+    { id: "des-1-uuid", number: 1, team: { id: "des-team", key: "DES" } },
+  ];
+
+  function mockRefsClient() {
+    const request = vi.fn().mockResolvedValue({ issues: { nodes } });
+    return { request, client: { request } as unknown as GraphQLClient };
+  }
+
+  it("resolves every reference in a single request", async () => {
+    const { request, client } = mockRefsClient();
+
+    const resolved = await resolveIssueRefs(client, ["ENG-1", "DES-1"]);
+
+    expect(resolved).toEqual([
+      {
+        ref: "ENG-1",
+        id: "550e8400-e29b-41d4-a716-4466554400e1",
+        teamId,
+        teamKey: "ENG",
+      },
+      { ref: "DES-1", id: "des-1-uuid", teamId: "des-team", teamKey: "DES" },
+    ]);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith(expect.anything(), {
+      filter: {
+        or: [
+          { number: { eq: 1 }, team: { key: { eq: "ENG" } } },
+          { number: { eq: 1 }, team: { key: { eq: "DES" } } },
+        ],
+      },
+      first: 2,
+    });
+  });
+
+  it("distinguishes the same issue number across teams", async () => {
+    const { client } = mockRefsClient();
+
+    const resolved = await resolveIssueRefs(client, ["DES-1"]);
+
+    expect(resolved[0]?.id).toBe("des-1-uuid");
+  });
+
+  it("collapses duplicate references, preserving first-seen order", async () => {
+    const { client } = mockRefsClient();
+
+    const resolved = await resolveIssueRefs(client, [
+      "ENG-2",
+      "ENG-1",
+      "ENG-2",
+    ]);
+
+    expect(resolved.map((entry) => entry.ref)).toEqual(["ENG-2", "ENG-1"]);
+  });
+
+  it("looks up UUID references too, since a UUID carries no team", async () => {
+    const { client } = mockRefsClient();
+
+    const resolved = await resolveIssueRefs(client, [
+      "550e8400-e29b-41d4-a716-4466554400e1",
+    ]);
+
+    expect(resolved[0]?.teamKey).toBe("ENG");
+  });
+
+  it("throws for a reference with no match", async () => {
+    const { client } = mockRefsClient();
+
+    await expect(resolveIssueRefs(client, ["ENG-99"])).rejects.toThrow(
+      'Issue "ENG-99" not found',
+    );
+  });
+
+  it("makes no request for an empty list", async () => {
+    const { request, client } = mockRefsClient();
+
+    await expect(resolveIssueRefs(client, [])).resolves.toEqual([]);
+    expect(request).not.toHaveBeenCalled();
   });
 });

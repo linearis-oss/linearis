@@ -53,8 +53,8 @@ type BatchNodes = {
   parentIssues?: Array<{ id: string; identifier: string }>;
 };
 
-function mockGql(nodes: BatchNodes) {
-  const request = vi.fn().mockResolvedValue({
+function buildBatchResponse(nodes: BatchNodes) {
+  return {
     teams: { nodes: nodes.teams ?? [] },
     assignees: { nodes: nodes.assignees ?? [] },
     creators: { nodes: nodes.creators ?? [] },
@@ -68,7 +68,11 @@ function mockGql(nodes: BatchNodes) {
     statuses: { nodes: nodes.statuses ?? [] },
     cycles: { nodes: nodes.cycles ?? [] },
     parentIssues: { nodes: nodes.parentIssues ?? [] },
-  });
+  };
+}
+
+function mockGql(nodes: BatchNodes) {
+  const request = vi.fn().mockResolvedValue(buildBatchResponse(nodes));
   return { client: { request } as unknown as GraphQLClient, request };
 }
 
@@ -188,5 +192,37 @@ describe("resolveSearchFilterIds", () => {
     expect(result).toEqual({
       assigneeId: "550e8400-e29b-41d4-a716-446655440000",
     });
+  });
+
+  it("resolves `me` against the viewer, once for both user filters", async () => {
+    const { client, request } = mockGql({});
+    // `viewer` is the one request here that takes no variables.
+    request.mockImplementation((_document, variables) =>
+      variables === undefined
+        ? Promise.resolve({
+            viewer: {
+              id: "viewer-uuid",
+              name: "Me",
+              email: "me@example.com",
+            },
+          })
+        : Promise.resolve(buildBatchResponse({})),
+    );
+
+    const result = await resolveSearchFilterIds(client, {
+      assignee: "me",
+      creator: "@me",
+    });
+
+    expect(result).toEqual({
+      assigneeId: "viewer-uuid",
+      creatorId: "viewer-uuid",
+    });
+    expect(request).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assigneeQuery: null, creatorQuery: null }),
+    );
+    // One viewer lookup plus the batch request — not one lookup per flag.
+    expect(request).toHaveBeenCalledTimes(2);
   });
 });

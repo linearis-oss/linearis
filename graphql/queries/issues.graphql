@@ -17,17 +17,32 @@ fragment CompleteIssueFields on Issue {
   identifier
   title
   description
+  url
   branchName
   priority
   estimate
   dueDate
   createdAt
   updatedAt
+  startedAt
+  completedAt
+  canceledAt
+  archivedAt
+  snoozedUntilAt
+  trashed
   state {
     id
     name
   }
+  creator {
+    id
+    name
+  }
   assignee {
+    id
+    name
+  }
+  delegate {
     id
     name
   }
@@ -87,6 +102,26 @@ fragment CompleteIssueFields on Issue {
         identifier
       }
     }
+  }
+}
+
+# Per-issue detail that is deliberately absent from CompleteIssueFields
+#
+# A subscriber roster and a sharing summary are worth one round-trip when the
+# caller asked for one issue, but they would multiply across every row of a
+# 50-issue list for no benefit — so they hang off the single-read fragments
+# only, not off the shared list fragment.
+fragment IssueDetailOnlyFields on Issue {
+  subscribers {
+    nodes {
+      id
+      name
+    }
+  }
+  sharedAccess {
+    isShared
+    sharedWithCount
+    viewerHasOnlySharedAccess
   }
 }
 
@@ -115,6 +150,7 @@ fragment IssueReadCommentFields on Comment {
 # discussion metadata behind explicit flags.
 fragment CompleteIssueWithDefaultCommentsFields on Issue {
   ...CompleteIssueFields
+  ...IssueDetailOnlyFields
   comments {
     nodes {
       ...IssueReadDefaultCommentFields
@@ -129,6 +165,7 @@ fragment CompleteIssueWithDefaultCommentsFields on Issue {
 # relationships (state, assignee, team, project, labels, comments).
 fragment CompleteIssueWithCommentsFields on Issue {
   ...CompleteIssueFields
+  ...IssueDetailOnlyFields
   comments {
     nodes {
       ...IssueReadCommentFields
@@ -154,17 +191,32 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
   identifier
   title
   description
+  url
   branchName
   priority
   estimate
   dueDate
   createdAt
   updatedAt
+  startedAt
+  completedAt
+  canceledAt
+  archivedAt
+  snoozedUntilAt
+  trashed
   state {
     id
     name
   }
+  creator {
+    id
+    name
+  }
   assignee {
+    id
+    name
+  }
+  delegate {
     id
     name
   }
@@ -227,28 +279,6 @@ fragment CompleteIssueSearchFields on IssueSearchResult {
   }
 }
 
-# Get issues list with all relationships in single query
-#
-# Fetches paginated issues excluding completed ones,
-# ordered by most recently updated. Includes all relationships
-# for comprehensive issue data.
-query GetIssues($first: Int!, $after: String, $orderBy: PaginationOrderBy) {
-  issues(
-    first: $first
-    after: $after
-    orderBy: $orderBy
-    filter: { state: { type: { neq: "completed" } } }
-  ) {
-    nodes {
-      ...CompleteIssueFields
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-
 # Get single issue by UUID with lean fields
 #
 # Fetches issue data by direct UUID lookup with the backward-compatible
@@ -263,10 +293,14 @@ query GetIssueById($id: String!) {
 #
 # Fetches issue using TEAM-123 format with the backward-compatible
 # default comment payload.
+#
+# includeArchived matches the UUID path (`issue(id:)` returns archived issues):
+# reading an issue by its identifier must not silently 404 once it is archived.
 query GetIssueByIdentifier($teamKey: String!, $number: Float!) {
   issues(
     filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
     first: 1
+    includeArchived: true
   ) {
     nodes {
       ...CompleteIssueWithDefaultCommentsFields
@@ -286,6 +320,7 @@ query GetIssueByIdentifierWithComments($teamKey: String!, $number: Float!) {
   issues(
     filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
     first: 1
+    includeArchived: true
   ) {
     nodes {
       ...CompleteIssueWithCommentsFields
@@ -305,6 +340,7 @@ query GetIssueByIdentifierWithReactions($teamKey: String!, $number: Float!) {
   issues(
     filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
     first: 1
+    includeArchived: true
   ) {
     nodes {
       ...CompleteIssueWithReactionsFields
@@ -332,13 +368,14 @@ query SearchIssues(
   $first: Int!
   $after: String
   $filter: IssueFilter
+  $includeArchived: Boolean = false
 ) {
   searchIssues(
     term: $term
     first: $first
     after: $after
     filter: $filter
-    includeArchived: false
+    includeArchived: $includeArchived
   ) {
     nodes {
       ...CompleteIssueSearchFields
@@ -352,20 +389,22 @@ query SearchIssues(
 
 # Search issues with advanced filters and all relationships in single query
 #
-# Supports filtering by team, assignee, project, and states.
-# Used by the advanced search functionality with multiple criteria.
+# Supports filtering by team, assignee, project, and states, and also backs the
+# unfiltered `issues list` — the implicit "hide completed" narrowing is built in
+# the service (buildListIssuesFilter) so that `--include-archived` can drop it.
 query FilteredSearchIssues(
   $first: Int!
   $after: String
   $filter: IssueFilter
   $orderBy: PaginationOrderBy
+  $includeArchived: Boolean = false
 ) {
   issues(
     first: $first
     after: $after
     filter: $filter
     orderBy: $orderBy
-    includeArchived: false
+    includeArchived: $includeArchived
   ) {
     nodes {
       ...CompleteIssueFields
@@ -858,15 +897,31 @@ query FindWorkflowStates($filter: WorkflowStateFilter, $first: Int = 1) {
 # ({ number: { eq }, team: { key: { eq } } }). team { id key } is selected so
 # the estimate-context resolver can derive the owning team without a second
 # round-trip.
+#
+# includeArchived is fixed to true: this query exists purely to turn a human
+# identifier into a UUID, and an archived issue still has one. Without it
+# `issues unarchive ENG-42` could never work, because the identifier could not
+# be resolved in the first place.
 query FindIssues($filter: IssueFilter, $first: Int = 1) {
-  issues(filter: $filter, first: $first) {
+  issues(filter: $filter, first: $first, includeArchived: true) {
     nodes {
       id
+      number
       team {
         id
         key
       }
     }
+  }
+}
+
+# Find the issue a VCS branch belongs to
+#
+# Linear derives a branch name per issue (the `branchName` field), and this is
+# the reverse lookup. Returns null when the branch is not one of Linear's.
+query IssueVcsBranchSearch($branchName: String!) {
+  issueVcsBranchSearch(branchName: $branchName) {
+    ...CompleteIssueWithDefaultCommentsFields
   }
 }
 
@@ -892,6 +947,7 @@ query GetIssueByIdentifierWithAttachments($teamKey: String!, $number: Float!) {
   issues(
     filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
     first: 1
+    includeArchived: true
   ) {
     nodes {
       ...CompleteIssueWithAttachmentsFields
