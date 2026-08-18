@@ -66,6 +66,13 @@ LINEAR_API_TOKEN=<token> linearis issues list    # via environment variable
 
 Token resolution order: `--api-token` flag → `LINEAR_API_TOKEN` env → `~/.linearis/token` → `~/.linear_api_token` (deprecated).
 
+GraphQL requests time out after 30 seconds by default. Override the timeout for one command with `--graphql-timeout-ms`, or set `LINEAR_GRAPHQL_TIMEOUT_MS` for all commands in an environment. The flag takes precedence over the environment variable.
+
+```bash
+linearis --graphql-timeout-ms 5000 issues list
+LINEAR_GRAPHQL_TIMEOUT_MS=5000 linearis auth status
+```
+
 ## Usage
 
 All output is JSON. Start with discovery, then act.

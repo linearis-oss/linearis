@@ -1,6 +1,9 @@
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GraphQLClient } from "../../../src/client/graphql-client.js";
+import {
+  GraphQLClient,
+  setGraphqlRequestTimeoutMs,
+} from "../../../src/client/graphql-client.js";
 import { AuthenticationError } from "../../../src/common/errors.js";
 
 // A stand-in document for the error-path tests. Typing its variables as
@@ -39,6 +42,7 @@ describe("GraphQLClient", () => {
     let mockFetch: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
+      setGraphqlRequestTimeoutMs();
       mockFetch = vi.fn();
       vi.stubGlobal("fetch", mockFetch);
     });
@@ -217,6 +221,35 @@ describe("GraphQLClient", () => {
         await rejection;
         expect(capturedSignal?.aborted).toBe(true);
         expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("uses the configured request timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        mockFetch.mockImplementation(
+          (_url: string, options: { signal?: AbortSignal }) =>
+            new Promise((_, reject) => {
+              options.signal?.addEventListener("abort", () => {
+                reject(new Error("This operation was aborted"));
+              });
+            }),
+        );
+
+        setGraphqlRequestTimeoutMs(1250);
+        const client = new GraphQLClient("good-token");
+        const promise = client.request(fakeDocument());
+        const rejection = expect(promise).rejects.toThrow("Request timed out");
+
+        await vi.advanceTimersByTimeAsync(1249);
+        expect(mockFetch.mock.calls[0]?.[1].signal.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(mockFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+
+        await vi.runAllTimersAsync();
+        await rejection;
       } finally {
         vi.useRealTimers();
       }

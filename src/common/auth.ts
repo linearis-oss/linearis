@@ -1,12 +1,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { parseGraphqlTimeoutOption } from "./number-options.js";
 import { getStoredToken } from "./token-storage.js";
 
 export interface CommandOptions {
   apiToken?: string;
   compact?: boolean;
   fields?: string[];
+  graphqlTimeoutMs?: number;
 }
 
 export type TokenSource = "flag" | "env" | "stored" | "legacy";
@@ -54,4 +56,19 @@ export function resolveApiToken(options: CommandOptions): ResolvedToken {
 export function getApiToken(options: CommandOptions): string {
   const { token } = resolveApiToken(options);
   return token;
+}
+
+export function resolveGraphqlTimeoutMs(
+  options: CommandOptions,
+): number | undefined {
+  if (options.graphqlTimeoutMs !== undefined) {
+    return options.graphqlTimeoutMs;
+  }
+
+  const environmentValue = process.env["LINEAR_GRAPHQL_TIMEOUT_MS"];
+  if (environmentValue) {
+    return parseGraphqlTimeoutOption(environmentValue);
+  }
+
+  return undefined;
 }

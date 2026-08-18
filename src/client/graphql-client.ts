@@ -7,7 +7,15 @@ import { withRetry } from "../common/retry.js";
 const LINEAR_GRAPHQL_ENDPOINT = "https://api.linear.app/graphql";
 
 /** Default timeout for GraphQL API requests (30 seconds) */
-const REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_GRAPHQL_TIMEOUT_MS = 30_000;
+
+let graphqlRequestTimeoutMs = DEFAULT_GRAPHQL_TIMEOUT_MS;
+
+export function setGraphqlRequestTimeoutMs(
+  timeoutMs = DEFAULT_GRAPHQL_TIMEOUT_MS,
+): void {
+  graphqlRequestTimeoutMs = timeoutMs;
+}
 
 /**
  * Variable-less operations generate `Exact<{ [key: string]: never }>` for their
@@ -131,7 +139,7 @@ export class GraphQLClient {
         const timeoutController = new AbortController();
         const timeoutHandle = setTimeout(() => {
           timeoutController.abort();
-        }, REQUEST_TIMEOUT_MS);
+        }, graphqlRequestTimeoutMs);
 
         try {
           // `TVariables extends Record<string, unknown>` lets `variables` widen
