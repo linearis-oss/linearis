@@ -153,6 +153,8 @@ describe("documents create", () => {
       "create",
       "--title",
       "Runbook",
+      "--team",
+      "ENG",
       "--issue",
       "ENG-42",
     ]);
@@ -191,6 +193,33 @@ describe("documents create", () => {
         issueId: "resolved-issue-uuid",
       }),
     );
+  });
+
+  it("rejects creating without --project or --team", async () => {
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "documents",
+      "create",
+      "--title",
+      "Runbook",
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "Invalid --project|--team: a document must belong to at least one project or team",
+      ),
+    );
+    expect(createDocument).not.toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
   });
 
   it("rejects combining --issue and --attach-to before creating", async () => {

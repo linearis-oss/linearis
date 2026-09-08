@@ -190,6 +190,12 @@ export function setupDocumentsCommands(program: Command): void {
             "cannot be combined with --issue",
           );
         }
+        if (!options.project && !options.team) {
+          throw invalidParameterError(
+            "--project|--team",
+            "a document must belong to at least one project or team",
+          );
+        }
 
         const issueIdentifier = options.issue ?? options.attachTo;
         const rootOpts = getRootOpts(command);
