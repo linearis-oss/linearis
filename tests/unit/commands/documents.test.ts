@@ -59,7 +59,6 @@ vi.mock("../../../src/services/document-service.js", async (importOriginal) => {
 
 import { setupDocumentsCommands } from "../../../src/commands/documents.js";
 import { resolveIssueId } from "../../../src/resolvers/issue-resolver.js";
-import { resolveTeamId } from "../../../src/resolvers/team-resolver.js";
 import { listAttachments } from "../../../src/services/attachment-service.js";
 import {
   createDocument,
@@ -153,8 +152,6 @@ describe("documents create", () => {
       "create",
       "--title",
       "Runbook",
-      "--team",
-      "ENG",
       "--issue",
       "ENG-42",
     ]);
@@ -169,33 +166,7 @@ describe("documents create", () => {
     );
   });
 
-  it("accepts --attach-to as an alias for --issue", async () => {
-    const program = createProgram();
-    await program.parseAsync([
-      "node",
-      "test",
-      "documents",
-      "create",
-      "--title",
-      "Runbook",
-      "--team",
-      "ENG",
-      "--attach-to",
-      "ENG-42",
-    ]);
-
-    expect(resolveTeamId).toHaveBeenCalledWith(expect.anything(), "ENG");
-    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
-    expect(createDocument).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        teamId: "resolved-team-uuid",
-        issueId: "resolved-issue-uuid",
-      }),
-    );
-  });
-
-  it("rejects creating without --project or --team", async () => {
+  it("rejects creating without a document scope", async () => {
     const exitSpy = vi
       .spyOn(process, "exit")
       .mockImplementation(() => undefined as never);
@@ -213,7 +184,7 @@ describe("documents create", () => {
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining(
-        "Invalid --project|--team: a document must belong to at least one project or team",
+        "Invalid --project|--team|--issue: a document needs exactly one scope: --project, --team, or --issue",
       ),
     );
     expect(createDocument).not.toHaveBeenCalled();
@@ -221,6 +192,64 @@ describe("documents create", () => {
 
     exitSpy.mockRestore();
   });
+
+  it("accepts --attach-to as an alias for --issue", async () => {
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "documents",
+      "create",
+      "--title",
+      "Runbook",
+      "--attach-to",
+      "ENG-42",
+    ]);
+
+    expect(resolveIssueId).toHaveBeenCalledWith(expect.anything(), "ENG-42");
+    expect(createDocument).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        issueId: "resolved-issue-uuid",
+      }),
+    );
+  });
+
+  it.each([
+    ["--project", "PROJ", "--team", "ENG"],
+    ["--project", "PROJ", "--issue", "ENG-42"],
+    ["--team", "ENG", "--issue", "ENG-42"],
+  ])(
+    "rejects combining %s and %s",
+    async (firstFlag, firstValue, secondFlag, secondValue) => {
+      const exitSpy = vi
+        .spyOn(process, "exit")
+        .mockImplementation(() => undefined as never);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const program = createProgram();
+      await program.parseAsync([
+        "node",
+        "test",
+        "documents",
+        "create",
+        "--title",
+        "Runbook",
+        firstFlag,
+        firstValue,
+        secondFlag,
+        secondValue,
+      ]);
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("a document needs exactly one scope"),
+      );
+      expect(createDocument).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      exitSpy.mockRestore();
+    },
+  );
 
   it("rejects combining --issue and --attach-to before creating", async () => {
     const exitSpy = vi
