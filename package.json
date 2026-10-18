@@ -91,8 +91,8 @@
     "@semantic-release/npm": "^13.0.0",
     "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/node": "^24.0.0",
-    "@vitest/coverage-v8": "^4.0.0",
-    "@vitest/ui": "^4.0.0",
+    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/ui": "^5.0.0",
     "clean-publish": "^7.0.0",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "knip": "^6.24.0",
@@ -100,7 +100,7 @@
     "semantic-release": "^25.0.1",
     "tsx": "^4.20.5",
     "typescript": "^7.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^5.0.0"
   },
   "graphql": {
     "schema": "https://api.linear.app/graphql",
