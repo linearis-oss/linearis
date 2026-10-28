@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import { firstOrThrow } from "../common/array.js";
 import type { CommandContext } from "../common/context.js";
@@ -122,6 +123,7 @@ interface FilterOptions extends RawFilterFlags {
 
 interface CreateOptions {
   description?: string;
+  descriptionFile?: string;
   assignee?: string;
   priority?: string;
   estimate?: string;
@@ -145,6 +147,7 @@ interface CreateOptions {
 interface UpdateOptions {
   title?: string;
   description?: string;
+  descriptionFile?: string;
   status?: string;
   priority?: string;
   estimate?: string;
@@ -176,6 +179,37 @@ interface UpdateOptions {
   duplicateOf?: string;
   similarTo?: string;
   removeRelation?: string;
+}
+
+/**
+ * Resolves `--description`/`--description-file` into a single description
+ * value. Reading from a file (or `-` for stdin) avoids passing large text as
+ * a single shell argument, which some sandboxed shells (e.g. an agent's tool
+ * runner) silently kill above a size threshold.
+ */
+function resolveDescriptionInput(options: {
+  description?: string;
+  descriptionFile?: string;
+}): string | undefined {
+  if (
+    options.description !== undefined &&
+    options.descriptionFile !== undefined
+  ) {
+    throw invalidParameterError(
+      "--description",
+      "cannot be combined with --description-file",
+    );
+  }
+
+  if (options.descriptionFile !== undefined) {
+    const content = readFileSync(
+      options.descriptionFile === "-" ? 0 : options.descriptionFile,
+      "utf8",
+    );
+    return content.replace(/\r?\n+$/, "");
+  }
+
+  return options.description;
 }
 
 interface ReadOptions {
@@ -1348,6 +1382,10 @@ export function setupIssuesCommands(program: Command): void {
     .command("create <title>")
     .description("create new issue")
     .option("--description <text>", "issue body")
+    .option(
+      "--description-file <path>",
+      "read issue body from file (- for stdin)",
+    )
     .option("--assignee <user>", "assign to user")
     .option("--priority <1-4>", "1=urgent 2=high 3=medium 4=low")
     .option("--project <project>", "add to project")
@@ -1431,8 +1469,9 @@ export function setupIssuesCommands(program: Command): void {
             teamId: ids.teamId,
           };
 
-          if (options.description) {
-            input.description = options.description;
+          const description = resolveDescriptionInput(options);
+          if (description) {
+            input.description = description;
           }
 
           if (ids.assigneeId) {
@@ -1506,6 +1545,10 @@ export function setupIssuesCommands(program: Command): void {
     )
     .option("--title <text>", "new title")
     .option("--description <text>", "new description")
+    .option(
+      "--description-file <path>",
+      "read new description from file (- for stdin)",
+    )
     .option("--status <status>", "new status")
     .option("--priority <1-4>", "new priority")
     .option("--assignee <user>", "new assignee")
@@ -1749,8 +1792,9 @@ export function setupIssuesCommands(program: Command): void {
             input.title = options.title;
           }
 
-          if (options.description) {
-            input.description = options.description;
+          const description = resolveDescriptionInput(options);
+          if (description) {
+            input.description = description;
           }
 
           if (ids.stateId) {

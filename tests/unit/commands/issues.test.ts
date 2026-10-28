@@ -1,7 +1,10 @@
 // tests/unit/commands/issues.test.ts
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Command } from "commander";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asUuid } from "../../../src/common/identifier.js";
 
 // Mock all external dependencies before importing the module under test
@@ -671,6 +674,78 @@ describe("issues create --due-date", () => {
   });
 });
 
+describe("issues create --description-file", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    dir = mkdtempSync(join(tmpdir(), "linearis-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads description from file, stripping a trailing newline", async () => {
+    const file = join(dir, "description.md");
+    writeFileSync(file, "Long description body.\n");
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Fix login bug",
+      "--team",
+      "ENG",
+      "--description-file",
+      file,
+    ]);
+
+    expect(createIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ description: "Long description body." }),
+    );
+  });
+
+  it("rejects --description combined with --description-file", async () => {
+    const file = join(dir, "description.md");
+    writeFileSync(file, "From file");
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Fix login bug",
+      "--team",
+      "ENG",
+      "--description",
+      "Inline",
+      "--description-file",
+      file,
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          error:
+            "Invalid --description: cannot be combined with --description-file",
+        },
+        null,
+        2,
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(createIssue).not.toHaveBeenCalled();
+  });
+});
+
 describe("issues update --estimate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1173,6 +1248,75 @@ describe("issues update --assignee", () => {
     ]);
 
     expect(resolveUpdateIssueIds).not.toHaveBeenCalled();
+  });
+});
+
+describe("issues update --description-file", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    dir = mkdtempSync(join(tmpdir(), "linearis-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads new description from file, stripping a trailing newline", async () => {
+    const file = join(dir, "description.md");
+    writeFileSync(file, "Updated description body.\n");
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--description-file",
+      file,
+    ]);
+
+    expect(updateIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+      expect.objectContaining({ description: "Updated description body." }),
+    );
+  });
+
+  it("rejects --description combined with --description-file", async () => {
+    const file = join(dir, "description.md");
+    writeFileSync(file, "From file");
+
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--description",
+      "Inline",
+      "--description-file",
+      file,
+    ]);
+
+    expect(console.error).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          error:
+            "Invalid --description: cannot be combined with --description-file",
+        },
+        null,
+        2,
+      ),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(updateIssue).not.toHaveBeenCalled();
   });
 });
 
