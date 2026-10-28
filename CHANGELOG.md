@@ -1,3 +1,9 @@
+## [2026.9.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.9.0-next.1...v2026.9.0-next.2) (2026-10-28)
+
+### Bug Fixes
+
+* **issues:** print the issue after applying relation flags ([925bfec](https://github.com/linearis-oss/linearis/commit/925bfecfba709954a87f7a1b96fe9471dcc0afd0))
+
 ## [2026.9.0-next.1](https://github.com/linearis-oss/linearis/compare/v2026.8.0...v2026.9.0-next.1) (2026-09-09)
 
 ### Bug Fixes
