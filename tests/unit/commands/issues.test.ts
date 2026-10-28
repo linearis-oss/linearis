@@ -2112,6 +2112,47 @@ describe("issues create relations", () => {
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
   });
 
+  it("prints the issue as read after its relations are applied", async () => {
+    const { getIssue } = await import("../../../src/services/issue-service.js");
+    const { outputSuccess } = await import("../../../src/common/output.js");
+    const read = {
+      id: "new-issue-id",
+      relations: { nodes: [{ type: "blocks" }] },
+    };
+    vi.mocked(getIssue).mockResolvedValueOnce(read as never);
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+      "--blocks",
+      "DAT-103",
+    ]);
+    expect(getIssue).toHaveBeenCalledWith(expect.anything(), "new-issue-id");
+    expect(outputSuccess).toHaveBeenCalledWith(read);
+  });
+
+  it("prints the created issue without a read when no relation is requested", async () => {
+    const { getIssue } = await import("../../../src/services/issue-service.js");
+    const { outputSuccess } = await import("../../../src/common/output.js");
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "create",
+      "Title",
+      "--team",
+      "ENG",
+    ]);
+    expect(getIssue).not.toHaveBeenCalled();
+    expect(outputSuccess).toHaveBeenCalledWith({ id: "new-issue-id" });
+  });
+
   it("creates single relation", async () => {
     const program = createProgram();
     await program.parseAsync([
@@ -2307,6 +2348,31 @@ describe("issues update relations", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  });
+
+  it("prints the issue as read after its relations are applied", async () => {
+    const { getIssue } = await import("../../../src/services/issue-service.js");
+    const { outputSuccess } = await import("../../../src/common/output.js");
+    const read = {
+      id: "resolved-issue-uuid",
+      relations: { nodes: [{ type: "blocks" }] },
+    };
+    vi.mocked(getIssue).mockResolvedValueOnce(read as never);
+    const program = createProgram();
+    await program.parseAsync([
+      "node",
+      "test",
+      "issues",
+      "update",
+      "ENG-42",
+      "--blocks",
+      "DAT-103",
+    ]);
+    expect(getIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "resolved-issue-uuid",
+    );
+    expect(outputSuccess).toHaveBeenCalledWith(read);
   });
 
   it("removes single relation", async () => {
