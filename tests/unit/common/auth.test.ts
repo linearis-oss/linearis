@@ -10,7 +10,10 @@ vi.mock("../../../src/common/token-storage.js", () => ({
   getStoredToken: vi.fn(),
 }));
 
-import { getApiToken } from "../../../src/common/auth.js";
+import {
+  getApiToken,
+  resolveGraphqlTimeoutMs,
+} from "../../../src/common/auth.js";
 import { getStoredToken } from "../../../src/common/token-storage.js";
 
 describe("getApiToken", () => {
@@ -69,5 +72,32 @@ describe("getApiToken", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
     expect(() => getApiToken({})).toThrow("No API token found");
+  });
+});
+
+describe("resolveGraphqlTimeoutMs", () => {
+  const originalEnv = process.env["LINEAR_GRAPHQL_TIMEOUT_MS"];
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env["LINEAR_GRAPHQL_TIMEOUT_MS"];
+    } else {
+      process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = originalEnv;
+    }
+  });
+
+  it("prefers the CLI option over the environment", () => {
+    process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = "9000";
+    expect(resolveGraphqlTimeoutMs({ graphqlTimeoutMs: 5000 })).toBe(5000);
+  });
+
+  it("parses the environment value when no CLI option is set", () => {
+    process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = "9000";
+    expect(resolveGraphqlTimeoutMs({})).toBe(9000);
+  });
+
+  it("uses the client default when neither source is set", () => {
+    delete process.env["LINEAR_GRAPHQL_TIMEOUT_MS"];
+    expect(resolveGraphqlTimeoutMs({})).toBeUndefined();
   });
 });

@@ -17,6 +17,9 @@ export function formatOverview(version: string, metas: DomainMeta[]): string {
   lines.push(
     "auth: linearis auth login | --api-token <token> | LINEAR_API_TOKEN | ~/.linearis/token",
   );
+  lines.push(
+    "graphql timeout: --graphql-timeout-ms <ms> | LINEAR_GRAPHQL_TIMEOUT_MS | default 30000",
+  );
   lines.push("output: JSON");
   lines.push("ids: UUID or human-readable (team key, issue ABC-123, name)");
   lines.push("");

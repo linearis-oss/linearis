@@ -29,3 +29,21 @@ export function parseEstimateOption(raw: string): number {
 
   return value;
 }
+
+export function parseGraphqlTimeoutOption(raw: string): number {
+  const value = parseStrictNonNegativeInteger(raw);
+  if (value === null || value < 1) {
+    throw invalidParameterError(
+      "--graphql-timeout-ms",
+      "must be a positive integer",
+    );
+  }
+  if (value > 2_147_483_647) {
+    throw invalidParameterError(
+      "--graphql-timeout-ms",
+      "must not exceed 2147483647",
+    );
+  }
+
+  return value;
+}
