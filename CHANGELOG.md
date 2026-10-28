@@ -1,3 +1,10 @@
+## [2026.9.0-next.3](https://github.com/linearis-oss/linearis/compare/v2026.9.0-next.2...v2026.9.0-next.3) (2026-10-28)
+
+### Bug Fixes
+
+* **documents:** require --project or --team when creating a document ([15b72df](https://github.com/linearis-oss/linearis/commit/15b72dffaa1ee6d7c8ffb32466a1145540119f52))
+* **documents:** validate exactly one document scope ([d533147](https://github.com/linearis-oss/linearis/commit/d533147a660c2e3bfba7e9d7f5c2ecc31c5b356d))
+
 ## [2026.9.0-next.2](https://github.com/linearis-oss/linearis/compare/v2026.9.0-next.1...v2026.9.0-next.2) (2026-10-28)
 
 ### Bug Fixes
