@@ -768,7 +768,7 @@ describe("issues update --estimate", () => {
       "--clear-estimate",
     ]);
 
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("rejects --estimate 0 and --clear-estimate together", async () => {
@@ -784,7 +784,7 @@ describe("issues update --estimate", () => {
       "--clear-estimate",
     ]);
 
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("validates against the destination team when --team moves the issue", async () => {
@@ -1240,7 +1240,7 @@ describe("issues update --clear-assignee", () => {
         "Cannot use --assignee and --clear-assignee together",
       ),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
     expect(updateIssue).not.toHaveBeenCalled();
   });
 });
@@ -1309,7 +1309,7 @@ describe("issues update --clear-project", () => {
         "Cannot use --project and --clear-project together",
       ),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
     expect(updateIssue).not.toHaveBeenCalled();
   });
 
@@ -1331,7 +1331,7 @@ describe("issues update --clear-project", () => {
         "Cannot use --clear-project and --project-milestone together",
       ),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
     expect(updateIssue).not.toHaveBeenCalled();
   });
 });
@@ -1496,7 +1496,7 @@ describe("issues read", () => {
         2,
       ),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
     expect(getIssueWithAttachments).not.toHaveBeenCalled();
     expect(getIssueWithComments).not.toHaveBeenCalled();
     expect(getIssueWithCommentThreads).not.toHaveBeenCalled();
@@ -2234,7 +2234,7 @@ describe("issues create relations", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("appears in multiple relation flags"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("deduplicates intra-flag duplicates silently", async () => {
@@ -2427,7 +2427,7 @@ describe("issues update relations", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("appears in multiple relation flags"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("errors when remove-relation mixed with add flags in update", async () => {
@@ -2446,7 +2446,7 @@ describe("issues update relations", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Cannot mix add and remove relation flags"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("adds similar relation", async () => {
@@ -2537,7 +2537,7 @@ describe("issues relations subcommands", () => {
         "Must specify one of --blocks, --related, --duplicate, or --similar",
       ),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("removes relation by UUID", async () => {

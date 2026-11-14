@@ -123,7 +123,7 @@ describe("attachments list", () => {
       ),
     );
     expect(listAttachments).not.toHaveBeenCalled();
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
 
     exitSpy.mockRestore();
   });

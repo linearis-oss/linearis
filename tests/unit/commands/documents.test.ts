@@ -188,7 +188,7 @@ describe("documents create", () => {
       ),
     );
     expect(createDocument).not.toHaveBeenCalled();
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
 
     exitSpy.mockRestore();
   });
@@ -245,7 +245,7 @@ describe("documents create", () => {
         expect.stringContaining("a document needs exactly one scope"),
       );
       expect(createDocument).not.toHaveBeenCalled();
-      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(process.exitCode).toBe(1);
 
       exitSpy.mockRestore();
     },
@@ -277,7 +277,7 @@ describe("documents create", () => {
       ),
     );
     expect(createDocument).not.toHaveBeenCalled();
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
 
     exitSpy.mockRestore();
   });

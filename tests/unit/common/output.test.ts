@@ -199,7 +199,7 @@ describe("outputError", () => {
     expect(stderrSpy).toHaveBeenCalledWith(
       JSON.stringify({ error: "something failed" }, null, 2),
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
 
     stderrSpy.mockRestore();
     exitSpy.mockRestore();
@@ -248,7 +248,7 @@ describe("handleCommand with AuthenticationError", () => {
 
     const output = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string);
     expect(output.error).toBe("AUTHENTICATION_REQUIRED");
-    expect(exitSpy).toHaveBeenCalledWith(42);
+    expect(process.exitCode).toBe(42);
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();
@@ -273,7 +273,7 @@ describe("outputUsageError", () => {
     outputUsageError(payload);
 
     expect(consoleSpy).toHaveBeenCalledWith(JSON.stringify(payload, null, 2));
-    expect(exitSpy).toHaveBeenCalledWith(2);
+    expect(process.exitCode).toBe(2);
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();
@@ -319,7 +319,7 @@ describe("outputAuthError", () => {
     expect(output.action).toBe("USER_ACTION_REQUIRED");
     expect(output.instruction).toContain("linearis auth");
     expect(output.exit_code).toBe(42);
-    expect(exitSpy).toHaveBeenCalledWith(42);
+    expect(process.exitCode).toBe(42);
 
     consoleSpy.mockRestore();
     exitSpy.mockRestore();
