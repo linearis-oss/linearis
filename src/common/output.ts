@@ -81,7 +81,7 @@ export function outputSuccess<T>(data: JsonSerializable<T>): void {
 
 export function outputError(error: Error): void {
   console.error(JSON.stringify({ error: error.message }, null, 2));
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 export function outputAuthError(error: AuthenticationError): void {
@@ -100,7 +100,7 @@ export function outputAuthError(error: AuthenticationError): void {
       2,
     ),
   );
-  process.exit(AUTH_ERROR_CODE);
+  process.exitCode = AUTH_ERROR_CODE;
 }
 
 /**
@@ -109,7 +109,7 @@ export function outputAuthError(error: AuthenticationError): void {
  */
 export function outputUsageError(payload: UsageErrorPayload): void {
   console.error(JSON.stringify(payload, null, 2));
-  process.exit(USAGE_ERROR_CODE);
+  process.exitCode = USAGE_ERROR_CODE;
 }
 
 export function parseLimit(value: string): number {

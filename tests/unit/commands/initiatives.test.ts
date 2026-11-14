@@ -437,7 +437,7 @@ describe("initiatives update", () => {
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("cannot be combined with --clear-owner"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 });
 

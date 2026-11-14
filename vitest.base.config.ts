@@ -5,6 +5,7 @@ export const baseVitestConfig = defineConfig({
     globals: true,
     environment: "node",
     // Set timeout for tests that might call Linear API
+    setupFiles: ["./tests/setup.ts"],
     testTimeout: 30000,
     hookTimeout: 30000,
   },
