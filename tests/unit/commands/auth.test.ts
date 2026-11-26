@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock all external dependencies before importing the module under test
 vi.mock("node:child_process", () => ({
@@ -22,19 +22,37 @@ vi.mock("../../../src/services/auth-service.js", () => ({
   validateToken: vi.fn(),
 }));
 
-vi.mock("../../../src/common/context.js", () => ({
-  createGraphQLClient: vi.fn(() => ({})),
-  getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
-}));
+vi.mock("../../../src/common/context.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/common/context.js")>();
+  return {
+    ...actual,
+    configureGraphqlRequestTimeout: vi.fn((options) =>
+      actual.configureGraphqlRequestTimeout(options),
+    ),
+    createGraphQLClient: vi.fn(() => ({})),
+    getRootOpts: vi.fn(() => ({ apiToken: "test-token" })),
+  };
+});
 
 vi.mock("../../../src/common/auth.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../src/common/auth.js")>();
-  return { ...actual, resolveApiToken: vi.fn() };
+  return {
+    ...actual,
+    resolveApiToken: vi.fn(),
+    resolveGraphqlTimeoutMs: vi.fn(actual.resolveGraphqlTimeoutMs),
+  };
 });
 
+import { createInterface } from "node:readline";
 import { setupAuthCommands } from "../../../src/commands/auth.js";
 import { resolveApiToken } from "../../../src/common/auth.js";
+import {
+  configureGraphqlRequestTimeout,
+  createGraphQLClient,
+  getRootOpts,
+} from "../../../src/common/context.js";
 import { clearToken, saveToken } from "../../../src/common/token-storage.js";
 import { validateToken } from "../../../src/services/auth-service.js";
 
@@ -43,6 +61,16 @@ const mockViewer = {
   name: "Test User",
   email: "test@example.com",
 };
+
+const originalGraphqlTimeoutEnv = process.env["LINEAR_GRAPHQL_TIMEOUT_MS"];
+
+afterEach(() => {
+  if (originalGraphqlTimeoutEnv === undefined) {
+    delete process.env["LINEAR_GRAPHQL_TIMEOUT_MS"];
+  } else {
+    process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = originalGraphqlTimeoutEnv;
+  }
+});
 
 function createProgram(): Command {
   const program = new Command();
@@ -57,6 +85,7 @@ describe("auth login", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRootOpts).mockReturnValue({ apiToken: "test-token" });
     // Prevent process.exit from actually exiting
     exitSpy = vi
       .spyOn(process, "exit")
@@ -85,6 +114,7 @@ describe("auth login", () => {
     expect(stderrSpy).toHaveBeenCalledWith(
       expect.stringContaining("Already authenticated as Test User"),
     );
+    expect(createGraphQLClient).toHaveBeenCalledWith("existing-token");
     expect(saveToken).not.toHaveBeenCalled();
   });
 
@@ -120,6 +150,71 @@ describe("auth login", () => {
       "Existing token is invalid. Starting new authentication...",
     );
     expect(saveToken).toHaveBeenCalledWith("test-token");
+  });
+
+  it("does not swallow failures after an existing token is resolved", async () => {
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "existing-token",
+      source: "stored",
+    });
+    vi.mocked(validateToken).mockRejectedValue(new Error("Invalid token"));
+    stderrSpy
+      .mockImplementationOnce(() => {
+        throw new Error("stderr unavailable");
+      })
+      .mockImplementation(() => {});
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "login"]);
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      "Authentication failed: stderr unavailable",
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(createInterface).not.toHaveBeenCalled();
+    expect(saveToken).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["abc", "must be a positive integer"],
+    ["0", "must be a positive integer"],
+    ["2147483648", "must not exceed 2147483647"],
+  ])(
+    "reports invalid timeout env %s instead of treating the existing token as invalid",
+    async (raw, reason) => {
+      process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = raw;
+      vi.mocked(resolveApiToken).mockReturnValue({
+        token: "existing-token",
+        source: "stored",
+      });
+      vi.mocked(validateToken).mockResolvedValue(mockViewer);
+
+      const program = createProgram();
+      await program.parseAsync(["node", "test", "auth", "login"]);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        `Authentication failed: Invalid --graphql-timeout-ms: ${reason}`,
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(createInterface).not.toHaveBeenCalled();
+      expect(validateToken).not.toHaveBeenCalled();
+      expect(saveToken).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reports invalid timeout configuration before prompting without an existing token", async () => {
+    process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = "abc";
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "login"]);
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      "Authentication failed: Invalid --graphql-timeout-ms: must be a positive integer",
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(createInterface).not.toHaveBeenCalled();
+    expect(validateToken).not.toHaveBeenCalled();
+    expect(saveToken).not.toHaveBeenCalled();
   });
 
   it("bypasses existing token check with --force", async () => {
@@ -168,11 +263,17 @@ describe("auth login", () => {
 
 describe("auth status", () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRootOpts).mockReturnValue({ apiToken: "test-token" });
     stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
   });
 
   it("reports authenticated with user info when token is valid", async () => {
@@ -191,6 +292,27 @@ describe("auth status", () => {
       source: "~/.linearis/token",
       user: { id: "user-1", name: "Test User", email: "test@example.com" },
     });
+  });
+
+  it("configures the global timeout before token validation", async () => {
+    vi.mocked(getRootOpts).mockReturnValue({
+      apiToken: "test-token",
+      graphqlTimeoutMs: 5000,
+    });
+    vi.mocked(resolveApiToken).mockReturnValue({
+      token: "valid-token",
+      source: "stored",
+    });
+    vi.mocked(validateToken).mockResolvedValue(mockViewer);
+
+    const program = createProgram();
+    await program.parseAsync(["node", "test", "auth", "status"]);
+
+    expect(configureGraphqlRequestTimeout).toHaveBeenCalledWith({
+      apiToken: "test-token",
+      graphqlTimeoutMs: 5000,
+    });
+    expect(createGraphQLClient).toHaveBeenCalledWith("valid-token");
   });
 
   it("reports unauthenticated when no token is found", async () => {
@@ -228,6 +350,35 @@ describe("auth status", () => {
         "Token is invalid or expired. Run 'linearis auth login' to reauthenticate.",
     });
   });
+
+  it.each([
+    ["abc", "must be a positive integer"],
+    ["0", "must be a positive integer"],
+    ["2147483648", "must not exceed 2147483647"],
+  ])(
+    "reports invalid timeout env %s instead of treating the token as invalid",
+    async (raw, reason) => {
+      process.env["LINEAR_GRAPHQL_TIMEOUT_MS"] = raw;
+      vi.mocked(resolveApiToken).mockReturnValue({
+        token: "valid-token",
+        source: "stored",
+      });
+
+      const program = createProgram();
+      await program.parseAsync(["node", "test", "auth", "status"]);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        JSON.stringify(
+          { error: `Invalid --graphql-timeout-ms: ${reason}` },
+          null,
+          2,
+        ),
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(stdoutSpy).not.toHaveBeenCalled();
+      expect(validateToken).not.toHaveBeenCalled();
+    },
+  );
 
   it("maps all token sources to human-readable labels", async () => {
     vi.mocked(validateToken).mockResolvedValue(mockViewer);

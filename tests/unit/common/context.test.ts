@@ -1,6 +1,22 @@
 import { Command } from "commander";
-import { describe, expect, it } from "vitest";
-import { getRootOpts } from "../../../src/common/context.js";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../src/common/auth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/common/auth.js")>();
+
+  return {
+    ...actual,
+    getApiToken: vi.fn(actual.getApiToken),
+    resolveGraphqlTimeoutMs: vi.fn(actual.resolveGraphqlTimeoutMs),
+  };
+});
+
+import {
+  getApiToken,
+  resolveGraphqlTimeoutMs,
+} from "../../../src/common/auth.js";
+import { createContext, getRootOpts } from "../../../src/common/context.js";
 
 describe("getRootOpts", () => {
   it("returns root options for nested commands", () => {
@@ -31,5 +47,20 @@ describe("getRootOpts", () => {
     expect(getRootOpts(root)).toEqual(
       expect.objectContaining({ apiToken: "root-token" }),
     );
+  });
+});
+
+describe("createContext", () => {
+  it("preserves missing-token errors before timeout configuration errors", () => {
+    const tokenError = new Error("No API token found");
+    vi.mocked(getApiToken).mockImplementationOnce(() => {
+      throw tokenError;
+    });
+    vi.mocked(resolveGraphqlTimeoutMs).mockImplementationOnce(() => {
+      throw new Error("Invalid --graphql-timeout-ms");
+    });
+
+    expect(() => createContext({})).toThrow(tokenError);
+    expect(resolveGraphqlTimeoutMs).not.toHaveBeenCalled();
   });
 });
