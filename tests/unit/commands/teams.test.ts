@@ -178,7 +178,7 @@ describe("teams create", () => {
     ]);
 
     expect(createTeam).not.toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 });
 
@@ -212,7 +212,7 @@ describe("teams update", () => {
     await program.parseAsync(["node", "test", "teams", "update", "ENG"]);
 
     expect(updateTeam).not.toHaveBeenCalled();
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 });
 

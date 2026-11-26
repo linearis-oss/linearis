@@ -339,7 +339,7 @@ describe("interceptParseErrors + handleParseFailure", () => {
       command: "linearis issues",
       exit_code: 2,
     });
-    expect(exitSpy).toHaveBeenCalledWith(2);
+    expect(process.exitCode).toBe(2);
     // Commander's plain-text message must not reach stderr alongside the JSON.
     expect(stderrSpy).not.toHaveBeenCalled();
   });
@@ -358,7 +358,7 @@ describe("interceptParseErrors + handleParseFailure", () => {
       command: path,
       exit_code: 2,
     });
-    expect(exitSpy).toHaveBeenCalledWith(2);
+    expect(process.exitCode).toBe(2);
     // Commander's help text must not reach stdout or stderr alongside the JSON.
     expect(stderrSpy).not.toHaveBeenCalled();
     expect(stdoutSpy).not.toHaveBeenCalled();
@@ -383,7 +383,7 @@ describe("interceptParseErrors + handleParseFailure", () => {
         exit_code: 2,
       });
       expect(emittedPayload().available_commands).not.toContain("help");
-      expect(exitSpy).toHaveBeenCalledWith(2);
+      expect(process.exitCode).toBe(2);
       expect(stdoutSpy).not.toHaveBeenCalled();
     },
   );
@@ -418,7 +418,7 @@ describe("interceptParseErrors + handleParseFailure", () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       JSON.stringify({ error: "boom" }, null, 2),
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it("wraps a non-Error rejection", () => {
@@ -427,6 +427,6 @@ describe("interceptParseErrors + handleParseFailure", () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       JSON.stringify({ error: "plain string" }, null, 2),
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 });
