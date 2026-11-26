@@ -1486,11 +1486,10 @@ export function setupIssuesCommands(program: Command): void {
           const result = await createIssue(ctx.gql, input);
 
           if (relationActions.length > 0) {
-            await resolveAndApplyRelations(
-              ctx,
-              asUuid(result.id),
-              relationActions,
-            );
+            const issueId = asUuid(result.id);
+            await resolveAndApplyRelations(ctx, issueId, relationActions);
+            outputSuccess(await getIssue(ctx.gql, issueId));
+            return;
           }
 
           outputSuccess(result);
@@ -1852,6 +1851,8 @@ export function setupIssuesCommands(program: Command): void {
               resolvedIssueId,
               relationActions,
             );
+            outputSuccess(await getIssue(ctx.gql, resolvedIssueId));
+            return;
           }
 
           outputSuccess(result);

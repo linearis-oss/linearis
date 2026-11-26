@@ -80,8 +80,8 @@ export const DOCUMENTS_META: DomainMeta = {
   name: "documents",
   summary: "long-form markdown docs attached to projects or issues",
   context: [
-    "a document is a markdown page. it can belong to a project and/or be",
-    "attached to an issue. documents support icons and colors.",
+    "a document is a markdown page. it must belong to exactly one project,",
+    "team, or issue. documents support icons and colors.",
   ].join("\n"),
   arguments: {
     document: "document identifier (UUID)",
@@ -190,8 +190,17 @@ export function setupDocumentsCommands(program: Command): void {
             "cannot be combined with --issue",
           );
         }
-
         const issueIdentifier = options.issue ?? options.attachTo;
+        const scopes = [options.project, options.team, issueIdentifier].filter(
+          Boolean,
+        );
+        if (scopes.length !== 1) {
+          throw invalidParameterError(
+            "--project|--team|--issue",
+            "a document needs exactly one scope: --project, --team, or --issue",
+          );
+        }
+
         const rootOpts = getRootOpts(command);
         const ctx = createContext(rootOpts);
 

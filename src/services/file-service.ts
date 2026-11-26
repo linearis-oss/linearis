@@ -5,7 +5,7 @@
  * Features:
  * - File upload via GraphQL fileUpload mutation
  * - File download with automatic authentication
- * - Signed URL detection (skips Bearer token for signed URLs)
+ * - Signed URL detection (skips authentication for signed URLs)
  * - Directory creation and file existence checks
  * - Comprehensive error handling and status reporting
  */
@@ -139,7 +139,7 @@ export class FileService {
    * Downloads a file from Linear's private cloud storage.
    *
    * Automatically handles authentication for Linear URLs and creates directories
-   * as needed. Detects signed URLs to skip Bearer token authentication.
+   * as needed. Detects signed URLs to skip authentication.
    *
    * @param url - URL to Linear file (uploads.linear.app domain)
    * @param options - Download options including output path and overwrite behavior
@@ -192,10 +192,9 @@ export class FileService {
       const urlObj = new URL(url);
       const isSignedUrl = urlObj.searchParams.has("signature");
 
-      // Make HTTP request (with Bearer token only if not a signed URL)
       const headers: Record<string, string> = {};
       if (!isSignedUrl) {
-        headers["Authorization"] = `Bearer ${this.apiToken}`;
+        headers["Authorization"] = this.apiToken;
       }
 
       const response = await fetch(url, {

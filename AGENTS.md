@@ -32,7 +32,7 @@ npm run generate:usage  # regenerate USAGE.md
 ## Commit Rules
 
 - **Conventional Commits** required (enforced by commitlint via lefthook).
-- **Issue/PR refs** in commit body when applicable: `Closes #n`, `Refs #n`, `Part of #n`.
+- **Issue refs:** `Closes #n`, `Refs #n`, `Part of #n`. Maintainers add `Fixes LIN-n` to the PR body (guide: "How we work in Linear").
 - **No AI co-author trailers.** Do not add `Co-authored-by` for AI assistants.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full commit types table and examples.
